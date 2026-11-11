@@ -2,7 +2,6 @@ import {
   afterRefusal,
   isNothingToRefund,
   pg1Schedule,
-  REFUND_ATTEMPT_DEADLINE_MS,
   refundRefusalOf,
   type RefundRefusal,
 } from '../../core/refund-retry';
@@ -11,7 +10,7 @@ import type { RecordedHttpCall } from '../../core/traffic-recorder';
 import { idsOf } from './orders';
 import { paidChargeId, createdPixIds } from './orders-pix-production';
 import { recordTraffic, type RecordedOutcome } from './record';
-import type { EvidenceRefundState } from './refund-state';
+import { REFUND_ATTEMPT_DEADLINE_MS, type EvidenceRefundState } from './refund-state';
 import type { EvidenceRunDeps } from './run';
 import { usageStep } from './run';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf, withStep } from './steps';
@@ -49,7 +48,7 @@ export interface RefundTarget {
 }
 
 /** The production Pix's refund target, from the steps that created and paid it. */
-export function pixRefundTarget(steps: readonly EvidenceStep[]): RefundTarget {
+function pixRefundTarget(steps: readonly EvidenceStep[]): RefundTarget {
   const ids = createdPixIds(steps);
   return { key: 'pix.refund', chargeId: ids ? paidChargeId(steps, ids) : '', orderId: ids?.orderId ?? null };
 }

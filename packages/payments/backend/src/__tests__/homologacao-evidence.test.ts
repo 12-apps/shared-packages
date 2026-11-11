@@ -27,6 +27,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** When the runs that the sweep later retries were made. */
+const RUN_AT = Date.parse('2026-11-11T15:00:00.000Z');
+
 describe('homologação evidence', () => {
   it('given a connected seller and a full run, then every scenario but the webhooks is EXECUTED and no secret is in the file', async () => {
     const w = world({ applePayConfigured: true });
@@ -72,13 +75,13 @@ describe('homologação evidence', () => {
   it('given PagBank answers the cancel 40008 twice, then the run sends one cancel and the sweep the rest, every attempt recorded (FUT-3722, FUT-4740)', async () => {
     const w = world({ cancelNotYet: 2 });
     await connected(w);
-    const prepared = await prepareEvidenceRun(w.runDeps);
-    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const at = (minutes: number) => ({ ...w.runDeps, now: () => new Date(RUN_AT + minutes * 60_000) });
+    const prepared = await prepareEvidenceRun(at(0));
+    await completeEvidenceRun(at(0), prepared.runId, cards());
     const cancels = () => w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel');
     expect(cancels()).toHaveLength(1);
     expect((await buildHomologacaoEvidenceFile(w.fileDeps)).content).toMatch(/\[4\.6\][^\n]*— FALHOU/);
 
-    const at = (minutes: number) => ({ ...w.runDeps, now: () => new Date(Date.now() + minutes * 60_000) });
     await retryDueEvidenceRefund(at(4));
     expect(cancels()).toHaveLength(1);
     await retryDueEvidenceRefund(at(5));
@@ -94,12 +97,15 @@ describe('homologação evidence', () => {
     const w = world({ cancelNotYet: 100 });
     const pauses: number[] = [];
     await connected(w);
-    const deps = { ...w.runDeps, sleep: async (ms: number) => void pauses.push(ms) };
-    const prepared = await prepareEvidenceRun(deps);
-    await completeEvidenceRun(deps, prepared.runId, cards());
+    const at = (minutes: number) => ({
+      ...w.runDeps,
+      sleep: async (ms: number) => void pauses.push(ms),
+      now: () => new Date(RUN_AT + minutes * 60_000),
+    });
+    const prepared = await prepareEvidenceRun(at(0));
+    await completeEvidenceRun(at(0), prepared.runId, cards());
     expect(pauses.filter((ms) => ms >= 5_000)).toEqual([]);
 
-    const at = (minutes: number) => ({ ...deps, now: () => new Date(Date.now() + minutes * 60_000) });
     await retryDueEvidenceRefund(at(5));
     await retryDueEvidenceRefund(at(15));
     await retryDueEvidenceRefund(at(60));

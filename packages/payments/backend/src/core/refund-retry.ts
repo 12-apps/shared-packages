@@ -79,7 +79,7 @@ function scheduleOfLength(attempts: number | undefined): RefundSchedule {
 }
 
 /** {@link refundRetryAt} for a given schedule. */
-export function refundRetryAtOn(schedule: RefundSchedule, attemptsMade: number, lastAttemptAt: Date): Date | null {
+function refundRetryAtOn(schedule: RefundSchedule, attemptsMade: number, lastAttemptAt: Date): Date | null {
   if (attemptsMade < 1 || attemptsMade >= schedule.attempts) return null;
   const pause = schedule.delaysMs[attemptsMade - 1];
   return pause === undefined ? null : new Date(lastAttemptAt.getTime() + pause);

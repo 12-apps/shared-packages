@@ -7,9 +7,10 @@ import {
   pg1Schedule,
   REFUND_ATTEMPT_DEADLINE_MS,
   refundRefusalOf,
+  type RefundRefusal,
 } from '../../core/refund-retry';
 import { reasonOfFailedCalls, reasonOfStatus } from './failure-reason';
-import { recordTraffic } from './record';
+import { recordTraffic, type RecordedOutcome } from './record';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf } from './steps';
 import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
 import { amountsOf, environmentOf } from './environment';
@@ -312,6 +313,22 @@ export async function consultCharge(
   });
 }
 
+/** What a card cancel's answer comes to: done (cancelled, or nothing left), or the refusal; and its observed line. */
+function cancelOutcome(
+  deps: EvidenceRunDeps,
+  canceled: RecordedOutcome<{ status: string }>,
+): { done: boolean; refusal: RefundRefusal | null; observed: string } {
+  if (!canceled.ok) {
+    if (isNothingToRefund(canceled.error)) return { done: true, refusal: null, observed: deps.copy.canceled('REFUNDED') };
+    return { done: false, refusal: refundRefusalOf(canceled.error), observed: failureOf(deps.copy, canceled) };
+  }
+  const done = canceled.value.status === 'REFUNDED' && answered(canceled.calls);
+  // PagBank's own word for the charge (CANCELED), which is what the scenario
+  // expects — not this package's normalized refund status.
+  const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
+  return { done, refusal: done ? null : 'UNKNOWN', observed: deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status) };
+}
+
 /**
  * Cancel the approved charge ONCE (FUT-4740). PagBank answers a cancel sent
  * seconds after a capture with 40008 "not yet"; that used to be retried here,
@@ -330,19 +347,9 @@ export async function cancelCharge(
   const canceled = await recordTraffic(() =>
     deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId, retriedByCaller: true, signal }),
   );
-  const nothingLeft = !canceled.ok && isNothingToRefund(canceled.error);
-  const done = nothingLeft || (canceled.ok && canceled.value.status === 'REFUNDED' && answered(canceled.calls));
-  // PagBank's own word for the charge (CANCELED), which is what the scenario
-  // expects — not this package's normalized refund status.
-  const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
+  const { done, refusal, observed } = cancelOutcome(deps, canceled);
   const now = clockOf(deps)();
-  const refusal = done ? null : canceled.ok ? 'UNKNOWN' : refundRefusalOf(canceled.error);
   const refund = refusal === null ? null : afterRefusal({ ...firstClaim(now, null), reported: false }, refusal, now, pg1Schedule);
-  const observed = nothingLeft
-    ? deps.copy.canceled('REFUNDED')
-    : canceled.ok
-      ? deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status)
-      : failureOf(deps.copy, canceled);
   return stepOf(key, done ? 'EXECUTED' : 'FAILED', now, {
     calls: canceled.calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),

@@ -105,7 +105,8 @@ interface World {
 async function world(): Promise<World> {
   const createRefundRetrier = await load<(deps: unknown) => Record<string, Fn>>('../core/refund-series', 'createRefundRetrier');
   const createMemoryRefundRetryStore = await load<() => unknown>('../memory', 'createMemoryRefundRetryStore');
-  let now = new Date(T0);
+  // The clock is the last instant pushed: `at` moves it without reassigning a closed-over binding.
+  const instants = [new Date(T0)];
   const gateway = {
     refund: vi.fn(async () => accepted()),
     refreshCharge: vi.fn(async () => ({ status: 'PAID', providerChargeId: 'CHAR_1' })),
@@ -120,10 +121,10 @@ async function world(): Promise<World> {
     gateway,
     store: createMemoryRefundRetryStore(),
     host,
-    now: () => now,
+    now: () => instants[instants.length - 1]!,
     onProviderFailure: (report: { severity: string; path: string }) => reports.push(report),
   });
-  return { retrier, gateway, host, reports, at: (ms) => (now = new Date(ms)) };
+  return { retrier, gateway, host, reports, at: (ms) => void instants.push(new Date(ms)) };
 }
 
 const viewOf = async (w: World) => w.retrier.viewOf!((await w.retrier.find!(KEY as never)) as never) as Record<string, unknown> | null;
@@ -323,12 +324,12 @@ describe('attempt 1, inside the request that cancelled (C1–C6)', () => {
 describe('attempts 2 and 3, in the background (C11–C19)', () => {
   /** Series 1 opened by a "not yet" at T0. */
   async function opened(): Promise<World> {
-    const w = await world();
-    w.gateway.refund.mockRejectedValueOnce(notYet());
-    await w.retrier.firstAttempt!(KEY as never, {} as never);
-    w.gateway.refund.mockClear();
-    w.host.attempted.mockClear();
-    return w;
+    const fresh = await world();
+    fresh.gateway.refund.mockRejectedValueOnce(notYet());
+    await fresh.retrier.firstAttempt!(KEY as never, {} as never);
+    fresh.gateway.refund.mockClear();
+    fresh.host.attempted.mockClear();
+    return fresh;
   }
 
   it('S5 nothing runs before T0+5; at T0+5 the charge is consulted, then ONE refund; "not yet" again → attempt 2, next at T0+15 (C11)', async () => {
@@ -399,15 +400,15 @@ describe('attempts 2 and 3, in the background (C11–C19)', () => {
 
   it('S11 the sweep and the press on the same due attempt send ONE cancel (C19, I1, I5)', async () => {
     const w = await opened();
-    let release: (value: unknown) => void = () => undefined;
-    w.gateway.refund.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    const releases: Array<(value: unknown) => void> = [];
+    w.gateway.refund.mockImplementationOnce(() => new Promise((resolve) => void releases.push(resolve)));
     w.gateway.refund.mockResolvedValue(accepted());
     w.at(T0 + 5 * MIN);
     const sweep = w.retrier.runDue!();
     const sweep2 = w.retrier.runDue!();
     const press = w.retrier.press!(KEY as never);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    release(accepted());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases[0]!(accepted());
     await Promise.all([sweep, sweep2, press]);
     expect(w.gateway.refund).toHaveBeenCalledTimes(1);
     expect(w.host.refunded).toHaveBeenCalledTimes(1);
@@ -418,7 +419,7 @@ describe('attempts 2 and 3, in the background (C11–C19)', () => {
     w.gateway.refund.mockImplementationOnce(() => new Promise(() => undefined)); // never answers: the process "died"
     w.at(T0 + 5 * MIN);
     void w.retrier.runDue!();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(w.gateway.refund).toHaveBeenCalledTimes(1));
     w.gateway.refund.mockRejectedValueOnce(notYet());
     w.at(T0 + 5 * MIN + 60_000);
     await w.retrier.runDue!();
@@ -463,17 +464,17 @@ describe('attempts 2 and 3, in the background (C11–C19)', () => {
 
 describe('the person: the press and the hand acts share the fence (C21–C27)', () => {
   async function exhausted(): Promise<World> {
-    const w = await world();
-    w.gateway.refund.mockRejectedValue(notYet());
-    await w.retrier.firstAttempt!(KEY as never, {} as never);
-    w.at(T0 + 5 * MIN);
-    await w.retrier.runDue!();
-    w.at(T0 + 15 * MIN);
-    await w.retrier.runDue!();
-    w.gateway.refund.mockReset();
-    w.gateway.refund.mockRejectedValue(notYet());
-    w.gateway.refreshCharge.mockClear();
-    return w;
+    const fresh = await world();
+    fresh.gateway.refund.mockRejectedValue(notYet());
+    await fresh.retrier.firstAttempt!(KEY as never, {} as never);
+    fresh.at(T0 + 5 * MIN);
+    await fresh.retrier.runDue!();
+    fresh.at(T0 + 15 * MIN);
+    await fresh.retrier.runDue!();
+    fresh.gateway.refund.mockReset();
+    fresh.gateway.refund.mockRejectedValue(notYet());
+    fresh.gateway.refreshCharge.mockClear();
+    return fresh;
   }
 
   it('S10 "Tentar estornar de novo" starts series 2 now, consult first; pressed mid-series it is a no-op (C21, C22)', async () => {
@@ -516,7 +517,7 @@ describe('the person: the press and the hand acts share the fence (C21–C27)', 
     w.gateway.refund.mockImplementationOnce(() => new Promise(() => undefined));
     w.at(T0 + 40 * MIN);
     void w.retrier.press!(KEY as never);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(w.gateway.refund).toHaveBeenCalledTimes(1));
     expect(await w.retrier.settleByHand!(KEY as never)).toBe(false);
     expect(await viewOf(w)).toMatchObject({ series: 2, inFlight: true });
   });

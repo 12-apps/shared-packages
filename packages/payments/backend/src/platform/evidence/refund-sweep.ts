@@ -2,7 +2,7 @@ import { refundDueNow } from '../../core/refund-retry';
 import { pollPix } from './orders';
 import { createdPixIds, paidChargeId, pixStateOf } from './orders-pix-production';
 import { claimAttempt, firstClaim, nextClaim, refundStepOf, runClaimedAttempt, stampAfter, type RefundTarget } from './refund-attempt';
-import { refundStateOf, type EvidenceRefundState } from './refund-state';
+import { claimHeld, refundStateOf, type EvidenceRefundState } from './refund-state';
 import { sandboxSeller, type EvidenceRunDeps } from './run';
 import { clockOf, withStep } from './steps';
 import type { EvidenceRecord, EvidenceStep, EvidenceStepKey } from './types';
@@ -82,7 +82,7 @@ export async function retryDueEvidenceRefund(deps: EvidenceRunDeps): Promise<Evi
  */
 export async function pressRetryRefund(deps: EvidenceRunDeps, record: EvidenceRecord): Promise<EvidenceRecord> {
   const previous = refundStateOf(record);
-  if (previous && !previous.exhausted) return record;
+  if (previous && (!previous.exhausted || claimHeld(previous, clockOf(deps)()))) return record;
   const seller = await sandboxSeller(deps);
   if (typeof seller !== 'object') return record;
   const state = firstClaim(clockOf(deps)(), previous);
@@ -94,15 +94,20 @@ export async function pressRetryRefund(deps: EvidenceRunDeps, record: EvidenceRe
 /** The card cancels a run makes ONE attempt of; the sweep sends the rest (FUT-4740). */
 const CARD_CANCEL_KEYS: readonly EvidenceStepKey[] = ['card.cancel', 'debit.cancel', 'gpay.cancel', 'apay.cancel'];
 
+/** A card cancel step still owed a refund, with its retry state and target; null otherwise. */
+function cardRefundOf(record: EvidenceRecord, key: EvidenceStepKey): { step: EvidenceStep; state: EvidenceRefundState; target: RefundTarget } | null {
+  const step = refundStepOf(record, key);
+  if (step?.status !== 'FAILED' || !step.refund) return null;
+  const chargeId = step.ids['charge_id'] ?? step.ids['order_id'];
+  return chargeId ? { step, state: step.refund, target: { key, chargeId, orderId: step.ids['order_id'] ?? null } } : null;
+}
+
 /** The card cancel step whose refund has an attempt due, with its target. */
-function dueCardCancel(record: EvidenceRecord, now: Date): { step: EvidenceStep; target: RefundTarget; due: 'NEXT' | 'CLOSE' } | null {
+function dueCardCancel(record: EvidenceRecord, now: Date) {
   for (const key of CARD_CANCEL_KEYS) {
-    const step = refundStepOf(record, key);
-    const state = step?.status === 'FAILED' ? step.refund : undefined;
-    const chargeId = step?.ids['charge_id'] ?? step?.ids['order_id'];
-    if (!step || !state || !chargeId) continue;
-    const due = refundDueNow(state, now);
-    if (due) return { step, target: { key, chargeId, orderId: step.ids['order_id'] ?? null }, due };
+    const owed = cardRefundOf(record, key);
+    const due = owed ? refundDueNow(owed.state, now) : null;
+    if (owed && due) return { ...owed, due };
   }
   return null;
 }
@@ -116,7 +121,7 @@ async function retryDueCardCancel(deps: EvidenceRunDeps, record: EvidenceRecord)
   const now = clockOf(deps)();
   const found = dueCardCancel(record, now);
   if (!found) return null;
-  const state = found.step.refund!;
+  const { state } = found;
   if (found.due === 'CLOSE') return closeCardSeries(deps, record, found.step, state, found.target);
   const seller = await sandboxSeller(deps);
   if (typeof seller !== 'object') return null;

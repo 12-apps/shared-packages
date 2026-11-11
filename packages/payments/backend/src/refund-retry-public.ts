@@ -14,7 +14,9 @@ export {
   REFUND_RETRY_ATTEMPTS,
   REFUND_RETRY_DELAYS_MS,
   refundRefusalOf,
+  refundScheduleFor,
   type RefundRefusal,
+  type RefundSchedule,
   type RefundRetryState,
 } from './core/refund-retry';
 export {
@@ -33,5 +35,5 @@ export type {
   RefundSeriesRow,
   RefundSeriesSettlement,
 } from './core/refund-series-store';
-export { createMemoryRefundRetryStore, type MemoryRefundRetryStore } from './memory-refund-retry';
+export { createMemoryRefundRetryStore, type MemoryRefundRetryStore } from './memory';
 export { createPrismaRefundRetryStore, type RefundRetryDelegate } from './prisma/refund-retry-store';
