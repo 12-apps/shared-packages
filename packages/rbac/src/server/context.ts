@@ -6,6 +6,7 @@ import type { RbacDbProvider } from './db';
 import type { RbacGrantsOption } from './grants';
 import type { RbacInvitesPort } from './invites';
 import type { RbacNotifyPort } from './notifications';
+import type { InputProblem } from './problems';
 
 /**
  * What every route in this surface shares (12-13): the actor, the request, the
@@ -322,8 +323,11 @@ export interface RbacServerConfig<
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class RbacApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** Set on a 422: every problem of the refused input, with its path. */
+  readonly problems?: InputProblem[];
+  constructor(status: number, message: string, problems?: InputProblem[]) {
     super(message);
+    if (problems) this.problems = problems;
     this.name = 'RbacApiError';
     this.status = status;
     Object.setPrototypeOf(this, RbacApiError.prototype);
@@ -334,14 +338,14 @@ export const ok = (data: unknown, status = 200): RbacResponse => ({
   status,
   body: { data },
 });
-export const fail = (status: number, error: string): RbacResponse => ({
+export const fail = (status: number, error: string, problems?: InputProblem[]): RbacResponse => ({
   status,
-  body: { error },
+  body: problems ? { error, problems } : { error },
 });
 
 /** Fold a store/governance {@link RbacApiError} into a response; rethrow the rest. */
 export function foldApiError(error: unknown): RbacResponse {
-  if (error instanceof RbacApiError) return fail(error.status, error.message);
+  if (error instanceof RbacApiError) return fail(error.status, error.message, error.problems);
   throw error;
 }
 

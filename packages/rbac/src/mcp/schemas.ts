@@ -115,14 +115,14 @@ export const teamMemberDetailSchema = z.object({
  * `role` and `customRoles` stay optional here for the same reason they are
  * optional there — a caller that names neither keeps the host port's default.
  */
-export const inviteBody = z.object({
+export const inviteBody = z.strictObject({
   email: z.string().trim().min(3),
   role: z.string().trim().min(1).optional(),
   customRoles: z.array(z.string().trim().min(1)).optional(),
 });
 
 /** Body for the soft enable/disable. */
-export const setMemberActiveBody = z.object({ active: z.boolean() });
+export const setMemberActiveBody = z.strictObject({ active: z.boolean() });
 
 /**
  * Body for granting a member one more role — a system role or a tenant custom
@@ -130,7 +130,7 @@ export const setMemberActiveBody = z.object({ active: z.boolean() });
  * is N×M×J); the route validates the role exists at the tenant and that the
  * granter may grant it.
  */
-export const grantMemberRoleBody = z.object({ role: z.string().trim().min(1) });
+export const grantMemberRoleBody = z.strictObject({ role: z.string().trim().min(1) });
 
 /** A role's permission set: the wildcard, or a list drawn from the host catalog. */
 export function permissionSetOf(catalogPermissions: readonly string[]) {
@@ -168,7 +168,7 @@ export function roleListRowSchemaOf(catalogPermissions: readonly string[]) {
 
 /** Body for creating or updating a custom role. */
 export function roleWriteBodyOf(catalogPermissions: readonly string[]) {
-  return z.object({
+  return z.strictObject({
     name: z.string().trim().min(1),
     description: z.string().trim().nullable().optional(),
     permissions: permissionSetOf(catalogPermissions),
@@ -177,7 +177,7 @@ export function roleWriteBodyOf(catalogPermissions: readonly string[]) {
 
 /** Body for a seeded TEMPLATE role's per-tenant override. */
 export function templateOverrideBodyOf(catalogPermissions: readonly string[]) {
-  return z.object({
+  return z.strictObject({
     description: z.string().trim().nullable().optional(),
     permissions: permissionSetOf(catalogPermissions),
   });
@@ -198,19 +198,19 @@ export function templateOverrideBodyOf(catalogPermissions: readonly string[]) {
  */
 export const rbacMcpParams = {
   /** The tenant-scoped collection — `/team`, `/roles`, `/permissions`. */
-  tenant: z.object({ tenantSlug: z.string().min(1) }),
+  tenant: z.strictObject({ tenantSlug: z.string().min(1) }),
   /** One member — `/team/:userId`. */
-  member: z.object({ tenantSlug: z.string().min(1), userId: z.string().min(1) }),
+  member: z.strictObject({ tenantSlug: z.string().min(1), userId: z.string().min(1) }),
   /** One of a member's additive roles — `/team/:userId/roles/:role`. */
-  memberRole: z.object({
+  memberRole: z.strictObject({
     tenantSlug: z.string().min(1),
     userId: z.string().min(1),
     role: z.string().min(1),
   }),
   /** One pending invite — `/team/invites/:inviteId`. */
-  invite: z.object({ tenantSlug: z.string().min(1), inviteId: z.string().min(1) }),
+  invite: z.strictObject({ tenantSlug: z.string().min(1), inviteId: z.string().min(1) }),
   /** One tenant-composed role, keyed by ID — `/roles/:id`. */
-  role: z.object({ tenantSlug: z.string().min(1), id: z.string().min(1) }),
+  role: z.strictObject({ tenantSlug: z.string().min(1), id: z.string().min(1) }),
   /** One seeded template role, keyed by NAME — `/roles/templates/:name`. */
-  template: z.object({ tenantSlug: z.string().min(1), name: z.string().min(1) }),
+  template: z.strictObject({ tenantSlug: z.string().min(1), name: z.string().min(1) }),
 } as const;

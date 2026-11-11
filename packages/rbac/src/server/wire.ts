@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PermissionRegistry } from '../core/types';
 
 import { RbacApiError, type RbacMessages } from './context';
+import { problemsOf } from './problems';
 import type { RoleListQuery } from './roles-store';
 import type { TeamListQuery } from './team-store';
 
@@ -74,7 +75,7 @@ export function buildWireSchemas<P extends string>(
   const permissionEnum = z.enum(permissions.list as unknown as [string, ...string[]]);
   const permissionSet = z.union([z.literal('*'), z.array(permissionEnum)]);
 
-  const roleWriteBody = z.object({
+  const roleWriteBody = z.strictObject({
     name: z.string().trim().min(1),
     description: z.string().trim().nullable().optional(),
     permissions: permissionSet,
@@ -82,13 +83,13 @@ export function buildWireSchemas<P extends string>(
 
   return {
     roleWriteBody: roleWriteBody as RoleWireSchemas['roleWriteBody'],
-    templateOverrideBody: z.object({
+    templateOverrideBody: z.strictObject({
       description: z.string().trim().nullable().optional(),
       permissions: permissionSet,
     }) as RoleWireSchemas['templateOverrideBody'],
-    grantMemberRoleBody: z.object({ role: z.string().trim().min(1) }),
-    setMemberActiveBody: z.object({ active: z.boolean() }),
-    inviteBody: z.object({
+    grantMemberRoleBody: z.strictObject({ role: z.string().trim().min(1) }),
+    setMemberActiveBody: z.strictObject({ active: z.boolean() }),
+    inviteBody: z.strictObject({
       email: z.string().trim().min(3),
       role: z.string().trim().min(1).optional(),
       // Deduplicated at the wire rather than downstream: a repeated name would
@@ -105,7 +106,10 @@ export function buildWireSchemas<P extends string>(
   };
 }
 
-/** Parse a zod body or throw the 400 the wire promises. */
+/**
+ * Parse a zod body or throw the 422 the wire promises: the sentence plus every
+ * problem with its path. Nothing is written for a refused body.
+ */
 export function parseBody<T>(
   schema: z.ZodType<T>,
   body: unknown,
@@ -113,9 +117,9 @@ export function parseBody<T>(
 ): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const path = issue?.path.join('.') ?? '';
-    throw new RbacApiError(400, `${messages.invalidBody}${path ? ` (${path})` : ''}.`);
+    const problems = problemsOf(parsed.error);
+    const path = problems[0]?.path ?? '';
+    throw new RbacApiError(422, `${messages.invalidBody}${path ? ` (${path})` : ''}.`, problems);
   }
   return parsed.data;
 }
