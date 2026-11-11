@@ -1,8 +1,9 @@
 "use client";
 
-import type { JSX } from "react";
+import { useId, type JSX } from "react";
 
 import { FormControl, FormLabel } from "@12-apps/ui/form/Form";
+import { RadioGroup } from "@12-apps/ui/form/RadioGroup";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
@@ -268,6 +269,7 @@ export function WindowFields({
   // field's own error is (FUT-4155).
   const { errors, setFieldValue } = useFormContext();
   const scheduleError = errors.schedule;
+  const repetitionLabelId = useId();
   const clearScheduleError = (): void => {
     if (scheduleError !== undefined) setFieldValue("schedule", "");
   };
@@ -275,28 +277,26 @@ export function WindowFields({
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
       <PeriodSection copy={copy} wholeDays={wholeDays} datesLock={datesLock} timeZoneSettings={timeZoneSettings} />
+      {/* The library's plain radio list: each row is a full-height tap target (FUT-4724).
+          The label stays the field label it always was, and names the group. */}
       <FormControl>
-        <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
-        <Stack spacing={0.5}>
-          {[
-            [false, copy.schedule.always] as const,
-            [true, copy.schedule.specific] as const,
-          ].map(([value, label]) => (
-            <label key={label} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="radio"
-                name="discount-repetition"
-                checked={scheduleEnabled === value}
-                onChange={() => {
-                  clearScheduleError();
-                  onScheduleEnabledChange(value);
-                }}
-                data-testid={value ? "repetition-specific" : "repetition-always"}
-              />
-              <Text variant="body">{label}</Text>
-            </label>
-          ))}
-        </Stack>
+        <Box id={repetitionLabelId}>
+          <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
+        </Box>
+        <RadioGroup
+          aria-labelledby={repetitionLabelId}
+          name="discount-repetition"
+          value={String(scheduleEnabled)}
+          options={[
+            { value: "false", label: copy.schedule.always, dataTestId: "repetition-always" },
+            { value: "true", label: copy.schedule.specific, dataTestId: "repetition-specific" },
+          ]}
+          onChange={(_event, next) => {
+            clearScheduleError();
+            onScheduleEnabledChange(next === "true");
+          }}
+          dataTestId="repetition"
+        />
       </FormControl>
       {scheduleEnabled && (
         <>

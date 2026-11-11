@@ -7,13 +7,13 @@ import DialogContentText from '@mui/material/DialogContentText/index.js';
 import DialogTitle from '@mui/material/DialogTitle/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, keyframes, styled, useTheme } from '@mui/material/styles/index.js';
+import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { neutralTones } from '../../../tokens/ink';
-import { levelAboveHeldSheets } from '../Sheet/held-sheet';
+import { useStyleAboveHeldSheets } from '../Sheet/use-style-above-held-sheets';
 
 import { ALERT_DIALOG_CONTAINER, AlertDialogFooter, narrowDialog } from './AlertDialog.parts';
 import type { AlertDialogProps } from './AlertDialog.types';
@@ -257,25 +257,6 @@ function AlertDialogHeader({
       </Typography>
     </StyledDialogTitle>
   );
-}
-
-/**
- * The dialog's root style, lifted above any HELD sheet open as it opens
- * (FUT-4478). A held sheet stays behind the question its host asks, and may sit
- * above `zIndex.modal` (a host's stack, a host theme's lift); at the dialog's
- * own level the question was drawn under it — unseen, unclickable. Read once per
- * opening: the sheet is already on screen then, and the level stays put while
- * the question is answered. Inline, so it outranks any class rule that raised
- * the sheet. With no held sheet above, the caller's style is untouched.
- */
-function useStyleAboveHeldSheets(
-  open: boolean,
-  style: React.CSSProperties | undefined,
-): React.CSSProperties | undefined {
-  const theme = useTheme();
-  const ownLevel = theme.zIndex?.modal ?? 0;
-  const lifted = React.useMemo(() => (open ? levelAboveHeldSheets(ownLevel) : undefined), [open, ownLevel]);
-  return lifted === undefined ? style : { ...style, zIndex: lifted };
 }
 
 export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(

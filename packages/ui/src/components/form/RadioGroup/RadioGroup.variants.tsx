@@ -91,6 +91,12 @@ const OptionLabel: React.FC<{ option: RadioOption; testIdValue?: string }> = ({
   </Box>
 );
 
+/** The option's own test id, on the native input (a `data-*` attribute is not in the input's props type). */
+const optionInputProps = (option: RadioOption): RadioProps['inputProps'] => {
+  const props: Record<string, string> = option.dataTestId ? { 'data-testid': option.dataTestId } : {};
+  return props;
+};
+
 export const DefaultRadios: React.FC<VariantProps> = ({
   options,
   value,
@@ -129,6 +135,7 @@ export const DefaultRadios: React.FC<VariantProps> = ({
             // augmentation, which would widen every consumer's `Radio` type.
             size={muiSize(size) as RadioProps['size']}
             data-testid={testId(dataTestId, `radio-${index}`)}
+            inputProps={optionInputProps(option)}
           />
         }
         label={

@@ -8,7 +8,10 @@ export interface RadioOption {
   description?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
-  /** The card's own test id (`cards` variant), in place of the index-based `<dataTestId>-card-<n>`. */
+  /**
+   * The option's own test id: on the card (`cards` variant), in place of the index-based
+   * `<dataTestId>-card-<n>`, and on the native `<input type="radio">` (`default` variant).
+   */
   dataTestId?: string;
 }
 
