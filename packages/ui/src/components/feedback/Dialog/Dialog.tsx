@@ -24,6 +24,7 @@ import {
 } from './Dialog.metrics';
 import { mergedBackdropSlot, mergedPaperSlot, mergedTransitionSlot } from './Dialog.slots';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
+import { useStyleAboveHeldSheets } from '../../data-display/Sheet/use-style-above-held-sheets';
 import { childTestId, resolveTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
   DialogActionsProps,
@@ -206,6 +207,8 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
     testId,
   };
   const handleClose = closeHandlerOf(persistent, onClose);
+  // Above any held sheet while open (FUT-4748): the modal's level, or the drawer's.
+  const rootStyle = useStyleAboveHeldSheets(open, props.style, variant === 'drawer' ? 'drawer' : 'modal');
 
   const header = title ? (
     <DialogHeader
@@ -221,7 +224,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
 
   if (variant === 'drawer') {
     return (
-      <DrawerDialog {...looks} drawerProps={{ ...props, open, onClose: handleClose }}>
+      <DrawerDialog {...looks} drawerProps={{ ...props, style: rootStyle, open, onClose: handleClose }}>
         {header}
         {body}
       </DrawerDialog>
@@ -237,6 +240,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
         fullScreen: variant === 'fullscreen',
         BackdropComponent: backdrop ? Backdrop : undefined,
         ...props,
+        style: rootStyle,
       }}
     >
       {header}
