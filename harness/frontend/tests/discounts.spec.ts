@@ -124,3 +124,41 @@ test('the host slot reports a bulk batch, and Desfazer restores what changed (FU
   await page.getByTestId('bulk-undo').click();
   await expect(page.getByTestId('bulk-undone')).toContainText('2 desfeitos');
 });
+
+test('the extend dialog keeps its two ways on one row at 320 (FUT-4420)', async ({ page, request }) => {
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  for (const name of ['Largura A', 'Largura B']) {
+    await request.post('/api/admin/harness/discounts', {
+      data: {
+        name,
+        type: 'PERCENTAGE',
+        percentOffBp: 1000,
+        scope: 'ORDER',
+        trigger: 'AUTOMATIC',
+        stackable: true,
+        active: true,
+        endsAt: '2099-03-10',
+      },
+    });
+  }
+  /* eslint-enable test-flakiness/no-unmocked-network */
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Largura B');
+  await page.getByTestId('discounts-grid').getByRole('checkbox').nth(0).check();
+  await page.getByTestId('discounts-grid').getByRole('checkbox').nth(1).check();
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Estender validade…' }).click();
+
+  const group = page.getByTestId('bulk-extend-mode');
+  await expect(group).toBeVisible();
+  const buttons = await group.getByRole('button').all();
+  const boxes = await Promise.all(buttons.map((button) => button.boundingBox()));
+  expect(boxes).toHaveLength(2);
+  expect(boxes[0]!.y).toBeCloseTo(boxes[1]!.y, 0);
+  expect(boxes[0]!.width).toBeCloseTo(boxes[1]!.width, 0);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+});
