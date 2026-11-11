@@ -15,6 +15,8 @@ import {
 } from "./data-views-layout-context";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import { CardBody } from "./data-views-card-body";
+import { PinnedRowLabel } from "../DataGrid/DataGrid.pinned";
+import { PinnedSlot, pinnedMarkOf, type PinnedMark } from "./data-views-pinned-slot";
 import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
 import type { DataViewCardSelection } from "./data-views-types";
@@ -45,7 +47,7 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   emptyState?: React.ReactNode;
   /** The header row follows the page scroll under the sticky toolbar. */
   stickyHead?: boolean;
-  /** The row to lead and tint — re-pinned by the DataGrid after its own sort. */
+  /** The row to lead and mark — re-pinned by the DataGrid after its own sort. */
   pinnedRowId?: string | number | null;
   /** Screen-reader text for the pinned row. */
   pinnedRowLabel?: string;
@@ -125,6 +127,8 @@ interface ListBodyProps<T extends Record<string, unknown>> {
   group?: ListGroupConfig<T>;
   /** The density every row answers, handed to the group when there is one. */
   density: DataViewsDensity;
+  /** The pinned row and its label (FUT-4745). */
+  pinned?: PinnedMark<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -153,6 +157,7 @@ function ListBody<T extends Record<string, unknown>>({
   rowGap,
   group,
   density,
+  pinned,
   dataTestId,
   emptyState,
 }: ListBodyProps<T>): React.JSX.Element {
@@ -188,8 +193,10 @@ function ListBody<T extends Record<string, unknown>>({
             // is a DIRECT child of the group's grid. One wrapper element and the
             // span is measured against a grid that isn't there, so every rail
             // collapses — the exact failure the group exists to prevent.
+            // The label is absolutely positioned, so it takes no track of the grid.
             return (
               <React.Fragment key={id}>
+                {row === pinned?.row ? <PinnedRowLabel label={pinned.label} /> : null}
                 {renderListRow(row, selectionFor(id))}
               </React.Fragment>
             );
@@ -206,7 +213,11 @@ function ListBody<T extends Record<string, unknown>>({
     >
       {rows.map((row) => {
         const id = getRowId(row);
-        return <Box key={id}>{renderListRow(row, selectionFor(id))}</Box>;
+        return (
+          <PinnedSlot key={id} pinned={row === pinned?.row} label={pinned?.label}>
+            {renderListRow(row, selectionFor(id))}
+          </PinnedSlot>
+        );
       })}
     </Box>
   );
@@ -285,6 +296,7 @@ function headerlessBody<T extends Record<string, unknown>>(
   { layout, zoom, density }: ReturnType<typeof useDataViewsLayout>,
 ): React.ReactNode | null {
   const { c, getRowId, renderCard, renderListRow, listGroup, board, selectable, dataTestId, emptyState } = props;
+  const pinned = pinnedMarkOf(c.pinnedRow, props.pinnedRowLabel);
   // ONE switch for every headerless body: no toggle reaches a card or row, and
   // BaseCard / BaseListCard draw no checkbox for a record without one.
   const onToggleId = selectable ? c.toggleId : undefined;
@@ -299,6 +311,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         rowGap={DENSITY_ROW_PADDING[density]}
         group={listGroup}
         density={density}
+        pinned={pinned}
         dataTestId={dataTestId}
         emptyState={emptyState}
       />
@@ -317,6 +330,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         // wide its columns are, and it is the only sizing control the board
         // has since the zoom slider was removed.
         cardScale={DENSITY_BOARD_SCALE[density]}
+        pinned={pinned}
         dataTestId={dataTestId}
       />
     );
@@ -331,8 +345,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         onToggleId={onToggleId}
         targetCardWidth={cardTargetWidthFor(zoom, density)}
         cardScale={cardScaleForZoom(zoom)}
-        pinnedRow={c.pinnedRow}
-        pinnedRowLabel={props.pinnedRowLabel}
+        pinned={pinned}
         dataTestId={dataTestId}
         emptyState={emptyState}
       />

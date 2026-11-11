@@ -419,7 +419,7 @@ scrolls away. Two details make it work on a real page:
 ## The pinned row (FUT-4745)
 
 `pinnedRowId` (on `DataViewsTableBase` and `DataViewsGrid`) puts ONE row first,
-tinted with the theme's success colour — the record a user has just added or
+marked in the theme's primary colour — the record a user has just added or
 edited, so they see it land. `pinnedRowLabel` is the host's screen-reader text
 for it ("Saved just now", in the host's language); the package ships no words.
 
@@ -431,18 +431,53 @@ for it ("Saved just now", in the host's language); the package ships no words.
 - **Whatever the filter.** It is resolved against the host's full `rows`, not
   the filtered set, so a search or pill that would hide it does not — the user
   just saved it and is looking for it. The other rows are filtered as usual.
+  (A bare `DataGrid` with its own client `filtering` differs: its filter runs
+  before the pin, so a row it excludes stays hidden.)
 - **Server mode** pins it within the page the host passes in `rows`: a host
   that wants it on the page includes it there.
 - **An id in no row** pins nothing and does not throw. `null` or omitted: the
   grid is exactly as it was, the same arrays included.
-- **Every width, every layout's order.** Nothing here reads the width. The
-  table row and the card are tinted (the card through a veil over the entity's
-  own surface, which takes no pointer events); the Lista and the Quadro get the
-  order only, since their rows are the entity's own render.
-- The tint is `alpha(success.main, action.selectedOpacity)` — tokens only, so it
-  follows the host's palette and is stronger in dark mode. A selected pinned
-  table row shows the selection colour.
+
+### While a row is pinned, it counts as shown
+
+The pinned row is part of what the grid shows, so everything that acts on the
+shown rows includes it, even when the search or a pill would have dropped it:
+
+- the counter ("3 de 20" for a search that matches 2 rows);
+- select-all, and so every bulk action;
+- `onVisibleRowsChange`, and therefore Exportar;
+- the empty state: a search matching nothing shows the pinned row alone rather
+  than "no results".
+
+**So the host clears `pinnedRowId` once the moment has passed** — on the next
+search, filter or sort change, or on navigation. The pin says "you just saved
+this"; a new query is a new intent, and a pin left set overrides it.
+
+### How it is marked, in every layout and at every width
+
+Nothing here reads the width.
+
+- **Two signals, so colour is never the only one:** a 3px accent bar in
+  `primary.main` on the leading edge (the table's first cell; the card, list
+  row and board card's left edge), drawn as an inset shadow so nothing moves,
+  and, in light mode, a faint fill, `alpha(primary.main, 0.05)`, `0.06` hovered.
+- **Primary, not success.** The store's brand wins, and a green row put a red
+  "Cancelado" chip beside green. The fill is capped so `error.main` text keeps
+  4.5:1 or better on it, hovered included: at success/0.08 it fell to 4.49
+  (light) and 3.92 (dark). Dark mode has NO fill, by measurement: the grid's
+  elevation-1 Paper is rgb(30,30,30) under its overlay, where `error.main` is
+  already 4.52:1 on a plain row, and any wash goes under 4.5. There the bar and
+  the label mark the row, and it hovers like every other row.
+- **Table:** the fill on the row, the bar on its first cell, the label hidden in
+  its first visible cell. A selected pinned row shows the selection colour; the
+  bar stays.
+- **Grade, Quadro, ungrouped Lista:** a veil over the entity's own render (it
+  takes no pointer events) carries the fill and the bar, and the label is read
+  just before the record.
+- **Lista with `listGroup`:** the label only. Its rows are subgrid over the
+  group's tracks and take no wrapper, so there is nothing to paint; the order
+  still holds.
 
 `__tests__/data-views-pinned-row.test.tsx` and
-`../DataGrid/__tests__/grid-pinned-row.test.tsx` pin all of it; **PinnedRow** in
-`data-views-table.stories.tsx` shows it.
+`../DataGrid/__tests__/grid-pinned-row.test.tsx` pin all of it; **PinnedRow**
+and **PinnedRowCards** in `data-views-table.stories.tsx` show it.

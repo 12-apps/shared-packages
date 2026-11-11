@@ -1,14 +1,16 @@
 /**
  * DataViews' pinned row (FUT-4745): `pinnedRowId` puts one row first and
- * tints it, in the table and in the cards, whatever the sort or the filter —
- * and shows it ONCE, never also in its sorted place.
+ * marks it — a faint primary fill and a leading accent in the table and on the
+ * cards, the host's hidden label in every layout — whatever the sort or the
+ * filter, and shows it ONCE, never also in its sorted place.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen, within } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
-import { pinnedRowTint } from "../../DataGrid/DataGrid.pinned";
+import { pinnedRowAccent, pinnedRowTint } from "../../DataGrid/DataGrid.pinned";
 import { DataViewsGrid } from "../DataViewsGrid";
+import type { BoardConfig } from "../DataViewsBoard";
 import { emptyViewState, type DataViewColumn, type DataViewState } from "../data-views-types";
 
 interface Row extends Record<string, unknown> {
@@ -33,9 +35,12 @@ function stateWith(patch: Partial<DataViewState>): DataViewState {
   return { ...emptyViewState(["name", "status"]), ...patch };
 }
 
-function renderGrid(props: Partial<React.ComponentProps<typeof DataViewsGrid<Row>>> = {}) {
+function renderGrid(
+  props: Partial<React.ComponentProps<typeof DataViewsGrid<Row>>> = {},
+  mode: "light" | "dark" = "light",
+) {
   return render(
-    <ThemeProvider theme={createTheme()}>
+    <ThemeProvider theme={createTheme({ palette: { mode } })}>
       <DataViewsGrid<Row>
         rows={rows}
         columns={columns}
@@ -71,7 +76,7 @@ describe("DataViews pinnedRowId — table layout", () => {
   it("without the prop keeps the existing order and pins nothing", () => {
     renderGrid({ appliedState: stateWith({ sortBy: [{ id: "name", dir: "asc" }] }) });
     expect(tableNames()).toEqual(["Ana", "Bruno", "Carla", "Davi"]);
-    expect(screen.getByTestId("items").querySelector("[data-pinned]")).toBeNull();
+    expect(screen.getByTestId("items").querySelectorAll("[data-pinned]")).toHaveLength(0);
   });
 
   it.each<["asc" | "desc", string[]]>([
@@ -101,8 +106,8 @@ describe("DataViews pinnedRowId — table layout", () => {
   it("pins nothing, without throwing, when the id is not in the data", () => {
     renderGrid({ pinnedRowId: "nope", pinnedRowLabel: "Saved now" });
     expect(tableNames()).toEqual(["Bruno", "Ana", "Carla", "Davi"]);
-    expect(screen.getByTestId("items").querySelector("[data-pinned]")).toBeNull();
-    expect(screen.queryByText("Saved now")).toBeNull();
+    expect(screen.getByTestId("items").querySelectorAll("[data-pinned]")).toHaveLength(0);
+    expect(screen.queryAllByText("Saved now")).toHaveLength(0);
   });
 
   it("treats null as no pin", () => {
@@ -110,16 +115,28 @@ describe("DataViews pinnedRowId — table layout", () => {
     expect(tableNames()).toEqual(["Bruno", "Ana", "Carla", "Davi"]);
   });
 
-  it("tints the pinned row and exposes the host's label inside it", () => {
-    renderGrid({ pinnedRowId: "3", pinnedRowLabel: "Saved now" });
-    const pinned = screen.getByTestId("items").querySelector('[data-pinned="true"]') as HTMLElement;
-    expect(pinned).not.toBeNull();
-    // The theme's success tint, normalised by jsdom the same way on both sides.
-    const probe = document.createElement("div");
-    probe.style.backgroundColor = pinnedRowTint(createTheme());
-    expect(getComputedStyle(pinned).backgroundColor).toBe(probe.style.backgroundColor);
-    expect(within(pinned).getByText("Saved now")).toBeInTheDocument();
-    expect(screen.getAllByText("Saved now")).toHaveLength(1);
+  it.each(["light", "dark"] as const)(
+    "marks the pinned row with the %s theme's primary fill and accent, and labels it",
+    (mode) => {
+      renderGrid({ pinnedRowId: "3", pinnedRowLabel: "Saved now" }, mode);
+      const pinned = screen.getByTestId("items").querySelector('[data-pinned="true"]') as HTMLElement;
+      const theme = createTheme({ palette: { mode } });
+      // The tint, normalised by jsdom the same way on both sides.
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = pinnedRowTint(theme);
+      expect(getComputedStyle(pinned).backgroundColor).toBe(probe.style.backgroundColor);
+      expect(getComputedStyle(pinned.querySelector("td") as HTMLElement).boxShadow).toBe(
+        pinnedRowAccent(theme),
+      );
+      expect(within(pinned).getByText("Saved now")).toBeInTheDocument();
+      expect(screen.getAllByText("Saved now")).toHaveLength(1);
+    },
+  );
+
+  it("pins a string id when handed the same id as a number", () => {
+    renderGrid({ pinnedRowId: 3 });
+    expect(tableNames()[0]).toBe("Carla");
+    expect(screen.getByTestId("items").querySelectorAll('[data-pinned="true"]')).toHaveLength(1);
   });
 });
 
@@ -129,7 +146,7 @@ describe("DataViews pinnedRowId — cards layout", () => {
   it("without the prop keeps the existing order", () => {
     renderGrid(cards);
     expect(cardNames()).toEqual(["Bruno", "Ana", "Carla", "Davi"]);
-    expect(screen.getByTestId("items-cards").querySelector("[data-pinned]")).toBeNull();
+    expect(screen.getByTestId("items-cards").querySelectorAll("[data-pinned]")).toHaveLength(0);
   });
 
   it("shows the pinned card first, once, under a filter", () => {
@@ -143,5 +160,38 @@ describe("DataViews pinnedRowId — cards layout", () => {
     expect(pinned).toHaveLength(1);
     expect(within(pinned[0] as HTMLElement).getByText("Saved now")).toBeInTheDocument();
     expect(within(pinned[0] as HTMLElement).getByText("Ana")).toBeInTheDocument();
+  });
+});
+
+describe("DataViews pinnedRowId — Lista and Quadro", () => {
+  const renderListRow = (row: Row): React.ReactNode => <div data-list-name>{row.name}</div>;
+  const board: BoardConfig<Row> = {
+    groupBy: "status",
+    groups: [
+      { value: "ACTIVE", label: "Active" },
+      { value: "INACTIVE", label: "Inactive" },
+    ],
+  };
+
+  it("leads the list with the pinned row, marked and labelled", () => {
+    renderGrid({ renderListRow, defaultLayout: "list", pinnedRowId: "4", pinnedRowLabel: "Saved now" });
+    const list = screen.getByTestId("items-list");
+    const names = Array.from(list.querySelectorAll("[data-list-name]")).map((el) => el.textContent);
+    expect(names).toEqual(["Davi", "Bruno", "Ana", "Carla"]);
+    const pinned = list.querySelectorAll('[data-pinned="true"]');
+    expect(pinned).toHaveLength(1);
+    expect(within(pinned[0] as HTMLElement).getByText("Saved now")).toBeInTheDocument();
+    expect(within(pinned[0] as HTMLElement).getByText("Davi")).toBeInTheDocument();
+  });
+
+  it("leads its board column with the pinned card, marked and labelled", () => {
+    renderGrid({ renderCard, board, defaultLayout: "board", pinnedRowId: "4", pinnedRowLabel: "Saved now" });
+    const column = screen.getByTestId("items-board-column-ACTIVE");
+    const names = Array.from(column.querySelectorAll("[data-card-name]")).map((el) => el.textContent);
+    expect(names).toEqual(["Davi", "Bruno", "Carla"]);
+    const pinned = column.querySelectorAll('[data-pinned="true"]');
+    expect(pinned).toHaveLength(1);
+    expect(within(pinned[0] as HTMLElement).getByText("Saved now")).toBeInTheDocument();
+    expect(screen.getAllByText("Saved now")).toHaveLength(1);
   });
 });

@@ -207,11 +207,15 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
   }) => void;
 
   /**
-   * The id (as `getRowId` returns it) of ONE row to show first and tint with
-   * the theme's success colour — e.g. the record the user has just saved. The
+   * The id (as `getRowId` returns it) of ONE row to show first and mark with
+   * the theme's primary colour (a leading accent bar and a faint fill) — e.g.
+   * the record the user has just saved. The
    * row is moved to the top AFTER sorting and BEFORE pagination, so it leads
    * whatever the sort; it is shown once, never also in its sorted place. An id
    * that matches no row pins nothing. Omitted or `null`: rows are untouched.
+   * A client `filtering` that excludes the row still hides it: the grid's own
+   * filter runs first (DataViews, which filters before handing rows over,
+   * keeps the pinned row regardless).
    */
   pinnedRowId?: string | number | null;
   /**

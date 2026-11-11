@@ -199,7 +199,7 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
     filters?: GridFilter[];
   }) => void;
 
-  /** One row shown first and tinted success (FUT-4745) — see "Pinned row" below */
+  /** One row shown first and marked in primary (FUT-4745) — see "Pinned row" below */
   pinnedRowId?: string | number | null;
   pinnedRowLabel?: string; // the host's screen-reader text for it
 
@@ -255,18 +255,30 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
   - In multi-select, `Ctrl/Cmd` toggles without clearing.
 
 - **Pinned row** (`pinnedRowId`, FUT-4745):
-  - The row whose id (`getRowId`, or the row's `id`; compared as strings) equals
+  - The row whose id (`getRowId`, or the row's `id`; compared as strings, so `3` pins `"3"`) equals
     `pinnedRowId` is moved to the top AFTER sorting and BEFORE the page slice, so it
     leads page one whatever the sort direction, and whatever page it would sort onto.
   - It is shown ONCE: it leaves its sorted place. It is never duplicated.
   - An id matching no row pins nothing and does not throw. Omitted or `null`: the
     pipeline returns the very same `rows` array as before.
-  - Tint: `alpha(palette.success.main, palette.action.selectedOpacity)` — theme tokens
-    only, so it follows the host's palette and dark mode (0.16 there against 0.08).
-    Hover deepens it by `hoverOpacity`; a SELECTED pinned row shows the selection
-    colour, since selection is the feedback for what the user is doing now.
+  - The grid's OWN client filter (`filtering.mode: 'client'`) runs before the pin, so a
+    pinned row it excludes is not shown. DataViews differs: it filters before handing
+    rows to the grid and keeps the pinned row whatever the search or pills.
+  - Mark: a 3px accent bar in `palette.primary.main` on the leading cell (an inset
+    shadow, so nothing moves) plus, in LIGHT mode, a faint fill, `alpha(primary.main,
+    0.05)`, `0.06` hovered — theme tokens only. Primary, not success: the store's
+    brand wins, and a green row put a red chip beside green. The fill is capped so
+    `error.main` text keeps 4.5:1 on it, hovered included (asserted in
+    `grid-pinned-row.test.tsx`). DARK mode has no fill: on the grid's elevation-1
+    Paper (rgb(30,30,30) under its overlay) `error.main` is already 4.52:1 on a plain
+    row, and any wash takes it below 4.5 — so there the bar and the label mark the row,
+    and it hovers like every other row. A SELECTED pinned row
+    shows the selection colour (the accent stays), since selection is the feedback for
+    what the user is doing now.
+  - The pin is a moment, not a filter: the HOST clears `pinnedRowId` once it has
+    passed (the next search, filter or sort change, or navigation).
   - `pinnedRowLabel` is rendered visually hidden at the start of the row's first
-    cell (`[data-slot="pinned-label"]`), so a screen reader announces it with the row.
+    VISIBLE cell (`[data-slot="pinned-label"]`), so a screen reader announces it with the row.
     The host supplies the words; without a label no text is rendered.
 
 - **Resize/Reorder/Pin**:

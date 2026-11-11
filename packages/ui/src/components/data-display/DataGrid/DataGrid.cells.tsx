@@ -21,7 +21,12 @@ import React from 'react';
 
 import { rem } from '../../../tokens/relative';
 
-import { PinnedRowLabel, pinnedRowHoverTint, pinnedRowTint } from './DataGrid.pinned';
+import {
+  PinnedRowLabel,
+  pinnedRowAccent,
+  pinnedRowHoverTint,
+  pinnedRowTint,
+} from './DataGrid.pinned';
 import { cellValue } from './DataGrid.rows';
 import type { DataGridModel } from './DataGrid.model';
 import type { DataGridProps, GridColumn, GridSort } from './DataGrid.types';
@@ -204,7 +209,7 @@ export interface GridRowProps<T extends Record<string, unknown>> {
   rowId: string | number;
   isSelected: boolean;
   isExpanded: boolean;
-  /** The row `pinnedRowId` names: tinted, and labelled for screen readers. */
+  /** The row `pinnedRowId` names: accent bar, faint fill, and a label for screen readers. */
   isPinned?: boolean;
   totalColumns: number;
   model: DataGridModel<T>;
@@ -282,6 +287,8 @@ export function GridRow<T extends Record<string, unknown>>(
           ...(isPinned && {
             backgroundColor: pinnedRowTint(theme),
             '&:hover': { backgroundColor: pinnedRowHoverTint(theme) },
+            // The accent bar on the leading cell, kept when the row is selected.
+            '& > td:first-of-type': { boxShadow: pinnedRowAccent(theme) },
           }),
           ...(isSelected && { backgroundColor: theme.palette.action.selected }),
           height: model.rowHeight,

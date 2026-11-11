@@ -71,7 +71,7 @@ interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
    * reject the pill/scope clash at setup. See `assertNoScopePillOverlap`.
    */
   scopeFieldId?: string;
-  /** The row to show first and tint (FUT-4745) — see `DataViewsGrid`. */
+  /** The row to show first and mark (FUT-4745) — see `DataViewsGrid`. */
   pinnedRowId?: string | number | null;
 }
 
@@ -94,7 +94,7 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   clearKey: number;
   /** The rows to render, the pinned one first when there is one. */
   matched: T[];
-  /** The row `pinnedRowId` resolved to, or undefined — the bodies tint it. */
+  /** The row `pinnedRowId` resolved to, or undefined — the bodies mark it. */
   pinnedRow?: T;
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */

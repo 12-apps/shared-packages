@@ -209,14 +209,19 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
   /** Server-mode wiring; when set the grid is backend-driven (no client filter/sort/paginate). */
   server?: DataViewServer;
   /**
-   * Pin ONE row first and tint it with the theme's success colour (FUT-4745) —
+   * Pin ONE row first and mark it with the theme's primary colour (FUT-4745) —
    * e.g. the record the user has just added or edited. The id is compared, as
    * a string, with `getRowId`. The row leads whatever the sort, survives the
    * client-side search and filters, and is shown ONCE: it leaves its sorted
    * place rather than appearing twice. In server mode it is pinned within the
    * page the host passes. An id matching no row in `rows` pins nothing.
-   * Omitted or `null`: the grid is exactly as before. The table row and the
-   * card are tinted; the Lista and the Quadro keep the order only.
+   * Omitted or `null`: the grid is exactly as before. Every layout draws a
+   * leading accent bar and a faint fill (the grouped Lista: the label only).
+   *
+   * While it is set the row counts as SHOWN: the counter, select-all, bulk
+   * actions, `onVisibleRowsChange` and Exportar include it, and it stands in
+   * for the empty state. So the HOST clears it once the moment has passed —
+   * on the next search, filter or sort change, or on navigation.
    */
   pinnedRowId?: string | number | null;
   /**
