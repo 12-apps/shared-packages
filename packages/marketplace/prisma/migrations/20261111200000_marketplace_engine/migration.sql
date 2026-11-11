@@ -150,6 +150,33 @@ ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_off
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_requested_at" TIMESTAMP(3);
 -- The preparation time an accept states, for a marketplace whose confirm takes one.
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "preparation_minutes" INTEGER;
+-- ADOPTION: an order the predecessor already accepted is NOT a confirm the
+-- engine owes. Nothing confirmed through an API before this engine (a store
+-- answered in the marketplace's own app, or the marketplace settled the order
+-- itself), so every row already ACCEPTED when the engine first arrives is
+-- stamped confirmed at the instant it was accepted; otherwise the outbound
+-- sweep would send a day of finished orders' confirms on its first pass.
+--
+-- Guarded on `line_skus`, a column ONLY this migration adds, rather than on
+-- `confirmed_at`, which an earlier unmerged host migration may have added:
+-- the column is absent exactly once per database, on the first run of THIS
+-- migration over a predecessor's table. A fresh host created the table above
+-- with `line_skus` (nothing to stamp), and a replay finds it (stamps nothing,
+-- so a confirm the engine genuinely owes stays owed).
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'marketplace_acceptances'
+          AND column_name = 'line_skus'
+    ) THEN
+        UPDATE "marketplace_acceptances"
+           SET "confirmed_at" = "acknowledged_at"
+         WHERE "status" = 'ACCEPTED'
+           AND "confirmed_at" IS NULL
+           AND "confirm_failed_at" IS NULL;
+    END IF;
+END $$;
 -- The order's SKUs as the marketplace sent them: what offending SKUs are checked against.
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "line_skus" JSONB;
 

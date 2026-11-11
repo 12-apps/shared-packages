@@ -3,6 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it, vi } from "vitest";
 
+import { createHarness } from "./harness";
+import { pgliteDb } from "./pglite-db";
+
 /**
  * The migration, applied to REAL Postgres (PGlite), in the three situations
  * it claims to handle:
@@ -143,4 +146,92 @@ describe("the engine's migration", () => {
     expect(names).not.toContain("marketplace_acceptances_provider_valid");
     await db.close();
   });
+
 });
+
+/**
+ * [R2-1] Adoption must not turn the predecessor's ACCEPTED orders into confirms
+ * the engine owes: on main nothing confirmed through an API, so the outbound
+ * sweep's first pass would otherwise send a day of finished orders' confirms.
+ * The harness clock is 2026-11-11T12:00Z; the rows are 1 h and 3 h older.
+ */
+describe("adopting the predecessor's accepted orders", () => {
+  const ACCEPTED_ROWS = `
+    INSERT INTO orders VALUES ('o-1h'), ('o-3h'), ('o-wait');
+    INSERT INTO marketplace_acceptances (id, client_id, order_id, provider, external_order_id, status, acknowledge_by, acknowledged_at, updated_at) VALUES
+      ('a1', 't', 'o-1h', 'IFOOD', 'x1', 'ACCEPTED', NULL, '2026-11-11T11:00:00Z', now()),
+      ('a2', 't', 'o-3h', 'IFOOD', 'x2', 'ACCEPTED', NULL, '2026-11-11T09:00:00Z', now()),
+      ('a3', 't', 'o-wait', 'IFOOD', 'x3', 'AWAITING', '2026-11-11T12:05:00Z', NULL, now());`;
+
+  async function confirmedAt(db: PGlite): Promise<Record<string, unknown>> {
+    const rows = (await db.query<{ order_id: string; confirmed_at: Date | null }>(
+      "SELECT order_id, confirmed_at FROM marketplace_acceptances ORDER BY order_id",
+    )).rows;
+    return Object.fromEntries(rows.map((row) => [row.order_id, row.confirmed_at?.toISOString() ?? null]));
+  }
+
+  async function sweepQueues(db: PGlite): Promise<string[]> {
+    const h = createHarness({ store: pgliteDb(db) });
+    await h.engine.sweepOutbound();
+    return h.enqueued.map((job) => `${job.payload.action}:${job.payload.orderId}`);
+  }
+
+  it("stamps them confirmed at their acceptance, so the first sweep queues no confirm", async () => {
+    const db = new PGlite();
+    await db.exec(PREDECESSOR + ACCEPTED_ROWS);
+
+    await applyAll(db);
+
+    expect(await confirmedAt(db)).toEqual({
+      "o-1h": "2026-11-11T11:00:00.000Z",
+      "o-3h": "2026-11-11T09:00:00.000Z",
+      "o-wait": null,
+    });
+    expect(await sweepQueues(db)).toEqual([]);
+    await db.close();
+  });
+
+  it("stamps them too on a host that already ran the unmerged outbound migration (the columns exist, NULL)", async () => {
+    const db = new PGlite();
+    await db.exec(
+      PREDECESSOR +
+        `ALTER TABLE "marketplace_acceptances" ADD COLUMN "confirmed_at" TIMESTAMP(3);
+         ALTER TABLE "marketplace_acceptances" ADD COLUMN "confirm_failed_at" TIMESTAMP(3);
+         ALTER TABLE "marketplace_acceptances" ADD COLUMN "cancellation_status" TEXT;
+         ALTER TABLE "marketplace_acceptances" ADD COLUMN "cancellation_reason_code" TEXT;` +
+        ACCEPTED_ROWS,
+    );
+
+    await applyAll(db);
+
+    expect((await confirmedAt(db))["o-1h"]).toBe("2026-11-11T11:00:00.000Z");
+    expect(await sweepQueues(db)).toEqual([]);
+    await db.close();
+  });
+
+  it("changes nothing on a replay: a confirm the engine genuinely owes stays owed and is swept", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    // An order the ENGINE accepted, whose confirm has not gone out yet.
+    await db.exec(`
+      INSERT INTO marketplace_acceptances (id, client_id, order_id, provider, external_order_id, status, acknowledged_at, line_skus, updated_at)
+      VALUES ('e1', 't', 'o-engine', 'IFOOD', 'x9', 'ACCEPTED', '2026-11-11T11:00:00Z', '["S"]', now())`);
+    const before = await db.query("SELECT * FROM marketplace_acceptances ORDER BY id");
+
+    await applyAll(db);
+
+    const after = await db.query("SELECT * FROM marketplace_acceptances ORDER BY id");
+    expect(after.rows).toEqual(before.rows);
+    expect((await confirmedAt(db))["o-engine"]).toBeNull();
+    expect(await sweepQueues(db)).toEqual(["confirm:o-engine"]);
+    await db.close();
+  });
+
+  it("leaves a fresh host's table alone: nothing to stamp", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    expect(await confirmedAt(db)).toEqual({});
+    await db.close();
+  });
+});
+
