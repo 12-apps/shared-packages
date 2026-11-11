@@ -27,7 +27,7 @@ export const MAX_MIN_SAMPLE = 1000;
 const filterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const reportFilterSchema = z
-  .object({
+  .strictObject({
     field: z.string().min(1),
     operator: z.enum(['eq', 'neq', 'in', 'gte', 'lte', 'between']),
     value: filterValueSchema.optional(),
@@ -47,13 +47,13 @@ export const reportFilterSchema = z
     }
   });
 
-export const reportDimensionSchema = z.object({
+export const reportDimensionSchema = z.strictObject({
   field: z.string().min(1),
   /** Only valid on date dimensions; buckets values by the grain. */
   timeGrain: timeGrainSchema.optional(),
 });
 
-export const reportMeasureSchema = z.object({
+export const reportMeasureSchema = z.strictObject({
   field: z.string().min(1),
   /** Defaults per field type (money/number → sum, otherwise count). */
   aggregation: aggregationSchema.optional(),
@@ -76,8 +76,8 @@ export const reportMeasureSchema = z.object({
 });
 
 export const reportPresentationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('table') }),
-  z.object({
+  z.strictObject({ kind: z.literal('table') }),
+  z.strictObject({
     kind: z.literal('chart'),
     chartType: z.enum(['line', 'bar', 'area', 'pie', 'donut']),
     stacked: z.boolean().optional(),
@@ -88,7 +88,7 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
    * A single-number tile (FUT-309): the measure aggregated over the whole
    * period, no grouping. Requires 0 dimensions and exactly 1 measure.
    */
-  z.object({
+  z.strictObject({
     kind: z.literal('kpi'),
     /** Tile caption; defaults to the measure's catalog label. */
     label: z.string().min(1).max(80).optional(),
@@ -99,7 +99,8 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const reportSpecSchema = z.object({
+// @request-input
+export const reportSpecSchema = z.strictObject({
   /** Spec contract version — always 1 today; parse rejects anything else. */
   version: z.literal(1).default(1),
   entity: z.string().min(1),
@@ -118,7 +119,7 @@ export const reportSpecSchema = z.object({
   measures: z.array(reportMeasureSchema).min(1).max(10),
   filters: z.array(reportFilterSchema).max(20).default([]),
   sort: z
-    .array(z.object({ by: z.string().min(1), direction: z.enum(['asc', 'desc']).default('desc') }))
+    .array(z.strictObject({ by: z.string().min(1), direction: z.enum(['asc', 'desc']).default('desc') }))
     .max(3)
     .default([]),
   limit: z.number().int().min(1).max(10_000).optional(),
@@ -146,7 +147,7 @@ export const DASHBOARD_MAX_BLOCKS = 12;
  * the author picks the width — not a storage constraint that would make a
  * legitimate narrow KPI strip unsavable.
  */
-export const dashboardBlockSchema = z.object({
+export const dashboardBlockSchema = z.strictObject({
   id: z
     .string()
     .regex(/^[a-zA-Z0-9_-]{1,40}$/, 'block id must be 1-40 letters, digits, "_" or "-"'),
@@ -174,8 +175,9 @@ export const dashboardBlockSchema = z.object({
  * reports and discriminated by `kind: "dashboard"` (a single spec has no
  * top-level `kind`).
  */
+// @request-input
 export const dashboardSpecSchema = z
-  .object({
+  .strictObject({
     /** Spec contract version — always 1 today; parse rejects anything else. */
     version: z.literal(1).default(1),
     kind: z.literal('dashboard'),

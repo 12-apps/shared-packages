@@ -27,6 +27,7 @@ import type {
 } from './DataGrid.types';
 
 const DEFAULT_PAGE_SIZE = 50;
+const NEVER_PINNED = (): boolean => false;
 /** Rows rendered on either side of the window, so a fast scroll stays filled. */
 const OVERSCAN_COUNT = 20;
 /** Below this many rows, virtualization costs more than it saves. */
@@ -68,6 +69,8 @@ export interface DataGridModel<T extends Record<string, unknown>> {
   rowPitch: number;
   visibleColumns: GridColumn<T>[];
   processedRows: T[];
+  /** Is this the row `pinnedRowId` resolved to? Always false when none is pinned. */
+  isPinnedRow: (row: T) => boolean;
   visibleRows: T[];
   visibleRange: VisibleRange;
   virtualized: boolean;
@@ -91,12 +94,34 @@ function densityHeight(base: number, density: DataGridProps['density']): number 
   return base;
 }
 
+/**
+ * The pinned-row test for {@link processRows}, or undefined when no row is
+ * pinned. The row is resolved ONCE against the caller's `rows` (ids compared
+ * as strings, so `7` pins the row whose id is `"7"`), and the test is object
+ * identity — the sort and the page slice keep row objects, never copy them.
+ */
+function usePinnedTest<T extends Record<string, unknown>>(
+  props: DataGridProps<T>,
+): ((row: T) => boolean) | undefined {
+  const { rows, getRowId, pinnedRowId } = props;
+  return useMemo(() => {
+    if (pinnedRowId === undefined || pinnedRowId === null) return undefined;
+    const wanted = String(pinnedRowId);
+    const pinned = rows.find((row, index) => {
+      const id = getRowId ? getRowId(row, index) : (row as { id?: unknown }).id;
+      return id !== undefined && String(id) === wanted;
+    });
+    return pinned === undefined ? undefined : (row: T) => row === pinned;
+  }, [rows, getRowId, pinnedRowId]);
+}
+
 /** The rows this render should show, with every client-mode step resolved. */
 function useProcessedRows<T extends Record<string, unknown>>(
   props: DataGridProps<T>,
   columnMap: ReadonlyMap<string, GridColumn<T>>,
   sortBy: readonly GridSort[],
   filters: readonly GridFilter[],
+  isPinned: ((row: T) => boolean) | undefined,
 ): T[] {
   const { rows, filtering = {}, sorting = {}, pagination, virtualizeRows = true } = props;
   const pageIndex = pagination?.pageIndex ?? 0;
@@ -112,6 +137,7 @@ function useProcessedRows<T extends Record<string, unknown>>(
         needsSorting: sorting.mode === 'client' && sortBy.length > 0,
         // Virtualization already slices; doing both would page a page.
         needsPagination: pagination?.mode === 'client' && !virtualizeRows,
+        isPinned,
         pageIndex,
         pageSize,
       }),
@@ -124,6 +150,7 @@ function useProcessedRows<T extends Record<string, unknown>>(
       sorting.mode,
       pagination?.mode,
       virtualizeRows,
+      isPinned,
       pageIndex,
       pageSize,
     ],
@@ -316,7 +343,8 @@ export function useDataGridModel<T extends Record<string, unknown>>(
     [columns],
   );
   const visibleColumns = useMemo(() => columns.filter((column) => !column.hidden), [columns]);
-  const processedRows = useProcessedRows(props, columnMap, sortBy, filters);
+  const isPinned = usePinnedTest(props);
+  const processedRows = useProcessedRows(props, columnMap, sortBy, filters, isPinned);
   const virtualized =
     (props.virtualizeRows ?? true) && processedRows.length > VIRTUALIZATION_THRESHOLD;
   const { range, onScroll } = useRowWindow(processedRows.length, rowPitch, virtualized);
@@ -329,6 +357,7 @@ export function useDataGridModel<T extends Record<string, unknown>>(
     rowPitch,
     visibleColumns,
     processedRows,
+    isPinnedRow: isPinned ?? NEVER_PINNED,
     visibleRows: virtualized ? processedRows.slice(range.start, range.end) : processedRows,
     visibleRange: range,
     virtualized,

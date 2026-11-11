@@ -23,6 +23,7 @@ import {
   type AuditMessages,
   type AuditPagingPolicy,
 } from './config';
+import { problemsOf } from './problems';
 
 /**
  * A calendar date (`YYYY-MM-DD`), interpreted at UTC midnight by the API.
@@ -144,11 +145,12 @@ export interface AuditLogQuery {
  * in rather than read from module constants so the schema a host advertises as
  * a tool and the clamps the endpoint applies are the same three values.
  */
+// @request-input
 export function auditLogQuerySchema(
   vocabulary: AuditVocabulary,
   paging: AuditPagingPolicy = DEFAULT_PAGINATION,
 ) {
-  return z.object({
+  return z.strictObject({
     q: z.string().min(1).max(MAX_SEARCH_LENGTH).optional(),
     action_in: commaList(vocabulary.actionIds),
     resourceType_in: commaList(vocabulary.resourceIds),
@@ -199,7 +201,7 @@ function narrowFilters(value: ParsedQuery): Omit<AuditLogQuery, 'page' | 'pageSi
   };
 }
 
-/** Parse a request query, or throw the 400 the wire promises. */
+/** Parse a request query, or throw the 422 the wire promises (the sentence plus every problem). */
 export function parseAuditLogQuery(
   vocabulary: AuditVocabulary,
   query: Record<string, string | undefined>,
@@ -208,9 +210,9 @@ export function parseAuditLogQuery(
 ): AuditLogQuery {
   const parsed = auditLogQuerySchema(vocabulary, paging).safeParse(query);
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const path = issue?.path.join('.') ?? '';
-    throw new AuditApiError(400, `${messages.invalidQuery}${path ? ` (${path})` : ''}.`);
+    const problems = problemsOf(parsed.error);
+    const path = problems[0]?.path ?? '';
+    throw new AuditApiError(422, `${messages.invalidQuery}${path ? ` (${path})` : ''}.`, problems);
   }
   return {
     ...narrowFilters(parsed.data),

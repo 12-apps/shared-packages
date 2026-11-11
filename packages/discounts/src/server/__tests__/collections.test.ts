@@ -297,7 +297,11 @@ describe("through the surface", () => {
       .route("POST", "/discounts")
       .handle({ actor: { clientId: "tenant-1" }, params: {}, query: {}, body: WRITE_BODY });
     expect(response.status).toBe(422);
-    expect(response.body).toEqual({ error: FOREIGN, issues: { targets: FOREIGN } });
+    expect(response.body).toEqual({
+      error: FOREIGN,
+      issues: { targets: FOREIGN },
+      problems: [{ path: "targets", message: FOREIGN }],
+    });
   });
 
   it("C17: logs that refusal as a warning naming the field, not as an error", async () => {

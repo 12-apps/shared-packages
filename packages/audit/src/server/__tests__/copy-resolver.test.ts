@@ -180,6 +180,6 @@ describe('the vocabulary stays fixed, whoever is reading', () => {
     const [pt, en] = await Promise.all([ask('pt-BR'), ask('en-US')]);
 
     expect(en.status).toBe(pt.status);
-    expect(en.status).toBe(400);
+    expect(en.status).toBe(422);
   });
 });

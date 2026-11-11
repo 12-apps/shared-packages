@@ -477,7 +477,7 @@ The listing's query parameters, as published: `q` (≤200 chars), `action_in`,
 `resourceType_in`, `actorUserId`, `resourceId`, `from`/`to` (inclusive
 `YYYY-MM-DD`), `sort` (`createdAt:desc` — the default — or `createdAt:asc`) and
 `page`/`pageSize` (integers, clamped to the numbers above). `sort` is the one
-axis a trail HAS; an unknown value is refused with a 400 rather than accepted
+axis a trail HAS; an unknown value is refused with a 422 (`problems` names the field) rather than accepted
 and dropped, because an accepted-and-dropped sort answers a caller's request
 with the opposite order and no way to notice.
 

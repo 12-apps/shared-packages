@@ -24,6 +24,12 @@ describe("desktopReportSchema", () => {
     expect(desktopReportSchema.safeParse(CRASH).success).toBe(true);
   });
 
+  it("refuses a key the schema does not declare, top level and inside a breadcrumb", () => {
+    expect(desktopReportSchema.safeParse({ ...CRASH, hostname: "x" }).success).toBe(false);
+    const crumb = { at: "t", text: "c", extra: 1 };
+    expect(desktopReportSchema.safeParse({ ...CRASH, breadcrumbs: [crumb] }).success).toBe(false);
+  });
+
   it("refuses an unknown kind and an over-long message", () => {
     expect(desktopReportSchema.safeParse({ ...CRASH, kind: "anything" }).success).toBe(false);
     expect(desktopReportSchema.safeParse({ ...CRASH, message: "x".repeat(2001) }).success).toBe(false);

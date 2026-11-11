@@ -8,6 +8,7 @@ import type { RefreshOptions } from './refresh-options';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
 import { CredentialsError, UnsupportedOperationError } from './errors';
+import { assertPartialRefundAllowed } from './partial-refund';
 import type {
   AttemptLedger,
   ChargeStore,
@@ -354,10 +355,8 @@ export function createPaymentsGateway<P extends string>(
       if (!adapter.capabilities.refunds || !adapter.refund) {
         throw new UnsupportedOperationError(adapter.name, 'refunds');
       }
-      if (input.amount && !adapter.capabilities.partialRefunds) {
-        throw new UnsupportedOperationError(adapter.name, 'partial refunds');
-      }
       const stored = await config.charges.findByProviderChargeId(provider, input.providerChargeId);
+      if (input.amount) assertPartialRefundAllowed(adapter.name, adapter.capabilities);
       return adapter.refund(input, creds, stored?.snapshot.settlementHints);
     },
 

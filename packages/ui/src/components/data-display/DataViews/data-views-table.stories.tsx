@@ -652,6 +652,37 @@ export const Table: Story = {
 };
 
 /**
+ * A just-saved record pinned first (FUT-4745): `pinnedRowId` names it,
+ * `pinnedRowLabel` is what a screen reader hears for it. The row leads whatever
+ * the sort or the filter, is marked with a primary accent bar and a faint
+ * primary fill, and is shown ONCE — it leaves its sorted place. Sort by any
+ * column, search, or switch layout in Exibir: "029B4E8E" stays on top.
+ *
+ * The pinned pedido is deliberately a CANCELADO one: its Situação chip is the
+ * outlined `danger` chip, red text straight on the row's fill, which is the
+ * contrast case the fill is capped for (light mode; dark mode marks the row
+ * with the accent bar alone). Hover the row to see it at its weakest.
+ */
+export const PinnedRow: Story = {
+  args: {
+    // Client mode, so the search and the sort run in the browser and the pin
+    // can be seen surviving both.
+    ...base,
+    defaultLayout: "table",
+    ignoreStoredLayout: true,
+    pinnedRowId: "029B4E8E",
+    pinnedRowLabel: "Salvo agora",
+  },
+  render: screen,
+};
+
+/** The same pin in the Grade layout: the veil and the accent bar over the entity's own card. */
+export const PinnedRowCards: Story = {
+  args: { ...PinnedRow.args, defaultLayout: "cards" },
+  render: screen,
+};
+
+/**
  * A grid with NO row selection — `selectable={false}`, for a screen with no
  * bulk action left to offer.
  *

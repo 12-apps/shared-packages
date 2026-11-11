@@ -10,6 +10,7 @@ import {
   type ReportResponse,
   type ReportRoute,
 } from '../create-report-builder';
+import { readWorkingCopy } from '../working-copy';
 import type { SavedReportDb, SavedReportRecord } from '../saved';
 
 /**
@@ -396,5 +397,24 @@ describe('what the rest of the surface says about a parked edit', () => {
     expect(response.status).toBe(200);
     expect(harness.row().status).toBe('archived');
     expect(harness.row().workingCopy).toMatchObject({ spec: EDITED_SPEC });
+  });
+});
+
+describe('reading a parked edit back from storage', () => {
+  it('keeps an edit whose stored JSON carries keys the schema does not declare', () => {
+    const stored = {
+      name: 'Parked',
+      spec: { ...PUBLISHED_SPEC, retiredKey: 1 },
+      leftover: true,
+    };
+
+    const read = readWorkingCopy(stored);
+
+    expect(read).toMatchObject({ name: 'Parked', spec: { entity: 'orders' } });
+    expect(read).not.toHaveProperty('leftover');
+  });
+
+  it('still reads a genuinely broken stored edit as no edit', () => {
+    expect(readWorkingCopy({ name: 'x', spec: { entity: 7 } })).toBeNull();
   });
 });

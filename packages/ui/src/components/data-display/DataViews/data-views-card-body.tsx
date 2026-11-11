@@ -1,6 +1,7 @@
 "use client";
 
 import { Box } from "../../../mui/Box";
+import { PinnedSlot, type PinnedMark } from "./data-views-pinned-slot";
 
 import { cardGridTracks } from "./data-views-grid-helpers";
 import type { DataViewCardSelection } from "./data-views-types";
@@ -18,6 +19,8 @@ interface CardBodyProps<T extends Record<string, unknown>> {
   targetCardWidth: number;
   /** Content scale (padding + type) handed to each card, from the zoom slider. */
   cardScale: number;
+  /** The pinned row (FUT-4745) and its label: that card is marked and labelled. */
+  pinned?: PinnedMark<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -38,6 +41,7 @@ export function CardBody<T extends Record<string, unknown>>({
   onToggleId,
   targetCardWidth,
   cardScale,
+  pinned,
   dataTestId,
   emptyState,
 }: CardBodyProps<T>): React.JSX.Element {
@@ -59,13 +63,13 @@ export function CardBody<T extends Record<string, unknown>>({
       {rows.map((row) => {
         const id = getRowId(row);
         return (
-          <Box key={id}>
+          <PinnedSlot key={id} pinned={row === pinned?.row} label={pinned?.label}>
             {renderCard(row, {
               selected: selectedIds.has(id),
               onToggleSelect: onToggleId && (() => onToggleId(id)),
               scale: cardScale,
             })}
-          </Box>
+          </PinnedSlot>
         );
       })}
     </Box>

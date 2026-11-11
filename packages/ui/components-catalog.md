@@ -92,7 +92,7 @@ Components for displaying data, visualizations, and information to users.
 ### DataGrid
 **Purpose**: Advanced data table with sorting, filtering, pagination, and editing
 **Use Cases**: Complex data tables, admin panels, data management interfaces
-**Features**: Row selection, inline editing, virtual scrolling, server/client modes, column resizing
+**Features**: Row selection, inline editing, virtual scrolling, server/client modes, column resizing, one pinned row shown first and marked with a primary accent bar and faint fill (`pinnedRowId` + `pinnedRowLabel`, also on `DataViewsTableBase`/`DataViewsGrid` for every layout)
 **Types**: `GridSelectionMode`, `GridColumn`, `GridSort`, `GridFilter`
 **Location**: `src/components/data-display/DataGrid`
 **Docs**: `src/components/data-display/DataGrid/DataGrid.md`

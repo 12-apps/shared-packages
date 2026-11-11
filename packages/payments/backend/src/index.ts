@@ -228,6 +228,7 @@ export type {
   WebhookDelivery,
 } from './core/types';
 
+export { supportsPartialRefund } from './core/partial-refund';
 export { createSettingsService, credentialStoreFrom, type SettingsService, type SettingsServiceOptions } from './config/service';
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';

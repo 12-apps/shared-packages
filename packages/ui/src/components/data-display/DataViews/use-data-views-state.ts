@@ -14,6 +14,7 @@ import {
 } from "./data-views-columns";
 import { computeActiveFilterCount, defaultSortFields } from "./data-views-grid-helpers";
 import { resolveScope, useScopeConfigChecks, type ScopeConfig } from "./data-views-scopes";
+import { usePinnedFirst } from "./data-views-pinned";
 import { serverDerived, useServerQuery } from "./data-views-server-query";
 import { useSelection } from "./data-views-selection";
 import { useClearFilters, useStateWriters } from "./data-views-writers";
@@ -70,6 +71,8 @@ interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
    * reject the pill/scope clash at setup. See `assertNoScopePillOverlap`.
    */
   scopeFieldId?: string;
+  /** The row to show first and mark (FUT-4745) — see `DataViewsGrid`. */
+  pinnedRowId?: string | number | null;
 }
 
 /** Everything the DataViewsGrid render needs; keeps the component itself thin. */
@@ -89,7 +92,10 @@ export interface DataViewsController<T extends Record<string, unknown>> {
   clearFilters: () => void;
   /** Changes on every {@link clearFilters}; the filter controls are keyed on it. */
   clearKey: number;
+  /** The rows to render, the pinned one first when there is one. */
   matched: T[];
+  /** The row `pinnedRowId` resolved to, or undefined — the bodies mark it. */
+  pinnedRow?: T;
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */
   hideableColumns: HideableColumn[];
@@ -319,15 +325,12 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   server,
   scopes = [],
   scopeFieldId,
+  pinnedRowId,
 }: UseDataViewsStateArgs<T>): DataViewsController<T> {
   useScopeConfigChecks(scopes, fields.map((field) => field.id), scopeFieldId, server !== undefined);
   const copy = useDataViewsCopy();
   const { columnsWithActions, allColumnIds } = useColumnsWithActions(columns, {
-    rowActions,
-    rowActionsLeading,
-    renderRowMenu,
-    testIdPrefix,
-    getRowId,
+    rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId,
   });
   // Seed once — see {@link seedState}.
   const [state, setState] = useState<DataViewState>(() =>
@@ -338,7 +341,8 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   useStateSyncEffects(appliedState, syncState, state, onStateChange, setState);
 
   const { patch, toggleColumn } = useStateWriters(setState);
-  const matched = useMatchedRows(server, rows, columns, fields, rangeFields, state);
+  const filtered = useMatchedRows(server, rows, columns, fields, rangeFields, state);
+  const { matched, pinnedRow } = usePinnedFirst(filtered, rows, getRowId, pinnedRowId);
   // Resolved at READ time, every render: a stale deep link or a saved view naming
   // a scope that has since been removed falls back to the first declared scope
   // instead of putting an id the backend rejects on the wire.
@@ -361,6 +365,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     patch,
     ...useClearFilters(patch),
     matched,
+    pinnedRow,
     gridColumns,
     hideableColumns,
     columnOrder: orderedColumnIds(allColumnIds, state.order),

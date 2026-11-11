@@ -125,12 +125,16 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // The worker's first mount of the admin and its edit form pays for emotion
 // writing every style once (1–1.5 s alone, several times that on a loaded
 // runner). Paid here, under the hook's own limit, not inside the first case
-// (FUT-4530).
+// (FUT-4530). jsdom's first getComputedStyle over those styles is the next
+// cost (0.7 s here; the ink case below reached 5.1 s on a loaded runner after
+// FUT-4477's step form): read one here too, so that case no longer pays the
+// first read of the sheets (0.7 s → 0.4 s locally).
 browserRootFontForThisFile();
 
 beforeAll(async () => {
   mount([LOCKED]);
-  await openEdit(LOCKED.id);
+  const period = await openEdit(LOCKED.id);
+  getComputedStyle(within(period).getByTestId("total-form-field-startsAt"));
   cleanup();
 });
 

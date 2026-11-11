@@ -166,8 +166,25 @@ describe("GET /discounts", () => {
       params: {},
       query: { type_in: "NOT_A_TYPE" },
     });
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: PT_BR_DISCOUNTS_SERVER_COPY.invalidQuery });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      error: PT_BR_DISCOUNTS_SERVER_COPY.invalidQuery,
+      problems: [{ path: "type_in" }],
+    });
+    expect(calls.list).toEqual([]);
+  });
+
+  it("refuses a query key it does not declare, naming it, without reaching the store", async () => {
+    const endpoint = routeFor(fakeStore(calls), "GET", "/discounts");
+    const response = await endpoint.handle({
+      actor: ACTOR,
+      params: {},
+      query: { utm_source: "mail" },
+    });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      problems: [{ path: "utm_source", message: "Unrecognized key" }],
+    });
     expect(calls.list).toEqual([]);
   });
 });
@@ -256,6 +273,7 @@ describe("POST /discounts", () => {
     expect(response.body).toEqual({
       error: PT_BR_DISCOUNTS_SERVER_COPY.comboScopeRequired,
       issues: { scope: PT_BR_DISCOUNTS_SERVER_COPY.comboScopeRequired },
+      problems: [{ path: "scope", message: PT_BR_DISCOUNTS_SERVER_COPY.comboScopeRequired }],
     });
     expect(calls.create).toEqual([]);
   });
@@ -283,6 +301,7 @@ describe("POST /discounts", () => {
     expect(response.body).toEqual({
       error: PT_BR_DISCOUNTS_SERVER_COPY.categoryTargetRequired,
       issues: { targets: PT_BR_DISCOUNTS_SERVER_COPY.categoryTargetRequired },
+      problems: [{ path: "targets", message: PT_BR_DISCOUNTS_SERVER_COPY.categoryTargetRequired }],
     });
     expect(calls.create).toEqual([]);
   });

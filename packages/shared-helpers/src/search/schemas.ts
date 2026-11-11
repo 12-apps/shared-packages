@@ -109,7 +109,7 @@ export function createSearchInput<E extends Record<string, z.ZodTypeAny> = Recor
 
   Object.assign(shape, buildFilterShape(entityConfig));
 
-  const baseSchema = z.object(shape);
+  const baseSchema = z.strictObject(shape);
 
   type Output = ParsedSearchInput & { [K in keyof E]: z.infer<E[K]> };
 
@@ -140,6 +140,13 @@ export function createSearchInput<E extends Record<string, z.ZodTypeAny> = Recor
     ) as unknown as z.ZodType<Output>;
 }
 
+/** The top-level keys a Zod issue blames: the unknown ones, or the one whose value failed. */
+function offendingKeys(issue: z.core.$ZodIssue): string[] {
+  if (issue.code === "unrecognized_keys") return issue.keys;
+  const key = issue.path[0];
+  return typeof key === "string" ? [key] : [];
+}
+
 /**
  * Parse admin-list search params RESILIENTLY: a single malformed value (e.g.
  * `?page=oops`) drops only its own key and re-parses, instead of failing the whole
@@ -148,25 +155,25 @@ export function createSearchInput<E extends Record<string, z.ZodTypeAny> = Recor
  * the server ignore a valid `q`/filter the user can still see. Falls back to all
  * schema defaults only if the cleaned input still won't parse.
  *
- * REST/MCP route handlers keep using strict `.safeParse` (a 400 is the right answer
- * for a programmatic caller); this is for the admin PAGES, which must degrade
+ * REST/MCP route handlers keep using strict `.safeParse` (a 422 with the problems is
+ * the right answer for a programmatic caller); this is for the admin PAGES, which must degrade
  * gracefully rather than 500 or desync.
  */
 export function parseSearchParamsResilient<T>(
   schema: z.ZodType<T>,
   raw: Record<string, unknown>,
 ): T {
-  const result = schema.safeParse(raw);
-  if (result.success) return result.data;
-  const badKeys = new Set(
-    result.error.issues
-      .map((issue) => issue.path[0])
-      .filter((key): key is string => typeof key === "string"),
-  );
-  if (badKeys.size > 0) {
-    const cleaned = Object.fromEntries(Object.entries(raw).filter(([key]) => !badKeys.has(key)));
-    const retry = schema.safeParse(cleaned);
-    if (retry.success) return retry.data;
+  // Drop what each failed parse blames and parse again, until it parses or
+  // nothing new is blamed: a strict object reports an unknown key BEFORE its
+  // object-level rules run, so one pass can hide a second bad key.
+  let current = raw;
+  for (let pass = 0; pass <= Object.keys(raw).length; pass += 1) {
+    const result = schema.safeParse(current);
+    if (result.success) return result.data;
+    const bad = new Set(result.error.issues.flatMap(offendingKeys));
+    const kept = Object.entries(current).filter(([key]) => !bad.has(key));
+    if (kept.length === Object.keys(current).length) break;
+    current = Object.fromEntries(kept);
   }
   return schema.parse({});
 }

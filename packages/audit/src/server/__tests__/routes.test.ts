@@ -89,9 +89,9 @@ describe('tenancy', () => {
 
   it('scopes EVERY query to the actor tenant, whatever the request says', async () => {
     // The attack surface: a caller adding a tenant to the query string. The wire
-    // schema declares no such key and zod strips what it does not declare, so the
-    // predicate the package built must still carry the actor's tenant — and only
-    // that one.
+    // schema is strict and declares no such key, so the request is refused with
+    // a 422 before any read; and a plain read still carries the actor's tenant —
+    // and only that one — in the predicate the package built.
     const h = harness();
     h.fake.seed({ clientId: OTHER, resourceId: 'theirs' });
 
@@ -102,7 +102,11 @@ describe('tenancy', () => {
       where: JSON.stringify({ clientId: OTHER }),
     });
 
-    expect(page(response.body).data).toEqual([]);
+    expect(response.status).toBe(422);
+    expect(h.fake.wheres).toEqual([]);
+
+    const plain = await h.get('/audit-logs');
+    expect(page(plain.body).data).toEqual([]);
     expect(h.fake.wheres.length).toBeGreaterThan(0);
     for (const where of h.fake.wheres) expect(where.clientId).toBe(TENANT);
   });
@@ -328,15 +332,32 @@ describe('filters', () => {
     expect((await ids(h, { resourceType_in: ',, ,' })).length).toBe(3);
   });
 
-  it('answers 400 for a malformed date or an unknown filter value', async () => {
+  it('answers 422 for a malformed date or an unknown filter value', async () => {
     const h = harness();
 
-    expect((await h.get('/audit-logs', { from: '20-07-2026' })).status).toBe(400);
-    expect((await h.get('/audit-logs', { action_in: UNKNOWN_ACTION })).status).toBe(400);
-    expect((await h.get('/audit-logs', { resourceType_in: 'invoice' })).status).toBe(400);
-    // The message names the offending field so a caller can fix it.
-    expect((await h.get('/audit-logs', { from: 'nope' })).body).toEqual({
+    expect((await h.get('/audit-logs', { from: '20-07-2026' })).status).toBe(422);
+    expect((await h.get('/audit-logs', { action_in: UNKNOWN_ACTION })).status).toBe(422);
+    expect((await h.get('/audit-logs', { resourceType_in: 'invoice' })).status).toBe(422);
+    // The message names the offending field so a caller can fix it, and the
+    // problems list carries every problem with its path.
+    expect((await h.get('/audit-logs', { from: 'nope' })).body).toMatchObject({
       error: `${DEFAULT_MESSAGES.invalidQuery} (from).`,
+      problems: expect.arrayContaining([expect.objectContaining({ path: 'from' })]),
+    });
+  });
+
+  it('answers 422 naming every unknown query key, and reads nothing', async () => {
+    const h = harness();
+    seedThree(h);
+
+    const response = await h.get('/audit-logs', { utm: 'x', extra: '1' });
+
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      problems: [
+        { path: 'utm', message: 'Unrecognized key' },
+        { path: 'extra', message: 'Unrecognized key' },
+      ],
     });
   });
 
@@ -367,13 +388,13 @@ describe('filters', () => {
     expect(h.fake.orderBys).toContainEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
   });
 
-  it('answers 400 for an order it cannot serve', async () => {
+  it('answers 422 for an order it cannot serve', async () => {
     // The third option — accept it and ignore it — is the one no client can tell
     // apart from a working sort.
     const h = harness();
 
-    expect((await h.get('/audit-logs', { sort: 'action:asc' })).status).toBe(400);
-    expect((await h.get('/audit-logs', { sort: 'createdAt' })).body).toEqual({
+    expect((await h.get('/audit-logs', { sort: 'action:asc' })).status).toBe(422);
+    expect((await h.get('/audit-logs', { sort: 'createdAt' })).body).toMatchObject({
       error: `${DEFAULT_MESSAGES.invalidQuery} (sort).`,
     });
   });
@@ -385,7 +406,7 @@ describe('filters', () => {
     seedThree(h);
 
     expect((await h.get('/audit-logs', { q: 'o'.repeat(200) })).status).toBe(200);
-    expect((await h.get('/audit-logs', { q: 'o'.repeat(201) })).status).toBe(400);
+    expect((await h.get('/audit-logs', { q: 'o'.repeat(201) })).status).toBe(422);
   });
 });
 

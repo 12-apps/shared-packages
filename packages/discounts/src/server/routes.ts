@@ -27,6 +27,7 @@ import {
 import { logWrite, observed, type DiscountsLogger } from "./logging";
 import { fallbackSentence } from "./fallback-copy";
 import { prepareWrite } from "./prepare-write";
+import { problemsOf } from "./problems";
 import { updateWithWindow, WindowChangedError, windowModeOf } from "./update-window";
 import { isKnownTimeZone } from "../timezone";
 import { listDiscountsQuery } from "./mcp";
@@ -132,12 +133,20 @@ function ok(body: unknown): WireResponse {
   return { status: 200, body };
 }
 
-/** The `{ error, issues }` shape a form reads its per-input errors out of. */
+/**
+ * The `{ error, issues, problems }` shape a form reads its per-input errors out
+ * of: `issues` for a client that predates `problems` (FUT-4729), `problems` for
+ * the 422 every strict-input surface answers in.
+ */
 function fieldError(error: DiscountValidationError | ForeignTargetError): WireResponse {
   const status = error instanceof DiscountValidationError ? error.status : 422;
   return {
     status,
-    body: { error: error.message, issues: { [error.field]: error.message } },
+    body: {
+      error: error.message,
+      issues: { [error.field]: error.message },
+      problems: [{ path: error.field, message: error.message }],
+    },
   };
 }
 
@@ -187,8 +196,14 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       const parsed = schema.safeParse(query);
       if (!parsed.success) {
         // Worded per request, from the tag the adapter put on it — never at the
-        // mount, which ran once at boot.
-        return { status: 400, body: { error: resolveDiscountsCopy(config.copy, locale).invalidQuery } };
+        // mount, which ran once at boot. Every problem rides along with its path.
+        return {
+          status: 422,
+          body: {
+            error: resolveDiscountsCopy(config.copy, locale).invalidQuery,
+            problems: problemsOf(parsed.error),
+          },
+        };
       }
       // Returned as-is rather than wrapped: the page IS the `{ data,
       // pagination }` envelope the advertised response describes, and wrapping

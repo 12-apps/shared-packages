@@ -148,6 +148,8 @@ export const GRID_ONLY_PROPS = [
   'onRequestData',
   'ariaLabel',
   'ariaDescription',
+  'pinnedRowId',
+  'pinnedRowLabel',
 ] as const;
 
 function omitGridProps(rest: Record<string, unknown>): React.HTMLAttributes<HTMLElement> {
