@@ -91,15 +91,30 @@ function snapshotOf(values: Readonly<Record<string, string>>, extra: StepExtras)
   };
 }
 
-/** Bars that stay in view publish their heights: the reveal moves only past them. */
+/** The scroll area an element scrolls in, or null. */
+function scrollAreaOf(element: HTMLElement | null): HTMLElement | null {
+  let area = element?.parentElement ?? null;
+  while (area && !["auto", "scroll"].includes(getComputedStyle(area).overflowY)) area = area.parentElement;
+  return area;
+}
+
+/**
+ * How much of the scroll area the sticky bars cover, from its top and from its
+ * bottom: where they actually sit, the area's own padding included — a sticky
+ * bar rests inside that padding, so its height alone fell short by it.
+ */
 function useInsets(): { chrome: RefObject<HTMLDivElement | null>; bar: RefObject<HTMLDivElement | null>; insets: RevealOptions } {
   const chrome = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
-  return {
-    chrome,
-    bar,
-    insets: { topInset: () => chrome.current?.offsetHeight ?? 0, bottomInset: () => bar.current?.offsetHeight ?? 0 },
+  const covered = (from: "top" | "bottom"): number => {
+    const element = from === "top" ? chrome.current : bar.current;
+    const area = scrollAreaOf(element);
+    if (!element || !area) return element?.offsetHeight ?? 0;
+    const box = element.getBoundingClientRect();
+    const frame = area.getBoundingClientRect();
+    return from === "top" ? box.bottom - frame.top : frame.bottom - box.top;
   };
+  return { chrome, bar, insets: { topInset: () => covered("top"), bottomInset: () => covered("bottom") } };
 }
 
 /** After a pendência or a server error opens a step: the caret goes to its first invalid field. */
@@ -114,6 +129,31 @@ function useFocusField(root: RefObject<HTMLElement | null>): (step: StepNumber) 
     return () => window.clearTimeout(timer);
   }, [request, root]);
   return (step) => setRequest({ step, at: Date.now() });
+}
+
+/**
+ * The height of the scroll area the form sits in, less its padding: the form
+ * fills it, so the submit bar rests on the dialog's bottom edge even when the
+ * steps are short (the prototype's footer), and sticks there when they are not.
+ * Measured, because the dialog's own height is the library's to decide.
+ */
+function useScrollAreaHeight(root: RefObject<HTMLElement | null>): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const area = scrollAreaOf(root.current);
+    if (!area || typeof ResizeObserver === "undefined") return undefined;
+    const scroller = area;
+    const measure = (): void => {
+      const style = getComputedStyle(scroller);
+      const inner = scroller.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0);
+      setHeight(inner > 0 ? inner : null);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    measure();
+    return () => observer.disconnect();
+  }, [root]);
+  return height;
 }
 
 /** Passing step 4 collapses every card: the submit bar is what comes next. */
@@ -228,10 +268,29 @@ function useStepModel(props: StepFormProps) {
   return { form, dirty, merged, issues, hold, world };
 }
 
+/** A pendência opens its step at the field; a strip chip opens Regras at its own block. */
+function chromeActions(
+  setFlow: Dispatch<SetStateAction<StepFlow>>,
+  focusField: (step: StepNumber) => void,
+  revealChip: (chip: StripChip) => void,
+): { onIssue: (issue: Pendencia) => void; onChip: (chip: StripChip) => void } {
+  return {
+    onIssue: (issue) => {
+      setFlow((current) => flowOpenTried(current, [issue.step]));
+      focusField(issue.step);
+    },
+    onChip: (chip) => {
+      setFlow((current) => flowOpen({ ...current, all: false }, 4));
+      revealChip(chip);
+    },
+  };
+}
+
 export function DiscountStepForm(props: StepFormProps): JSX.Element {
   const { copy, formatters, groups, editing, extra, flow, setFlow } = props;
   const root = useRef<HTMLDivElement>(null);
   const width = useElementWidth(root);
+  const areaHeight = useScrollAreaHeight(root);
   const [rowMin, setRowMin] = useState(rowMinPx(FALLBACK_CARD_PX));
   const { chrome, bar, insets } = useInsets();
   const focusField = useFocusField(root);
@@ -254,7 +313,11 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
   const sentence = resumoSentence(form, world);
 
   return (
-    <Box ref={root} data-testid="discount-step-form" sx={{ minWidth: 0 }}>
+    <Box
+      ref={root}
+      data-testid="discount-step-form"
+      sx={{ minWidth: 0, display: "flex", flexDirection: "column", minHeight: areaHeight === null ? undefined : `${areaHeight}px` }}
+    >
       <Box ref={chrome} sx={{ position: "sticky", top: 0, zIndex: 1, bgcolor: "background.paper", pb: 1.5 }}>
         <FormChrome
           copy={copy}
@@ -262,16 +325,10 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
           dirty={dirty}
           issues={issues}
           strip={editing ? stripChips(form, world) : []}
-          onIssue={(issue: Pendencia) => {
-            setFlow((current) => flowOpenTried(current, [issue.step]));
-            focusField(issue.step);
-          }}
-          onChip={(chip: StripChip) => {
-            setFlow((current) => flowOpen({ ...current, all: false }, 4));
-            revealChip(chip);
-          }}
+          {...chromeActions(setFlow, focusField, revealChip)}
         />
       </Box>
+      <Box sx={{ flex: 1 }}>
       <ComboPreviewLayout
         copy={copy}
         formatters={formatters}
@@ -297,6 +354,7 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
           revealWatch={[chrome.current, bar.current]}
         />
       </ComboPreviewLayout>
+      </Box>
       <SubmitBar
         bar={bar}
         copy={copy}
