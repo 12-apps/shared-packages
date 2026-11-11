@@ -1,0 +1,43 @@
+[
+  {
+    "targetType": "CATEGORY",
+    "slug": "categories",
+    "label": "Categorias",
+    "nests": false,
+    "targets": [
+      {
+        "id": "cat-bebidas",
+        "name": "Bebidas",
+        "parentId": null
+      },
+      {
+        "id": "cat-lanches",
+        "name": "Lanches",
+        "parentId": null
+      }
+    ]
+  },
+  {
+    "targetType": "ITEM",
+    "slug": "items",
+    "label": "Produtos",
+    "nests": false,
+    "targets": [
+      {
+        "id": "item-cafe",
+        "name": "Café",
+        "parentId": "cat-bebidas"
+      },
+      {
+        "id": "item-suco",
+        "name": "Suco",
+        "parentId": "cat-bebidas"
+      },
+      {
+        "id": "item-x-salada",
+        "name": "X-Salada",
+        "parentId": "cat-lanches"
+      }
+    ]
+  }
+]
