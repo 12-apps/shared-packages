@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import { useState, type ComponentType, type JSX } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import AddIcon from "@mui/icons-material/Add";
@@ -42,7 +42,9 @@ import {
   discountsAppliedState,
   discountsSearch,
 } from "./table-config";
+import { useBulkActions, type BulkActions } from "./use-bulk-actions";
 import { useDiscountsData } from "./use-discounts-data";
+import type { DiscountsBulkSlotProps } from "./use-discounts-bulk";
 
 /**
  * The promotions list: a grid in SERVER mode — the URL params ARE the query —
@@ -68,6 +70,20 @@ export interface DiscountsScreenProps {
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
   breadcrumb?: readonly { label: string; href?: string }[];
+  /**
+   * The host's report for the bulk actions (FUT-4420). A COMPONENT, for the
+   * reason `RolesScreen.bulkSlot` is one: it renders INSIDE this screen's
+   * `CardActionsProvider` (so it reaches `useCardActions()`), around the grid
+   * it receives as `children`, and holds the chrome that says what a batch did
+   * - progress, the per-row reasons, "Tentar novamente", Desfazer, the
+   * download of the failures. The package owns the state and the server
+   * routes; the host owns the look.
+   *
+   * Absent - the default - the three entries ("Ativar todos", "Desativar
+   * todos", "Estender validade…") are NOT offered and the screen is what it
+   * was: a batch with nowhere to report would be a silent one.
+   */
+  bulkSlot?: ComponentType<DiscountsBulkSlotProps>;
 }
 
 /** The bulk delete's confirmation, described from the SELECTION. */
@@ -168,6 +184,7 @@ function DiscountsGrid({
   server,
   onVisibleRowsChange,
   bulkDelete,
+  bulkActions,
 }: {
   rows: DiscountListItem[];
   copy: CompleteDiscountsWebCopy;
@@ -176,6 +193,7 @@ function DiscountsGrid({
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (next: DiscountListItem[]) => void;
   bulkDelete: ReturnType<typeof useBulkDelete>;
+  bulkActions: readonly RowAction<DiscountListItem>[];
 }): JSX.Element {
   return (
     <>
@@ -191,6 +209,7 @@ function DiscountsGrid({
         testIdPrefix="discounts"
         rowActions={
           [
+            ...bulkActions,
             {
               id: "delete",
               label: copy.actions.delete,
@@ -280,6 +299,7 @@ function ScreenBody({
   server,
   onVisibleRowsChange,
   bulkDelete,
+  bulk,
 }: {
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
@@ -292,6 +312,7 @@ function ScreenBody({
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (rows: DiscountListItem[]) => void;
   bulkDelete: ReturnType<typeof useBulkDelete>;
+  bulk: BulkActions;
 }): JSX.Element {
   return (
     <Dashboard.Body>
@@ -315,15 +336,18 @@ function ScreenBody({
         errorDismissLabel={copy.actions.actionFailedDismiss}
       >
         <DaysUnknownListNotice rows={rows} copy={copy} timeZoneSettings={menu.timeZoneSettings} />
-        <DiscountsGrid
-          rows={rows}
-          copy={copy}
-          menu={menu}
-          appliedState={appliedState}
-          server={server}
-          onVisibleRowsChange={onVisibleRowsChange}
-          bulkDelete={bulkDelete}
-        />
+        {bulk.frame(
+          <DiscountsGrid
+            rows={rows}
+            copy={copy}
+            menu={menu}
+            appliedState={appliedState}
+            server={server}
+            onVisibleRowsChange={onVisibleRowsChange}
+            bulkDelete={bulkDelete}
+            bulkActions={bulk.actions}
+          />,
+        )}
       </CardActionsProvider>
     </Dashboard.Body>
   );
@@ -336,6 +360,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
+  const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot);
 
   const rows = useDiscountRows(data.page?.data, formatters, copy, timezone);
 
@@ -385,6 +410,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
           server={server}
           onVisibleRowsChange={setVisibleRows}
           bulkDelete={bulkDelete}
+          bulk={bulk}
         />
       </Dashboard>
     </DataViewsCopyProvider>

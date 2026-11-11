@@ -1,4 +1,4 @@
-import type { DiscountsFormCopy, DiscountsWebCopy, DiscountsWindowCopy } from "./copy";
+import type { DiscountsBulkCopy, DiscountsFormCopy, DiscountsWebCopy, DiscountsWindowCopy } from "./copy";
 
 /**
  * The complete shape of a pack, split from `./copy` for the file-size gate;
@@ -22,7 +22,8 @@ export type DiscountsWindowFallbackKey =
  * own two, and what `createWebDiscounts` hands its screens once it has filled
  * a host's pack in.
  */
-export type CompleteDiscountsWebCopy = Omit<DiscountsWebCopy, "window" | "form"> & {
+export type CompleteDiscountsWebCopy = Omit<DiscountsWebCopy, "window" | "form" | "bulk"> & {
+  readonly bulk: DiscountsBulkCopy;
   readonly window: DiscountsWindowCopy & Required<Pick<DiscountsWindowCopy, DiscountsWindowFallbackKey>>;
   readonly form: Omit<DiscountsFormCopy, "calendar" | "endsBeforeStartDay"> & {
     readonly calendar: Required<NonNullable<DiscountsFormCopy["calendar"]>>;

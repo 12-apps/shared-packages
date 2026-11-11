@@ -24,11 +24,20 @@ export {
   type WebDiscounts,
 } from "./create-web-discounts";
 export type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
+export {
+  foldRetry,
+  undoableOf,
+  type DiscountsBulkRequest,
+  type DiscountsBulkSlotProps,
+  type DiscountsBulkState,
+} from "./use-discounts-bulk";
+export * from "../bulk";
 
 export {
   missingWebCopy,
   fill,
   type DiscountsActionsCopy,
+  type DiscountsBulkCopy,
   type DiscountsCardCopy,
   type DiscountsFormCopy,
   type DiscountsScreenCopy,

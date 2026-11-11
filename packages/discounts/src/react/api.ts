@@ -1,3 +1,4 @@
+import type { DiscountBulkOperation, DiscountBulkResult } from "../bulk";
 import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
@@ -259,6 +260,8 @@ export interface DiscountsApiClient {
   create(input: DiscountFormPayload): Promise<DiscountsResult<DiscountWireRecord>>;
   update(id: string, input: DiscountFormPayload): Promise<DiscountsResult<{ id: string }>>;
   remove(id: string): Promise<DiscountsResult<{ id: string }>>;
+  /** Activate, deactivate, extend or undo a batch: one answer per discount (FUT-4420). */
+  bulk(operation: DiscountBulkOperation): Promise<DiscountsResult<DiscountBulkResult>>;
 }
 
 export function createDiscountsApiClient(
@@ -279,5 +282,6 @@ export function createDiscountsApiClient(
     update: (id, input) =>
       transport.send<{ id: string }>(item(id), "PATCH", toWriteBody(input, formatters)),
     remove: (id) => transport.send<{ id: string }>(item(id), "DELETE"),
+    bulk: (operation) => transport.send<DiscountBulkResult>(`${collection}/bulk`, "POST", operation),
   };
 }
