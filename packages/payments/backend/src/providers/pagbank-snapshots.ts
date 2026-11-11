@@ -17,7 +17,7 @@
  */
 import { ProviderRequestError } from '../core/errors';
 import type { CardFunding } from '../core/card-funding';
-import type { ChargeInput, ChargeSnapshot } from '../core/types';
+import type { ChargeInput, ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
 import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
 import { NAME } from './pagbank-http';
@@ -85,7 +85,7 @@ export function settledCharge(res: PagBankOrderResponse) {
   return charges.find((c) => c.status === 'PAID') ?? charges[0];
 }
 
-/** The refunded total a canceled charge reports, or 0 when it reports none. */
+/** The CUMULATIVE refunded total a charge reports, or 0 when it reports none. */
 export function refundedCents(charge: PagBankOrderCharge | undefined): number {
   const refunded = charge?.amount?.summary?.refunded;
   return typeof refunded === 'number' ? refunded : 0;
@@ -138,7 +138,9 @@ function pixQrLapsed(charge: PagBankOrderCharge): boolean {
 function chargeStatus(charge: PagBankOrderCharge): ChargeSnapshot['status'] {
   switch (charge.status) {
     case 'PAID':
-      return 'PAID';
+      // A partial cancel keeps the charge PAID and moves the summary (FUT-4571):
+      // part of the money stands, so it is never a reversal, never plain PAID.
+      return refundedCents(charge) > 0 ? 'PARTIALLY_REFUNDED' : 'PAID';
     case 'AUTHORIZED':
       return 'AUTHORIZED';
     case 'DECLINED':
@@ -168,6 +170,26 @@ function orderStatus(
 }
 
 /**
+ * A charge's `payment_method.type` in OUR vocabulary, or null when it names
+ * none we know. Card is CREDIT_CARD or DEBIT_CARD (FUT-4571).
+ */
+export function chargeMethod(charge: PagBankOrderCharge | undefined): PaymentMethodKind | null {
+  const type = charge?.payment_method?.type;
+  if (type === 'CREDIT_CARD' || type === 'DEBIT_CARD') return 'CARD';
+  if (type === 'PIX') return 'PIX';
+  return null;
+}
+
+/**
+ * The method an order snapshot names. An order with no charge is an unpaid Pix,
+ * the one shape PagBank answers without a charge; a card charge must say CARD,
+ * because `mergeRefreshedSnapshot` takes this onto the stored row (FUT-4571).
+ */
+function methodOfCharge(charge: PagBankOrderCharge | undefined): PaymentMethodKind {
+  return chargeMethod(charge) ?? 'PIX';
+}
+
+/**
  * Normalize an order body's charge into the shared snapshot shape.
  *
  * A PAID charge with no `amount.value` is REFUSED rather than normalized to 0
@@ -193,7 +215,7 @@ export function orderSnapshot(
     ...(typeof res.reference_id === 'string' ? { reference: res.reference_id } : {}),
     status: orderStatus(res, paid),
     amount: { amountCents: capturedAmountCents(NAME, settled, captured), currency: 'BRL' },
-    method: 'PIX',
+    method: methodOfCharge(paid),
     ...(typeof res.id === 'string' ? { settlementHints: { orderId: res.id } } : {}),
     raw: res,
   };

@@ -18,7 +18,8 @@ import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { pixPayload, summaryItems } from './pagbank-payloads';
-import { captureCharge, findChargeByReference, getCharge, refund } from './pagbank-operations';
+import { captureCharge, findChargeByReference, getCharge } from './pagbank-operations';
+import { PARTIAL_REFUND_METHODS, refund } from './pagbank-refund';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
@@ -196,12 +197,14 @@ const webhook: PaymentProviderAdapter['webhook'] = {
       { provider: NAME, eventId, type: 'CHARGE_UPDATED', charge, raw: body },
     ];
     // A canceled charge whose summary shows money RETURNED is a refund, and
-    // the host must be able to see it as one (FUT-681 — "estornos são
-    // invisíveis ao host"). The charge event above already moves the row to
-    // REFUNDED; this names the refund itself, the way Stone and Stripe do.
-    // Its own event id, because the inbox dedups per event.
+    // the host must be able to see it as one (FUT-681). The charge event above
+    // moves the row to REFUNDED; this names the refund itself, the way Stone
+    // and Stripe do, under its own event id (the inbox dedups per event).
+    // A PAID charge with refunded > 0 is a PARTIAL refund: the charge event
+    // says PARTIALLY_REFUNDED, and no refund event follows, because a
+    // REFUNDED refund fact is a reversal to a host (FUT-4571, `core/reversal.ts`).
     const refunded = refundedCents(paid);
-    if (refunded > 0) {
+    if (charge.status === 'REFUNDED' && refunded > 0) {
       events.push({
         provider: NAME,
         eventId: `${eventId}:refund`,
@@ -289,7 +292,9 @@ const capabilities: ProviderCapabilities = {
   debit: true,
   savedCards: true,
   refunds: true,
+  // Card refunds in part; Pix waits for a sandbox run (FUT-4571).
   partialRefunds: false,
+  partialRefundMethods: PARTIAL_REFUND_METHODS,
   splits: false,
   webhooks: true,
   tokenization: 'PUBLIC_KEY',

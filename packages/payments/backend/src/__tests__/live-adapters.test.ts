@@ -1267,12 +1267,18 @@ describe('pagbank refund honesty', () => {
   });
 
   it('still sends the explicit amount when the caller has one', async () => {
-    const calls = stubFetch([{ body: { id: 'CHAR_3', status: 'CANCELED' } }]);
+    // A partial reads the charge back first since FUT-4571 (method, remainder,
+    // refunded-so-far judge the answer), so the cancel is the SECOND call.
+    const calls = stubFetch([
+      { body: { id: 'CHAR_3', status: 'PAID', amount: { value: 1000 }, payment_method: { type: 'CREDIT_CARD' } } },
+      { body: { id: 'CHAR_3', status: 'CANCELED' } },
+    ]);
     await pagbankProvider(PT_BR_PAGBANK_COPY).refund!(
       { providerChargeId: 'CHAR_3', amount: { amountCents: 500, currency: 'BRL' } },
       creds,
     );
-    expect(jsonOf(calls[0]!.init)).toEqual({ amount: { value: 500 } });
+    expect(calls[1]!.init.method).toBe('POST');
+    expect(jsonOf(calls[1]!.init)).toEqual({ amount: { value: 500 } });
   });
 
   it('reports the amount PagBank says went back, not a fabricated zero', async () => {
