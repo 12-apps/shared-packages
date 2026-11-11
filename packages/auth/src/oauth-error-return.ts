@@ -253,18 +253,29 @@ async function onCallback(
 
   const out = editable(response);
   if (stored !== null) out.headers.append("set-cookie", startCookie(ctx, null));
-  if (failure !== null) {
-    const code = refused ? PROVIDER_REFUSAL_CODE : (failure.searchParams.get("error") ?? "");
-    const start = stored === null ? null : acceptStart(stored, ctx);
-    const back = start === null ? null : backToStart(start, failure, code, ctx.url.origin);
-    if (back !== null) {
-      out.headers.set("location", back);
-    } else if (refused) {
-      failure.searchParams.set("error", code);
-      out.headers.set("location", failure.toString());
-    }
-  }
+  const next = failure === null ? null : failureLocation(failure, stored, refused, ctx);
+  if (next !== null) out.headers.set("location", next);
   return out;
+}
+
+/**
+ * Where a failed callback goes instead of Auth.js's error page: the stored
+ * start when it is usable, else that same page with a refused consent's code —
+ * or `null` to leave Auth.js's redirect as it is.
+ */
+function failureLocation(
+  failure: URL,
+  stored: string | null,
+  refused: boolean,
+  ctx: ReturnContext,
+): string | null {
+  const code = refused ? PROVIDER_REFUSAL_CODE : (failure.searchParams.get("error") ?? "");
+  const start = stored === null ? null : acceptStart(stored, ctx);
+  const back = start === null ? null : backToStart(start, failure, code, ctx.url.origin);
+  if (back !== null) return back;
+  if (!refused) return null;
+  failure.searchParams.set("error", code);
+  return failure.toString();
 }
 
 /**

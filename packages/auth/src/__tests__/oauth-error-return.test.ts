@@ -372,6 +372,11 @@ describe("a planted start cookie never leads off the origin", () => {
   });
 });
 
+/** Is this Set-Cookie line Auth.js's session token? */
+function isSessionCookie(line: string): boolean {
+  return line.startsWith("authjs.session-token=");
+}
+
 /** Every Set-Cookie with its value blanked, so two runs can be compared. */
 function cookieShapes(response: Response): string[] {
   return response.headers
@@ -409,43 +414,43 @@ describe("a successful sign-in is untouched", () => {
 
     expect(location(on).toString()).toBe(`${ORIGIN}/painel/pedidos`);
     expect(on.headers.get("location")).toBe(off.headers.get("location"));
-    const sessions = on.headers.getSetCookie().filter((line) => line.startsWith("authjs.session-token="));
-    expect(sessions).toHaveLength(1);
+    expect(on.headers.getSetCookie().filter(isSessionCookie)).toHaveLength(1);
     // Auth.js's own cookies exactly as it set them, plus the start's clear.
     const startClear = `${START_COOKIE}=<value>; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
     expect(cookieShapes(on)).toEqual([...cookieShapes(off), startClear].sort());
   });
 });
 
+/** A wrong password through the JSON credentials callback, with a stale start cookie. */
+async function credentialsCallback(errorReturnsToStart: boolean): Promise<Response> {
+  const auth = createApiAuth({
+    providers: [oauthProvider],
+    signInGate: () => true,
+    errorReturnsToStart,
+    emailPassword: {
+      authenticate: () => Promise.resolve({ ok: false, reason: "invalid-credentials" }),
+    },
+  });
+  const jar = new Jar();
+  const csrf = await auth.handler(new Request(`${BASE}/csrf`));
+  jar.take(csrf);
+  const { csrfToken } = (await csrf.json()) as { csrfToken: string };
+  jar.set(START_COOKIE, encodeURIComponent("/entrar?volta=x"));
+  return auth.handler(
+    new Request(`${BASE}/callback/${CREDENTIALS_PROVIDER_ID}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-auth-return-redirect": "1",
+        cookie: jar.header(),
+      },
+      body: new URLSearchParams({ csrfToken, email: "a@b.c", password: "wrong" }).toString(),
+    }),
+  );
+}
+
 describe("a JSON answer is never rewritten", () => {
   it("leaves a credentials callback's body and status alone, and clears a stale start", async () => {
-    async function credentialsCallback(errorReturnsToStart: boolean): Promise<Response> {
-      const auth = createApiAuth({
-        providers: [oauthProvider],
-        signInGate: () => true,
-        errorReturnsToStart,
-        emailPassword: {
-          authenticate: () => Promise.resolve({ ok: false, reason: "invalid-credentials" }),
-        },
-      });
-      const jar = new Jar();
-      const csrf = await auth.handler(new Request(`${BASE}/csrf`));
-      jar.take(csrf);
-      const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      jar.set(START_COOKIE, encodeURIComponent("/entrar?volta=x"));
-      return auth.handler(
-        new Request(`${BASE}/callback/${CREDENTIALS_PROVIDER_ID}`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/x-www-form-urlencoded",
-            "x-auth-return-redirect": "1",
-            cookie: jar.header(),
-          },
-          body: new URLSearchParams({ csrfToken, email: "a@b.c", password: "wrong" }).toString(),
-        }),
-      );
-    }
-
     const on = await credentialsCallback(true);
     const off = await credentialsCallback(false);
 
@@ -455,19 +460,34 @@ describe("a JSON answer is never rewritten", () => {
   });
 });
 
+/** The provider's refusal arriving at the callback, with these cookies. */
+function refusalWith(cookie: string): Request {
+  return new Request(`${BASE}/callback/acme?error=access_denied`, { headers: { cookie } });
+}
+
+/**
+ * With the option off: a sign-in started from a page, then the same refusal
+ * served by the handler and by Auth.js directly. A start cookie is planted, so
+ * a handler that read it would show.
+ */
+async function refusedWithOptionOff(): Promise<{
+  started: Response;
+  viaHandler: Response;
+  direct: Response;
+}> {
+  const auth = makeAuth([oauthProvider], false);
+  const jar = new Jar();
+  const started = await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+  const cookie = `${jar.header()}; ${START_COOKIE}=${encodeURIComponent(START)}`;
+  const viaHandler = await auth.handler(refusalWith(cookie));
+  const direct = (await Auth(refusalWith(cookie), auth.config)) as Response;
+  return { started, viaHandler, direct };
+}
+
 describe("off by default: the handler is Auth.js's, untouched", () => {
   it("sets no start cookie and answers exactly as Auth.js does", async () => {
-    const auth = makeAuth([oauthProvider], false);
-    const jar = new Jar();
-    const started = await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+    const { started, viaHandler, direct } = await refusedWithOptionOff();
     expect(started.headers.getSetCookie().join("\n")).not.toContain("sign-in-start");
-
-    const request = (): Request =>
-      new Request(`${BASE}/callback/acme?error=access_denied`, {
-        headers: { cookie: `${jar.header()}; ${START_COOKIE}=${encodeURIComponent(START)}` },
-      });
-    const viaHandler = await auth.handler(request());
-    const direct = (await Auth(request(), auth.config)) as Response;
 
     expect(viaHandler.status).toBe(direct.status);
     expect(viaHandler.headers.get("location")).toBe(direct.headers.get("location"));
@@ -478,13 +498,9 @@ describe("off by default: the handler is Auth.js's, untouched", () => {
 
   it("is off when createApiAuth is given no option", async () => {
     // The options object a host passes today, with nothing new in it.
-    const auth = createApiAuth({ providers: [oauthProvider], signInGate: () => true });
+    const { handler } = createApiAuth({ providers: [oauthProvider], signInGate: () => true });
 
-    const response = await auth.handler(
-      new Request(`${BASE}/callback/acme?error=access_denied`, {
-        headers: { cookie: `${START_COOKIE}=${encodeURIComponent(START)}` },
-      }),
-    );
+    const response = await handler(refusalWith(`${START_COOKIE}=${encodeURIComponent(START)}`));
 
     expect(location(response).pathname).toBe("/login");
     expect(location(response).searchParams.get("error")).toBe("OAuthCallbackError");
