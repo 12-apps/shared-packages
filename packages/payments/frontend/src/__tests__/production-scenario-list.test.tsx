@@ -161,3 +161,41 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
     expect(screen.queryAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(0);
   });
 });
+
+/**
+ * PG3 (FUT-4740, C33/T-18): a card cancel PagBank answered "not yet" is retried
+ * in the background like the Pix; its row says where it stands, and once its
+ * attempts ran out the same press reads "Tentar estornar o cartão de novo".
+ */
+describe('ProductionScenarioList — the card refunds (PG3, C33)', () => {
+  const pixRefunded = (cards: unknown[]): ProductionPixView =>
+    ({ runId: 'run-2', state: 'REFUNDED', qrText: null, expiresAt: null, refund: null, cards }) as ProductionPixView;
+  const run = (cards: unknown[]) => ({
+    scenarios: [outcome('credit', 'FAILED'), outcome('debit', 'EXECUTED'), outcome('pix', 'EXECUTED'), outcome('googlePay', 'PENDING'), outcome('applePay', 'PENDING')],
+    pix: pixRefunded(cards),
+  });
+
+  it('C1 a card retrying reads T-18: "Crédito · estornando — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min"', () => {
+    show(run([{ scenario: 'credit', attempt: 2, of: 3, nextAt: '2026-11-11T15:15:00.000Z', exhausted: false, refusal: 'NOT_YET' }]));
+
+    expect(text('credit')).toBe('Crédito · estornando — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min');
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
+  });
+
+  it('C2 a card out of attempts reads "pago, não estornado — 3 de 3 tentativas recusadas pelo PagBank…" and offers the card press', () => {
+    const { onRetryRefund } = show(run([{ scenario: 'credit', attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' }]));
+
+    expect(text('credit')).toBe(
+      'Crédito · pago, não estornado — 3 de 3 tentativas recusadas pelo PagBank; tente de novo ou estorne no painel do PagBank',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar estornar o cartão de novo' }));
+    expect(onRetryRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it('C3 while the Pix refund is the one out of attempts, the press is the Pix one', () => {
+    show({ ...RUN_1620, pix: { ...RUN_1620.pix, cards: [{ scenario: 'credit', attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' }] } as ProductionPixView });
+
+    expect(screen.getAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
+  });
+});

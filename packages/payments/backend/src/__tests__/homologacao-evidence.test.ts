@@ -6,6 +6,8 @@ import {
   buildHomologacaoEvidenceJson,
   completeEvidenceRun,
   completeSellerConnect,
+  confirmEvidencePix,
+  pixViewOf,
   prepareEvidenceRun,
   retryDueEvidenceRefund,
 } from '../platform/evidence/index';
@@ -113,6 +115,24 @@ describe('homologação evidence', () => {
 
     expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(3);
     expect(file.content).toMatch(/\[4\.6\][^\n]*— FALHOU/);
+  });
+
+  it('given a card cancel out of attempts, then "Tentar estornar o cartão de novo" (RETRY_REFUND) sends ONE cancel and the card is done (FUT-4740 C33)', async () => {
+    const w = world({ cancelNotYet: 3 });
+    await connected(w);
+    const at = (minutes: number) => ({ ...w.runDeps, now: () => new Date(RUN_AT + minutes * 60_000) });
+    const prepared = await prepareEvidenceRun(at(0));
+    await completeEvidenceRun(at(0), prepared.runId, cards());
+    await retryDueEvidenceRefund(at(5));
+    await retryDueEvidenceRefund(at(15));
+    const cancels = () => w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel');
+    expect(cancels()).toHaveLength(3);
+
+    const view = pixViewOf(await confirmEvidencePix(at(40), prepared.runId, 'RETRY_REFUND'), 'pulado');
+
+    expect(cancels()).toHaveLength(4);
+    expect(view.cards).toEqual([]);
+    expect((await buildHomologacaoEvidenceFile(w.fileDeps)).content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
   });
 
   it('given a cancel, then it names the charge amount PagBank documents (FUT-3722)', async () => {

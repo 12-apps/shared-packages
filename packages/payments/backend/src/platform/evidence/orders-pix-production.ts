@@ -1,3 +1,4 @@
+import { cardRefundViewsOf, type EvidenceCardRefundView } from './card-refund-state';
 import { pixConsultStep, pollPix } from './orders';
 import { refundViewOf, type EvidencePixRefundView } from './refund-state';
 import { clockOf, pendingStep, stepOf } from './steps';
@@ -32,6 +33,8 @@ export interface EvidencePixView {
    * attempt was refused, and once it is refunded.
    */
   refund: EvidencePixRefundView | null;
+  /** The run's card cancels whose refund did not go back (FUT-4740, C33): their rows and the press. */
+  cards: EvidenceCardRefundView[];
 }
 
 const stepIn = (steps: readonly EvidenceStep[], key: EvidenceStep['key']) => steps.find((step) => step.key === key);
@@ -95,6 +98,7 @@ export function pixViewOf(record: EvidenceRecord, skippedNote: string): Evidence
     qrText: state === 'AWAITING_PAYMENT' ? findString(qrPartOf(record), ['text']) : null,
     expiresAt: state === 'AWAITING_PAYMENT' ? pixExpiresAt(record) : null,
     refund: state === 'REFUND_PENDING' ? refundViewOf(record) : null,
+    cards: cardRefundViewsOf(record),
   };
 }
 

@@ -5,6 +5,7 @@ import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
+import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
 import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
@@ -304,12 +305,13 @@ export class EvidencePixOpenError extends Error {
   }
 }
 
-/** The card cancels a run retries in the background (FUT-4740). */
-const CARD_CANCEL_KEYS = ['card.cancel', 'debit.cancel', 'gpay.cancel', 'apay.cancel'] as const;
-
-/** A card charge of the run is paid and its cancel has not gone back (C34): a new run would charge again. */
-function cardHoldsMoney(record: EvidenceRecord): boolean {
-  return record.steps.some((step) => (CARD_CANCEL_KEYS as readonly string[]).includes(step.key) && step.status === 'FAILED' && step.refund !== undefined);
+/** A new production run over a paid, unrefunded CARD charge (FUT-4740, C34); a Pix-open subclass, named for the card. */
+export class EvidenceCardRefundOpenError extends EvidencePixOpenError {
+  constructor(runId: string) {
+    super(runId);
+    this.message = `A card charge of homologation evidence run ${runId} is paid and not refunded`;
+    this.name = 'EvidenceCardRefundOpenError';
+  }
 }
 
 /** Refuse a new production run while the latest one still holds a Pix — or a card — to settle (FUT-4740 C34). */
@@ -317,7 +319,8 @@ async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
   if (environmentOf(deps) !== 'PRODUCTION') return;
   const latest = await deps.store.latest(PROVIDER, 'RUN');
   if (!latest) return;
-  if (pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)()) || cardHoldsMoney(latest)) throw new EvidencePixOpenError(latest.id);
+  if (pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)())) throw new EvidencePixOpenError(latest.id);
+  if (cardHoldsMoney(latest)) throw new EvidenceCardRefundOpenError(latest.id);
 }
 
 /**

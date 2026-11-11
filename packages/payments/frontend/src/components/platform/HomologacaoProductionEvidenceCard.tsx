@@ -95,6 +95,13 @@ const PHONE_HIDDEN_SX = {
   whiteSpace: { xs: 'nowrap', sm: 'normal' },
 } as const;
 
+/** Why a new run waits: the Pix to pay or refund, or a card whose refund did not go back (FUT-4740, C34). */
+function blockingHint(pix: ProductionPixView | null | undefined, copy: HomologacaoProductionEvidenceCopy): string {
+  if (pix?.state === 'REFUND_PENDING') return copy.pixBlocksChargeRefund;
+  if (pix?.state === 'AWAITING_PAYMENT') return copy.pixBlocksCharge;
+  return (pix?.cards?.length ?? 0) > 0 ? copy.cardBlocksChargeRefund : copy.pixBlocksCharge;
+}
+
 function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['stepper']; done: readonly boolean[] }): ReactNode {
   const labels = [copy.connect, copy.data, copy.charge, copy.download];
   const found = done.findIndex((isDone) => !isDone);
@@ -264,7 +271,7 @@ function stepsDone(connected: boolean, ready: boolean, flow: ProductionFlow): bo
 /** Why the charge cannot be pressed, when it cannot: the open Pix first, then the missing data. */
 function chargeBlockedBy(connected: boolean, ready: boolean, flow: ProductionFlow, copy: HomologacaoProductionEvidenceCopy): string | null {
   if (!connected || flow.busy) return null;
-  if (flow.pixOpen) return flow.pix?.state === 'REFUND_PENDING' ? copy.pixBlocksChargeRefund : copy.pixBlocksCharge;
+  if (flow.pixOpen) return blockingHint(flow.pix, copy);
   return !ready && !flow.charged ? copy.incompleteData : null;
 }
 

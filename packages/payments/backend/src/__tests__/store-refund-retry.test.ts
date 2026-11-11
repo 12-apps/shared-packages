@@ -680,6 +680,43 @@ describe('round-1 review: the deadline, a part, a failed consult, the amount, th
   });
 });
 
+describe('round-2 review: a series an undo ENDED is restartable by the press (R2)', () => {
+  it('R2 an ENDED series of the same claim restarts on the press; a BY_HAND one stays final', async () => {
+    const w = await world();
+    w.gateway.refund.mockRejectedValueOnce(notYet());
+    await w.retrier.firstAttempt!(KEY as never, {} as never);
+    await w.retrier.end!(KEY as never);
+    w.gateway.refund.mockClear();
+    w.at(T0 + 10 * MIN);
+    await w.retrier.press!(KEY as never);
+    expect(w.gateway.refund).toHaveBeenCalledTimes(1);
+    expect(w.host.refunded).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the evidence run\'s card refunds hold a new run, by name (C34, review R3)', () => {
+  it('R3 a card cancel out of attempts holds the run until it is done; the refusal names the card', async () => {
+    const { cardHoldsMoney, cardRefundViewsOf } = (await import('../platform/evidence/card-refund-state')) as Mod as {
+      cardHoldsMoney: (record: unknown) => boolean;
+      cardRefundViewsOf: (record: unknown) => unknown[];
+    };
+    const { EvidenceCardRefundOpenError, EvidencePixOpenError } = (await import('../platform/evidence/run')) as Mod as {
+      EvidenceCardRefundOpenError: new (runId: string) => Error;
+      EvidencePixOpenError: new (runId: string) => Error;
+    };
+    const refund = { series: 1, attempt: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET', claimedAt: null, reported: true };
+    const failed = { id: 'run-1', steps: [{ key: 'card.cancel', status: 'FAILED', ids: { charge_id: 'CHAR_C' }, refund }] };
+    const done = { id: 'run-1', steps: [{ key: 'card.cancel', status: 'EXECUTED', ids: { charge_id: 'CHAR_C' }, refund }] };
+    expect(cardHoldsMoney(failed)).toBe(true);
+    expect(cardRefundViewsOf(failed)).toEqual([{ scenario: 'credit', attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' }]);
+    expect(cardHoldsMoney(done)).toBe(false);
+    const refusal = new EvidenceCardRefundOpenError('run-1');
+    expect(refusal).toBeInstanceOf(EvidencePixOpenError);
+    expect(refusal.name).toBe('EvidenceCardRefundOpenError');
+    expect(refusal.message).toMatch(/card/u);
+  });
+});
+
 describe('the evidence run\'s card cancels: one attempt, the rest in the background (C32)', () => {
   it('S18 a card cancel answered 40008 sends ONE cancel in the run and leaves attempt 2 due at +5 min', async () => {
     const orders = (await import('../platform/evidence/orders')) as Mod;

@@ -1,4 +1,5 @@
 import { refundDueNow } from '../../core/refund-retry';
+import { CARD_CANCEL_KEYS, cardRefundStep } from './card-refund-state';
 import { pollPix } from './orders';
 import { createdPixIds, paidChargeId, pixStateOf } from './orders-pix-production';
 import { claimAttempt, firstClaim, nextClaim, refundStepOf, runClaimedAttempt, stampAfter, type RefundTarget } from './refund-attempt';
@@ -98,15 +99,11 @@ export async function pressRetryRefund(deps: EvidenceRunDeps, record: EvidenceRe
   return runClaimedAttempt(deps, claimed, state, seller);
 }
 
-/** The card cancels a run makes ONE attempt of; the sweep sends the rest (FUT-4740). */
-const CARD_CANCEL_KEYS: readonly EvidenceStepKey[] = ['card.cancel', 'debit.cancel', 'gpay.cancel', 'apay.cancel'];
-
 /** A card cancel step still owed a refund, with its retry state and target; null otherwise. */
 function cardRefundOf(record: EvidenceRecord, key: EvidenceStepKey): { step: EvidenceStep; state: EvidenceRefundState; target: RefundTarget } | null {
-  const step = refundStepOf(record, key);
-  if (step?.status !== 'FAILED' || !step.refund) return null;
-  const chargeId = step.ids['charge_id'] ?? step.ids['order_id'];
-  return chargeId ? { step, state: step.refund, target: { key, chargeId, orderId: step.ids['order_id'] ?? null } } : null;
+  const step = cardRefundStep(record, key);
+  const chargeId = step ? (step.ids['charge_id'] ?? step.ids['order_id']) : undefined;
+  return step && chargeId ? { step, state: step.refund, target: { key, chargeId, orderId: step.ids['order_id'] ?? null } } : null;
 }
 
 /** The card cancel step whose refund has an attempt due, with its target. */
@@ -157,4 +154,25 @@ async function closeCardSeries(
     : { ...step, refund };
   const next = { ...record, steps: withStep(record.steps, closed), updatedAt: stampAfter(clockOf(deps)(), record.updatedAt) };
   return deps.store.saveIf(next, record.updatedAt);
+}
+
+/**
+ * "Tentar estornar o cartão de novo" (FUT-4740, C33): a new series for the
+ * first card cancel whose attempts ran out, starting now. Its attempt reads
+ * the charge back before it cancels, so a card refunded meanwhile in the
+ * PagBank panel is adopted (the step turns EXECUTED) and the new-run block
+ * (C34) lifts. A no-op while no card's attempts ran out.
+ */
+export async function pressRetryCardRefund(deps: EvidenceRunDeps, record: EvidenceRecord): Promise<EvidenceRecord> {
+  const now = clockOf(deps)();
+  const owed = CARD_CANCEL_KEYS.map((key) => cardRefundOf(record, key)).find(
+    (candidate) => candidate !== null && candidate.state.exhausted && !claimHeld(candidate.state, now),
+  );
+  if (!owed) return record;
+  const seller = await sandboxSeller(deps);
+  if (typeof seller !== 'object') return record;
+  const state = { ...firstClaim(now, owed.state), reported: false };
+  const claimed = await claimAttempt(deps, record, state, record.steps, owed.target.key);
+  if (!claimed) return (await deps.store.latest(PROVIDER, 'RUN')) ?? record;
+  return runClaimedAttempt(deps, claimed, state, seller, false, owed.target);
 }

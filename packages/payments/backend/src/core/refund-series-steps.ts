@@ -285,8 +285,9 @@ function claimNewSeries(ctx: SeriesContext, key: RefundSeriesKey, stored: Refund
 export async function pressSeries(ctx: SeriesContext, key: RefundSeriesKey): Promise<RefundSeriesView | null> {
   const stored = await ctx.store.find(key.provider, key.providerChargeId, key.subject);
   const current = live(stored, key) ? stored : null;
-  // Settled for THIS cancel (refunded, adopted, by hand): nothing is owed through it.
-  if (stored && !current && stored.boundTo === key.boundTo) return null;
+  // Settled for THIS claim as money back (refunded, adopted, by hand): nothing is owed through it. A series
+  // only ENDED (an undo that kept its claim) is restartable: the host asked, so the money is owed (review R2).
+  if (stored && !current && stored.boundTo === key.boundTo && stored.settledHow !== 'ENDED') return null;
   // A series still running (or an attempt in flight): the press answers it, never a second one.
   if (current && (!current.exhausted || claimHeld(current, ctx.clock()))) return seriesView(ctx, current);
   const claimed = await claimNewSeries(ctx, key, stored, current);

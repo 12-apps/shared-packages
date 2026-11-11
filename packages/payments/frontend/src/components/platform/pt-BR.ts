@@ -242,6 +242,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     incompleteData: 'Preencha o titular e o cartão de crédito para cobrar.',
     pixBlocksCharge: 'Pague ou pule o Pix antes de cobrar de novo.',
     pixBlocksChargeRefund: 'Estorne o Pix antes de cobrar de novo.',
+    cardBlocksChargeRefund: 'Estorne o cartão antes de cobrar de novo.',
     scenarios: {
       label: 'Cenários desta cobrança',
       names: { credit: 'Crédito', debit: 'Débito (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
@@ -262,6 +263,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         SKIPPED: 'pulado, pendente',
         paid: 'pago',
         paidNotRefunded: 'pago, não estornado',
+        refunding: 'estornando',
         notYet: (attempt, of, minutes) =>
           `o PagBank ainda não liberou o estorno — tentativa ${attempt} de ${of}, a próxima em ${minutes} min`,
         exhausted: (of) =>
@@ -269,6 +271,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         refused: 'o PagBank recusou o estorno; tente de novo ou estorne no painel do PagBank',
       },
       retryRefund: 'Tentar estornar o Pix de novo',
+      retryCardRefund: 'Tentar estornar o cartão de novo',
     },
     charge: '3. Cobrar R$ 1,00 por cenário e estornar',
     confirm: {

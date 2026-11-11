@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { sxRem } from '../rem';
 import { TAP_SX } from './ConnectEnvironmentCard';
 import type { HomologacaoProductionEvidenceCopy } from './copy';
-import type { ProductionPixView } from './ProductionPixPanel';
+import type { ProductionCardRefundView, ProductionPixView } from './ProductionPixPanel';
 import { ScenarioMark, type ScenarioMarkKind } from './ScenarioMark';
 
 /**
@@ -79,6 +79,18 @@ function refundRow(pix: ProductionPixView, copy: Copy, now: number): Row {
   return { key, mark: 'retrying', markLabel: copy.marks.retrying, status: copy.pix.paid, reason };
 }
 
+/** A card's row while its refund is not done (T-18): retrying with the next attempt, or out of attempts. */
+function cardRefundRow(card: ProductionCardRefundView, copy: Copy, now: number): Row {
+  const key = card.scenario;
+  if (card.exhausted) {
+    const reason = card.refusal === 'REFUSED' ? copy.pix.refused : copy.pix.exhausted(card.of);
+    return { key, mark: 'failed', markLabel: copy.status.failed, status: copy.pix.paidNotRefunded, reason };
+  }
+  if (card.nextAt === null) return { key, mark: 'checking', markLabel: copy.marks.checking, status: copy.pix.refunding, reason: null };
+  const reason = copy.pix.notYet(card.attempt, card.of, minutesUntil(card.nextAt, now));
+  return { key, mark: 'retrying', markLabel: copy.marks.retrying, status: copy.pix.refunding, reason };
+}
+
 /** The Pix row from the live view: where it stands now, which the outcomes cannot say. */
 function pixRow(pix: ProductionPixView, copy: Copy, checking: boolean, now: number): Row | null {
   const key = 'pix' as const;
@@ -102,10 +114,25 @@ function rowsOf(scenarios: readonly ProductionScenarioOutcome[] | null, pix: Pro
       const outcome = scenarios?.find((candidate) => candidate.scenario === 'pix');
       return live ? [live] : outcome ? [outcomeRow(outcome, copy)] : [];
     }
+    // A card whose cancel did not go back: where its refund stands, which the outcome cannot say (C33).
+    const card = pix?.cards?.find((candidate) => candidate.scenario === key);
+    if (card) return [cardRefundRow(card, copy, now)];
     const outcome = scenarios?.find((candidate) => candidate.scenario === key);
     return outcome ? [outcomeRow(outcome, copy)] : [];
   });
   return rows;
+}
+
+/** A countdown is on screen: the Pix's next attempt, or a card's. */
+function countingDown(pix: ProductionPixView | null): boolean {
+  if (pix?.state === 'REFUND_PENDING' && pix.refund?.nextAt != null) return true;
+  return pix?.cards?.some((card) => card.nextAt !== null) ?? false;
+}
+
+/** Which press the list offers: the Pix's once its attempts ran out, else a card's (C33), else none. */
+function pressOf(pix: ProductionPixView | null): 'PIX' | 'CARD' | null {
+  if (pix?.state === 'REFUND_PENDING') return pix.refund?.exhausted === true ? 'PIX' : null;
+  return pix?.cards?.some((card) => card.exhausted) ? 'CARD' : null;
 }
 
 /** The clock, redrawn every so often while a countdown is on screen. */
@@ -138,10 +165,12 @@ export function ProductionScenarioList({
   /** The press is in flight: the button waits. */
   retrying: boolean;
 }): ReactNode {
-  const counting = pix?.state === 'REFUND_PENDING' && pix.refund?.nextAt != null;
+  const counting = countingDown(pix);
   const rows = rowsOf(scenarios, pix, checking, copy, useNow(counting));
   if (rows.length === 0) return null;
-  const exhausted = pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true;
+  const press = pressOf(pix);
+  const exhausted = press === 'PIX';
+  const cardExhausted = press === 'CARD';
   return (
     <Stack spacing={1} data-testid="production-scenarios">
       <Typography variant="body2" fontWeight={600}>
@@ -163,12 +192,12 @@ export function ProductionScenarioList({
           </Stack>
         ))}
       </Box>
-      {exhausted ? (
+      {exhausted || cardExhausted ? (
         <Button
           variant="outlined"
           onClick={onRetryRefund}
           disabled={retrying}
-          data-testid="production-retry-refund"
+          data-testid={cardExhausted ? 'production-retry-card-refund' : 'production-retry-refund'}
           sx={{
             ...TAP_SX,
             alignSelf: 'flex-start',
@@ -181,7 +210,7 @@ export function ProductionScenarioList({
             borderColor: 'text.primary',
           }}
         >
-          {copy.retryRefund}
+          {cardExhausted ? copy.retryCardRefund : copy.retryRefund}
         </Button>
       ) : null}
     </Stack>
