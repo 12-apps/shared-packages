@@ -85,9 +85,11 @@ function settle(ctx: SeriesContext, row: RefundSeriesRow, how: RefundSeriesSettl
 
 /** Open (or re-open, for a new cancel) the series of `key` in `state`. */
 async function open(ctx: SeriesContext, key: RefundSeriesKey, state: RefundRetryState): Promise<RefundSeriesRow | null> {
+  // Insert first: a charge's first series is one write (the host's query budget); only a re-cancel finds a row.
+  const inserted = await ctx.store.insert({ ...rowFields(key), ...state, of: state.of });
+  if (inserted) return inserted;
   const stored = await ctx.store.find(key.provider, key.providerChargeId, key.subject);
-  if (!stored) return ctx.store.insert({ ...rowFields(key), ...state, of: state.of });
-  return ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: state.of }, stored.version);
+  return stored ? ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: state.of }, stored.version) : null;
 }
 
 /** A refusal of attempt 1: none for good opens a series; "not yet" and no answer do (I4). */
