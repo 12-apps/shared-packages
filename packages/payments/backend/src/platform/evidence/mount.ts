@@ -55,8 +55,15 @@ export interface HomologacaoEvidenceMount {
    * The background sweep that sends the production Pix refund's later attempts
    * (FUT-4360): the host registers it like the package's other blueprints.
    */
-  refundSweep: PaymentsJobBlueprint;
+  refundSweep: HomologacaoEvidenceSweep;
 }
+
+/**
+ * A scheduled job, `PaymentsJobBlueprint`-shaped but with its deps closed over:
+ * the mount already holds everything the sweep needs, so the host installs it
+ * as it is (name, queue, schedule, lease) and adds only its own namespace.
+ */
+export type HomologacaoEvidenceSweep = Omit<PaymentsJobBlueprint, 'handle'> & { handle: () => Promise<void> };
 
 /** Every minute: the first retry is due 5 minutes in, so the coarsest tick is a minute late at most. */
 const REFUND_SWEEP_CRON = '* * * * *';

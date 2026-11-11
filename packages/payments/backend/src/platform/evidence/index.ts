@@ -44,6 +44,7 @@ export {
 export {
   createHomologacaoEvidenceMount,
   type HomologacaoEvidenceMount,
+  type HomologacaoEvidenceSweep,
   type HomologacaoEvidenceMountOptions,
 } from './mount';
 export { recordTraffic, type RecordedOutcome } from './record';
