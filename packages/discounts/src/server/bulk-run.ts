@@ -70,7 +70,7 @@ export interface BulkContext {
 const settled = (status: Settled["status"], code: DiscountBulkCode): Settled => ({ kind: "settled", status, code });
 
 /** The state Desfazer restores, from a record read now. */
-export function stateOf(record: DiscountRecord): DiscountBulkState {
+function stateOf(record: DiscountRecord): DiscountBulkState {
   return {
     active: record.active,
     startsAt: record.startsAt === null ? null : record.startsAt.toISOString(),
@@ -331,7 +331,7 @@ function countsOf(rows: readonly DiscountBulkRow[]): DiscountBulkCounts {
 }
 
 /** The ids of an operation, de-duplicated, in the order asked. */
-export function bulkIdsOf(body: DiscountBulkOperation): string[] {
+function bulkIdsOf(body: DiscountBulkOperation): string[] {
   const asked = body.operation === "undo" ? body.rows.map((row) => row.id) : body.ids;
   return [...new Set(asked)];
 }

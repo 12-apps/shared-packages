@@ -51,7 +51,7 @@ export function maskedToIso(masked: string): string | null {
   return isIsoDay(iso) ? iso : null;
 }
 
-export function isoToMasked(iso: string): string {
+function isoToMasked(iso: string): string {
   const match = ISO_DAY.exec(iso);
   return match === null ? iso : `${match[3]}/${match[2]}/${match[1]}`;
 }

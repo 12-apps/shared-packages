@@ -81,7 +81,7 @@ export interface DiscountsBulkSlotProps {
 }
 
 /** The three requests of the "Ações" entries, as the screen builds them. */
-export type DiscountsBulkRunner = (request: DiscountsBulkRequest) => Promise<void>;
+type DiscountsBulkRunner = (request: DiscountsBulkRequest) => Promise<void>;
 
 const countsOf = (rows: readonly DiscountBulkRow[]): DiscountBulkCounts => {
   const counts: DiscountBulkCounts = { ok: 0, unchanged: 0, skipped: 0, failed: 0 };
