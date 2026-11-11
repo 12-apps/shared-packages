@@ -235,6 +235,8 @@ export function doneLines(step: 1 | 2 | 3 | 4, form: FormSnapshot, world: Summar
 function comboSentence(form: FormSnapshot, world: SummaryWorld): string {
   const { summary } = world.copy.steps;
   const value = valueText(form, world);
+  // No reward value yet: the clause is dropped rather than said as "…" (UI N9).
+  if (value === summary.nothing) return fill(summary.sentenceComboNoReward, { parts: comboParts(form, world) });
   const type = comboRewardOf({ type: form.values.comboReward ?? "" });
   const reward =
     type === "BUNDLE_PRICE"
@@ -260,7 +262,10 @@ function plainSentence(form: FormSnapshot, world: SummaryWorld): string {
     scope === "ORDER"
       ? summary.sentenceWholeOrder
       : fill(summary.sentenceTargets, { names: namer(world)(ids).join(summary.list) || summary.nothing });
-  return fill(summary.sentencePlain, { value: valueText(form, world), where });
+  const value = valueText(form, world);
+  // The sentence never starts on "…": with no value yet it says where only (UI N9).
+  if (value === summary.nothing) return fill(summary.sentencePlainNoValue, { where });
+  return fill(summary.sentencePlain, { value, where });
 }
 
 /** The "Resumo" sentence. */

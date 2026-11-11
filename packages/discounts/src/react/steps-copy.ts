@@ -56,12 +56,16 @@ export interface DiscountsStepSummaryCopy {
   readonly capCount: string;
   readonly capAny: string;
   readonly sentenceCombo: string;
+  /** A combo whose reward has no value yet: the sentence stops before it, never on "…". */
+  readonly sentenceComboNoReward: string;
   readonly sentencePrice: string;
   readonly sentencePercent: string;
   readonly sentenceAmount: string;
   readonly sentenceFree: string;
   readonly sentenceFreeProducts: string;
   readonly sentencePlain: string;
+  /** A percentage or amount with no value yet: the sentence never starts on "…". */
+  readonly sentencePlainNoValue: string;
   readonly sentenceWholeOrder: string;
   readonly sentenceTargets: string;
 }

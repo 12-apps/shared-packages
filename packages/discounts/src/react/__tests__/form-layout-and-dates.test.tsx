@@ -129,9 +129,8 @@ describe("FUT-4477: Tipo is four cards, one row or one column", () => {
     containerWidth(288);
     renderForm();
     await waitFor(() => expect(tipoLayout()).toBe("column"));
-    const group = reach("discount-kind-cards");
-    expect(group.getAttribute("role")).toBe("radiogroup");
-    expect(group.getAttribute("aria-label")).toBe(copy.form.kind);
+    // The library's radiogroup (FUT-4477, UI review B6) inside the measured box.
+    const group = within(reach("discount-kind-cards")).getByRole("radiogroup", { name: copy.form.kind });
     expect(within(group).getAllByRole("radio")).toHaveLength(4);
   });
 

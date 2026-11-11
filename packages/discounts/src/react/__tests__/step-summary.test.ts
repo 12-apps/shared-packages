@@ -90,11 +90,16 @@ describe("the Resumo", () => {
     expect(resumoSentence(snapshot({ kind: "PERCENTAGE", percentOff: "15" }), world)).toBe("15% de desconto no pedido inteiro.");
   });
 
-  it("R2: no product, no ' em …'; no value yet, '…'", () => {
+  it("R2: no product, no ' em …'; no value yet, the value's clause is dropped, never '…'", () => {
     expect(resumoSentence(snapshot({ kind: "FREE_UNITS", freeUnits: "1" }, { slots: [{ quantity: 3, categoryIds: [], menuItemIds: [] }] }), world)).toBe(
       "Leve 3, pague 2.",
     );
-    expect(resumoSentence(snapshot({ kind: "PERCENTAGE" }), world)).toBe("… de desconto no pedido inteiro.");
+    expect(resumoSentence(snapshot({ kind: "PERCENTAGE" }), world)).toBe("Desconto no pedido inteiro.");
+    expect(resumoSentence(snapshot({ kind: "FIXED_AMOUNT", scope: "CATEGORY" }, { categoryIds: ["cat-bebidas"] }), world)).toBe(
+      "Desconto em Bebidas.",
+    );
+    const noPrice = snapshot({ kind: "COMBO", comboReward: "BUNDLE_PRICE" }, { slots: COMBO.slots });
+    expect(plain(resumoSentence(noPrice, world))).toBe("Leve 2 de Lanches.");
   });
 
   it("R3: the rule chips in order, with every variant", () => {
