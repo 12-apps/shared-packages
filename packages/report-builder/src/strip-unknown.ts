@@ -17,7 +17,7 @@ export function withoutUnrecognizedKeys(schema: z.ZodType, input: unknown): unkn
     if (result.success) return current;
     const unknown = result.error.issues.filter((issue) => issue.code === 'unrecognized_keys');
     if (unknown.length === 0) return current;
-    for (const issue of unknown) dropKeys(current, issue.path, issue.keys);
+    unknown.forEach((issue) => dropKeys(current, issue.path, issue.keys));
   }
   return current;
 }

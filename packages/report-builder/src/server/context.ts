@@ -14,9 +14,7 @@ import {
   type ResolvedReportRange,
   toReportRangeView,
 } from './range';
-import { invalidInputError } from './problems';
 import type { SavedReportDb } from './saved';
-import { reportRangeQuery } from './wire-range';
 
 /**
  * What every route in this surface shares: the actor, the request, the
@@ -354,21 +352,6 @@ export function windowOf(
     messagesOf(config, request.locale).range,
     config.timeZone,
   );
-}
-
-/**
- * The window a GET names in its query: `reportRangeQuery` first, so a key it
- * does not declare or a value it refuses is a 422 (with every problem) and not
- * a default quietly run, then the same resolution every route shares.
- */
-export function windowOfQuery(
-  config: ReportBuilderServerConfig,
-  request: Pick<ReportRequest, 'query' | 'locale'>,
-): ResolvedReportRange {
-  const messages = messagesOf(config, request.locale);
-  const parsed = reportRangeQuery(messages.range).safeParse(request.query);
-  if (!parsed.success) throw invalidInputError(parsed.error, messages.invalidBody);
-  return windowOf(config, request);
 }
 
 /** A period named in a REQUEST BODY (the dry run) rather than in the query. */

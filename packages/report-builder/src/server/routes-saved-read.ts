@@ -12,12 +12,12 @@ import {
   ok,
   runOptions,
   toReportRangeView,
-  windowOfQuery,
   type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
   type ResolvedReportRange,
 } from './context';
+import { windowOfQuery } from './range-query';
 import type { SavedReportRecord, SavedReportStore } from './saved';
 import { documentShape, toSummary } from './summary';
 import { resolveDefaultRange } from './range';

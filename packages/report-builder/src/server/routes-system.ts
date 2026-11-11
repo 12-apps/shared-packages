@@ -9,10 +9,10 @@ import {
   ok,
   runOptions,
   toReportRangeView,
-  windowOfQuery,
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
+import { windowOfQuery } from './range-query';
 import type { SystemReportDef } from './system-reports';
 import { REPORT_GRAINS } from './wire';
 import { REPORT_BUILDER_FEATURES } from './features';
