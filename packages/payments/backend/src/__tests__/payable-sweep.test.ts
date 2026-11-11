@@ -290,11 +290,11 @@ describe('reconcilePendingCharges', () => {
     try {
       const store = await storeWith([{ id: 'CHAR_slow', ageMs: 10 * MIN }]);
       // An adapter that ignores the signal and answers PAID after the deadline.
-      let answer: () => void = () => undefined;
+      const late: { answer: () => void } = { answer: () => undefined };
       const refreshCharge = vi.fn<PaymentsGateway['refreshCharge']>(
         (_m, _p, id) =>
           new Promise((resolve) => {
-            answer = () => resolve(snapshot({ providerChargeId: id, status: 'PAID' }));
+            late.answer = () => resolve(snapshot({ providerChargeId: id, status: 'PAID' }));
           }),
       );
       const settle = vi.fn(async () => undefined);
@@ -304,10 +304,11 @@ describe('reconcilePendingCharges', () => {
         { now: NOW },
       );
       await vi.waitFor(() => expect(deadlines).toHaveLength(1));
-      // The deadline fires first; only THEN does the ignoring adapter answer PAID.
+      // The deadline fires first (an abort listener runs synchronously, so a
+      // race on the signal would already have rejected); only THEN does the
+      // ignoring adapter answer PAID.
       deadlines[0]?.controller.abort(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      answer();
+      late.answer();
       const report = await pass;
 
       expect(deadlines[0]?.ms).toBe(15_000);
