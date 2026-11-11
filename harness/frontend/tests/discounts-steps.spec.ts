@@ -238,16 +238,23 @@ async function fillComboStepTwo(page: Page, dialog: Locator, add = true): Promis
   await pick(page, dialog, 'combo-slot-0-categories', 'Lanches');
 }
 
-/** "Como o combo é cobrado": three parts where they fit, a select where they do not (ADR 0190). */
+/**
+ * "Como o combo é cobrado": three parts where they fit, a select where they do not (ADR 0190).
+ * The field paints the parts first and swaps to the select once it has measured
+ * its width, so which control is there is read again until the choice lands;
+ * one early look can find parts that are gone by the click.
+ */
 async function chooseReward(dialog: Locator, label: string): Promise<void> {
   const field = dialog.getByTestId('total-form-field-comboReward');
   const select = field.getByRole('combobox');
-  if ((await select.count()) > 0) {
-    await select.click();
-    await dialog.page().getByRole('option', { name: label }).click();
-    return;
-  }
-  await field.getByRole('button', { name: label, exact: true }).click();
+  await expect(async () => {
+    if ((await select.count()) > 0) {
+      await select.click({ timeout: 2000 });
+      await dialog.page().getByRole('option', { name: label }).click({ timeout: 2000 });
+    } else {
+      await field.getByRole('button', { name: label, exact: true }).click({ timeout: 2000 });
+    }
+  }).toPass({ timeout: 15000 });
 }
 
 async function fillComboStepThree(dialog: Locator): Promise<void> {
