@@ -151,7 +151,21 @@ async function fullRefund(
   }
   const res = await cancel(chargeId, value, credentials);
   if (!charge && hasRefundSummary(res)) return unprovenRefund(providerChargeId, chargeId, res);
-  const before = charge ? refundedCents(charge) : 0;
+  return fullOutcome(providerChargeId, chargeId, charge ? refundedCents(charge) : 0, value, res);
+}
+
+/**
+ * A full cancel's answer, judged against the refunded figure read before it
+ * (0 when there was none to read). On a never-refunded charge: main's id and
+ * amount, unchanged. After a partial: the delta, under its own id (D4).
+ */
+function fullOutcome(
+  providerChargeId: string,
+  chargeId: string,
+  before: number,
+  value: number | null,
+  res: ChargeBody,
+): RefundSnapshot {
   const after = refundedCents(res);
   const earlier = before > 0;
   return {
