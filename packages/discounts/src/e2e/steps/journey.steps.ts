@@ -108,8 +108,10 @@ Then('the first step cannot be passed yet and says what is missing', async ({ pa
   const next = page.getByTestId(DIALOG).getByTestId('discount-step-1-next');
   await expect(next).toBeDisabled();
   // The reason is the button's description, not a sentence this package names.
-  await expect(page.getByTestId(DIALOG).getByTestId('discount-step-1-missing')).not.toBeEmpty();
-  await expect(next).toHaveAttribute('aria-describedby', 'discount-step-1-missing');
+  const reason = page.getByTestId(DIALOG).getByTestId('discount-step-1-missing');
+  await expect(reason).not.toBeEmpty();
+  // The id is React's own (useId): compare it, never a fixed string.
+  await expect(next).toHaveAttribute('aria-describedby', (await reason.getAttribute('id')) ?? '');
 });
 
 When('I name the promotion', async ({ page }) => {

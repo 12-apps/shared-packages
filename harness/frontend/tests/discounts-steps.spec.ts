@@ -14,6 +14,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  */
 
 const FIXTURES = JSON.parse(
+  /* eslint-disable-next-line test-flakiness/no-unmocked-fs --
+     the payloads main's form sent ARE the oracle (FUT-4477); a fixture file, read once. */
   readFileSync(
     fileURLToPath(new URL('../../../packages/discounts/src/react/__tests__/fixtures/form-payloads.json', import.meta.url)),
     'utf8',
@@ -69,7 +71,7 @@ for (const width of [390, 1280]) {
       await fill(dialog, 'total-form-field-bundlePrice', '30,00');
       await next(dialog, 3);
       // Step 4: a coupon with no code, then a day that does not exist.
-      await dialog.getByTestId('total-form-field-trigger').getByText('Código').first().click();
+      await dialog.getByTestId('total-form-field-trigger').getByRole('button', { name: 'Código', exact: true }).click();
       await expectHeld(dialog, 4, 'Falta: código do cupom');
       await fill(dialog, 'total-form-field-code', 'LANCHE30');
       await dialog.getByRole('textbox', { name: 'Início' }).fill('31/02/2026');
@@ -83,7 +85,7 @@ for (const width of [390, 1280]) {
       await fill(dialog, 'total-form-field-name', '10% em Bebidas');
       await next(dialog, 1);
       await expect(dialog.getByTestId('discount-steps-targets')).toContainText('Onde vale o desconto');
-      await dialog.getByTestId('total-form-field-scope').getByText('Categoria').first().click();
+      await dialog.getByTestId('total-form-field-scope').getByRole('button', { name: 'Categoria', exact: true }).click();
       await pick(page, dialog, 'discount-categories-targets', 'Bebidas');
       await next(dialog, 2);
       await expect(dialog.getByTestId('discount-steps-targets-answer')).toHaveText('Categorias: Bebidas');
@@ -113,6 +115,8 @@ for (const width of [390, 1280]) {
     });
 
     test('4: a duplicate coupon code opens Regras with the server\'s message, which survives other typing', async ({ page, request }) => {
+      /* eslint-disable-next-line test-flakiness/no-unmocked-network --
+         the harness backend IS the subject: a stored coupon the next one collides with. */
       await request.post(API, { data: { ...FIXTURES['fixed-item-coupon-rules']!.body, name: 'Primeiro' } });
       const dialog = await openCreate(page);
       await fill(dialog, 'total-form-field-name', 'Cupom repetido');
@@ -120,7 +124,7 @@ for (const width of [390, 1280]) {
       await next(dialog, 2);
       await fill(dialog, 'total-form-field-percentOff', '10');
       await next(dialog, 3);
-      await dialog.getByTestId('total-form-field-trigger').getByText('Código').first().click();
+      await dialog.getByTestId('total-form-field-trigger').getByRole('button', { name: 'Código', exact: true }).click();
       await fill(dialog, 'total-form-field-code', 'XSALADA5');
       await next(dialog, 4);
       await dialog.getByTestId('discount-form-submit').click();
@@ -134,9 +138,12 @@ for (const width of [390, 1280]) {
     });
 
     test('5: an edit opens every step done, the strip, the pill, and asks before leaving with changes', async ({ page, request }) => {
+      /* eslint-disable-next-line test-flakiness/no-unmocked-network --
+         the harness backend IS the subject: the rule the edit opens. */
       await request.post(API, { data: FIXTURES['combo-bundle-price']!.body });
       await page.goto('#/discounts');
-      await page.locator('[data-testid^="discount-actions-"]').first().click();
+      // The one rule the reset left plus the one just stored: exactly one row.
+      await page.locator('[data-testid^="discount-actions-"]').click();
       await page.getByTestId('discount-action-edit').click();
       const dialog = page.getByTestId('discount-dialog');
       for (const id of ['identity', 'targets', 'price', 'rules']) {
@@ -147,7 +154,7 @@ for (const width of [390, 1280]) {
       await expect(dialog.getByTestId('discount-submit-hold')).toHaveText('Nada mudou.');
       await expect(dialog.getByRole('toolbar', { name: 'Situação do desconto' })).toBeVisible();
       await dialog.getByTestId('discount-strip-activation').click();
-      await dialog.getByTestId('total-form-field-trigger').getByText('Código').first().click();
+      await dialog.getByTestId('total-form-field-trigger').getByRole('button', { name: 'Código', exact: true }).click();
       await fill(dialog, 'total-form-field-code', 'LANCHE30');
       await expect(dialog.getByTestId('discount-state-pill')).toContainText('Alterações não salvas');
       await expect(dialog.getByTestId('discount-form-submit')).toHaveText('Salvar alterações');
@@ -156,6 +163,13 @@ for (const width of [390, 1280]) {
       const confirm = page.getByTestId('discount-leave-confirm');
       await expect(confirm).toContainText('Sair sem salvar?');
       await confirm.getByRole('button', { name: 'Continuar editando' }).click();
+      await expect(confirm).toBeHidden();
+      await expect(dialog.getByTestId('total-form-field-code')).toHaveValue('LANCHE30');
+      // Esc ON the question closes only the question: the sheet's own Escape
+      // listener must not take it for a way out of the form underneath.
+      await page.keyboard.press('Escape');
+      await expect(confirm).toBeVisible();
+      await page.keyboard.press('Escape');
       await expect(confirm).toBeHidden();
       await expect(dialog.getByTestId('total-form-field-code')).toHaveValue('LANCHE30');
       await page.keyboard.press('Escape');
@@ -187,14 +201,15 @@ async function openCreate(page: Page): Promise<Locator> {
 
 /** A field by test id, on the input itself or around it. */
 async function fill(dialog: Locator, testId: string, text: string): Promise<void> {
-  const field = dialog.getByTestId(testId).first();
-  const input = (await field.evaluate((node) => node.tagName)) === 'INPUT' ? field : field.locator('input').first();
+  // The test id sits on the input itself or on its wrapper, depending on the field.
+  const typed = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])';
+  const input = dialog.locator(`${typed}[data-testid="${testId}"], [data-testid="${testId}"] ${typed}`);
   await input.fill(text);
 }
 
 async function pick(page: Page, dialog: Locator, testId: string, text: string): Promise<void> {
   await fill(dialog, testId, text);
-  await page.getByRole('option', { name: text, exact: true }).first().click();
+  await page.getByRole('option', { name: text, exact: true }).click();
 }
 
 async function next(dialog: Locator, step: 1 | 2 | 3 | 4): Promise<void> {
@@ -206,8 +221,10 @@ async function next(dialog: Locator, step: 1 | 2 | 3 | 4): Promise<void> {
 async function expectHeld(dialog: Locator, step: 1 | 2 | 3 | 4, missing: string): Promise<void> {
   const button = dialog.getByTestId(`discount-step-${step}-next`);
   await expect(button).toBeDisabled();
-  await expect(button).toHaveAttribute('aria-describedby', `discount-step-${step}-missing`);
-  await expect(dialog.getByTestId(`discount-step-${step}-missing`)).toHaveText(missing);
+  const reason = dialog.getByTestId(`discount-step-${step}-missing`);
+  // The id is React's own (useId): compare it, never a fixed string.
+  await expect(button).toHaveAttribute('aria-describedby', (await reason.getAttribute('id')) ?? '');
+  await expect(reason).toHaveText(missing);
 }
 
 async function fillComboStepOne(dialog: Locator): Promise<void> {
@@ -230,7 +247,7 @@ async function chooseReward(dialog: Locator, label: string): Promise<void> {
     await dialog.page().getByRole('option', { name: label }).click();
     return;
   }
-  await field.getByText(label).first().click();
+  await field.getByRole('button', { name: label, exact: true }).click();
 }
 
 async function fillComboStepThree(dialog: Locator): Promise<void> {

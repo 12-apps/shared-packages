@@ -126,21 +126,21 @@ function FreeUnitsLines({
 }): JSX.Element {
   return (
     <>
-        {(error !== undefined || notDigits(freeUnits)) && (
-          <FormMessage error dataTestId="free-units-free-message">
-            {error ?? copy.form.wholeNumberOnly}
-          </FormMessage>
-        )}
-        {noProduct ? (
-          <FormMessage error dataTestId="free-units-message">
-            {copy.form.freeUnitsTargetRequired}
-          </FormMessage>
-        ) : null}
-        {summary !== null && (
-          <Text variant="caption" data-testid="free-units-summary">
-            {summary}
-          </Text>
-        )}
+      {(error !== undefined || notDigits(freeUnits)) && (
+        <FormMessage error dataTestId="free-units-free-message">
+          {error ?? copy.form.wholeNumberOnly}
+        </FormMessage>
+      )}
+      {noProduct ? (
+        <FormMessage error dataTestId="free-units-message">
+          {copy.form.freeUnitsTargetRequired}
+        </FormMessage>
+      ) : null}
+      {summary !== null && (
+        <Text variant="caption" data-testid="free-units-summary">
+          {summary}
+        </Text>
+      )}
     </>
   );
 }

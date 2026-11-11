@@ -68,7 +68,7 @@ function renderForm(): void {
 }
 
 describe("FUT-4441: a pick through the form clears the product refusal", () => {
-  it("drops the product line and the error toast once a product is picked", async () => {
+  it("drops the product line once a product is picked, and no toast is ever raised", async () => {
     renderForm();
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
     await findReach("free-units-builder");
@@ -98,7 +98,7 @@ describe("FUT-4441: a pick through the form clears the product refusal", () => {
     });
   });
 
-  it("keeps a quantity refusal, and its toast, after the pick", async () => {
+  it("keeps a quantity refusal after the pick, and no toast is ever raised", async () => {
     renderForm();
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
     await findReach("free-units-builder");
