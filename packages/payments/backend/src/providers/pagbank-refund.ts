@@ -150,6 +150,7 @@ async function fullRefund(
     });
   }
   const res = await cancel(chargeId, value, credentials);
+  if (!charge && hasRefundSummary(res)) return unprovenRefund(providerChargeId, chargeId, res);
   const before = charge ? refundedCents(charge) : 0;
   const after = refundedCents(res);
   const earlier = before > 0;
@@ -165,6 +166,29 @@ async function fullRefund(
       amountCents: earlier ? (after > before ? after - before : (value ?? 0)) : reportedRefundCents(res),
       currency: 'BRL',
     },
+    raw: res,
+  };
+}
+
+function hasRefundSummary(res: PagBankOrderCharge): boolean {
+  return typeof res.amount?.summary?.refunded === 'number';
+}
+
+/**
+ * A full refund whose read-back failed, answered with a cumulative summary:
+ * with no before-figure, the summary cannot say how much of it THIS cancel
+ * returned (an earlier partial may hold part of it). So it is PENDING, under
+ * no amount, for a person to reconcile, never REFUNDED at the cumulative
+ * figure (FUT-4571, D4). An answer with no summary at all keeps the FUT-680
+ * reading, which an existing test pins.
+ */
+function unprovenRefund(providerChargeId: string, chargeId: string, res: ChargeBody): RefundSnapshot {
+  return {
+    provider: NAME,
+    providerChargeId,
+    providerRefundId: refundIdOf(chargeId, refundedCents(res)),
+    status: refundStatusOf(res.status) === 'REFUNDED' ? 'PENDING' : refundStatusOf(res.status),
+    amount: { amountCents: 0, currency: 'BRL' },
     raw: res,
   };
 }
@@ -198,7 +222,9 @@ function judgePartial(
   }
   if (res.status !== 'PAID') return { status: refundStatusOf(res.status), cents: requested };
   if (grew === requested) return { status: 'REFUNDED', cents: requested };
-  return grew > 0 ? { status: 'PENDING', cents: grew } : { status: 'FAILED', cents: requested };
+  // Grown otherwise: PENDING under the amount THIS refund asked for — the rest
+  // of the growth may be another refund's, sent at the same time.
+  return { status: grew > 0 ? 'PENDING' : 'FAILED', cents: requested };
 }
 
 /**

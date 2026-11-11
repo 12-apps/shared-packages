@@ -18,21 +18,16 @@ export function supportsPartialRefund(
 }
 
 /**
- * The gateway's gate for a refund that names an amount, before any HTTP call.
- *
- * Refused when the provider refunds no method in part. When it names methods,
- * a STORED row's method decides; with no stored row the call goes on to the
- * adapter, which reads the charge back and refuses an unsupported method
- * itself before it sends anything.
+ * The gateway's gate for a refund that names an amount, before any HTTP call:
+ * refused only when the provider refunds no method in part. Which method a
+ * charge was paid with is the ADAPTER's to judge, from the provider's own
+ * read-back: a stored row's method is not trusted here, because PagBank card
+ * rows written before FUT-4571 read PIX, and the gate would refuse them all.
  */
 export function assertPartialRefundAllowed(
   provider: string,
   caps: Pick<ProviderCapabilities, 'partialRefunds' | 'partialRefundMethods'>,
-  storedMethod: PaymentMethodKind | undefined,
 ): void {
-  if (caps.partialRefunds) return;
-  const named = caps.partialRefundMethods ?? [];
-  if (named.length === 0 || (storedMethod !== undefined && !named.includes(storedMethod))) {
-    throw new UnsupportedOperationError(provider, 'partial refunds');
-  }
+  if (caps.partialRefunds || (caps.partialRefundMethods?.length ?? 0) > 0) return;
+  throw new UnsupportedOperationError(provider, 'partial refunds');
 }

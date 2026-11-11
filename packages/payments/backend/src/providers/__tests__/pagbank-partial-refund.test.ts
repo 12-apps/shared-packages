@@ -346,14 +346,31 @@ describe('PagBank refund through the gateway (FUT-4571)', () => {
     expect(refund).toMatchObject({ status: 'REFUNDED', amount: brl(500) });
   });
 
-  it('G2 refuses a partial for a stored PIX charge before any HTTP call', async () => {
-    const calls = mockFetchQueue([{ body: {} }]);
+  it('G2 refuses a partial for a stored PIX charge with no cancel sent (the read-back GET is allowed)', async () => {
+    // Round 1, B1: the stored method is not trusted (card rows written before
+    // FUT-4571 read PIX), so PagBank's own read-back says Pix and the adapter
+    // refuses before the cancel.
+    const calls = mockFetchQueue([{ body: order(charge({ type: 'PIX', refunded: 0 })) }]);
     const { gateway, ready } = world({ method: 'PIX' }, CREDS);
     await ready;
     await expect(
       gateway.refund(TENANT, 'pagbank', { providerChargeId: 'CHAR_1', amount: brl(500) }),
     ).rejects.toThrow(UnsupportedOperationError);
-    expect(calls).toHaveLength(0);
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it('G5 lets a partial through for a stored row reading PIX when PagBank reads the charge back as CREDIT_CARD', async () => {
+    // Every PagBank card row paid before FUT-4571 reads PIX (the old
+    // orderSnapshot hard-code, merged in by the PAID webhook).
+    const calls = mockFetchQueue([
+      { body: order(charge({ refunded: 0 })) },
+      { body: charge({ status: 'PAID', refunded: 500 }) },
+    ]);
+    const { gateway, ready } = world({ method: 'PIX' }, CREDS);
+    await ready;
+    const refund = await gateway.refund(TENANT, 'pagbank', { providerChargeId: 'CHAR_1', amount: brl(500) });
+    expect(calls.map(([url]) => url)).toEqual([`${API}/orders/ORDE_1`, `${API}/charges/CHAR_1/cancel`]);
+    expect(refund).toMatchObject({ status: 'REFUNDED', amount: brl(500) });
   });
 
   it('G3 with no stored row, defers to the adapter, which reads the method back', async () => {
@@ -448,11 +465,36 @@ describe('PagBank partials sent at the same time (FUT-4571, implementer’s addi
     // Grown by 600 against a read of 0: money moved, but not provably as asked.
     expect(second.status).toBe('PENDING');
     expect(second.providerRefundId).not.toBe(first.providerRefundId);
+    // Round 1, NB1: the amount it asked for, never the 600 the summary grew by.
+    expect(second.amount).toEqual(brl(300));
   });
 
   it('R13 a CANCELED answer never reports more than the cancel asked for', async () => {
     mockFetchQueue([{ body: order(charge({ refunded: 0 })) }, { body: charge({ status: 'CANCELED', refunded: 1000 }) }]);
     const refund = await partial(500);
+    expect(refund).toMatchObject({ status: 'REFUNDED', amount: brl(500) });
+  });
+
+  it('R14 a full refund whose read-back failed never reports the cumulative summary as its own', async () => {
+    // Round 1, NB2: refunded 1000 may hold an earlier 500 partial; with no
+    // before-figure this cancel's share is unproven, so a person reconciles it.
+    const lost = { status: 500, body: { error: 'boom' } };
+    const calls = mockFetchQueue([lost, { body: charge({ status: 'CANCELED', refunded: 1000 }) }]);
+    const refund = await adapter().refund!({ providerChargeId: 'CHAR_1' }, CREDS, { orderId: 'ORDE_1' });
+    expect(posts(calls)).toHaveLength(1);
+    expect(refund.status).toBe('PENDING');
+    expect(refund.amount.amountCents).not.toBe(1000);
+  });
+});
+
+describe('PagBank debit card partials (FUT-4571, owner 2026-11-11: credit AND debit)', () => {
+  it('D1 refunds part of a DEBIT_CARD charge like a credit one', async () => {
+    const calls = mockFetchQueue([
+      { body: order(charge({ type: 'DEBIT_CARD', refunded: 0 })) },
+      { body: charge({ type: 'DEBIT_CARD', status: 'PAID', refunded: 500 }) },
+    ]);
+    const refund = await partial(500);
+    expect(bodyOf(posts(calls)[0])).toEqual({ amount: { value: 500 } });
     expect(refund).toMatchObject({ status: 'REFUNDED', amount: brl(500) });
   });
 });
