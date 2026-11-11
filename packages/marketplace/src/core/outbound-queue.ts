@@ -34,25 +34,28 @@ export function outboundDedupeKey(payload: OutboundJobPayload): string {
  *
  * A marketplace whose adapter states no API for the action gets nothing
  * queued: there is nobody to call, and the host shows the app link instead.
- * The queue port never throws; a refusal to enqueue is logged, because the
- * row's own stamp is what a later run (or a person) acts on.
+ * The queue port never throws. A refusal to enqueue is logged AND recovered:
+ * the row still owes the call (PENDING, or ACCEPTED with no confirm stamp),
+ * and the outbound sweep re-queues every such row (`./outbound-sweep.ts`).
+ *
+ * `dedupeKey` defaults to the job's own key; the sweep passes its own, since a
+ * queue keeps a finished job's id and would swallow a re-queue under it.
  */
 export async function enqueueOutbound(
   ctx: EngineContext,
   payload: OutboundJobPayload,
   provider: MarketplaceProvider,
+  dedupeKey: string = outboundDedupeKey(payload),
 ): Promise<boolean> {
   const adapter = ctx.registry.get(provider);
   if (!adapter) return false;
   const able =
     payload.action === "confirm" ? adapter.capabilities.apiConfirm : adapter.capabilities.apiCancel;
   if (!able) return false;
-  const outcome = await ctx.ports.enqueue.enqueue(MARKETPLACE_OUTBOUND_JOB, payload, {
-    dedupeKey: outboundDedupeKey(payload),
-  });
+  const outcome = await ctx.ports.enqueue.enqueue(MARKETPLACE_OUTBOUND_JOB, payload, { dedupeKey });
   if (!outcome.enqueued) {
     ctx.ports.logger.warn(
-      `${MARKETPLACE_OUTBOUND_JOB}: ${payload.action} for order ${payload.orderId} was not queued` +
+      `${MARKETPLACE_OUTBOUND_JOB}: ${payload.action} for order ${payload.orderId} was not queued; the outbound sweep will re-queue it` +
         (outcome.reason ? ` (${outcome.reason})` : ""),
     );
   }

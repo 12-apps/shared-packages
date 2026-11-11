@@ -132,14 +132,18 @@ export async function ingestMarketplaceOrder(
       acknowledgedAt: accepted ? now : null,
       externalDueAt: order.deliveryDueAt,
       commissionCents: order.commissionCents,
+      // The order's SKUs: what a cancellation's offending SKUs are checked against.
+      lineSkus: [...new Set(order.lines.map((line) => line.externalSku))],
     },
   });
 
   if (accepted) {
-    await ctx.ports.order.onAccepted(clientId, orderId);
-    // Born accepted is still an aceite the marketplace must hear about. Queued,
-    // never called: no ingest ever waits on a marketplace's API.
+    // Born accepted is still an acceptance the marketplace must hear about.
+    // Queued FIRST, never called (no ingest waits on a marketplace's API), so
+    // a host half that throws cannot lose it; the sweep re-queues it if the
+    // queue refused it.
     await enqueueOutbound(ctx, { clientId, orderId, action: "confirm" }, order.provider);
+    await ctx.ports.order.onAccepted(clientId, orderId);
   }
 
   await markMarketplaceEventSeen(ctx, clientId, order.provider, now);

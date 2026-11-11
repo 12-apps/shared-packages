@@ -111,9 +111,9 @@ export interface AdapterCallContext {
 export type OutboundResult =
   /** 2xx. For a marketplace whose outcome is asynchronous, "the request was taken". */
   | { kind: "accepted" }
-  /** 4xx: final, never retried. */
+  /** A final 4xx (not 408/425/429): never retried. */
   | { kind: "refused"; status: number; message: string }
-  /** 5xx, a timeout, a network error: retried until the last attempt. */
+  /** 408, 425, 429, 5xx, a timeout, a network error: retried until the last attempt. */
   | { kind: "retry"; reason: string };
 
 /** What a cancellation request carries. */
@@ -154,16 +154,23 @@ export interface MarketplaceAdapter {
 }
 
 /**
+ * The 4xx statuses that are NOT a refusal: a request timeout (408), "too
+ * early" (425) and a rate limit (429) say "ask again later" by HTTP's own
+ * semantics, and a marketplace rate-limits its merchant API.
+ */
+const TRANSIENT_CLIENT_STATUSES = new Set([408, 425, 429]);
+
+/**
  * Read one HTTP answer the way the engine acts on it. Shared by every adapter
- * whose API speaks plain status codes, so "a 4xx is final, anything else that
- * is not a 2xx is a retry" is one rule rather than one per marketplace.
+ * whose API speaks plain status codes, so the rule is one rule rather than one
+ * per marketplace: 2xx accepted; a 4xx other than 408/425/429 refused and
+ * final; everything else (408, 425, 429, 5xx, anything unexpected) retried.
  */
 export function outboundResultOf(response: MarketplaceHttpResponse): OutboundResult {
   if (response.status >= 200 && response.status < 300) return { kind: "accepted" };
   const message = response.body.slice(0, 300);
-  if (response.status >= 400 && response.status < 500) {
-    return { kind: "refused", status: response.status, message };
-  }
+  const refusal = response.status >= 400 && response.status < 500 && !TRANSIENT_CLIENT_STATUSES.has(response.status);
+  if (refusal) return { kind: "refused", status: response.status, message };
   return { kind: "retry", reason: `status ${response.status}: ${message}` };
 }
 

@@ -17,18 +17,22 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  * - `outbound`, on demand: one call to a marketplace, three attempts with
  *   backoff. Its idempotency is the ROW's (the engine re-reads it), never the
  *   queue's dedupe alone.
+ * - `outbound-sweep`, every five minutes: re-queues every call a row still
+ *   owes (a PENDING request, an accept with no confirm stamp) once it is older
+ *   than the job's own retry span, so a refused enqueue or a dead process
+ *   loses nothing.
  *
  * What stays the host's: whether to run them at all, on which runtime, and the
  * lease implementation. A host with no worker declines `jobs` in writing.
  *
  * Bound with `{ engine }`, these arrive at a runner as
- * `marketplace.expire-acceptances`, `marketplace.reconcile-inbox` and
- * `marketplace.outbound` — the names the origin host already uses.
+ * `marketplace.expire-acceptances`, `marketplace.reconcile-inbox`,
+ * `marketplace.outbound` and `marketplace.outbound-sweep`.
  */
 
 /** What the host closes over at bind time: the mounted engine. */
 export interface MarketplaceJobDeps {
-  engine: Pick<MarketplaceEngine, "expireLapsed" | "retryable" | "reprocess" | "runOutbound">;
+  engine: Pick<MarketplaceEngine, "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "sweepOutbound">;
 }
 
 /** The single-flight queue name (`@12-apps/jobs`' `SWEEP_QUEUE`), as a literal. */
@@ -99,6 +103,22 @@ const outbound: WireJobBlueprint<OutboundJobPayload, MarketplaceJobDeps> = {
   },
 };
 
+const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
+  name: "outbound-sweep",
+  queue: MARKETPLACE_SWEEP_QUEUE,
+  concurrency: 1,
+  schedule: { pattern: "*/5 * * * *", timezone: "UTC" },
+  attempts: 1,
+  lease: { ttlMs: SWEEP_LEASE_MS },
+  handle: async (_payload, deps, context) => {
+    const result = await deps.engine.sweepOutbound();
+    if (result.requeued === 0 && result.givenUp === 0) return;
+    context.logger.info(
+      `marketplace.outbound-sweep: re-queued ${result.requeued} call(s), gave up on ${result.givenUp} request(s).`,
+    );
+  },
+};
+
 /** The jobs contribution. */
 export const MARKETPLACE_JOBS = {
   namespace: "marketplace",
@@ -106,5 +126,6 @@ export const MARKETPLACE_JOBS = {
     "expire-acceptances": expireAcceptances,
     "reconcile-inbox": reconcileInbox,
     outbound,
+    "outbound-sweep": outboundSweep,
   },
 } as const satisfies JobsContribution<MarketplaceJobDeps>;

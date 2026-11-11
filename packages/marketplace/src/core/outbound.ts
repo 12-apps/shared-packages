@@ -55,6 +55,8 @@ interface OutboundRow {
   confirmFailedAt: Date | null;
   cancellationStatus: string | null;
   cancellationReasonCode: string | null;
+  cancellationOffendingSkus: unknown;
+  preparationMinutes: number | null;
   createdAt: Date;
 }
 
@@ -68,6 +70,8 @@ const ROW_SELECT = {
   confirmFailedAt: true,
   cancellationStatus: true,
   cancellationReasonCode: true,
+  cancellationOffendingSkus: true,
+  preparationMinutes: true,
   createdAt: true,
 } as const;
 
@@ -170,7 +174,8 @@ async function runConfirm(
       : await adapter.confirm(
           { http: ctx.ports.http, tokens: ctx.tokens, now, ...connection },
           refOf(row),
-          { preparationMinutes: null },
+          // The stated preparation time, for a marketplace whose confirm takes one.
+          { preparationMinutes: adapter.capabilities.confirmTakesPreparationTime ? row.preparationMinutes : null },
         );
   return settle(
     ctx,
@@ -181,6 +186,11 @@ async function runConfirm(
     () => stampConfirm(ctx, row, true, now),
     () => stampConfirm(ctx, row, false, now),
   );
+}
+
+/** The offending SKUs stored with the request. */
+function skusOf(row: OutboundRow): string[] {
+  return Array.isArray(row.cancellationOffendingSkus) ? row.cancellationOffendingSkus.map(String) : [];
 }
 
 async function runCancellation(
@@ -202,7 +212,7 @@ async function runCancellation(
     result = await adapter.requestCancellation(
       { http: ctx.ports.http, tokens: ctx.tokens, now: ctx.ports.clock.now(), ...connection },
       refOf(row),
-      { reason, text: "", mode: "MANUAL", offendingSkus: [] },
+      { reason, text: "", mode: "MANUAL", offendingSkus: skusOf(row) },
     );
   }
   const taken = adapter.capabilities.asyncCancellationOutcome ? "REQUESTED" : "CONFIRMED";
@@ -218,15 +228,28 @@ async function runCancellation(
 }
 
 /**
- * Run one queued outbound call. Returns what it did; throws
- * {@link OutboundRetryError} only for an answer worth retrying before the last
- * attempt.
+ * The failure stamp a run that died on its LAST attempt leaves: FAILED, never
+ * PENDING, so a person is shown the app link. Best-effort: if the database is
+ * what failed, the row stays owed and the outbound sweep picks it up.
  */
-export async function runOutbound(
-  ctx: EngineContext,
-  payload: OutboundJobPayload,
-  attempt: OutboundAttempt,
-): Promise<OutboundOutcome> {
+async function stampLastAttemptFailure(ctx: EngineContext, payload: OutboundJobPayload, error: unknown): Promise<OutboundOutcome> {
+  const reason = error instanceof Error ? error.message : String(error);
+  const db = await ctx.ports.db();
+  await (payload.action === "confirm"
+    ? db.marketplaceAcceptance.updateMany({
+        where: { orderId: payload.orderId, clientId: payload.clientId, confirmedAt: null, confirmFailedAt: null },
+        data: { confirmFailedAt: ctx.ports.clock.now() },
+      })
+    : db.marketplaceAcceptance.updateMany({
+        where: { orderId: payload.orderId, clientId: payload.clientId, cancellationStatus: "PENDING" },
+        data: { cancellationStatus: "FAILED" },
+      }));
+  ctx.ports.logger.error(`marketplace.outbound: ${payload.action} for order ${payload.orderId} failed: ${reason}`);
+  ctx.ports.publishChanged(payload.clientId);
+  return { kind: "failed", action: payload.action, reason };
+}
+
+async function runOnce(ctx: EngineContext, payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome> {
   const db = await ctx.ports.db();
   const row = (await db.marketplaceAcceptance.findFirst({
     where: { orderId: payload.orderId, clientId: payload.clientId },
@@ -238,4 +261,23 @@ export async function runOutbound(
   return payload.action === "confirm"
     ? runConfirm(ctx, payload, row, adapter, attempt)
     : runCancellation(ctx, payload, row, adapter, attempt);
+}
+
+/**
+ * Run one queued outbound call. Returns what it did; throws
+ * {@link OutboundRetryError} for an answer worth retrying before the last
+ * attempt. Any OTHER throw (an adapter bug, a database error while stamping)
+ * is rethrown for the queue to retry, and on the last attempt ends FAILED.
+ */
+export async function runOutbound(
+  ctx: EngineContext,
+  payload: OutboundJobPayload,
+  attempt: OutboundAttempt,
+): Promise<OutboundOutcome> {
+  try {
+    return await runOnce(ctx, payload, attempt);
+  } catch (error) {
+    if (error instanceof OutboundRetryError || attempt.attempt < attempt.maxAttempts) throw error;
+    return stampLastAttemptFailure(ctx, payload, error);
+  }
 }

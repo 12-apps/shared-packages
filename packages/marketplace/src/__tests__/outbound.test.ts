@@ -192,4 +192,58 @@ describe("the cancellation request", () => {
       await h.engine.runOutbound({ clientId: TENANT, orderId: "nope", action: "confirm" }, FIRST),
     ).toMatchObject({ kind: "skipped" });
   });
+
+  it.each([408, 425, 429])("[B2] retries a %i, never stamping it a refusal", async (status) => {
+    const http = scriptedHttp((request) => (request.url.endsWith("/token") ? TOKEN : { status, body: "slow down" }));
+    const subject = createHarness({ http });
+    const orderId = await refusedOrder(subject);
+    const payload = { clientId: TENANT, orderId, action: "requestCancellation" as const };
+
+    await expect(subject.engine.runOutbound(payload, FIRST)).rejects.toBeInstanceOf(OutboundRetryError);
+    expect(subject.acceptance(orderId)?.cancellationStatus).toBe("PENDING");
+  });
+
+  it("[B2] still refuses a final 4xx for good", async () => {
+    const http = scriptedHttp((request) => (request.url.endsWith("/token") ? TOKEN : { status: 404, body: "no such order" }));
+    const h = createHarness({ http });
+    const orderId = await acceptedOrder(h);
+
+    const outcome = await h.engine.runOutbound({ clientId: TENANT, orderId, action: "confirm" }, FIRST);
+
+    expect(outcome.kind).toBe("failed");
+    expect(h.acceptance(orderId)?.confirmFailedAt).toEqual(h.clock.at);
+  });
 });
+
+describe("[B1] a run that dies on something other than an answer", () => {
+  it("rethrows for the queue before the last attempt, and ends FAILED (not PENDING) on the last", async () => {
+    const h = createHarness({
+      http: {
+        requests: [],
+        http: async () => ({ status: 202, body: "" }),
+      },
+    });
+    const orderId = await refusedOrder(h);
+    // The connection's blob is fine, but the adapter crashes on this order.
+    const adapter = h.engine.adapter("IFOOD")!;
+    const original = adapter.requestCancellation;
+    Object.assign(adapter, {
+      requestCancellation: async () => {
+        throw new TypeError("adapter bug");
+      },
+    });
+    const payload = { clientId: TENANT, orderId, action: "requestCancellation" as const };
+
+    try {
+      await expect(h.engine.runOutbound(payload, FIRST)).rejects.toThrow(/adapter bug/);
+      expect(h.acceptance(orderId)?.cancellationStatus).toBe("PENDING");
+
+      const last = await h.engine.runOutbound(payload, LAST);
+      expect(last).toMatchObject({ kind: "failed", reason: "adapter bug" });
+      expect(h.acceptance(orderId)?.cancellationStatus).toBe("FAILED");
+    } finally {
+      Object.assign(adapter, { requestCancellation: original });
+    }
+  });
+});
+
