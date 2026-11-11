@@ -1,6 +1,7 @@
 import { describeCustomerIssue, type CustomerFieldIssue } from './customer-schema';
 import type { DeclineReason, ProviderName } from './types';
 import type { WalkFailure } from './walk-failure';
+import type { RefundRefusal } from './refund-retry';
 
 /**
  * Error taxonomy. Hosts catch on these classes (or on `PaymentsError` for a
@@ -220,6 +221,12 @@ export class ProviderRequestError extends PaymentsError {
        * build one.
        */
       request?: ProviderRequestSnapshot;
+      /**
+       * The adapter's own reading of a REFUND's refusal (FUT-4740): "not yet",
+       * refused for good, or no verdict. Set by the adapter that knows the
+       * provider's vocabulary; read by `refundRefusalOf` in core.
+       */
+      refundRefusal?: RefundRefusal;
       cause?: unknown;
     } = {},
   ) {

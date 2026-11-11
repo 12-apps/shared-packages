@@ -1,12 +1,17 @@
-import { ProviderRequestError } from '../../core/errors';
-import { NOTHING_TO_REFUND, refundRetryAt, type RefundRefusal } from '../../core/refund-retry';
+import {
+  afterRefusal,
+  isNothingToRefund,
+  pg1Schedule,
+  REFUND_ATTEMPT_DEADLINE_MS,
+  refundRefusalOf,
+  type RefundRefusal,
+} from '../../core/refund-retry';
 import { reportProviderFailure } from '../../core/provider-failure';
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
-import { classifyPagBankRefundRefusal } from '../../providers/pagbank-rejections';
 import { idsOf } from './orders';
 import { paidChargeId, createdPixIds } from './orders-pix-production';
 import { recordTraffic, type RecordedOutcome } from './record';
-import { REFUND_ATTEMPT_DEADLINE_MS, type EvidenceRefundState } from './refund-state';
+import type { EvidenceRefundState } from './refund-state';
 import type { EvidenceRunDeps } from './run';
 import { usageStep } from './run';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf, withStep } from './steps';
@@ -98,7 +103,7 @@ function answerOf(deps: EvidenceRunDeps, refunded: RecordedOutcome<{ status: str
   if (refunded.ok && refunded.value.status === 'REFUNDED' && answered(refunded.calls)) {
     return { refusal: null, observed: deps.copy.canceled(pagbankWord(refunded)), error: null };
   }
-  const refusal = refunded.ok ? 'UNKNOWN' : classifyPagBankRefundRefusal(refunded.error);
+  const refusal = refunded.ok ? 'UNKNOWN' : refundRefusalOf(refunded.error);
   return { refusal, observed: failureOf(deps.copy, refunded), error: refunded.ok ? null : refunded.error };
 }
 
@@ -106,15 +111,6 @@ function answerOf(deps: EvidenceRunDeps, refunded: RecordedOutcome<{ status: str
 function pagbankWord(refunded: { calls: readonly RecordedHttpCall[]; value: { status: string } }): string {
   const said = (refunded.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
   return typeof said === 'string' ? said : refunded.value.status;
-}
-
-const isNothingToRefund = (error: unknown): boolean =>
-  error instanceof ProviderRequestError && error.options.providerCode === NOTHING_TO_REFUND;
-
-/** The state after an attempt that did not refund: the next one due, or none. */
-function afterRefusal(state: EvidenceRefundState, refusal: RefundRefusal, now: Date): EvidenceRefundState {
-  const nextAt = refusal === 'REFUSED' ? null : refundRetryAt(state.attempt, now);
-  return { ...state, refusal, nextAt: nextAt?.toISOString() ?? null, exhausted: nextAt === null, claimedAt: null };
 }
 
 /**
@@ -134,7 +130,7 @@ export async function runClaimedAttempt(
   const next: EvidenceRefundState =
     settled.refusal === null
       ? { ...state, refusal: null, nextAt: null, exhausted: false, claimedAt: null }
-      : afterRefusal(state, settled.refusal, now);
+      : afterRefusal(state, settled.refusal, now, pg1Schedule);
   const reportNow = next.exhausted && !next.reported;
   const final = reportNow ? { ...next, reported: true } : next;
   let steps = withStep(claimed.steps, { ...settled.step, refund: final });
@@ -160,20 +156,5 @@ function reportStuckRefund(deps: EvidenceRunDeps, record: EvidenceRecord, settle
   });
 }
 
-/** The first series' state: attempt 1 claimed, nothing refused yet. */
-export function firstClaim(now: Date, previous: EvidenceRefundState | null): EvidenceRefundState {
-  return {
-    series: (previous?.series ?? 0) + 1,
-    attempt: 1,
-    nextAt: null,
-    exhausted: false,
-    refusal: previous?.refusal ?? null,
-    claimedAt: now.toISOString(),
-    reported: previous?.reported ?? false,
-  };
-}
-
-/** The attempt after a claimed one: the next number, claimed now. */
-export function nextClaim(now: Date, previous: EvidenceRefundState): EvidenceRefundState {
-  return { ...previous, attempt: previous.attempt + 1, nextAt: null, claimedAt: now.toISOString() };
-}
+// Moved to core (FUT-4740), re-exported for the evidence modules that claim through this one.
+export { firstClaim, nextClaim } from '../../core/refund-retry';

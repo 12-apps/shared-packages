@@ -1,8 +1,8 @@
-import { REFUND_RETRY_ATTEMPTS } from '../../core/refund-retry';
+import { refundDueNow } from '../../core/refund-retry';
 import { pollPix } from './orders';
 import { createdPixIds, paidChargeId, pixStateOf } from './orders-pix-production';
 import { claimAttempt, firstClaim, nextClaim, refundStepOf, runClaimedAttempt, stampAfter } from './refund-attempt';
-import { claimHeld, refundStateOf, type EvidenceRefundState } from './refund-state';
+import { refundStateOf, type EvidenceRefundState } from './refund-state';
 import { sandboxSeller, type EvidenceRunDeps } from './run';
 import { clockOf, withStep } from './steps';
 import type { EvidenceRecord } from './types';
@@ -29,10 +29,8 @@ type Due =
 function dueNow(record: EvidenceRecord, now: Date): Due | null {
   const state = refundStateOf(record);
   if (!state) return refundStepOf(record) ? { kind: 'LEGACY' } : null;
-  if (state.exhausted || claimHeld(state, now)) return null;
-  const expiredClaim = state.claimedAt !== null;
-  if (!expiredClaim && (state.nextAt === null || now.getTime() < new Date(state.nextAt).getTime())) return null;
-  return state.attempt >= REFUND_RETRY_ATTEMPTS ? { kind: 'CLOSE', state } : { kind: 'NEXT', state };
+  const due = refundDueNow(state, now);
+  return due === null ? null : { kind: due, state };
 }
 
 /**
