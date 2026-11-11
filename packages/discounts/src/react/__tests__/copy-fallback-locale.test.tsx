@@ -20,6 +20,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 7: the language a host pack's missing sentences are
@@ -123,8 +124,8 @@ beforeAll(async () => {
   render(bareSurface(hostFormatters()));
   const kebab = await screen.findAllByTestId(`discount-actions-${UNKNOWN.id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  await findReach("discount-period", undefined, SURFACE_LOADED);
   cleanup();
 });
 
@@ -133,12 +134,12 @@ describe("a bare DiscountsSurface with a pt-BR pack from before the calendar blo
     const formatters = hostFormatters();
     expect(formatters.locale).toBeUndefined();
     render(bareSurface(formatters));
-    const notice = await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
+    const notice = await findReach("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
     expect(notice.textContent).toContain("Datas indisponíveis");
     const kebab = await screen.findAllByTestId(`discount-actions-${UNKNOWN.id}`, undefined, SURFACE_LOADED);
     fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-    fireEvent.click(await screen.findByTestId("discount-action-edit"));
-    const period = await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+    fireEvent.click(await findReach("discount-action-edit"));
+    const period = await findReach("discount-period", undefined, SURFACE_LOADED);
     expect(within(period).getByTestId("discount-period-unavailable").textContent).toBe(
       PT_BR_DISCOUNTS_WEB_COPY.window.daysUnknownBoxes,
     );

@@ -18,10 +18,20 @@ Feature: Promotions
 
   Scenario: A manager composes a percentage promotion and finds it in the grid
     # The round trip is the claim: a rate typed as a percentage comes back as
-    # one only if the conversion into basis points AND back out both ran.
+    # one only if the conversion into basis points AND back out both ran. The
+    # form asks it in four steps — three Continuar and a Pronto — then Criar.
     When I open the promotions screen
     And I compose a percentage promotion
     Then the promotion is listed with its rate
+
+  Scenario: A step cannot be passed while something in it is missing
+    # Continuar is held, with what is missing said beside it, until the step
+    # is complete — the form never refuses after a press.
+    When I open the promotions screen
+    And I start a promotion step by step
+    Then the first step cannot be passed yet and says what is missing
+    When I name the promotion
+    Then the first step can be passed
 
   Scenario: The value field follows the kind, and scope disappears for a combo
     # Three rules in one dialog, all of them about the form refusing to let an

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
@@ -10,6 +10,7 @@ import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { reach } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 3 (B2): a rule written in the store's zone that the
@@ -80,9 +81,9 @@ describe("a rule whose days the server cannot place", () => {
         wholeDays
       />,
     );
-    expect(screen.getByTestId("discount-days-unknown").textContent).toContain(copy.window.daysUnknownForm);
-    expect((screen.getByTestId("total-form-field-startsAt") as HTMLInputElement).value).toBe("");
-    expect((screen.getByTestId("total-form-field-endsAt") as HTMLInputElement).value).toBe("");
+    expect(reach("discount-days-unknown").textContent).toContain(copy.window.daysUnknownForm);
+    expect((reach("total-form-field-startsAt") as HTMLInputElement).value).toBe("");
+    expect((reach("total-form-field-endsAt") as HTMLInputElement).value).toBe("");
   });
 
   it("keeps the UTC instants' own days for a server that counts no whole days (no flag, no days)", () => {

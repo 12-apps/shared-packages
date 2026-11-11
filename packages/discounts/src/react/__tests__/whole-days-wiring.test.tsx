@@ -20,6 +20,7 @@ import { STORY_GROUPS } from "../__stories__/fixtures";
 import { getByLabelFor } from "./labelled-control";
 import { oneAdminPerDescribe } from "./one-admin";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach, reach, submitForm } from "./step-form-shim";
 
 /**
  * `wholeDays` from the factory to the form (FUT-4482, review round 2): the
@@ -96,12 +97,12 @@ function adminTree(wholeDays: boolean, rows: DiscountWireRecord[], sent: unknown
 }
 
 const box = (name: "startsAt" | "endsAt"): HTMLInputElement =>
-  screen.getByTestId(`total-form-field-${name}`) as HTMLInputElement;
+  reach(`total-form-field-${name}`) as HTMLInputElement;
 const typeInto = (name: "startsAt" | "endsAt", value: string): void => {
   fireEvent.change(box(name), { target: { value } });
 };
 const tap = (day: number): void => {
-  const cell = within(screen.getByTestId("discount-period"))
+  const cell = within(reach("discount-period"))
     .getAllByRole("gridcell", { name: `${day} de novembro de 2026` })[0]!;
   fireEvent.click(cell);
 };
@@ -112,14 +113,14 @@ const fillRequired = (): void => {
 
 async function openCreate(): Promise<void> {
   fireEvent.click((await screen.findAllByText(copy.screen.create))[0]!);
-  await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  await findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 async function openEdit(): Promise<void> {
   const kebab = await screen.findAllByTestId(`discount-actions-${RECORD.id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  await findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 // The worker's first mount of the admin and its form pays for emotion writing
@@ -149,7 +150,7 @@ describe("createWebDiscounts({ wholeDays: true }).Screen — the create dialog",
     fillRequired();
     typeInto("startsAt", "10112026");
     typeInto("endsAt", "10112026");
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-10" });
   });
@@ -178,7 +179,7 @@ describe("createWebDiscounts({ wholeDays: true }).Screen — the edit dialog", (
   it("WD4: accepts equal typed days and sends them", async () => {
     await openEdit();
     typeInto("endsAt", "10112026");
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-10" });
   });
@@ -197,7 +198,7 @@ describe("createWebDiscounts({ wholeDays: true }).DiscountForm", () => {
     typeInto("startsAt", "10112026");
     tap(10);
     await waitFor(() => expect(box("endsAt").value).toBe("10/11/2026"));
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-10" });
   });

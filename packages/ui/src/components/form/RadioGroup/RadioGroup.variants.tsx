@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box/index.js';
 import ButtonBase from '@mui/material/ButtonBase/index.js';
-import Card from '@mui/material/Card/index.js';
 import CardContent from '@mui/material/CardContent/index.js';
 import FormControlLabel from '@mui/material/FormControlLabel/index.js';
 import FormLabel from '@mui/material/FormLabel/index.js';
@@ -13,7 +12,6 @@ import React from 'react';
 import {
   buttonRadioSx,
   formLabelSx,
-  radioCardSx,
   segmentButtonSx,
   segmentContainerSx,
 } from './RadioGroup.styles';
@@ -27,13 +25,6 @@ const StyledFormLabel = styled(FormLabel, {
 })<{ glass?: boolean; error?: boolean }>(({ theme, glass, error }) => ({
   ...formLabelSx(theme, glass, error),
 }));
-
-const StyledRadioCard = styled(Card, {
-  shouldForwardProp: (prop) =>
-    !['selected', 'customColor', 'glass', 'gradient', 'glow', 'customSize', 'animated'].includes(
-      prop as string,
-    ),
-})<SurfaceFlags>(({ theme, ...flags }) => ({ ...radioCardSx(theme, flags) }));
 
 const StyledButtonRadio = styled(ButtonBase, {
   shouldForwardProp: (prop) =>
@@ -70,6 +61,10 @@ export interface VariantProps {
   groupRef?: React.Ref<HTMLDivElement>;
   onChange?: RadioGroupProps['onChange'];
   rest?: Record<string, unknown>;
+  /** The group's label, which names the cards variant's `radiogroup`. */
+  label?: string;
+  /** The cards variant draws a radio in each card (FUT-4477). */
+  indicator?: boolean;
 }
 
 /** `${dataTestId}-${suffix}`, or nothing when the caller supplied no id. */
@@ -158,6 +153,13 @@ export const DefaultRadios: React.FC<VariantProps> = ({
 );
 
 export interface CardBodyProps {
+  /** A visible radio before the label, presentational: the card is the radio. */
+  indicator?: boolean;
+  /**
+   * `xs`/`sm` cards: the card's own padding is the only padding, the gaps are
+   * tighter and the label is body-sized, so four fit on a row in a form.
+   */
+  compact?: boolean;
   option: RadioOption;
   index: number;
   isSelected: boolean;
@@ -165,6 +167,33 @@ export interface CardBodyProps {
   showDescriptions: boolean;
   dataTestId?: string;
 }
+
+/** The compact (`xs`/`sm`) and roomy faces of a card's body. */
+const BODY_LOOK_SX = {
+  compact: {
+    content: { p: 0, '&:last-child': { pb: 0 } },
+    gap: 1.5,
+    label: 'body2',
+    description: 'caption',
+    // The caption at a plain line-height, not the letter-spaced 1.66.
+    descriptionSx: { mt: 0.25, lineHeight: 1.35, letterSpacing: 0 },
+  },
+  roomy: { content: { p: 2, '&:last-child': { pb: 2 } }, gap: 2, label: 'subtitle1', description: 'body2', descriptionSx: { mt: 0.5 } },
+} as const;
+
+/** The presentational radio mark of `indicator`: the card itself is the radio. */
+const CardIndicator: React.FC<{ checked: boolean; color: string }> = ({ checked, color }) => (
+  <Radio
+    checked={checked}
+    tabIndex={-1}
+    aria-hidden
+    disableRipple
+    color={color === 'neutral' ? 'default' : muiRadioColor(color)}
+    size="small"
+    sx={{ p: 0, mt: 0.25, pointerEvents: 'none' }}
+    inputProps={{ 'aria-hidden': true, tabIndex: -1 }}
+  />
+);
 
 /** A card's contents: the icon, the label, and the optional description under it. */
 export const CardBody: React.FC<CardBodyProps> = ({
@@ -174,67 +203,42 @@ export const CardBody: React.FC<CardBodyProps> = ({
   color,
   showDescriptions,
   dataTestId,
-}) => (
-  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-      {option.icon && (
-        <Box sx={{ mt: 0.5, color: isSelected ? `${color}.main` : 'text.secondary' }}>
-          {option.icon}
-        </Box>
-      )}
-      <Box sx={{ flex: 1 }}>
-        <Typography
-          variant="subtitle1"
-          fontWeight={600}
-          color={isSelected ? `${color}.main` : 'text.primary'}
-          data-testid={testId(dataTestId, `label-${index}`)}
-        >
-          {option.label}
-        </Typography>
-        {option.description && showDescriptions && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {option.description}
-          </Typography>
+  indicator,
+  compact,
+}) => {
+  const look = compact ? BODY_LOOK_SX.compact : BODY_LOOK_SX.roomy;
+  const described = Boolean(option.description) && showDescriptions;
+  return (
+    <CardContent sx={look.content}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: look.gap }}>
+        {indicator && <CardIndicator checked={isSelected} color={color} />}
+        {option.icon && (
+          <Box sx={{ mt: 0.5, color: isSelected ? `${color}.main` : 'text.secondary' }}>
+            {option.icon}
+          </Box>
         )}
+        <Box sx={{ flex: 1 }}>
+          <Typography
+            variant={look.label}
+            fontWeight={600}
+            // Compact: the tint and edge say chosen; the name stays ink.
+            color={isSelected && !compact ? `${color}.main` : 'text.primary'}
+            data-testid={testId(dataTestId, `label-${index}`)}
+          >
+            {option.label}
+          </Typography>
+          {described && (
+            <Typography variant={look.description} component="p" color="text.secondary" sx={look.descriptionSx} data-description="">
+              {option.description}
+            </Typography>
+          )}
+        </Box>
       </Box>
-    </Box>
-  </CardContent>
-);
+    </CardContent>
+  );
+};
 
 export { OptionLabel };
-
-export const CardRadios: React.FC<VariantProps> = ({
-  options, value, color, size, direction, showDescriptions, glass, gradient, glow, dataTestId, onSelect,
-}) => (
-  <Box
-    sx={{ display: 'flex', flexDirection: direction, gap: 2 }}
-    data-testid={testId(dataTestId, 'container')}
-  >
-    {options.map((option, index) => (
-      <StyledRadioCard
-        key={option.value}
-        selected={value === option.value}
-        customColor={color}
-        glass={glass}
-        gradient={gradient}
-        glow={glow}
-        customSize={size}
-        animated
-        data-testid={testId(dataTestId, `card-${index}`)}
-        onClick={() => onSelect(option)}
-      >
-        <CardBody
-          option={option}
-          index={index}
-          isSelected={value === option.value}
-          color={color}
-          showDescriptions={showDescriptions}
-          dataTestId={dataTestId}
-        />
-      </StyledRadioCard>
-    ))}
-  </Box>
-);
 
 export const ButtonRadios: React.FC<VariantProps> = ({
   options, value, color, size, direction, glass, gradient, dataTestId, onSelect,

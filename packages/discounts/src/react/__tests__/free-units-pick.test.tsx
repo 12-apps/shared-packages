@@ -8,6 +8,7 @@ import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { findReach, peek, reach, reachLabel, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4441 / FUT-4470: the form-level half of "picking a product clears the
@@ -67,29 +68,29 @@ function renderForm(): void {
 }
 
 describe("FUT-4441: a pick through the form clears the product refusal", () => {
-  it("drops the product line and the error toast once a product is picked", async () => {
+  it("drops the product line once a product is picked, and no toast is ever raised", async () => {
     renderForm();
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
-    await screen.findByTestId("free-units-builder");
+    await findReach("free-units-builder");
     // Everything else valid, so the product list is the ONE refusal and the
     // toast stands or falls with it.
-    fireEvent.change(screen.getByLabelText(copy.form.name), {
+    fireEvent.change(reachLabel(copy.form.name), {
       target: { value: "Leve 3 pague 2" },
     });
-    fireEvent.change(screen.getByTestId("free-units-quantity"), {
+    fireEvent.change(reach("free-units-quantity"), {
       target: { value: "3" },
     });
-    fireEvent.change(screen.getByTestId("free-units-free"), {
+    fireEvent.change(reach("free-units-free"), {
       target: { value: "1" },
     });
 
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    expect(await screen.findByTestId("free-units-message")).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy(),
-    );
+    submitForm();
+    await waitFor(() => expect(peek("free-units-message")).toBeTruthy());
+    // The toast is the SERVER's refusal now (FUT-4477, `FormErrorSnackbar show`):
+    // a step's own errors are said on the step, and the toast stays down.
+    await waitFor(() => expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull());
 
-    fireEvent.click(screen.getByTestId("free-units-items-pick"));
+    fireEvent.click(reach("free-units-items-pick"));
 
     await waitFor(() => {
       expect(screen.queryByTestId("free-units-message")).toBeNull();
@@ -97,21 +98,21 @@ describe("FUT-4441: a pick through the form clears the product refusal", () => {
     });
   });
 
-  it("keeps a quantity refusal, and its toast, after the pick", async () => {
+  it("keeps a quantity refusal after the pick, and no toast is ever raised", async () => {
     renderForm();
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
-    await screen.findByTestId("free-units-builder");
-    fireEvent.change(screen.getByLabelText(copy.form.name), {
+    await findReach("free-units-builder");
+    fireEvent.change(reachLabel(copy.form.name), {
       target: { value: "Leve 3 pague 2" },
     });
-    fireEvent.change(screen.getByTestId("free-units-quantity"), {
+    fireEvent.change(reach("free-units-quantity"), {
       target: { value: "0" },
     });
 
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    expect(await screen.findByTestId("free-units-message")).toBeTruthy();
+    submitForm();
+    await waitFor(() => expect(peek("free-units-message")).toBeTruthy());
 
-    fireEvent.click(screen.getByTestId("free-units-items-pick"));
+    fireEvent.click(reach("free-units-items-pick"));
 
     await waitFor(() => {
       expect(screen.queryByTestId("free-units-message")).toBeNull();
@@ -119,6 +120,7 @@ describe("FUT-4441: a pick through the form clears the product refusal", () => {
     expect(
       screen.getAllByText(copy.form.invalidComboQuantity).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
+    // No toast for a client refusal since FUT-4477 (the server's alone).
+    await waitFor(() => expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull());
   });
 });

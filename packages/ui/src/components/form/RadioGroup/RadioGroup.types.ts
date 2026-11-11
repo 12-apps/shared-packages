@@ -8,6 +8,8 @@ export interface RadioOption {
   description?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
+  /** The card's own test id (`cards` variant), in place of the index-based `<dataTestId>-card-<n>`. */
+  dataTestId?: string;
 }
 
 export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
@@ -75,6 +77,12 @@ export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
    * Whether to show descriptions for card variant
    */
   showDescriptions?: boolean;
+
+  /**
+   * `variant="cards"`: a visible radio in each card, before its label. The card
+   * itself is the `radio` (keyboard and screen reader); this is the mark.
+   */
+  indicator?: boolean;
 
   /**
    * Test ID for the radio group container element

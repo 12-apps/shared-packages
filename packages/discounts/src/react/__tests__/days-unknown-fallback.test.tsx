@@ -17,6 +17,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach, reach } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 6 (release): the web-copy keys this branch added are
@@ -102,8 +103,8 @@ function mount(copy: DiscountsWebCopy, locale: string) {
 async function openEdit(): Promise<HTMLElement> {
   const kebab = await screen.findAllByTestId(`discount-actions-${UNKNOWN.id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  return findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 // The worker's first mount of the admin and its form pays for emotion writing
@@ -140,7 +141,7 @@ describe.each([
 
   it("says the list's sentences from the package's pack for its locale", async () => {
     mount(older, locale);
-    expect((await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED)).textContent).toContain(
+    expect((await findReach("discounts-days-unknown-notice", undefined, SURFACE_LOADED)).textContent).toContain(
       pack.window.daysUnknownList,
     );
     // The rule is paused, and the phone's marker says so (round 6).
@@ -150,7 +151,7 @@ describe.each([
   it("says the form's sentences and names the calendar from that pack", async () => {
     mount(older, locale);
     const period = await openEdit();
-    expect(screen.getByTestId("discount-days-unknown").textContent).toContain(pack.window.daysUnknownForm);
+    expect(reach("discount-days-unknown").textContent).toContain(pack.window.daysUnknownForm);
     expect(within(period).getByTestId("discount-period-unavailable").textContent).toBe(pack.window.daysUnknownBoxes);
     expect(within(period).getAllByRole("button", { name: pack.form.calendar.nextMonth }).length).toBeGreaterThan(0);
   });

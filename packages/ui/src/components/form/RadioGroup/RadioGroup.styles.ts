@@ -126,6 +126,8 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
     backgroundColor: selected ? alpha(palette.main, 0.05) : theme.palette.background.paper,
     position: 'relative' as const,
     overflow: 'hidden' as const,
+    // The card is the radio (keyboard focus lands on it): a ring that shows where.
+    '&:focus-visible': { outline: `${rem(theme, 2)} solid ${palette.main}`, outlineOffset: rem(theme, 2) },
     ...(animated && { animation: `${slideAnimation(theme)} 0.4s ease-out` }),
     // A radial wash that grows from the centre as the card is selected or hovered.
     '&::before': {
@@ -152,9 +154,35 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
   };
 };
 
+/** `xs`/`sm` cards: the compact, flat face a form uses (FUT-4477). */
+export const isCompactCard = (size: string | undefined): boolean => size === 'xs' || size === 'sm';
+
+/**
+ * The compact card is flat: a 1 px divider edge (the chosen one in the colour),
+ * a 10 px radius, a plain tint when chosen, and no elevation, wash, glow or
+ * scale — four of them sit side by side in a form, where motion and depth
+ * would be noise. Hover only colours the edge.
+ */
+const compactCardSx = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSSObject => {
+  const { selected, customSize = 'sm' } = flags;
+  return {
+    cursor: 'pointer',
+    position: 'relative' as const,
+    boxShadow: 'none',
+    borderRadius: rem(theme, 10),
+    border: `1px solid ${selected ? palette.main : theme.palette.divider}`,
+    backgroundColor: selected ? alpha(palette.main, 0.08) : theme.palette.background.paper,
+    transition: 'border-color 0.2s ease, background-color 0.2s ease',
+    padding: customSize === 'xs' ? rem(theme, 8) : rems(theme, 12, 14),
+    '&:hover': { borderColor: palette.main },
+    '&:focus-visible': { outline: `${rem(theme, 2)} solid ${palette.main}`, outlineOffset: rem(theme, 2) },
+  };
+};
+
 export const radioCardSx = (theme: Theme, flags: SurfaceFlags): CSSObject => {
   const { selected, customColor = 'primary', glass, gradient, glow } = flags;
   const palette = getColorFromTheme(theme, customColor);
+  if (isCompactCard(flags.customSize)) return compactCardSx(theme, flags, palette);
 
   return {
     ...cardBase(theme, flags, palette),

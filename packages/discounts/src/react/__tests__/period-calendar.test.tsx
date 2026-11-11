@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
@@ -8,6 +8,7 @@ import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { reach, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4156, approved option B: "Quando vale" carries a range calendar that is
@@ -90,8 +91,8 @@ afterEach(() => {
 });
 
 const box = (name: "startsAt" | "endsAt"): HTMLInputElement =>
-  screen.getByTestId(`total-form-field-${name}`) as HTMLInputElement;
-const period = (): HTMLElement => screen.getByTestId("discount-period");
+  reach(`total-form-field-${name}`) as HTMLInputElement;
+const period = (): HTMLElement => reach("discount-period");
 const tap = (day: number, month = "novembro", year = 2026): void => {
   const cell = within(period()).getAllByRole("gridcell", { name: `${day} de ${month} de ${year}` })[0];
   if (cell === undefined) throw new Error(`no ${day} de ${month} de ${year} on screen`);
@@ -130,7 +131,7 @@ describe("FUT-4156 option B: the calendar is always open in Quando vale", () => 
     openForm({ startsOn: "2026-11-10", endsOn: "2026-11-20", startsAt: "2026-11-10T03:00:00.000Z", endsAt: "2026-11-21T03:00:00.000Z" });
     tap(14);
     await waitFor(() => expect(box("startsAt").value).toBe("14/11/2026"));
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent.bodies).toHaveLength(1));
     expect(sent.bodies[0]).toMatchObject({ startsAt: "2026-11-14", endsAt: null });
   });

@@ -1,41 +1,26 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import { useCallback, useContext, useMemo, useState, type Dispatch, type JSX, type SetStateAction } from "react";
 
-import { Alert } from "@12-apps/ui/data-display/Alert";
-import {
-  Fields,
-  FormContainer,
-  FormErrorSnackbar,
-  SubmitButton,
-} from "@12-apps/ui/form/total-form";
-import { Stack } from "@12-apps/ui/mui/Stack";
+import { FormContainer, FormErrorSnackbar } from "@12-apps/ui/form/total-form";
 
 import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
-import { FirstOrderField } from "./first-order-field";
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
 import type { CompleteDiscountsWebCopy } from "./copy";
 import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
-import {
-  ComboCapField,
-  DiscountSwitches,
-  LimitFields,
-  RewardFields,
-  ScopeField,
-  TriggerFields,
-  WindowFields,
-  type CurrencyFieldComponent,
-} from "./discount-form-fields";
-import { ComboPreviewLayout } from "./combo-cart-preview";
-import { DiscountTargetPicker } from "./discount-target-picker";
-import { KindField } from "./kind-field";
+import { DirtyReportContext } from "./discount-dialog";
+import type { CurrencyFieldComponent } from "./discount-form-fields";
+import { DiscountStepForm } from "./discount-step-form";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
 import { formDatesLock, initialValues, type DatesLock, type DiscountFormValues } from "./discount-form-values";
-import { DISCOUNT_KINDS, typeAndScopeFor } from "./form-kind";
+import { typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
+import { NO_SERVER_ERRORS, serverErrorsOf, type ServerErrors } from "./step-effects";
+import { flowOpenTried, flowRefused, initialFlow, type StepFlow } from "./step-flow";
+import { stepOfKey, type StepNumber } from "./step-keys";
 
 /**
  * The create/edit form — shared by the header's create dialog and the row
@@ -107,7 +92,21 @@ function useNonStringState(editing: DiscountWireRecord | null) {
 }
 
 type NonStringState = ReturnType<typeof useNonStringState>;
-type SubmitHelpers = { setFieldErrors: (errors: Record<string, string | undefined>) => void };
+
+/** What a submit tells the steps: a new try, the client's refusal, the server's. */
+interface SubmitHooks {
+  setError: (message: string | null) => void;
+  setFlow: Dispatch<SetStateAction<StepFlow>>;
+  setServer: Dispatch<SetStateAction<ServerErrors>>;
+}
+
+/** The steps a map of field errors belongs to; keys the table does not list have none. */
+function stepsOf(errors: Readonly<Record<string, string | undefined>>): StepNumber[] {
+  return Object.keys(errors).flatMap((key) => {
+    const step = stepOfKey(key);
+    return step === null || errors[key] === undefined ? [] : [step];
+  });
+}
 
 export interface DiscountFormProps {
   api: DiscountsApiClient;
@@ -136,6 +135,12 @@ export interface DiscountFormProps {
    * dated one would be refused. Default false.
    */
   zoneUnknown?: boolean;
+  /**
+   * Whether the values differ from those the form opened with (FUT-4478): a
+   * host embedding the form guards its own way out with it. `DiscountDialog`
+   * hears it without this prop and guards its close itself.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -181,11 +186,12 @@ function windowIntent(
 function makeSubmit(
   props: DiscountFormProps,
   extra: NonStringState,
-  setError: (message: string | null) => void,
-): (values: DiscountFormValues, helpers: SubmitHelpers) => Promise<void> {
+  hooks: SubmitHooks,
+): (values: DiscountFormValues) => Promise<void> {
   const { api, copy, formatters, editing, onSaved, onError } = props;
-  return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
-    setError(null);
+  return async function handleSubmit(values): Promise<void> {
+    hooks.setError(null);
+    hooks.setServer((previous) => ({ ...previous, refused: false }));
     const { locked, keepWindow, noDates } = windowIntent(props, values);
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
@@ -199,9 +205,9 @@ function makeSubmit(
       datesLocked: locked,
     });
     if (Object.keys(invalid).length > 0) {
-      // ONE message for a client refusal: the red fields and the toast
-      // (FUT-4143). The `saveFailed` alert is the SERVER's, below.
-      setFieldErrors(invalid);
+      // The submit is held while anything is missing, so this is the backstop:
+      // every step at fault is tried — its messages show — and the first opens.
+      hooks.setFlow((flow) => flowRefused(flow, stepsOf(invalid)));
       return;
     }
     const payload: DiscountFormPayload = {
@@ -227,10 +233,18 @@ function makeSubmit(
       onSaved();
       return;
     }
-    setError(result.error);
+    hooks.setError(result.error);
     // The server attributes what it can — a duplicate code, a rate out of range
-    // — so highlight those inputs instead of only showing the banner.
-    if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+    // — so those inputs say it, on their steps, kept apart from the client's
+    // rules until the field they name changes (FUT-4478).
+    const fieldErrors = result.fieldErrors;
+    if (fieldErrors) {
+      const form = { values, ...extra, slots: extra.comboRequirements };
+      hooks.setServer((previous) => serverErrorsOf(fieldErrors, form, previous.round + 1));
+      // Contract R11: every step it names is tried, and the lowest opens — out of
+      // Ver tudo too, so the field it names is the one thing on screen.
+      hooks.setFlow((flow) => flowOpenTried(flow, stepsOf(fieldErrors)));
+    }
     onError(result, editing ? "discounts.update" : "discounts.create");
   };
 }
@@ -256,79 +270,49 @@ function windowFlags(props: DiscountFormProps): {
 export function DiscountForm(props: DiscountFormProps): JSX.Element {
   const { copy, formatters, currencyField, groups, editing } = props;
   const [error, setError] = useState<string | null>(null);
+  const [flow, setFlow] = useState<StepFlow>(() => initialFlow(editing !== null));
+  const [server, setServer] = useState<ServerErrors>(NO_SERVER_ERRORS);
   const extra = useNonStringState(editing);
-  const handleSubmit = makeSubmit(props, extra, setError);
+  const handleSubmit = makeSubmit(props, extra, { setError, setFlow, setServer });
+  // What the form opened with, worked out once: the container reads it only on its first render.
+  const opened = useMemo(() => initialValues(editing, formatters), [editing, formatters]);
+  const report = useContext(DirtyReportContext);
+  const { onDirtyChange } = props;
+  const onDirty = useCallback(
+    (dirty: boolean) => {
+      onDirtyChange?.(dirty);
+      report?.(dirty);
+    },
+    [onDirtyChange, report],
+  );
 
   return (
     <FormContainer<DiscountFormValues>
       // No `schema`: the container runs one before `onSubmit` and stops when
       // it fails, which judged the name alone. Every rule, the name's too,
       // lives in `validate` so one Criar marks every field (FUT-4143).
-      initialValues={initialValues(editing, formatters)}
+      initialValues={opened}
       onSubmit={handleSubmit}
       dataTestId="discount-form"
     >
-      {/* The combo preview's column (FUT-4417) beside a wide form; nothing for other kinds. */}
-      <ComboPreviewLayout
+      <DiscountStepForm
         copy={copy}
         formatters={formatters}
+        currencyField={currencyField}
         groups={groups}
-        slots={extra.comboRequirements}
-      >
-        <Stack spacing={2}>
-          <Fields.TextField name="name" label={copy.form.name} />
-          <KindField copy={copy} kinds={DISCOUNT_KINDS} />
-          <RewardFields copy={copy} currencyField={currencyField} />
-          <ScopeField copy={copy} />
-          <DiscountTargetPicker
-            groups={groups}
-            copy={copy}
-            selection={{
-              categoryIds: extra.categoryIds,
-              menuItemIds: extra.menuItemIds,
-              comboRequirements: extra.comboRequirements,
-              onCategoryIdsChange: extra.setCategoryIds,
-              onMenuItemIdsChange: extra.setMenuItemIds,
-              onComboRequirementsChange: extra.setComboRequirements,
-            }}
-          />
-          <ComboCapField copy={copy} />
-          <TriggerFields copy={copy} />
-          <WindowFields
-            copy={copy}
-            {...windowFlags(props)}
-            schedule={extra.schedule}
-            scheduleEnabled={extra.scheduleEnabled}
-            onScheduleChange={extra.setSchedule}
-            onScheduleEnabledChange={extra.setScheduleEnabled}
-          />
-          <LimitFields copy={copy} currencyField={currencyField} />
-          <FirstOrderField
-            copy={copy}
-            checked={extra.firstOrderOnly}
-            onChange={extra.setFirstOrderOnly}
-          />
-          <DiscountSwitches
-            copy={copy}
-            active={extra.active}
-            stackable={extra.stackable}
-            onActive={extra.setActive}
-            onStackable={extra.setStackable}
-          />
-          {error && (
-            <Alert
-              variant="danger"
-              title={copy.form.saveFailed}
-              description={error}
-              data-testid="discount-form-error"
-            />
-          )}
-          <SubmitButton dataTestId="discount-form-submit">
-            {editing ? copy.form.submitEdit : copy.form.submitCreate}
-          </SubmitButton>
-        </Stack>
-      </ComboPreviewLayout>
-      <FormErrorSnackbar message={copy.form.errorSnackbar} />
+        editing={editing !== null}
+        extra={extra}
+        window={windowFlags(props)}
+        datesLocked={formDatesLock(editing, props.zoneUnknown === true) !== null}
+        flow={flow}
+        setFlow={setFlow}
+        server={server}
+        setServer={setServer}
+        error={error}
+        onDirtyChange={onDirty}
+      />
+      {/* Only after the SERVER refused the last submit: a step's live errors are its own to show (FUT-4477). */}
+      <FormErrorSnackbar message={copy.form.errorSnackbar} show={server.refused} />
     </FormContainer>
   );
 }

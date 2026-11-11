@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useState, type JSX, type ReactNode } from "react";
+import { createContext, Fragment, useRef, useState, type JSX, type ReactNode } from "react";
 
+import { AlertDialog } from "@12-apps/ui/data-display/AlertDialog";
 import { UsableModal } from "@12-apps/ui/feedback/UsableModal";
 import { Box } from "@12-apps/ui/mui/Box";
 
@@ -13,7 +14,7 @@ import type { CompleteDiscountsWebCopy } from "./copy";
  *
  * `size="wide"` — the panel the library keeps for a dense two-column editor —
  * because the combo form lays out "Como fica no carrinho" in its own column
- * beside the fields when the form has the room (`PREVIEW_ASIDE_MIN_PX`), and
+ * beside the fields when the form has the room (`asideMinPx`), and
  * the 800 px dialog it replaced never had it. The owner's call, 2026-11-05:
  * "Substitui o modal pelo stacked modal no desktop".
  *
@@ -25,6 +26,12 @@ import type { CompleteDiscountsWebCopy } from "./copy";
  *
  * `copy.form.dialog` names the ✕ and the back arrow, which carry a glyph only;
  * the arrow shows when the modal opens over another stacked panel.
+ *
+ * **Leaving with changes** (FUT-4478): the form reports whether it is dirty
+ * through `DirtyReportContext`, and the modal's ONE `onClose` — the ✕, the
+ * veil, Esc and the sheet's back — asks "Sair sem salvar?" while it is; clean,
+ * it closes at once. Discounts keep no draft (owner, 2026-11-06), so the
+ * question is the whole guard. A discard closes silently.
  */
 export function DiscountDialog({
   open,
@@ -40,15 +47,24 @@ export function DiscountDialog({
   children: ReactNode;
 }): JSX.Element {
   const [opening, setOpening] = useState(open ? 1 : 0);
+  const dirty = useRef(false);
+  const [asking, setAsking] = useState(false);
+  const close = (): void => {
+    if (dirty.current) setAsking(true);
+    else onClose();
+  };
+  const { chrome } = copy.steps;
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) setOpening(opening + 1);
+    dirty.current = false;
   }
   return (
+    <DirtyReportContext.Provider value={(next) => (dirty.current = next)}>
     <UsableModal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={title}
       size="wide"
       closeLabel={copy.form.dialog.close}
@@ -63,5 +79,27 @@ export function DiscountDialog({
         <Fragment key={opening}>{children}</Fragment>
       </Box>
     </UsableModal>
+    <AlertDialog
+      open={asking}
+      title={chrome.leaveTitle}
+      description={chrome.leaveBody}
+      confirmText={chrome.leaveStay}
+      cancelText={chrome.leaveDiscard}
+      closeLabel={copy.form.dialog.close}
+      initialFocus="confirm"
+      emphasis="confirm"
+      onConfirm={() => setAsking(false)}
+      onCancel={() => {
+        setAsking(false);
+        dirty.current = false;
+        onClose();
+      }}
+      onClose={() => setAsking(false)}
+      data-testid="discount-leave-confirm"
+    />
+    </DirtyReportContext.Provider>
   );
 }
+
+/** Where a form inside `DiscountDialog` says whether it has unsaved changes. */
+export const DirtyReportContext = createContext<((dirty: boolean) => void) | null>(null);

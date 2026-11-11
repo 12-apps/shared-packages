@@ -48,6 +48,9 @@ export function UsableModalSheet({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
+      // The host's `onClose` decides: a guarded form may answer a close with a
+      // question, and the sheet must not slide away behind it (FUT-4478).
+      controlled
       position="bottom"
       size="xl"
       style={sheetCeiling(theme)}

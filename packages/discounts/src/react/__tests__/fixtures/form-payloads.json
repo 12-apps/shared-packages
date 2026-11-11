@@ -1,0 +1,200 @@
+{
+  "$comment": "FUT-4477: the wire body (POST /discounts) the form sent on main @ 624f87dc for each input, captured on the harness seed (harness-targets.json) by driving the real dialog in Chromium. The step form must send these byte for byte; FUT-4479 reuses them.",
+  "fixtures": {
+    "percentage-category-schedule": {
+      "inputs": {
+        "kind": "PERCENTAGE",
+        "name": "10% em Bebidas no almoço",
+        "percentOff": "10",
+        "scope": "CATEGORY",
+        "categories": [
+          "Bebidas"
+        ],
+        "repetition": "specific",
+        "preset": "Seg a Sex",
+        "from": "11:00",
+        "to": "14:00"
+      },
+      "body": {
+        "name": "10% em Bebidas no almoço",
+        "type": "PERCENTAGE",
+        "percentOffBp": 1000,
+        "amountOffCents": null,
+        "bundlePriceCents": null,
+        "freeUnits": null,
+        "comboRequirements": [],
+        "maxComboApplications": null,
+        "scope": "CATEGORY",
+        "trigger": "AUTOMATIC",
+        "code": null,
+        "startsAt": null,
+        "endsAt": null,
+        "schedule": {
+          "windows": [
+            {
+              "days": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "from": "11:00",
+              "to": "14:00"
+            }
+          ]
+        },
+        "minSubtotalCents": null,
+        "usageLimit": null,
+        "perBuyerLimit": null,
+        "stackable": true,
+        "firstOrderOnly": false,
+        "active": true,
+        "categoryIds": [
+          "cat-bebidas"
+        ],
+        "menuItemIds": []
+      }
+    },
+    "fixed-item-coupon-rules": {
+      "inputs": {
+        "kind": "FIXED_AMOUNT",
+        "name": "R$ 5 no X-Salada",
+        "amountOff": "5,00",
+        "scope": "ITEM",
+        "items": [
+          "X-Salada"
+        ],
+        "trigger": "CODE",
+        "code": "XSALADA5",
+        "startsAt": "01/12/2026",
+        "endsAt": "31/12/2026",
+        "minSubtotal": "20,00",
+        "usageLimit": "100",
+        "perBuyerLimit": "1",
+        "firstOrderOnly": true,
+        "stackable": false
+      },
+      "body": {
+        "name": "R$ 5 no X-Salada",
+        "type": "FIXED_AMOUNT",
+        "percentOffBp": null,
+        "amountOffCents": 500,
+        "bundlePriceCents": null,
+        "freeUnits": null,
+        "comboRequirements": [],
+        "maxComboApplications": null,
+        "scope": "ITEM",
+        "trigger": "CODE",
+        "code": "XSALADA5",
+        "startsAt": "2026-12-01",
+        "endsAt": "2026-12-31",
+        "schedule": null,
+        "minSubtotalCents": 2000,
+        "usageLimit": 100,
+        "perBuyerLimit": 1,
+        "stackable": false,
+        "firstOrderOnly": true,
+        "active": true,
+        "categoryIds": [],
+        "menuItemIds": [
+          "item-x-salada"
+        ]
+      }
+    },
+    "combo-bundle-price": {
+      "inputs": {
+        "kind": "COMBO",
+        "name": "2 Lanches por R$ 30",
+        "groups": [
+          {
+            "quantity": "2",
+            "categories": [
+              "Lanches"
+            ]
+          }
+        ],
+        "comboReward": "BUNDLE_PRICE",
+        "bundlePrice": "30,00"
+      },
+      "body": {
+        "name": "2 Lanches por R$ 30",
+        "type": "BUNDLE_PRICE",
+        "percentOffBp": null,
+        "amountOffCents": null,
+        "bundlePriceCents": 3000,
+        "freeUnits": null,
+        "comboRequirements": [
+          {
+            "quantity": 2,
+            "categoryIds": [
+              "cat-lanches"
+            ],
+            "menuItemIds": []
+          }
+        ],
+        "maxComboApplications": null,
+        "scope": "COMBO",
+        "trigger": "AUTOMATIC",
+        "code": null,
+        "startsAt": null,
+        "endsAt": null,
+        "schedule": null,
+        "minSubtotalCents": null,
+        "usageLimit": null,
+        "perBuyerLimit": null,
+        "stackable": true,
+        "firstOrderOnly": false,
+        "active": true,
+        "categoryIds": [],
+        "menuItemIds": []
+      }
+    },
+    "free-units-cafe-suco": {
+      "inputs": {
+        "kind": "FREE_UNITS",
+        "name": "Leve 3, pague 2 em Café e Suco",
+        "buy": "3",
+        "freeUnits": "1",
+        "items": [
+          "Café",
+          "Suco"
+        ],
+        "maxComboApplications": "2"
+      },
+      "body": {
+        "name": "Leve 3, pague 2 em Café e Suco",
+        "type": "FREE_UNITS",
+        "percentOffBp": null,
+        "amountOffCents": null,
+        "bundlePriceCents": null,
+        "freeUnits": 1,
+        "comboRequirements": [
+          {
+            "quantity": 3,
+            "categoryIds": [],
+            "menuItemIds": [
+              "item-cafe",
+              "item-suco"
+            ]
+          }
+        ],
+        "maxComboApplications": 2,
+        "scope": "COMBO",
+        "trigger": "AUTOMATIC",
+        "code": null,
+        "startsAt": null,
+        "endsAt": null,
+        "schedule": null,
+        "minSubtotalCents": null,
+        "usageLimit": null,
+        "perBuyerLimit": null,
+        "stackable": true,
+        "firstOrderOnly": false,
+        "active": true,
+        "categoryIds": [],
+        "menuItemIds": []
+      }
+    }
+  }
+}

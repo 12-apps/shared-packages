@@ -21,7 +21,7 @@ A versatile radio button group component with multiple visual variants, animatio
 |------|------|---------|-------------|
 | `variant` | `'default' \| 'cards' \| 'buttons' \| 'segments'` | `'default'` | Visual style variant |
 | `color` | `'primary' \| 'secondary' \| 'success' \| 'warning' \| 'danger' \| 'neutral'` | `'primary'` | Color theme |
-| `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Size of the radio group |
+| `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Size of the radio group. `cards` at `xs`/`sm` are compact: the card's padding only, tighter gaps, a body-sized label — four fit on one row in a form. They are also flat: a 1 px divider edge, a 10 px radius, a plain tint and edge in the colour when chosen, the name in ink, no elevation, wash, glow or scale |
 | `options` | `RadioOption[]` | - | Array of radio options (required) |
 | `label` | `string` | - | Label for the radio group |
 | `value` | `string` | - | Currently selected value |
@@ -34,6 +34,7 @@ A versatile radio button group component with multiple visual variants, animatio
 | `gradient` | `boolean` | `false` | Gradient effect |
 | `direction` | `'row' \| 'column'` | `'column'` | Layout direction |
 | `showDescriptions` | `boolean` | `true` | Show option descriptions |
+| `indicator` | `boolean` | `false` | `cards` only: a visible radio before each card's label (the card itself is the radio) |
 | `dataTestId` | `string` | - | Test ID for component testing |
 
 ## RadioOption Interface
@@ -209,6 +210,10 @@ Segmented control style, ideal for compact horizontal selections.
 - Screen reader friendly
 - Focus management and visible focus indicators
 - Proper radio group semantics
+
+### `cards` is a radio group
+
+The cards variant is a `radiogroup` named by `label` (or `aria-label`), and each card is a `radio` with `aria-checked`. One Tab stop: the checked card, else the first enabled one. The arrows, Home and End move AND choose, as native radios do; Space or Enter chooses the focused card; a disabled card is skipped and announced `aria-disabled`; the focused card shows a ring in the group's colour. `indicator` adds a visible radio mark, hidden from assistive technology. An option's own `dataTestId` names its card in place of the index-based `<dataTestId>-card-<n>`.
 
 ## Testing
 

@@ -238,6 +238,8 @@ const CardVariantComponent = () => {
       value={value}
       onChange={(e) => setValue(e.target.value)}
       showDescriptions
+      // A radio mark in each card; Tab reaches the group once, the arrows choose.
+      indicator
     />
   );
 };

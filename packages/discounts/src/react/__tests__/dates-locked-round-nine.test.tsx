@@ -21,6 +21,7 @@ import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { oneAdminPerDescribe } from "./one-admin";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach, reach, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 9. Under an unknown zone the dates are locked and
@@ -117,8 +118,8 @@ function mount(rows: DiscountWireRecord[], options: MountOptions = {}): Record<s
 async function openEdit(id: string): Promise<HTMLElement> {
   const kebab = await screen.findAllByTestId(`discount-actions-${id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  return findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 // The worker's first mount of the admin and its edit form pays for emotion
@@ -139,9 +140,9 @@ const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement
 };
 
 async function pauseAndSave(sent: Record<string, unknown>[]): Promise<Record<string, unknown>> {
-  const active = screen.getByTestId("discount-active");
+  const active = reach("discount-active");
   fireEvent.click(active.querySelector("input") ?? active);
-  fireEvent.click(screen.getByTestId("discount-form-submit"));
+  submitForm();
   await waitFor(() => expect(sent).toHaveLength(1), SURFACE_LOADED);
   return sent[0]!;
 }
@@ -162,7 +163,7 @@ describe("an older host pack on a locked row (B2)", () => {
 
   it("fills the list's locked notice in the host's language too", async () => {
     mount([LOCKED], { copy: olderPack(EN_US_DISCOUNTS_WEB_COPY), locale: "en-US" });
-    const notice = await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
+    const notice = await findReach("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
     expect(notice.textContent).toContain(EN_US_DISCOUNTS_WEB_COPY.window.datesLockedList);
   });
 });
@@ -240,13 +241,13 @@ describe("an unchanged period on an open form keeps the stored window (N4)", () 
 describe("the list notice under an unknown zone (UI, round 9)", () => {
   it("is said for locked rows that still show their days", async () => {
     mount([LOCKED]);
-    const notice = await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
+    const notice = await findReach("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
     expect(notice.textContent).toContain(PT_BR_DISCOUNTS_WEB_COPY.window.datesLockedList);
   });
 
   it("says the days-unknown words, which cover the lock, when any row has no days", async () => {
     mount([LOCKED, { ...LOCKED, id: "d-2", startsOn: undefined, endsOn: undefined, daysUnknown: true }]);
-    const notice = await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
+    const notice = await findReach("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
     expect(notice.textContent).toContain(PT_BR_DISCOUNTS_WEB_COPY.window.daysUnknownList);
     expect(PT_BR_DISCOUNTS_WEB_COPY.window.daysUnknownList).toContain("bloqueadas");
     expect(screen.getAllByTestId("discounts-days-unknown-notice")).toHaveLength(1);

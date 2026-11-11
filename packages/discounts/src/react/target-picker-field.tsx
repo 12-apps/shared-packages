@@ -36,6 +36,7 @@ function TargetField({
   onChange,
   dataTestId,
   autocompleteCopy,
+  refused,
 }: {
   label: string;
   placeholder: string;
@@ -45,6 +46,7 @@ function TargetField({
   ids: readonly string[];
   onChange: (next: string[]) => void;
   dataTestId: string;
+  refused: boolean;
 }): JSX.Element {
   const [query, setQuery] = useState("");
   const byId = new Map(options.map((option) => [option.id, option]));
@@ -52,7 +54,7 @@ function TargetField({
   // — still renders as a chip, so saving cannot silently drop it.
   const selected = ids.map((id) => byId.get(id) ?? { id, name: id });
 
-  const missing = requiredMessage !== undefined && ids.length === 0;
+  const missing = refused && requiredMessage !== undefined && ids.length === 0;
 
   return (
     <FormControl fullWidth>
@@ -106,6 +108,7 @@ export function TargetPickerField({
   dataTestId,
   copy,
   autocompleteCopy,
+  refused = true,
 }: {
   group: WireTargetGroup;
   label: string;
@@ -118,6 +121,8 @@ export function TargetPickerField({
   copy: CategorySelectCopy;
   /** `Autocomplete`'s, for the flat branch. Same rule, same wave. */
   autocompleteCopy: AutocompleteCopy;
+  /** Whether an empty list says so; false until the step is tried (FUT-4477). Both branches. */
+  refused?: boolean;
 }): JSX.Element {
   if (group.nests) {
     return (
@@ -128,7 +133,7 @@ export function TargetPickerField({
         options={[...group.targets]}
         value={[...ids]}
         onChange={onChange}
-        error={requiredMessage !== undefined && ids.length === 0 ? requiredMessage : undefined}
+        error={refused && requiredMessage !== undefined && ids.length === 0 ? requiredMessage : undefined}
         copy={copy}
         dataTestId={dataTestId}
       />
@@ -144,6 +149,7 @@ export function TargetPickerField({
       ids={ids}
       onChange={onChange}
       dataTestId={dataTestId}
+      refused={refused}
     />
   );
 }

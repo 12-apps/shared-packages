@@ -110,6 +110,41 @@ function FreeUnitsCounts({
   );
 }
 
+/** What the builder says under its picker: the reward's refusal, the missing products, the sentence. */
+function FreeUnitsLines({
+  copy,
+  error,
+  freeUnits,
+  noProduct,
+  summary,
+}: {
+  copy: DiscountsWebCopy;
+  error: string | undefined;
+  freeUnits: string;
+  noProduct: boolean;
+  summary: string | null;
+}): JSX.Element {
+  return (
+    <>
+      {(error !== undefined || notDigits(freeUnits)) && (
+        <FormMessage error dataTestId="free-units-free-message">
+          {error ?? copy.form.wholeNumberOnly}
+        </FormMessage>
+      )}
+      {noProduct ? (
+        <FormMessage error dataTestId="free-units-message">
+          {copy.form.freeUnitsTargetRequired}
+        </FormMessage>
+      ) : null}
+      {summary !== null && (
+        <Text variant="caption" data-testid="free-units-summary">
+          {summary}
+        </Text>
+      )}
+    </>
+  );
+}
+
 export function FreeUnitsBuilder({
   slots,
   groups,
@@ -119,6 +154,8 @@ export function FreeUnitsBuilder({
   targetRefused,
   onChange,
   onFreeUnitsChange,
+  hideTitle = false,
+  countsHint,
 }: {
   slots: readonly ComboRequirement[];
   groups: readonly WireTargetGroup[];
@@ -135,6 +172,10 @@ export function FreeUnitsBuilder({
   targetRefused: boolean;
   onChange: (next: ComboRequirement[]) => void;
   onFreeUnitsChange: (next: string) => void;
+  /** Inside a step card whose heading already says it (ADR 0074: no heading twice in a row). */
+  hideTitle?: boolean;
+  /** A line under the two counts — the step form's "Quantas unidades … saem de graça" (FUT-4475). */
+  countsHint?: string;
 }): JSX.Element | null {
   const items = groups.find((group) => group.targetType === "ITEM");
   if (!items) return null;
@@ -143,7 +184,7 @@ export function FreeUnitsBuilder({
   const summary = summaryOf(slot.quantity, Number(freeUnits), copy);
   return (
     <FormControl fullWidth>
-      <FormLabel>{copy.combo.freeUnitsTitle}</FormLabel>
+      {hideTitle ? null : <FormLabel>{copy.combo.freeUnitsTitle}</FormLabel>}
       <Text variant="caption">{copy.combo.freeUnitsHint}</Text>
       <Stack spacing={2} sx={{ mt: 1 }} data-testid="free-units-builder">
         <FreeUnitsCounts
@@ -154,6 +195,11 @@ export function FreeUnitsBuilder({
           onQuantity={(quantity) => onChange([{ ...slot, quantity }])}
           onFreeUnits={onFreeUnitsChange}
         />
+        {countsHint === undefined ? null : (
+          <Text variant="caption" data-testid="free-units-hint">
+            {countsHint}
+          </Text>
+        )}
         <TargetPickerField
           group={items}
           label={fill(copy.combo.freeUnitsPick, { collection: items.label })}
@@ -168,21 +214,13 @@ export function FreeUnitsBuilder({
           autocompleteCopy={copy.autocomplete}
           dataTestId="free-units-items"
         />
-        {(error !== undefined || notDigits(freeUnits)) && (
-          <FormMessage error dataTestId="free-units-free-message">
-            {error ?? copy.form.wholeNumberOnly}
-          </FormMessage>
-        )}
-        {slot.menuItemIds.length === 0 && targetRefused ? (
-          <FormMessage error dataTestId="free-units-message">
-            {copy.form.freeUnitsTargetRequired}
-          </FormMessage>
-        ) : null}
-        {summary !== null && (
-          <Text variant="caption" data-testid="free-units-summary">
-            {summary}
-          </Text>
-        )}
+        <FreeUnitsLines
+          copy={copy}
+          error={error}
+          freeUnits={freeUnits}
+          noProduct={slot.menuItemIds.length === 0 && targetRefused}
+          summary={summary}
+        />
       </Stack>
     </FormControl>
   );

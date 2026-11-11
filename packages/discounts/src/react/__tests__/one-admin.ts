@@ -3,6 +3,8 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterAll, afterEach, beforeAll, expect } from "vitest";
 
+import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
+
 const CLOSED = { timeout: 10_000 };
 
 /**
@@ -32,8 +34,14 @@ export function oneAdminPerDescribe(tree: () => ReactElement, reset: () => void)
     });
   });
   afterEach(async () => {
+    // A case that saved last leaves the save's own close in flight: let it land
+    // first, so a saved form is not asked "Sair sem salvar?" and discarded.
+    await act(async () => {});
     const open = screen.queryAllByTestId("discount-form")[0];
     if (open) fireEvent.keyDown(open, { key: "Escape" });
+    // A case that changed something meets "Sair sem salvar?" (FUT-4478): discard.
+    const discard = screen.queryAllByRole("button", { name: PT_BR_DISCOUNTS_WEB_COPY.steps.chrome.leaveDiscard })[0];
+    if (discard) fireEvent.click(discard);
     await waitFor(() => expect(screen.queryAllByTestId("discount-form")).toHaveLength(0), CLOSED);
     reset();
   });

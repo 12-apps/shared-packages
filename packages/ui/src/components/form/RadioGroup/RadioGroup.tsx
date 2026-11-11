@@ -5,9 +5,9 @@ import React, { forwardRef } from 'react';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import type { RadioOption, RadioGroupProps } from './RadioGroup.types';
+import { CardRadios } from './RadioGroup.cards';
 import {
   ButtonRadios,
-  CardRadios,
   DefaultRadios,
   GroupLabel,
   SegmentRadios,
@@ -40,7 +40,7 @@ const VARIANTS: Record<string, React.FC<VariantProps>> = {
 export const RadioGroup = forwardRef<HTMLDivElement, RadioGroupProps>((props, ref) => {
   const {
     variant, color, size, options, label, error, helperText, glassLabel,
-    glow, glass, gradient, direction, showDescriptions, value, onChange, dataTestId,
+    glow, glass, gradient, direction, showDescriptions, value, onChange, dataTestId, indicator,
     ...rest
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
@@ -77,6 +77,8 @@ export const RadioGroup = forwardRef<HTMLDivElement, RadioGroupProps>((props, re
         groupRef={ref}
         onChange={onChange}
         rest={rest}
+        label={label}
+        indicator={indicator}
       />
 
       {helperText && (

@@ -18,6 +18,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach, reach, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4482, CP8: Novo desconto under an unknown store zone. The server says so
@@ -107,9 +108,9 @@ function mount(options: MountOptions = {}): Record<string, unknown>[] {
 }
 
 async function openCreate(): Promise<HTMLElement> {
-  const button = await screen.findByTestId("new-discount-button", undefined, SURFACE_LOADED);
+  const button = await findReach("new-discount-button", undefined, SURFACE_LOADED);
   fireEvent.click(within(button).queryByRole("button") ?? button);
-  return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  return findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement => {
@@ -118,11 +119,11 @@ const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement
 };
 
 async function nameAndSave(sent: Record<string, unknown>[]): Promise<Record<string, unknown>> {
-  const name = screen.getByTestId("total-form-field-name");
+  const name = reach("total-form-field-name");
   fireEvent.change(name.querySelector("input") ?? name, { target: { value: "Leve agora" } });
-  const percent = screen.getByTestId("total-form-field-percentOff");
+  const percent = reach("total-form-field-percentOff");
   fireEvent.change(percent.querySelector("input") ?? percent, { target: { value: "10" } });
-  fireEvent.click(screen.getByTestId("discount-form-submit"));
+  submitForm();
   await waitFor(() => expect(sent).toHaveLength(1), SURFACE_LOADED);
   return sent[0]!;
 }

@@ -76,6 +76,16 @@ describe("revealBlock", () => {
     expect(scrollBy).not.toHaveBeenCalled();
   });
 
+  it("measures nothing for a block with no box: no ancestor style, no inset", () => {
+    place(0, 0);
+    const styles = vi.spyOn(window, "getComputedStyle");
+    const topInset = vi.fn(() => 64);
+    revealBlock(box, { topInset });
+    expect(styles).not.toHaveBeenCalled();
+    expect(topInset).not.toHaveBeenCalled();
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
   it("does nothing for null", () => {
     expect(() => revealBlock(null)).not.toThrow();
     expect(scrollBy).not.toHaveBeenCalled();

@@ -135,7 +135,7 @@ export interface WebDiscounts {
    * onboarding step, a wizard. Already bound to the same client and copy.
    */
   DiscountForm: ComponentType<
-    Pick<DiscountFormProps, "editing" | "groups" | "onSaved">
+    Pick<DiscountFormProps, "editing" | "groups" | "onSaved" | "onDirtyChange">
   >;
   /** The bound wire client, for host glue. */
   api: DiscountsApiClient;
