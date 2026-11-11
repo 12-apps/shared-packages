@@ -510,6 +510,28 @@ describe("the gateway's follow-up provider calls report and rethrow", () => {
     expect(w.reports.map((r) => [r.path, r.provider, r.errorName])).toEqual([['REFRESH', 'alpha', 'TypeError']]);
   });
 
+  it("refreshCharge: the sweep's quiet read reports no transport failure and an HTTP answer still reports", async () => {
+    const quiet = world({ chain: [{ adapter: scripted('alpha', { getCharge: refuse(preSendFailure()) }) }] });
+    await expect(quiet.gateway.refreshCharge(TENANT, 'alpha', 'ch_1', undefined, { transport: 'quiet' })).rejects.toThrow('fetch failed');
+    expect(quiet.reports).toEqual([]);
+
+    const http = new ProviderRequestError('alpha', 'alpha 404', { httpStatus: 404 });
+    const answered = world({ chain: [{ adapter: scripted('alpha', { getCharge: refuse(http) }) }] });
+    await expect(answered.gateway.refreshCharge(TENANT, 'alpha', 'ch_1', undefined, { transport: 'quiet' })).rejects.toBe(http);
+    expect(answered.reports.map((r) => [r.path, r.httpStatus])).toEqual([['REFRESH', 404]]);
+  });
+
+  it("refreshCharge: the sweep's final read reports a transport failure or a timeout once, as REFRESH_ABANDONED", async () => {
+    const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    for (const failure of [preSendFailure(), timeout]) {
+      const w = world({ chain: [{ adapter: scripted('alpha', { getCharge: refuse(failure) }) }] });
+      await expect(w.gateway.refreshCharge(TENANT, 'alpha', 'ch_1', undefined, { transport: 'final' })).rejects.toBe(failure);
+      expect(w.reports.map((r) => [r.path, r.severity, r.provider, r.reference])).toEqual([
+        ['REFRESH_ABANDONED', 'warning', 'alpha', 'ch_1'],
+      ]);
+    }
+  });
+
   it('the pending-charge sweep, which swallows the error, no longer swallows the report', async () => {
     const w = world({
       chain: [

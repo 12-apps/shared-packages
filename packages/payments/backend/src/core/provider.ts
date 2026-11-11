@@ -26,6 +26,7 @@ import type { CaptureInput } from './charge-capture';
 import type { CredentialExpiry } from './credential-expiry';
 import type { InstallmentCapability } from './installments';
 import type { ProviderWebhookHandling } from './provider-webhook';
+import type { ProviderReadOptions } from './refresh-options';
 import type { SettlementHints } from './settlement-hints';
 import type {
   VaultBeginInput,
@@ -217,6 +218,7 @@ export interface PaymentProviderAdapterBase {
     providerChargeId: string,
     credentials: ResolvedCredentials,
     hints?: SettlementHints,
+    options?: ProviderReadOptions,
   ): Promise<ChargeSnapshot>;
 
   /**

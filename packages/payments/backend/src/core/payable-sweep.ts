@@ -1,3 +1,4 @@
+import { isRequestTimeout, isTransportError } from './failover';
 import type { PaymentsGateway } from './gateway';
 import type { ChargeQueryStore, StoredCharge } from './ports';
 import type { ChargeSnapshot, MerchantRef } from './types';
@@ -46,6 +47,14 @@ export interface PendingSweepOptions {
   abandonAfterMs?: number;
   /** Per-pass bound (default 40). */
   batch?: number;
+  /**
+   * The gap between two passes of THIS sweep (FUT-4268). Set, the pass that
+   * meets a charge inside the last `finalTickMs` of its window is that
+   * charge's last: if it still fails with no HTTP answer, it is warned and
+   * reported ONCE. Passes at least this far apart never see one charge in the
+   * band twice. Unset (the young sweep), no pass is a last one.
+   */
+  finalTickMs?: number;
 }
 
 export interface PendingSweepReport {
@@ -88,11 +97,15 @@ export interface PendingSweepDeps {
   decline?: (snapshot: ChargeSnapshot, merchant: MerchantRef, charge: StoredCharge) => Promise<void>;
   /** Sweep observability; the package binds no logger. */
   logWarn?: (line: string) => void;
+  /** A failure with no HTTP answer, which the next pass retries (FUT-4268). Never a warning. */
+  logInfo?: (line: string) => void;
 }
 
 const DEFAULT_GRACE_MS = 2 * 60_000;
 const DEFAULT_ABANDON_AFTER_MS = 24 * 60 * 60_000;
 const DEFAULT_BATCH = 40;
+/** One provider read's deadline: a stuck call must not hold the sweep's lease (FUT-4268). */
+const REFRESH_TIMEOUT_MS = 15_000;
 
 /**
  * One reconciliation pass. Never throws: a provider outage must not fail the
@@ -123,7 +136,10 @@ export async function reconcilePendingCharges(
   const askable = pending.filter((charge) => !charge.providerChargeId.startsWith('stub_'));
 
   const report: PendingSweepReport = { checked: askable.length, settled: 0, failed: 0, ...(deps.decline ? { declined: 0 } : {}) };
-  for (const charge of askable) tally(report, await reconcileOne(deps, charge));
+  for (const charge of askable) {
+    const last = options.finalTickMs !== undefined && charge.createdAt.getTime() <= options.now.getTime() - (abandon - options.finalTickMs);
+    tally(report, await reconcileOne(deps, charge, last));
+  }
   return report;
 }
 
@@ -137,12 +153,20 @@ function tally(report: PendingSweepReport, outcome: 'settled' | 'declined' | 'wa
 async function reconcileOne(
   deps: PendingSweepDeps,
   charge: StoredCharge,
+  last: boolean,
 ): Promise<'settled' | 'declined' | 'waiting' | 'failed'> {
   try {
+    const signal = AbortSignal.timeout(REFRESH_TIMEOUT_MS);
+    // The deadline acts ONLY through the signal: an adapter that honours it has
+    // its request aborted; one that ignores it is awaited, because abandoning a
+    // read that later answers PAID would leave the charge stored PAID and never
+    // listed again, with its order unsettled.
     const snapshot = await deps.gateway.refreshCharge(
       charge.merchant,
       charge.provider,
       charge.providerChargeId,
+      undefined,
+      { signal, transport: last ? 'final' : 'quiet' },
     );
     if (snapshot?.status === 'DECLINED' && deps.decline) {
       await deps.decline(snapshot, charge.merchant, charge);
@@ -152,11 +176,20 @@ async function reconcileOne(
     await deps.settle(snapshot, charge.merchant, charge);
     return 'settled';
   } catch (error) {
-    deps.logWarn?.(
-      `[payments] pending-charge sweep could not reconcile ${charge.provider} ` +
-        `${charge.providerChargeId} (${charge.merchant.kind}:${charge.merchant.id}): ` +
-        `${error instanceof Error ? error.message : String(error)}`,
-    );
+    logFailure(deps, charge, error, last);
     return 'failed';
   }
+}
+
+/**
+ * No HTTP answer is the network's, not the charge's: the next pass asks again,
+ * so only the pass that will not is a warning (FUT-4268). Anything else is as before.
+ */
+function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown, last: boolean): void {
+  const line =
+    `[payments] pending-charge sweep could not reconcile ${charge.provider} ` +
+    `${charge.providerChargeId} (${charge.merchant.kind}:${charge.merchant.id}): ` +
+    `${error instanceof Error ? error.message : String(error)}`;
+  if ((isTransportError(error) || isRequestTimeout(error)) && !last) deps.logInfo?.(line);
+  else deps.logWarn?.(line);
 }

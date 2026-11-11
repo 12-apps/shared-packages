@@ -57,10 +57,10 @@ export interface ProviderHttpInit {
   body?: string;
   /**
    * Abort the request — and DESTROY its socket — when this fires. Optional and
-   * unset by every adapter call (`providerFetch` never sets it), so nothing on
-   * the charge paths changes; a caller with its own deadline (Apple Pay
-   * merchant validation, FUT-3686) sets it so a timed-out call stops holding a
-   * connection open.
+   * unset on the charge paths, so nothing there changes; a caller with its own
+   * deadline sets it so a timed-out call stops holding a connection open: Apple
+   * Pay merchant validation (FUT-3686) and the pending-charge sweep's status
+   * read (FUT-4268, via `ProviderReadOptions`).
    */
   signal?: AbortSignal;
 }

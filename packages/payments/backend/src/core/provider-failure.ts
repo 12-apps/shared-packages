@@ -35,6 +35,11 @@ import type { MerchantRef, PaymentEnvironment, ProviderName } from './types';
 export type ProviderFailurePath =
   | 'CHARGE'
   | 'REFRESH'
+  /**
+   * The pending-charge sweep's LAST read of a charge, which failed with no HTTP
+   * answer (FUT-4268). Its own path so the host raises one alert for it.
+   */
+  | 'REFRESH_ABANDONED'
   | 'CANCEL'
   | 'CAPTURE'
   | 'REFUND'

@@ -361,7 +361,7 @@ export function infinitePayProvider(source: PaymentsCopySource<InfinitePayCopy>)
     verifyCredentials: (credentials, locale) => verifyCredentialsWith(copy(locale))(credentials),
     createCharge: (input, credentials) => createChargeWith(copy(input.locale))(input, credentials),
 
-    async getCharge(providerChargeId, credentials, hints) {
+    async getCharge(providerChargeId, credentials, hints, options) {
       if (credentials.stub) return stubPendingSnapshot(NAME, providerChargeId);
       // Same four-field demand as `findChargeByReference` — `payment_check`
       // does not answer a partial question, it answers "not paid".
@@ -369,7 +369,7 @@ export function infinitePayProvider(source: PaymentsCopySource<InfinitePayCopy>)
         orderNsu: providerChargeId,
         slug: hints?.slug,
         transactionNsu: hints?.transactionNsu,
-      });
+      }, options?.signal);
       // Same as `findChargeByReference`: the hint must outlive this answer.
       return checkSnapshot(check, {
         reference: providerChargeId,
