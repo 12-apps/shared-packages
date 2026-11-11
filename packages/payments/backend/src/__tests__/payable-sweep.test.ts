@@ -280,9 +280,7 @@ describe('reconcilePendingCharges', () => {
     });
   });
 
-  it('gives each read a 15 s deadline, and a stuck one stops holding the sweep', async () => {
-    // `AbortSignal.timeout` runs on the runtime's own timer, which fake timers
-    // do not drive: stand in for it, and fire the deadline by hand.
+  it('gives each read a 15 s deadline through its signal, and settles a signal-ignoring read that answers PAID after it', async () => {
     const deadlines: Array<{ ms: number; controller: AbortController }> = [];
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
       const controller = new AbortController();
@@ -290,26 +288,31 @@ describe('reconcilePendingCharges', () => {
       return controller.signal;
     });
     try {
-      const store = await storeWith([{ id: 'CHAR_stuck', ageMs: 10 * MIN }, { id: 'CHAR_ok', ageMs: 10 * MIN }]);
-      const refreshCharge = vi.fn<PaymentsGateway['refreshCharge']>((_m, _p, id) =>
-        id === 'CHAR_stuck' ? new Promise<never>(() => undefined) : Promise.resolve(snapshot({ providerChargeId: id })),
+      const store = await storeWith([{ id: 'CHAR_slow', ageMs: 10 * MIN }]);
+      // An adapter that ignores the signal and answers PAID after the deadline.
+      let answer: () => void = () => undefined;
+      const refreshCharge = vi.fn<PaymentsGateway['refreshCharge']>(
+        (_m, _p, id) =>
+          new Promise((resolve) => {
+            answer = () => resolve(snapshot({ providerChargeId: id, status: 'PAID' }));
+          }),
       );
-      const logWarn = vi.fn();
-      const logInfo = vi.fn();
+      const settle = vi.fn(async () => undefined);
 
       const pass = reconcilePendingCharges(
-        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { charges: store, gateway: { refreshCharge } as never, settle },
         { now: NOW },
       );
       await vi.waitFor(() => expect(deadlines).toHaveLength(1));
+      // The deadline fires first; only THEN does the ignoring adapter answer PAID.
       deadlines[0]?.controller.abort(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      answer();
       const report = await pass;
 
-      expect(deadlines.map((d) => d.ms)).toEqual([15_000, 15_000]);
-      expect(report).toEqual({ checked: 2, settled: 0, failed: 1 });
-      expect(refreshCharge.mock.calls[0]?.[4]?.signal).toBeInstanceOf(AbortSignal);
-      expect(logWarn).not.toHaveBeenCalled();
-      expect(logInfo).toHaveBeenCalledOnce();
+      expect(deadlines[0]?.ms).toBe(15_000);
+      expect(settle).toHaveBeenCalledOnce();
+      expect(report).toEqual({ checked: 1, settled: 1, failed: 0 });
     } finally {
       timeout.mockRestore();
     }

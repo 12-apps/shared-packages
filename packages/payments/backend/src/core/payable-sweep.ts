@@ -157,12 +157,16 @@ async function reconcileOne(
 ): Promise<'settled' | 'declined' | 'waiting' | 'failed'> {
   try {
     const signal = AbortSignal.timeout(REFRESH_TIMEOUT_MS);
-    const snapshot = await abandonAt(
-      signal,
-      deps.gateway.refreshCharge(charge.merchant, charge.provider, charge.providerChargeId, undefined, {
-        signal,
-        transport: last ? 'final' : 'quiet',
-      }),
+    // The deadline acts ONLY through the signal: an adapter that honours it has
+    // its request aborted; one that ignores it is awaited, because abandoning a
+    // read that later answers PAID would leave the charge stored PAID and never
+    // listed again, with its order unsettled.
+    const snapshot = await deps.gateway.refreshCharge(
+      charge.merchant,
+      charge.provider,
+      charge.providerChargeId,
+      undefined,
+      { signal, transport: last ? 'final' : 'quiet' },
     );
     if (snapshot?.status === 'DECLINED' && deps.decline) {
       await deps.decline(snapshot, charge.merchant, charge);
@@ -188,16 +192,4 @@ function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown
     `${error instanceof Error ? error.message : String(error)}`;
   if ((isTransportError(error) || isRequestTimeout(error)) && !last) deps.logInfo?.(line);
   else deps.logWarn?.(line);
-}
-
-/**
- * Reject when `signal` fires, whatever the call underneath does with it: an
- * adapter that ignores the signal still cannot hold the sweep past its deadline.
- */
-function abandonAt<T>(signal: AbortSignal, call: Promise<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    signal.addEventListener('abort', onAbort, { once: true });
-    call.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
-  });
 }
