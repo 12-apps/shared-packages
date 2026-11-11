@@ -3,7 +3,7 @@ import Card from '@mui/material/Card/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React, { useRef } from 'react';
 
-import { radioCardSx } from './RadioGroup.styles';
+import { isCompactCard, radioCardSx } from './RadioGroup.styles';
 import type { SurfaceFlags } from './RadioGroup.styles';
 import type { RadioOption } from './RadioGroup.types';
 import { CardBody, testId, type VariantProps } from './RadioGroup.variants';
@@ -49,6 +49,7 @@ export const CardRadios: React.FC<VariantProps> = ({
   label, rest, indicator,
 }) => {
   const group = useRef<HTMLDivElement>(null);
+  const compact = isCompactCard(size);
   const checked = options.findIndex((option) => option.value === value);
   const stop = checked >= 0 ? checked : nextEnabled(options, -1, 1);
   const choose = (index: number, focus: boolean): void => {
@@ -76,7 +77,7 @@ export const CardRadios: React.FC<VariantProps> = ({
       role="radiogroup"
       aria-label={named}
       onKeyDown={onKeyDown}
-      sx={{ display: 'flex', flexDirection: direction, gap: size === 'xs' || size === 'sm' ? 1 : 2, '& > *': direction === 'row' ? { flex: '1 1 0', minWidth: 0 } : {} }}
+      sx={{ display: 'flex', flexDirection: direction, gap: compact ? 1 : 2, '& > *': direction === 'row' ? { flex: '1 1 0', minWidth: 0 } : {} }}
       data-testid={testId(dataTestId, 'container')}
     >
       {options.map((option, index) => {
@@ -95,7 +96,8 @@ export const CardRadios: React.FC<VariantProps> = ({
             gradient={gradient}
             glow={glow}
             customSize={size}
-            animated
+            animated={!compact}
+            elevation={compact ? 0 : undefined}
             data-testid={option.dataTestId ?? testId(dataTestId, `card-${index}`)}
             onClick={() => choose(index, false)}
           >
@@ -107,7 +109,7 @@ export const CardRadios: React.FC<VariantProps> = ({
               showDescriptions={showDescriptions}
               dataTestId={dataTestId}
               indicator={indicator}
-              compact={size === 'xs' || size === 'sm'}
+              compact={compact}
             />
           </StyledRadioCard>
         );

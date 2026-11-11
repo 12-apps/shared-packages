@@ -170,8 +170,16 @@ export interface CardBodyProps {
 
 /** The compact (`xs`/`sm`) and roomy faces of a card's body. */
 const BODY_LOOK = {
-  compact: { content: { p: 0, '&:last-child': { pb: 0 } }, gap: 1.5, label: 'body2', description: 'caption', descriptionGap: 0.25 },
-  roomy: { content: { p: 2, '&:last-child': { pb: 2 } }, gap: 2, label: 'subtitle1', description: 'body2', descriptionGap: 0.5 },
+  compact: {
+    content: { p: 0, '&:last-child': { pb: 0 } },
+    gap: 1.5,
+    label: 'body2',
+    description: 'caption',
+    descriptionGap: 0.25,
+    // The caption at a plain line-height, not the letter-spaced 1.66.
+    descriptionSx: { lineHeight: 1.35, letterSpacing: 0 },
+  },
+  roomy: { content: { p: 2, '&:last-child': { pb: 2 } }, gap: 2, label: 'subtitle1', description: 'body2', descriptionGap: 0.5, descriptionSx: {} },
 } as const;
 
 /** The presentational radio mark of `indicator`: the card itself is the radio. */
@@ -214,13 +222,14 @@ export const CardBody: React.FC<CardBodyProps> = ({
           <Typography
             variant={look.label}
             fontWeight={600}
-            color={isSelected ? `${color}.main` : 'text.primary'}
+            // Compact: the tint and edge say chosen; the name stays ink.
+            color={isSelected && !compact ? `${color}.main` : 'text.primary'}
             data-testid={testId(dataTestId, `label-${index}`)}
           >
             {option.label}
           </Typography>
           {described && (
-            <Typography variant={look.description} component="p" color="text.secondary" sx={{ mt: look.descriptionGap }} data-description="">
+            <Typography variant={look.description} component="p" color="text.secondary" sx={{ mt: look.descriptionGap, ...look.descriptionSx }} data-description="">
               {option.description}
             </Typography>
           )}

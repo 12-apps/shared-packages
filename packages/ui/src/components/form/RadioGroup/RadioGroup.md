@@ -21,7 +21,7 @@ A versatile radio button group component with multiple visual variants, animatio
 |------|------|---------|-------------|
 | `variant` | `'default' \| 'cards' \| 'buttons' \| 'segments'` | `'default'` | Visual style variant |
 | `color` | `'primary' \| 'secondary' \| 'success' \| 'warning' \| 'danger' \| 'neutral'` | `'primary'` | Color theme |
-| `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Size of the radio group. `cards` at `xs`/`sm` are compact: the card's padding only, tighter gaps, a body-sized label — four fit on one row in a form |
+| `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Size of the radio group. `cards` at `xs`/`sm` are compact: the card's padding only, tighter gaps, a body-sized label — four fit on one row in a form. They are also flat: a 1 px divider edge, a 10 px radius, a plain tint and edge in the colour when chosen, the name in ink, no elevation, wash, glow or scale |
 | `options` | `RadioOption[]` | - | Array of radio options (required) |
 | `label` | `string` | - | Label for the radio group |
 | `value` | `string` | - | Currently selected value |
