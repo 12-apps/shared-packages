@@ -261,7 +261,7 @@ describe("normalizeIfoodEvent — order type, who delivers, the address", () => 
 const anAdapter = () => createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US });
 
 describe("the iFood adapter", () => {
-  it("[P1] states its capabilities as booleans and links to an https page", () => {
+  it("[P1] states its capabilities, with its cancellation answer window, and links to an https page", () => {
     const adapter = anAdapter();
     expect(adapter.provider).toBe("IFOOD");
     expect(adapter.capabilities).toEqual({
@@ -271,6 +271,7 @@ describe("the iFood adapter", () => {
       asyncCancellationOutcome: true,
       perOrderAppLink: false,
       confirmTakesPreparationTime: false,
+      cancellationAnswerWindowMs: 5 * 60_000,
     });
     expect(adapter.appLink({ externalOrderId: "ord-1", externalDisplayId: "4821" })).toMatch(/^https:\/\//);
   });

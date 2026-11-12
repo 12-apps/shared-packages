@@ -1,14 +1,17 @@
 import type { AcceptanceStatus, CancellationStatus } from "./acceptance";
 import {
   CLAIM_SELECT,
+  NO_STANDING_REQUEST,
   notPendingProblem,
   planCancellation,
   refusalData,
+  requestData,
   type CancellationPlan,
   type ClaimRow,
   type DecisionProblem,
   type DecisionProblemCode,
 } from "./cancellation";
+import { requestsFirst, tellCancellationFailed } from "./cancellation-outcome";
 import { enqueueOutbound } from "./outbound-queue";
 import type { EngineContext, MarketplaceAdmission, MarketplaceDb } from "./ports";
 
@@ -51,10 +54,14 @@ export type DecisionInput =
       offendingSkus?: readonly string[];
     };
 
-/** One decided row. */
+/**
+ * One decided row. `status` is the row's status after the call: ACCEPTED or
+ * REJECTED, or — for a refusal of a host that requests first (FUT-4758) —
+ * the status it keeps (AWAITING, ACCEPTED) while `cancellation` waits.
+ */
 export interface DecidedRow {
   orderId: string;
-  status: Extract<AcceptanceStatus, "ACCEPTED" | "REJECTED">;
+  status: AcceptanceStatus;
   cancellation: CancellationStatus | null;
   reasonCode: string | null;
   offendingSkus: string[];
@@ -88,6 +95,8 @@ interface PlannedDecision {
   row: ClaimRow;
   data: Record<string, unknown>;
   decided: DecidedRow;
+  /** A refusal that only REQUESTS the cancellation: the host cancels on the marketplace's confirmation. */
+  requestOnly: boolean;
 }
 
 /** Thrown inside the transaction to roll it back, carrying the reason. */
@@ -108,10 +117,11 @@ function duplicateProblems(decisions: readonly DecisionInput[]): DecisionProblem
   });
 }
 
-function decidedOf(input: DecisionInput, plan: CancellationPlan | null): DecidedRow {
+function decidedOf(input: DecisionInput, plan: CancellationPlan | null, keptStatus?: string): DecidedRow {
+  const decided: AcceptanceStatus = input.decision === "ACCEPT" ? "ACCEPTED" : "REJECTED";
   return {
     orderId: input.orderId,
-    status: input.decision === "ACCEPT" ? "ACCEPTED" : "REJECTED",
+    status: (keptStatus as AcceptanceStatus | undefined) ?? decided,
     cancellation: plan?.status ?? null,
     reasonCode: plan?.reason?.code ?? null,
     offendingSkus: plan?.skus ?? [],
@@ -119,6 +129,15 @@ function decidedOf(input: DecisionInput, plan: CancellationPlan | null): Decided
 }
 
 /** Plan one decision against its row, or name what is wrong with it. */
+/** The columns of a request that no longer stands, cleared. */
+const CLEARED_REQUEST = {
+  cancellationStatus: null,
+  cancellationReasonCode: null,
+  cancellationOffendingSkus: null,
+  cancellationRequestedAt: null,
+  cancellationFailureReason: null,
+} as const;
+
 function planOne(
   ctx: EngineContext,
   input: DecisionInput,
@@ -130,12 +149,32 @@ function planOne(
   const stale = notPendingProblem(row, path);
   if (stale || !row) return stale ? [stale] : [];
   if (input.decision === "ACCEPT") {
-    const data = { status: "ACCEPTED", acknowledgedAt: now, preparationMinutes: input.preparationMinutes ?? null };
-    return { input, index, row, data, decided: decidedOf(input, null) };
+    // An accept after a FAILED request (FUT-4758) leaves no request behind it.
+    const data = {
+      status: "ACCEPTED",
+      acknowledgedAt: now,
+      preparationMinutes: input.preparationMinutes ?? null,
+      ...(row.cancellationStatus === null ? {} : CLEARED_REQUEST),
+    };
+    return { input, index, row, data, decided: decidedOf(input, null), requestOnly: false };
   }
   const plan = planCancellation(ctx.registry.get(row.provider), input, row, path);
   if (Array.isArray(plan)) return plan;
-  return { input, index, row, data: refusalData(plan, row.status, now), decided: decidedOf(input, plan) };
+  if (requestOnly(ctx, plan)) {
+    return { input, index, row, data: requestData(plan, now), decided: decidedOf(input, plan, row.status), requestOnly: true };
+  }
+  return { input, index, row, data: refusalData(plan, row.status, now), decided: decidedOf(input, plan), requestOnly: false };
+}
+
+/**
+ * Whether a refusal only REQUESTS the cancellation (FUT-4758): the host
+ * requests first (it binds `onCancellationConfirmed`), and there is a request
+ * to make — PENDING, or FAILED at once for a marketplace that cannot take it
+ * through its API (a person cancels in its app, and its event confirms). A
+ * provider with no adapter has nothing to ask: refused at once, as ever.
+ */
+function requestOnly(ctx: EngineContext, plan: CancellationPlan): boolean {
+  return requestsFirst(ctx) && plan.status !== null;
 }
 
 /** Admit every decision through the host, then claim every row, in one transaction. */
@@ -164,7 +203,7 @@ async function admitAndClaim(
     if (refused.length > 0) throw new Rollback(refused);
     for (const one of planned) {
       const claimed = await tx.marketplaceAcceptance.updateMany({
-        where: { orderId: one.input.orderId, clientId, status: "AWAITING" },
+        where: { orderId: one.input.orderId, clientId, status: "AWAITING", ...NO_STANDING_REQUEST },
         data: one.data,
       });
       if (claimed.count === 0) refused.push({ path: ["decisions", one.index, "orderId"], code: "CONFLICT" });
@@ -178,14 +217,17 @@ async function admitAndClaim(
 async function afterCommit(ctx: EngineContext, clientId: string, planned: readonly PlannedDecision[]): Promise<void> {
   for (const one of planned) {
     const { orderId } = one.input;
-    if (one.decided.status === "ACCEPTED") {
+    if (one.input.decision === "ACCEPT") {
       await enqueueOutbound(ctx, { clientId, orderId, action: "confirm" }, one.row.provider);
     } else if (one.decided.cancellation === "PENDING") {
       await enqueueOutbound(ctx, { clientId, orderId, action: "requestCancellation" }, one.row.provider);
     }
     try {
-      if (one.decided.status === "ACCEPTED") await ctx.ports.order.onAccepted(clientId, orderId);
-      else await ctx.ports.order.onRefused(clientId, orderId, "REJECTED");
+      if (one.decided.status === "ACCEPTED" && one.input.decision === "ACCEPT") await ctx.ports.order.onAccepted(clientId, orderId);
+      else if (!one.requestOnly) await ctx.ports.order.onRefused(clientId, orderId, "REJECTED");
+      // A request the marketplace cannot take through its API failed at once:
+      // the order stays, and a person cancels it in the marketplace's app.
+      else if (one.decided.cancellation === "FAILED") await tellCancellationFailed(ctx, clientId, orderId, "REFUSED");
     } catch (error) {
       ctx.ports.logger.error(
         `marketplace.decide: order ${orderId} is ${one.decided.status} but the host's half failed: ` +
@@ -271,13 +313,22 @@ export async function decideOne(
 }
 
 /**
- * The STORE cancelled an order through the host's own cancel — before or
- * after accepting it. Stamps the request the marketplace must hear and queues
- * it. The host's own cancel already ran, so the engine neither admits nor
- * calls `onRefused`: it records and queues, and nothing else.
+ * The STORE asks to cancel an order — before or after accepting it. Stamps
+ * the request the marketplace must hear and queues it; the engine neither
+ * admits nor calls `onRefused`: it records and queues, and nothing else.
+ *
+ * REQUEST FIRST (FUT-4758), for a host that binds `onCancellationConfirmed`:
+ * only the request moves. The decision status stays AWAITING or ACCEPTED while
+ * the marketplace answers, so the host keeps the order as it was until then,
+ * and a refused or timed-out request (`onCancellationFailed`) leaves it
+ * acceptable. The marketplace's confirmation moves it to REJECTED. A FAILED
+ * request may be asked again. A host that binds no `onCancellationConfirmed`
+ * cancelled first and gets 1.0.0's stamps exactly: REJECTED at once.
+ *
+ * The returned row's `status` is the row's after the call.
  *
  * `stale` (ALREADY_DECIDED) when the marketplace already cancelled it, the
- * clock lapsed (EXPIRED), or a request was already made.
+ * clock lapsed (EXPIRED), or a request is already waiting.
  */
 export async function recordStoreCancellation(
   ctx: EngineContext,
@@ -289,16 +340,28 @@ export async function recordStoreCancellation(
   const plan = planCancellation(ctx.registry.get(row.provider), input, row, []);
   if (Array.isArray(plan)) return resultOfProblem(plan[0]!);
 
+  return claimStoreCancellation(ctx, input, row, plan);
+}
+
+/** Stamp the store's cancellation (the request alone, or 1.0.0's REJECTED), queue it, and tell the host. */
+async function claimStoreCancellation(
+  ctx: EngineContext,
+  input: { clientId: string; orderId: string; now?: Date },
+  row: ClaimRow,
+  plan: CancellationPlan,
+): Promise<DecisionResult> {
   const now = input.now ?? ctx.ports.clock.now();
   const db = await ctx.ports.db();
+  const only = requestOnly(ctx, plan);
   const claimed = await db.marketplaceAcceptance.updateMany({
-    where: { orderId: input.orderId, clientId: input.clientId, status: row.status, cancellationStatus: null },
-    data: refusalData(plan, row.status, now),
+    where: { orderId: input.orderId, clientId: input.clientId, status: row.status, ...NO_STANDING_REQUEST },
+    data: only ? requestData(plan, now) : refusalData(plan, row.status, now),
   });
   if (claimed.count === 0) return { kind: "stale", reason: "CONFLICT", status: null };
   if (plan.status === "PENDING") {
     await enqueueOutbound(ctx, { clientId: input.clientId, orderId: input.orderId, action: "requestCancellation" }, row.provider);
   }
   ctx.ports.publishChanged(input.clientId);
-  return { kind: "decided", ...decidedOf({ orderId: input.orderId, decision: "REJECT" }, plan) };
+  if (only && plan.status === "FAILED") await tellCancellationFailed(ctx, input.clientId, input.orderId, "REFUSED");
+  return { kind: "decided", ...decidedOf({ orderId: input.orderId, decision: "REJECT" }, plan, only ? row.status : undefined) };
 }

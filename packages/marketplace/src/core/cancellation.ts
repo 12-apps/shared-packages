@@ -1,5 +1,6 @@
 import type { AcceptanceStatus, CancellationStatus } from "./acceptance";
 import type { CancellationReason, MarketplaceAdapter } from "./adapter";
+import { failedRequestData, tellCancellationFailed } from "./cancellation-outcome";
 import type { EngineContext } from "./ports";
 import { resolveReason } from "./registry";
 import type { MarketplaceProvider } from "./types";
@@ -9,12 +10,23 @@ import type { MarketplaceProvider } from "./types";
  * the marketplace. Lives on the acceptance row:
  *
  *     null ──refuse/cancel──▶ PENDING ──job 2xx──▶ REQUESTED ──event──▶ CONFIRMED
- *                                │   └──job 4xx / last attempt──▶ FAILED ──event──▶ CONFIRMED
+ *                                │   ├──job 4xx / last attempt / event──▶ FAILED (REFUSED) ──event──▶ CONFIRMED
+ *                                │   └──past the window (sweep)──▶ FAILED (TIMEOUT)
  *                                └──event (the marketplace cancelled)──▶ CONFIRMED
  *
  * CONFIRMED is terminal; every write is predicated on the statuses it may come
- * from, so an out-of-order event cannot undo it.
+ * from, so an out-of-order event cannot undo it. A FAILED request stands for
+ * nothing: the order may be decided again, or the cancellation asked again
+ * (FUT-4758: a refused or timed-out request leaves the order as it was).
  */
+
+/** No request of the store's is waiting on the marketplace: never asked, or asked and FAILED. */
+function noStandingRequest(cancellationStatus: string | null): boolean {
+  return cancellationStatus === null || cancellationStatus === "FAILED";
+}
+
+/** The same, as the `where` a claim is predicated on. */
+export const NO_STANDING_REQUEST = { OR: [{ cancellationStatus: null }, { cancellationStatus: "FAILED" }] } as const;
 
 /** Why a decision (or a store cancellation) was refused. Vocabulary, not copy. */
 export type DecisionProblemCode =
@@ -64,7 +76,7 @@ export function notPendingProblem(
   allowed: readonly string[] = ["AWAITING"],
 ): DecisionProblem | null {
   if (!row) return { path: [...path, "orderId"], code: "NOT_FOUND" };
-  if (allowed.includes(row.status) && row.cancellationStatus === null) return null;
+  if (allowed.includes(row.status) && noStandingRequest(row.cancellationStatus)) return null;
   const status = row.status as AcceptanceStatus;
   return { path: [...path, "orderId"], code: status === "EXPIRED" ? "EXPIRED" : "ALREADY_DECIDED", status };
 }
@@ -148,28 +160,47 @@ export function refusalData(plan: CancellationPlan, fromStatus: string, now: Dat
     cancellationReasonCode: plan.reason?.code ?? null,
     cancellationOffendingSkus: plan.skus.length > 0 ? plan.skus : null,
     cancellationRequestedAt: plan.status === "PENDING" ? now : null,
+    cancellationFailureReason: plan.status === "FAILED" ? "REFUSED" : null,
   };
 }
 
 /**
- * The marketplace refused the store's cancellation request. FAILED, from
- * PENDING or REQUESTED only: CONFIRMED is terminal, so a refusal arriving
- * after the cancellation changes nothing. Returns whether a row moved.
+ * The columns the store's own cancellation REQUEST writes (FUT-4758): the
+ * request alone. The decision status stays as it is (AWAITING or ACCEPTED)
+ * while the marketplace answers, so a refused or timed-out request leaves the
+ * order acceptable and still on the acceptance clock; only the marketplace's
+ * confirmation moves it to REJECTED.
+ */
+export function requestData(plan: CancellationPlan, now: Date): Record<string, unknown> {
+  return {
+    cancellationStatus: plan.status,
+    cancellationReasonCode: plan.reason?.code ?? null,
+    cancellationOffendingSkus: plan.skus.length > 0 ? plan.skus : null,
+    cancellationRequestedAt: plan.status === "PENDING" ? now : null,
+    cancellationFailureReason: plan.status === "FAILED" ? "REFUSED" : null,
+  };
+}
+
+/**
+ * The marketplace refused the store's cancellation request. FAILED (REFUSED),
+ * from PENDING or REQUESTED only: CONFIRMED is terminal, so a refusal arriving
+ * after the cancellation changes nothing. The host hears it once, from the
+ * call that moved the row. Returns whether a row moved.
  */
 export async function failCancellationRequest(
   ctx: EngineContext,
   input: { clientId: string; provider: MarketplaceProvider; externalOrderId: string },
 ): Promise<boolean> {
   const db = await ctx.ports.db();
+  const where = { clientId: input.clientId, provider: input.provider, externalOrderId: input.externalOrderId };
+  const row = (await db.marketplaceAcceptance.findFirst({ where, select: { orderId: true } })) as { orderId: string } | null;
+  if (!row) return false;
   const moved = await db.marketplaceAcceptance.updateMany({
-    where: {
-      clientId: input.clientId,
-      provider: input.provider,
-      externalOrderId: input.externalOrderId,
-      cancellationStatus: { in: ["PENDING", "REQUESTED"] },
-    },
-    data: { cancellationStatus: "FAILED" },
+    where: { ...where, cancellationStatus: { in: ["PENDING", "REQUESTED"] } },
+    data: failedRequestData("REFUSED"),
   });
-  if (moved.count > 0) ctx.ports.publishChanged(input.clientId);
-  return moved.count > 0;
+  if (moved.count === 0) return false;
+  ctx.ports.publishChanged(input.clientId);
+  await tellCancellationFailed(ctx, input.clientId, row.orderId, "REFUSED");
+  return true;
 }

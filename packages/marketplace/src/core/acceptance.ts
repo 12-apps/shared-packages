@@ -1,3 +1,5 @@
+import { NO_STANDING_REQUEST } from "./cancellation";
+import { rejectConfirmed, tellCancellationConfirmed } from "./cancellation-outcome";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -125,13 +127,16 @@ export async function expireLapsedAcceptances(
 ): Promise<ExpirySweepResult> {
   const db = await ctx.ports.db();
   const lapsed = (await db.marketplaceAcceptance.findMany({
-    where: { status: "AWAITING", acknowledgeBy: { lt: now } },
+    // An order whose cancellation request waits is left to that request: its
+    // answer, or its window's TIMEOUT, ends it first (FUT-4758), so the host
+    // never hears EXPIRED and then the confirmation for one order.
+    where: { status: "AWAITING", acknowledgeBy: { lt: now }, ...NO_STANDING_REQUEST },
     select: { id: true, clientId: true, orderId: true },
   })) as { id: string; clientId: string; orderId: string }[];
   if (lapsed.length === 0) return { expired: 0, tenants: 0 };
 
   const result = await db.marketplaceAcceptance.updateMany({
-    where: { id: { in: lapsed.map((row) => row.id) }, status: "AWAITING" },
+    where: { id: { in: lapsed.map((row) => row.id) }, status: "AWAITING", ...NO_STANDING_REQUEST },
     data: { status: "EXPIRED", acknowledgedAt: now },
   });
 
@@ -158,10 +163,17 @@ export async function expireLapsedAcceptances(
  *
  * Terminal on the acceptance side whatever state it was in. A cancellation
  * request the store made is answered: CONFIRMED, from PENDING, REQUESTED or
- * FAILED (a refusal followed by a cancellation is still a cancellation).
- * Returns false when no acceptance stands for this external order — a
+ * FAILED (a refusal followed by a cancellation is still a cancellation), and
+ * the host hears it through `onCancellationConfirmed` when it has one;
+ * otherwise, and for a cancellation the store never asked for,
+ * `onRefused(…, "CANCELLED")`. Returns false when no acceptance stands for this external order — a
  * cancellation can outrun the placement it refers to.
  */
+/** Whether the host takes a confirmed request through `onCancellationConfirmed` (FUT-4758). */
+function hasConfirmHook(ctx: EngineContext): boolean {
+  return ctx.ports.order.onCancellationConfirmed !== undefined;
+}
+
 export async function cancelAcceptance(
   ctx: EngineContext,
   input: { clientId: string; provider: MarketplaceProvider; externalOrderId: string; now?: Date },
@@ -173,24 +185,28 @@ export async function cancelAcceptance(
       provider: input.provider,
       externalOrderId: input.externalOrderId,
     },
-    select: { orderId: true },
-  })) as { orderId: string } | null;
+    select: { orderId: true, cancellationStatus: true },
+  })) as { orderId: string; cancellationStatus: string | null } | null;
   if (!row) return false;
 
   // The two stamps commit together: a cancelled order never shows a request
   // still PENDING. The host's cancel runs after; if it throws, the inbox row
   // is FAILED and the retry sweep re-runs this, whose stamps are idempotent.
-  await ctx.ports.transaction(async (tx) => {
-    await tx.marketplaceAcceptance.updateMany({
-      where: { orderId: row.orderId, status: { not: "REJECTED" } },
-      data: { status: "REJECTED", acknowledgedAt: input.now ?? ctx.ports.clock.now() },
-    });
-    await tx.marketplaceAcceptance.updateMany({
+  const answered = await ctx.ports.transaction(async (tx) => {
+    await rejectConfirmed(tx, row.orderId, input.now ?? ctx.ports.clock.now());
+    const confirmed = await tx.marketplaceAcceptance.updateMany({
       where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "REQUESTED", "FAILED"] } },
-      data: { cancellationStatus: "CONFIRMED" },
+      data: { cancellationStatus: "CONFIRMED", cancellationFailureReason: null },
     });
+    return confirmed.count > 0;
   });
-  await ctx.ports.order.onRefused(input.clientId, row.orderId, "CANCELLED");
+  // The store's own request, answered (FUT-4758): a host that cancels on the
+  // confirmation hears it as such; any other cancellation is the marketplace's.
+  // A redelivered confirmation of a request already answered tells a host
+  // with the callback nothing more (it heard the first one).
+  const storeAsked = answered || row.cancellationStatus === "CONFIRMED";
+  const told = storeAsked && (answered ? await tellCancellationConfirmed(ctx, input.clientId, row.orderId) : hasConfirmHook(ctx));
+  if (!told) await ctx.ports.order.onRefused(input.clientId, row.orderId, "CANCELLED");
   ctx.ports.publishChanged(input.clientId);
   return true;
 }

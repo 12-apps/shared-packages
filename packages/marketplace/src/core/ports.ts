@@ -117,6 +117,13 @@ export type MarketplaceAdmissionResult =
 export type MarketplaceRefusal = "REJECTED" | "EXPIRED" | "CANCELLED";
 
 /**
+ * Why the store's own cancellation request FAILED: REFUSED (the marketplace
+ * said no, or every attempt failed) or TIMEOUT (no answer inside the
+ * marketplace's cancellation window). Vocabulary, not copy.
+ */
+export type CancellationFailureReason = "REFUSED" | "TIMEOUT";
+
+/**
  * The host's domain, as five questions the engine asks and never answers.
  *
  * `onAccepted`/`onRefused` return nothing on purpose: the acceptance row's
@@ -151,6 +158,23 @@ export interface MarketplaceOrderPort {
   onAccepted(clientId: string, orderId: string): Promise<void>;
   /** The store said no, the marketplace cancelled, or the clock lapsed. */
   onRefused(clientId: string, orderId: string, reason: MarketplaceRefusal): Promise<void>;
+  /**
+   * OPTIONAL. The marketplace CONFIRMED the store's own cancellation request
+   * (the job's answer, or the marketplace's event). A host that requests first
+   * and cancels on confirm runs its cancel here. When present it is called
+   * INSTEAD of `onRefused(…, "CANCELLED")` for a cancellation the store asked
+   * for; a cancellation the marketplace made on its own still reaches
+   * `onRefused`. Absent (a 1.0.0 host): `onRefused(…, "CANCELLED")` as before.
+   */
+  onCancellationConfirmed?(clientId: string, orderId: string): Promise<void>;
+  /**
+   * OPTIONAL. The store's own cancellation request FAILED: refused (the job's
+   * answer, the marketplace's event, or the last attempt) or timed out (the
+   * outbound sweep, past the marketplace's window). Called once per request,
+   * by the call that moved the row to FAILED. The pedido is still the
+   * marketplace's: a person finishes it there, through the adapter's app link.
+   */
+  onCancellationFailed?(clientId: string, orderId: string, reason: CancellationFailureReason): Promise<void>;
   /** Queue facts for a batch of orders, keyed by id. Missing ids are dropped. */
   summarize(
     clientId: string,
@@ -238,6 +262,14 @@ export interface MarketplacePorts {
    * awaits it, and a dead bus costs latency, never a transition.
    */
   publishChanged: (clientId: string) => void;
+  /**
+   * OPTIONAL. How long a store's cancellation request may wait for the
+   * marketplace's answer before the outbound sweep fails it as TIMEOUT, in
+   * milliseconds, for every adapter. Absent: each adapter's own
+   * `capabilities.cancellationAnswerWindowMs`; an adapter that states none is
+   * only given up on after `OUTBOUND_GIVE_UP_MS`.
+   */
+  cancellationWindowMs?: number;
   /** The acceptance window a connection gets when it does not state its own. */
   defaultAckSlaSeconds: number;
   /** How many stored deliveries one reconciliation pass re-runs. */

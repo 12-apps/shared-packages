@@ -112,9 +112,10 @@ const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
   lease: { ttlMs: SWEEP_LEASE_MS },
   handle: async (_payload, deps, context) => {
     const result = await deps.engine.sweepOutbound();
-    if (result.requeued === 0 && result.givenUp === 0) return;
+    if (result.requeued === 0 && result.givenUp === 0 && result.timedOut === 0) return;
     context.logger.info(
-      `marketplace.outbound-sweep: re-queued ${result.requeued} call(s), gave up on ${result.givenUp} request(s).`,
+      `marketplace.outbound-sweep: re-queued ${result.requeued} call(s), timed out ${result.timedOut} ` +
+        `cancellation request(s), gave up on ${result.givenUp}.`,
     );
   },
 };
