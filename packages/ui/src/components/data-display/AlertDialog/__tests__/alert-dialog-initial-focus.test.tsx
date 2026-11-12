@@ -8,7 +8,7 @@
  * dialog's container and Enter did nothing. The footer now focuses its button
  * in an effect, which StrictMode runs again.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -21,7 +21,7 @@ function Opener(props: Partial<AlertDialogProps>): React.ReactElement {
   const [open, setOpen] = React.useState(false);
   return (
     <>
-      <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+      <button type="button" data-testid="opener" autoFocus onClick={() => setOpen(true)}>
         open
       </button>
       <AlertDialog
@@ -40,8 +40,10 @@ function Opener(props: Partial<AlertDialogProps>): React.ReactElement {
 async function openIn(strict: boolean, props: Partial<AlertDialogProps>): Promise<void> {
   const tree = <Opener {...props} />;
   render(strict ? <React.StrictMode>{tree}</React.StrictMode> : tree);
-  screen.getByTestId('opener').focus();
-  screen.getByTestId('opener').click();
+  const opener = screen.getByTestId('opener');
+  await act(async () => {
+    opener.click();
+  });
   await screen.findByTestId('d-actions');
 }
 
@@ -52,18 +54,18 @@ describe.each([
   it('focuses the emphasised cancel when emphasis is cancel', async () => {
     await openIn(strict, { emphasis: 'cancel' });
 
-    expect(screen.getByTestId('d-cancel-button')).toHaveFocus();
+    await waitFor(() => expect(screen.getByTestId('d-cancel-button')).toHaveFocus());
   });
 
   it('focuses the confirm by default', async () => {
     await openIn(strict, {});
 
-    expect(screen.getByTestId('d-confirm-button')).toHaveFocus();
+    await waitFor(() => expect(screen.getByTestId('d-confirm-button')).toHaveFocus());
   });
 
   it('lets initialFocus override the emphasis', async () => {
     await openIn(strict, { emphasis: 'cancel', initialFocus: 'confirm' });
 
-    expect(screen.getByTestId('d-confirm-button')).toHaveFocus();
+    await waitFor(() => expect(screen.getByTestId('d-confirm-button')).toHaveFocus());
   });
 });
