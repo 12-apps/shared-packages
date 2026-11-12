@@ -11,7 +11,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { BANNER_TINT_S, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
+import { BANNER_CHILDREN_CLASS, BANNER_TINT_S, bannerInk, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
 import { FOCUS } from '../Alert/Alert.metrics';
 import type { BannerProps, BannerVariant } from './Banner.types';
 import { rem } from '../../../tokens/relative';
@@ -36,7 +36,7 @@ const StyledBanner = styled(Box, {
     borderRadius: theme.spacing(1),
     backgroundColor: alpha(colorPalette.main, 0.1),
     border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
-    color: colorPalette.main,
+    color: bannerInk(theme, colorPalette.main),
     position: sticky ? 'sticky' : 'relative',
     top: sticky ? 0 : 'auto',
     zIndex: sticky ? theme.zIndex.appBar : 'auto',
@@ -209,7 +209,7 @@ const BannerBody: React.FC<{
           {description}
         </Typography>
       )}
-      {children}
+      {children && <Box className={BANNER_CHILDREN_CLASS}>{children}</Box>}
     </Box>
   </>
 );

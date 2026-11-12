@@ -123,8 +123,8 @@ export const HOVER = { tintAlpha: 0.06 } as const;
  * painted above the background and below the content, so it never dims the
  * ink itself; and animatable, which `background-image` is not. It DOES dim the
  * ink's contrast, because it darkens a light surface toward a dark ink (and
- * lightens a dark one toward a light ink) — on Alert, {@link POINTER_INK_STEP}
- * is the other half of the press.
+ * lightens a dark one toward a light ink) — on Alert and Banner,
+ * {@link POINTER_INK_STEP} is the other half of the press.
  *
  * `ms` is 250 and not the 1000 first asked for, and the reason is that ONE
  * property carries both states. CSS runs a transition from the DESTINATION
@@ -167,7 +167,8 @@ export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
  * is not stepped at all (`inkAbsolute` in `Alert.ink.ts`): a host that
  * repaints it to a light pane and a dark ink would otherwise have its ink
  * stepped toward white under a black layer. DOM only; native has no pointer
- * states. `Banner` paints the same tint and does not step yet.
+ * states. `Banner` paints the same tint and steps its words by this same table
+ * (FUT-4519).
  */
 export const POINTER_INK_STEP = {
   hover: { black: 0.15, white: 0.2 },

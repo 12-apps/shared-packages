@@ -23,6 +23,7 @@ interface BannerProps {
 - Strong visual hierarchy by variant; optional sticky behavior.
 - Inline actions (primary/secondary) and dismiss control.
 - Supports compact and spacious density via CSS modifiers.
+- Hover and press tint the surface and step the words (title, message, `children`) toward the mode's absolute by the Alert's `POINTER_INK_STEP`, so the text keeps 4.5:1 in every state (FUT-4519). The words are painted in the variant hue darkened (light) or lightened (dark) by 0.6; the icon keeps the plain hue and does not step.
 
 **A11y**
 
