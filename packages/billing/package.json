@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@12-apps/payments-backend": ">=4.56.0",
+    "@12-apps/payments-backend": ">=4.58.0",
     "@12-apps/wiring": ">=1.3.0"
   },
   "peerDependenciesMeta": {
