@@ -2,7 +2,9 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.js';
 
 import type { BannerVariant } from './Banner.types';
-import { ACTIVE, HOVER } from '../Alert/Alert.metrics';
+import { pointerInkStyles } from '../Alert/Alert.ink';
+import { ACTIVE, HOVER, SEMANTIC_SURFACE } from '../Alert/Alert.metrics';
+import { darken, lighten } from '../../../tokens/color';
 import { modeInk } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 
@@ -43,6 +45,42 @@ export const getVariantColor = (theme: Theme, variant: BannerVariant) => {
   return colorMap[variant];
 };
 
+/**
+ * The ink the words are painted in (FUT-4519): the variant's hue pulled toward
+ * the mode's absolute by the same amount the Alert's semantic ink is. The hue
+ * itself is the ICON's colour; as text it was 2.5:1 to 3.8:1 on its own wash.
+ */
+export const bannerInk = (theme: Theme, main: string): string =>
+  theme.palette.mode === 'dark' ? lighten(main, SEMANTIC_SURFACE.ink) : darken(main, SEMANTIC_SURFACE.ink);
+
+/** The class `Banner` wraps its `children` in, at `display: contents`, so they can step with the words. */
+export const BANNER_CHILDREN_CLASS = 'banner-children';
+
+/** What steps under a pointer: the title, the message, the children and the secondary action's label, none nested in another. */
+const BANNER_WORDS = `& .banner-title, & .banner-description, & .${BANNER_CHILDREN_CLASS}, & .banner-actions .MuiButton-outlined`;
+
+/** The dismiss button: opacity and a wash only, no spin. */
+const bannerDismissStyles = (theme: Theme, colorPalette: PaletteColor): CSSObject => ({
+  color: 'inherit',
+  opacity: 0.7,
+  marginLeft: theme.spacing(1),
+  flexShrink: 0,
+
+  // Opacity and a wash only: the dismiss used to spin 90deg, which drew the
+  // eye to the way out rather than to the message. Same fix as `Alert`'s
+  // close button, which is the sibling surface (FUT-1458).
+  '&:hover': {
+    opacity: 1,
+    backgroundColor: alpha(colorPalette.main, 0.1),
+  },
+
+  '&:focus-visible': {
+    opacity: 1,
+    outline: `${rem(theme, 2)} solid ${colorPalette.main}`,
+    outlineOffset: rem(theme, 2),
+  },
+});
+
 export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSObject => ({
   // Icon container
   '.banner-icon': {
@@ -76,15 +114,22 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     fontSize: rem(theme, 16),
     lineHeight: 1.4,
     marginBottom: theme.spacing(0.5),
-    color: colorPalette.dark || colorPalette.main,
+    // The root's ink, not `dark`: the pointer step mixes `currentColor`, and
+    // `dark` was 3.5:1 on dark mode's wash.
+    color: 'inherit',
   },
 
-  // Description styles  
+  // Description styles
   '.banner-description': {
     fontSize: rem(theme, 14),
     lineHeight: 1.5,
     opacity: 0.9,
     color: 'inherit',
+  },
+
+  // `display: contents`: no box of its own, so the layout is what it was.
+  [`.${BANNER_CHILDREN_CLASS}`]: {
+    display: 'contents',
   },
 
   // Actions area
@@ -101,27 +146,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     },
   },
 
-  // Dismiss button
-  '.banner-dismiss': {
-    color: 'inherit',
-    opacity: 0.7,
-    marginLeft: theme.spacing(1),
-    flexShrink: 0,
-
-    // Opacity and a wash only: the dismiss used to spin 90deg, which drew the
-    // eye to the way out rather than to the message. Same fix as `Alert`'s
-    // close button, which is the sibling surface (FUT-1458).
-    '&:hover': {
-      opacity: 1,
-      backgroundColor: alpha(colorPalette.main, 0.1),
-    },
-
-    '&:focus-visible': {
-      opacity: 1,
-      outline: `${rem(theme, 2)} solid ${colorPalette.main}`,
-      outlineOffset: rem(theme, 2),
-    },
-  },
+  '.banner-dismiss': bannerDismissStyles(theme, colorPalette),
 });
 
 /**
@@ -140,21 +165,30 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
 const tint = (theme: Theme, a: number): string =>
   `inset 0 0 0 100vmax ${alpha(modeInk(theme), a)}`;
 
-export const bannerPointerStates = (theme: Theme): CSSObject => ({
-  '&:hover': {
-    boxShadow: tint(theme, HOVER.tintAlpha),
-  },
+export const bannerPointerStates = (theme: Theme): CSSObject => {
+  // The tint moves the surface toward the ink's side; the words step the same
+  // way, by the Alert's own table (FUT-4519, as FUT-4506 did for the Alert).
+  const ink = pointerInkStyles(theme, undefined, BANNER_WORDS);
+  return {
+    ...ink.rest,
 
-  // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
-  // an ancestor of whatever is pressed, so without it pressing the dismiss or
-  // an action dimmed the message that owns it. Excluding `:has(:active)`
-  // wholesale does not work — pressing the TEXT makes that text `:active` too,
-  // so the guard matched on every press and the state never fired.
-  '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
-    boxShadow: tint(theme, ACTIVE.tintAlpha),
-    transition: 'none',
-  },
-});
+    '&:hover': {
+      boxShadow: tint(theme, HOVER.tintAlpha),
+      ...ink.hover,
+    },
+
+    // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
+    // an ancestor of whatever is pressed, so without it pressing the dismiss or
+    // an action dimmed the message that owns it. Excluding `:has(:active)`
+    // wholesale does not work — pressing the TEXT makes that text `:active` too,
+    // so the guard matched on every press and the state never fired.
+    '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
+      boxShadow: tint(theme, ACTIVE.tintAlpha),
+      transition: 'none',
+      ...ink.press,
+    },
+  };
+};
 
 /** The seconds the tint takes easing back, shared with `Alert`. */
 export const BANNER_TINT_S = ACTIVE.ms / 1000;

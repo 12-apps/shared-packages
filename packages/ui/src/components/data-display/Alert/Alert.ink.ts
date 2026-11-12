@@ -92,15 +92,23 @@ export function steppedInkCss(absolute: string, step: number): string {
  *   ease into. A `:hover` block declares no transition, ever (see `ACTIVE`).
  *
  * All three are empty for a variant that does not step.
+ *
+ * `words` is the selector list of the parts that step, relative to the root
+ * (default: the Alert's own). `Banner` passes its title, message and children
+ * so both surfaces step by the same table (FUT-4519).
  */
-export function pointerInkStyles(theme: Theme, variant: string | undefined): Record<'rest' | PointerInkState, CSSObject> {
+export function pointerInkStyles(
+  theme: Theme,
+  variant: string | undefined,
+  words: string = MESSAGE_INK,
+): Record<'rest' | PointerInkState, CSSObject> {
   const side = inkAbsolute(theme, variant);
   if (side === null) return { rest: {}, hover: {}, press: {} };
   const absolute = absoluteInk(theme)[side];
   const at = (state: PointerInkState): string => steppedInkCss(absolute, POINTER_INK_STEP[state][side]);
   return {
-    rest: { [MESSAGE_INK]: { transition: `color ${seconds(ACTIVE.ms)} ${ALERT_EASING}` } },
-    hover: { [MESSAGE_INK]: { color: at('hover') } },
-    press: { [MESSAGE_INK]: { color: at('press'), transition: 'none' } },
+    rest: { [words]: { transition: `color ${seconds(ACTIVE.ms)} ${ALERT_EASING}` } },
+    hover: { [words]: { color: at('hover') } },
+    press: { [words]: { color: at('press'), transition: 'none' } },
   };
 }
