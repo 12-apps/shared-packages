@@ -59,6 +59,28 @@ export const BANNER_CHILDREN_CLASS = 'banner-children';
 /** What steps under a pointer: the title, the message and the children, none nested in another. */
 const BANNER_WORDS = `& .banner-title, & .banner-description, & .${BANNER_CHILDREN_CLASS}`;
 
+/** The dismiss button: opacity and a wash only, no spin. */
+const bannerDismissStyles = (theme: Theme, colorPalette: PaletteColor): CSSObject => ({
+  color: 'inherit',
+  opacity: 0.7,
+  marginLeft: theme.spacing(1),
+  flexShrink: 0,
+
+  // Opacity and a wash only: the dismiss used to spin 90deg, which drew the
+  // eye to the way out rather than to the message. Same fix as `Alert`'s
+  // close button, which is the sibling surface (FUT-1458).
+  '&:hover': {
+    opacity: 1,
+    backgroundColor: alpha(colorPalette.main, 0.1),
+  },
+
+  '&:focus-visible': {
+    opacity: 1,
+    outline: `${rem(theme, 2)} solid ${colorPalette.main}`,
+    outlineOffset: rem(theme, 2),
+  },
+});
+
 export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSObject => ({
   // Icon container
   '.banner-icon': {
@@ -124,27 +146,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     },
   },
 
-  // Dismiss button
-  '.banner-dismiss': {
-    color: 'inherit',
-    opacity: 0.7,
-    marginLeft: theme.spacing(1),
-    flexShrink: 0,
-
-    // Opacity and a wash only: the dismiss used to spin 90deg, which drew the
-    // eye to the way out rather than to the message. Same fix as `Alert`'s
-    // close button, which is the sibling surface (FUT-1458).
-    '&:hover': {
-      opacity: 1,
-      backgroundColor: alpha(colorPalette.main, 0.1),
-    },
-
-    '&:focus-visible': {
-      opacity: 1,
-      outline: `${rem(theme, 2)} solid ${colorPalette.main}`,
-      outlineOffset: rem(theme, 2),
-    },
-  },
+  '.banner-dismiss': bannerDismissStyles(theme, colorPalette),
 });
 
 /**
