@@ -139,10 +139,16 @@ const inSlotOrder = (
  * An effect runs again on that remount, and runs before the trap's own (a
  * child's effect precedes its parent's), so the trap finds focus already inside.
  */
-function useFocusOnOpen(target: React.RefObject<HTMLButtonElement | null>): void {
+function useFocusOnOpen(cancelFocused: boolean): {
+  cancelRef: React.RefObject<HTMLButtonElement | null>;
+  confirmRef: React.RefObject<HTMLButtonElement | null>;
+} {
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  const confirmRef = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
-    target.current?.focus();
-  }, [target]);
+    (cancelFocused ? cancelRef : confirmRef).current?.focus();
+  }, [cancelFocused]);
+  return { cancelRef, confirmRef };
 }
 
 /**
@@ -181,9 +187,7 @@ export function AlertDialogFooter({
   const emphasis = effectiveEmphasis(asked, showCancel);
   const look = buttonLooks(emphasis, variant);
   const cancelFocused = focusesCancel(initialFocus, emphasis);
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
-  const confirmRef = React.useRef<HTMLButtonElement>(null);
-  useFocusOnOpen(cancelFocused ? cancelRef : confirmRef);
+  const { cancelRef, confirmRef } = useFocusOnOpen(cancelFocused);
   const cancel = showCancel && (
     <Button
       key="cancel"
