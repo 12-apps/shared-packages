@@ -130,6 +130,22 @@ const inSlotOrder = (
 ): React.ReactNode[] => (emphasis === 'cancel' ? [confirm, cancel] : [cancel, confirm]);
 
 /**
+ * Focus the button that owns focus when the dialog opens.
+ *
+ * `autoFocus` alone only runs when the button first mounts. Under StrictMode
+ * the dialog's tree is mounted, torn down and mounted again, the focus trap's
+ * cleanup hands focus back to the opener, and the remounted button is never
+ * autofocused: focus landed on the dialog's container and Enter did nothing.
+ * An effect runs again on that remount, and runs before the trap's own (a
+ * child's effect precedes its parent's), so the trap finds focus already inside.
+ */
+function useFocusOnOpen(target: React.RefObject<HTMLButtonElement | null>): void {
+  React.useEffect(() => {
+    target.current?.focus();
+  }, [target]);
+}
+
+/**
  * Action row: the optional cancel button and the (variant-coloured) confirm,
  * with the emphasised one LAST — the primary slot, on the right or, once the
  * row stacks, on top. DOM order is the tab order, so it follows the same rule.
@@ -165,9 +181,13 @@ export function AlertDialogFooter({
   const emphasis = effectiveEmphasis(asked, showCancel);
   const look = buttonLooks(emphasis, variant);
   const cancelFocused = focusesCancel(initialFocus, emphasis);
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  const confirmRef = React.useRef<HTMLButtonElement>(null);
+  useFocusOnOpen(cancelFocused ? cancelRef : confirmRef);
   const cancel = showCancel && (
     <Button
       key="cancel"
+      ref={cancelRef}
       onClick={onCancel}
       variant={look.cancel.variant}
       color={look.cancel.color}
@@ -181,6 +201,7 @@ export function AlertDialogFooter({
   const confirm = (
     <Button
       key="confirm"
+      ref={confirmRef}
       onClick={onConfirm}
       variant={look.confirm.variant}
       color={look.confirm.color}
