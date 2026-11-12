@@ -1,157 +1,91 @@
 import {
+  createRefundRetrier,
   CredentialsError,
-  isNothingToRefund,
-  refundRefusalOf,
+  REFUND_CLAIM_TTL_MS,
   UnsupportedOperationError,
-  type MerchantRef,
-  type PaymentsGateway,
+  type FirstAttemptResult,
+  type RefundRetrier,
+  type RefundSeriesKey,
+  type RefundSeriesRow,
   type RefundSnapshot,
 } from "@12-apps/payments-backend";
+
+import {
+  SUBSCRIPTION_REFUND_SUBJECT,
+  type RefundablePayment,
+  type RefundablePaymentStore,
+  type RefundPendingReason,
+  type RefundPendingRecord,
+  type RefundRecord,
+  type SettleByHandResult,
+  type SubscriptionRefund,
+  type SubscriptionRefundDeps,
+  type SubscriptionRefundResult,
+} from "./refund-ports";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
  * the customer, through the provider that took it.
  *
- * ## What is here, and what is not
+ * ## The flow is the payments package's
  *
- * Here is the MECHANISM: which charge is refunded (the stored one, in full, so
- * an instalment charge returns everything the provider took), at which merchant
- * (the platform's, the same inversion collection rests on), how a provider's
- * answer becomes one of three outcomes, and that a refund the provider did not
- * take is RECORDED as pending rather than thrown away.
+ * Every provider call is made by `@12-apps/payments-backend`'s refund retrier
+ * (`createRefundRetrier`, FUT-4740), the one store refunds use: attempt 1 under
+ * a deadline with `retriedByCaller`, a "not yet" or a lost answer opened as a
+ * background series whose every later attempt is CLAIMED behind the series
+ * row's version and CONSULTS the charge before it sends anything, a charge
+ * with nothing left to refund adopted as returned with the amount the consult
+ * saw, a person's retry as a new series that consults first, and a hand
+ * settlement that waits while an attempt is in flight. Nothing here calls the
+ * gateway's `refund` itself.
+ *
+ * What this module adds is the binding that flow needs and cannot invent: the
+ * merchant (the PLATFORM's, the inversion collection rests on), what a
+ * subscription payment's series is keyed by, the host's payment rows as the
+ * claim that lets attempt 1 be sent ONCE, and the outcome a host reads.
  *
  * What stays in the HOST is every opinion: WHEN a payment is refundable (a
  * withdrawal window, from which payment it counts, whether a renewal reopens
- * it), what a cancel does to the plan, who may ask for a refund, who settles a
- * pending one by hand and how that is audited. This module refunds what it is
- * told to refund, once the host has decided it should.
+ * it), what a cancel does to the plan, who may ask for a refund or settle one
+ * by hand, and how that is audited.
+ *
+ * ## Two fences, so a refund is never sent twice
+ *
+ *  1. Attempt 1 is sent only by the caller whose `claim` moved the payment
+ *     from PAID to REFUND_PENDING — a compare-and-set in the host's row. Two
+ *     cancels, two tabs: one sends, the other answers `IN_PROGRESS`.
+ *  2. Every later attempt (the sweep's, a person's `retry`) is the retrier's,
+ *     claimed behind its series row's version, and consults the charge first.
+ *     `retry` is refused while attempt 1 may still be running (its claim is
+ *     younger than the retrier's claim lifetime and no answer was recorded).
+ *
+ * The host's two writes are conditional too: `markRefunded` only moves a row
+ * that is still REFUND_PENDING, and `markRefundPending` only writes one that is
+ * not refunded, so a late "pending" can never overwrite a refund.
  *
  * ## The channel
  *
  * A provider refund goes back by the channel the charge was paid through — a
- * Pix charge is returned to the payer's key, a card charge to the card. Nothing
- * here chooses it, and nothing could: `gateway.refund` refunds a charge, not an
- * amount to a destination. The payment's `method` is handed back on every
- * outcome so the host's copy can say which one.
+ * Pix charge to the payer's key, a card charge to the card. Nothing here
+ * chooses it: a refund is of a charge, not of an amount to a destination. The
+ * payment's `method` is handed back so the host's copy can say which.
  *
- * ## Three outcomes, and which ones write
+ * ## A refund the provider is still processing
  *
- *  - `REFUNDED` — the provider took the refund (its snapshot says REFUNDED or
- *    PENDING: a Pix refund is commonly asynchronous, and once accepted it is
- *    the provider's to complete), or answered that the charge has nothing left
- *    to refund (an earlier attempt whose answer was lost, a refund made in the
- *    provider's panel). `markRefunded` is called.
- *  - `PENDING` — the provider did not refund: it refused, it does not refund
- *    at all, it gave no answer, or the payment carries no charge to refund.
- *    `markRefundPending` is called with why, so a person can settle it.
- *  - `NOT_REFUNDABLE` — nothing to do: no such payment, a payment that was
- *    never paid, or one already refunded. NOTHING is written.
- *
- * A refund with NO answer (a timeout, a 5xx) is PENDING, not failed: the money
- * may have gone back. A later {@link SubscriptionRefund.retry} is safe for
- * exactly that reason — the provider answers "nothing to refund" and the retry
- * adopts it as done instead of refunding twice.
+ * A provider may answer a refund with a PENDING snapshot — accepted, to be
+ * completed (common for Pix). It is recorded as refunded with
+ * `confirmed: false`: the money is the provider's to return now, and a person
+ * must not be asked to settle it. Confirming it (or a later failure) is the
+ * provider's refund notification, which the host's webhook already receives.
  *
  * Server-only.
  */
 
-/** Where a subscription payment stands, as this flow needs to know it. */
-export type RefundablePaymentState =
-  /** Paid and not refunded: a refund may be raised. */
-  | "PAID"
-  /** A refund was asked for and the provider did not take it: a retry may be raised. */
-  | "REFUND_PENDING"
-  /** Refunded already, by the provider or recorded by hand. */
-  | "REFUNDED"
-  /** Anything else (pending, failed): never refundable. */
-  | "OTHER";
-
-/** One subscription payment, as the host's own row maps onto it. */
-export interface RefundablePayment {
-  id: string;
-  state: RefundablePaymentState;
-  /** The provider key the charge was raised at; null when no charge was raised. */
-  provider: string | null;
-  /** The provider's charge id; null when no charge was raised. */
-  providerChargeId: string | null;
-  /** How it was paid (PIX | CARD | …), handed back for the host's copy. */
-  method: string | null;
-  /** The cycle's principal, for the host's copy. A full refund returns what the provider took. */
-  amountCents: number;
-  currency: string;
-}
-
-/** Why a refund the flow asked for did not happen. */
-export type RefundPendingReason =
-  /** The provider answered no, for good. */
-  | "REFUSED"
-  /** The provider said "not yet". */
-  | "NOT_YET"
-  /** No verdict: a timeout, a 5xx, a transport error. The money may have gone back. */
-  | "UNKNOWN"
-  /** The provider (or its adapter) does not refund at all. */
-  | "UNSUPPORTED"
-  /** The platform has no usable credentials at that provider any more. */
-  | "NO_CREDENTIALS"
-  /** The payment is paid but carries no provider charge (recorded by hand, say). */
-  | "NO_CHARGE";
-
-/** What `markRefunded` is handed. */
-export interface RefundRecord {
-  /** The provider's refund id; null when the provider answered "nothing to refund". */
-  providerRefundId: string | null;
-  /** True when the provider said REFUNDED (or nothing left); false while it is processing it. */
-  confirmed: boolean;
-  at: Date;
-}
-
-/** What `markRefundPending` is handed. */
-export interface RefundPendingRecord {
-  reason: RefundPendingReason;
-  /** The provider's own message, for an operator; never card or credential data. */
-  message: string | null;
-  at: Date;
-}
-
-/** The host's subscription payment rows, as the refund reads and writes them. */
-export interface RefundablePaymentStore {
-  find(paymentId: string): Promise<RefundablePayment | null>;
-  markRefunded(paymentId: string, record: RefundRecord): Promise<void>;
-  markRefundPending(paymentId: string, record: RefundPendingRecord): Promise<void>;
-}
-
-export type SubscriptionRefundResult =
-  | { outcome: "REFUNDED"; paymentId: string; method: string | null; record: RefundRecord }
-  | { outcome: "PENDING"; paymentId: string; method: string | null; record: RefundPendingRecord }
-  | { outcome: "NOT_REFUNDABLE"; paymentId: string; why: "NOT_FOUND" | "NOT_PAID" | "ALREADY_REFUNDED" };
-
-export interface SubscriptionRefund {
-  /**
-   * Refund one PAID payment in full (a `REFUND_PENDING` one is retried, which
-   * is the same act). The host decides beforehand that it should be refunded.
-   */
-  refund(paymentId: string, options?: { reason?: string }): Promise<SubscriptionRefundResult>;
-  /**
-   * Ask the provider again for a payment whose refund is pending. Refuses
-   * (`NOT_REFUNDABLE`, `NOT_PAID`) a payment that never asked for one, so a
-   * "Tentar de novo" can never become the first refund of a payment nobody
-   * decided to refund.
-   */
-  retry(paymentId: string, options?: { reason?: string }): Promise<SubscriptionRefundResult>;
-}
-
-export interface SubscriptionRefundDeps {
-  /**
-   * The host's payments gateway, resolved per call — narrowed to the one
-   * method this flow uses, so it cannot charge, vault or rotate anything.
-   */
-  payments(): Promise<{ gateway: Pick<PaymentsGateway, "refund"> }>;
-  /** The merchant the payment was collected INTO — the platform's own account. */
-  merchant: MerchantRef;
-  /** The host's payment rows, built per call over its own database client. */
-  store(): Promise<RefundablePaymentStore>;
-  /** The clock; injected for tests. */
-  now?: () => Date;
+/** One call's context: the deps, the clock and this request's stores. */
+interface Ctx {
+  deps: SubscriptionRefundDeps;
+  now: () => Date;
+  store: RefundablePaymentStore;
 }
 
 /** A provider's message, trimmed to what an operator can read in one line. */
@@ -160,80 +94,227 @@ function messageOf(error: unknown): string | null {
   return error.message.trim().slice(0, 500);
 }
 
-/** Why a thrown refund did not happen, in this package's words. */
-function pendingReasonOf(error: unknown): RefundPendingReason {
+/** A refusal decided before anything was sent, in this package's words. */
+function predispatchReason(error: unknown): RefundPendingReason {
   if (error instanceof UnsupportedOperationError) return "UNSUPPORTED";
   if (error instanceof CredentialsError) return "NO_CREDENTIALS";
-  return refundRefusalOf(error);
+  // Anything else the retrier did not classify: nothing is known, a person looks.
+  return "UNKNOWN";
 }
 
-/** A snapshot the provider answered with, as an outcome. */
-function recordOfSnapshot(snapshot: RefundSnapshot, at: Date): RefundRecord | RefundPendingRecord {
-  if (snapshot.status === "FAILED") return { reason: "REFUSED", message: null, at };
-  return { providerRefundId: snapshot.providerRefundId, confirmed: snapshot.status === "REFUNDED", at };
+function snapshotRecord(snapshot: RefundSnapshot, at: Date): RefundRecord {
+  return {
+    how: "PROVIDER",
+    providerRefundId: snapshot.providerRefundId || null,
+    refundedCents: snapshot.amount?.amountCents ?? null,
+    confirmed: snapshot.status === "REFUNDED",
+    at,
+  };
+}
+
+function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSeriesKey {
+  return {
+    merchant: ctx.deps.merchant,
+    provider: payment.provider ?? "",
+    providerChargeId: payment.providerChargeId ?? "",
+    reference: payment.id,
+    subject: SUBSCRIPTION_REFUND_SUBJECT,
+    // A payment is refunded once: its series is bound to the payment itself.
+    boundTo: payment.id,
+    cause: reason ?? null,
+  };
+}
+
+/** The retrier over this request's stores, with the subscription host half bound. */
+async function retrierOf(ctx: Ctx): Promise<RefundRetrier> {
+  const { deps, store, now } = ctx;
+  const [{ gateway }, series] = await Promise.all([deps.payments(), deps.series()]);
+  return createRefundRetrier({
+    gateway,
+    store: series,
+    now: deps.now,
+    attemptMs: deps.attemptMs,
+    onProviderFailure: deps.onProviderFailure,
+    host: {
+      // Still owed while the row is pending: a hand settlement or a refund recorded elsewhere ends the series.
+      stillOwed: async (row: RefundSeriesRow) => (await store.find(row.reference))?.state === "REFUND_PENDING",
+      attempted: async (row, refusal, error) => {
+        await store.markRefundPending(row.reference, { reason: refusal, message: messageOf(error), at: now() });
+      },
+      refunded: async (row, outcome) => {
+        const record: RefundRecord = outcome.snapshot
+          ? snapshotRecord(outcome.snapshot, now())
+          : { how: "ADOPTED", providerRefundId: null, refundedCents: outcome.refundedCents ?? null, confirmed: true, at: now() };
+        await store.markRefunded(row.reference, record);
+      },
+    },
+  });
+}
+
+async function pending(ctx: Ctx, payment: RefundablePayment, record: RefundPendingRecord): Promise<SubscriptionRefundResult> {
+  await ctx.store.markRefundPending(payment.id, record);
+  return { outcome: "PENDING", paymentId: payment.id, method: payment.method, record };
+}
+
+/**
+ * Record a refund attempt 1 took. When the write itself fails the money is
+ * back and the row says otherwise: a series is opened due now, so the sweep
+ * consults the charge, adopts the refund and writes it again.
+ */
+async function refunded(
+  ctx: Ctx,
+  retrier: RefundRetrier,
+  payment: RefundablePayment,
+  record: RefundRecord,
+): Promise<SubscriptionRefundResult> {
+  try {
+    await ctx.store.markRefunded(payment.id, record);
+  } catch (error) {
+    await retrier.openDue(keyOf(ctx, payment)).catch(() => false);
+    throw error;
+  }
+  return { outcome: "REFUNDED", paymentId: payment.id, method: payment.method, record };
+}
+
+/** Attempt 1's answer, on the payment row. */
+function recordFirst(
+  ctx: Ctx,
+  retrier: RefundRetrier,
+  payment: RefundablePayment,
+  result: FirstAttemptResult,
+): Promise<SubscriptionRefundResult> {
+  const at = ctx.now();
+  switch (result.kind) {
+    case "REFUNDED":
+      return result.snapshot.status === "FAILED"
+        ? pending(ctx, payment, { reason: "REFUSED", message: null, at })
+        : refunded(ctx, retrier, payment, snapshotRecord(result.snapshot, at));
+    case "ADOPTED":
+      return refunded(ctx, retrier, payment, {
+        how: "ADOPTED",
+        providerRefundId: null,
+        refundedCents: result.refundedCents,
+        confirmed: true,
+        at,
+      });
+    default:
+      // A refusal for good; or "not yet" / no answer, whose series the retrier opened (and
+      // recorded through `attempted`) and the sweep carries on. Recorded here as well, in
+      // case no series opened.
+      return pending(ctx, payment, { reason: result.kind, message: messageOf(result.error), at });
+  }
+}
+
+/** Attempt 1, sent by the claim's winner only. */
+async function firstAttempt(ctx: Ctx, payment: RefundablePayment, reason: string | undefined): Promise<SubscriptionRefundResult> {
+  if (!payment.provider || !payment.providerChargeId) {
+    return pending(ctx, payment, { reason: "NO_CHARGE", message: null, at: ctx.now() });
+  }
+  const retrier = await retrierOf(ctx);
+  let result: FirstAttemptResult;
+  try {
+    result = await retrier.firstAttempt(keyOf(ctx, payment, reason), reason ? { reason } : {});
+  } catch (error) {
+    return pending(ctx, payment, { reason: predispatchReason(error), message: messageOf(error), at: ctx.now() });
+  }
+  return recordFirst(ctx, retrier, payment, result);
+}
+
+/** Attempt 1 may still be running: claimed recently and nothing answered yet. */
+function attemptOneMayRun(ctx: Ctx, payment: RefundablePayment): boolean {
+  if (payment.pendingReason !== null || payment.requestedAt === null) return false;
+  return ctx.now().getTime() < payment.requestedAt.getTime() + REFUND_CLAIM_TTL_MS;
+}
+
+type Refusal = { outcome: "NOT_REFUNDABLE"; paymentId: string; why: "NOT_FOUND" | "NOT_PAID" | "ALREADY_REFUNDED" | "IN_PROGRESS" };
+
+/** The payment a person's act (retry, settle) may touch: pending, with attempt 1 over. */
+async function pendingPayment(ctx: Ctx, paymentId: string): Promise<RefundablePayment | Refusal> {
+  const payment = await ctx.store.find(paymentId);
+  if (!payment) return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_FOUND" };
+  if (payment.state === "REFUNDED") return { outcome: "NOT_REFUNDABLE", paymentId, why: "ALREADY_REFUNDED" };
+  if (payment.state !== "REFUND_PENDING") return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_PAID" };
+  if (attemptOneMayRun(ctx, payment)) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  return payment;
+}
+
+const refused = (value: RefundablePayment | Refusal): value is Refusal => "outcome" in value;
+
+async function refund(ctx: Ctx, paymentId: string, reason: string | undefined): Promise<SubscriptionRefundResult> {
+  const payment = await ctx.store.find(paymentId);
+  if (!payment) return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_FOUND" };
+  if (payment.state === "REFUNDED") return { outcome: "NOT_REFUNDABLE", paymentId, why: "ALREADY_REFUNDED" };
+  if (payment.state === "REFUND_PENDING") return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  if (payment.state !== "PAID") return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_PAID" };
+  const at = ctx.now();
+  if (!(await ctx.store.claim(paymentId, at))) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  return firstAttempt(ctx, { ...payment, state: "REFUND_PENDING", requestedAt: at }, reason);
+}
+
+/** The payment as it stands after the retrier ran, as an outcome. */
+async function outcomeOf(ctx: Ctx, payment: RefundablePayment): Promise<SubscriptionRefundResult> {
+  const after = await ctx.store.find(payment.id);
+  const at = ctx.now();
+  if (after?.state === "REFUNDED") {
+    const record: RefundRecord = { how: "PROVIDER", providerRefundId: null, refundedCents: null, confirmed: true, at };
+    return { outcome: "REFUNDED", paymentId: payment.id, method: payment.method, record };
+  }
+  const record: RefundPendingRecord = { reason: after?.pendingReason ?? "UNKNOWN", message: null, at };
+  return { outcome: "PENDING", paymentId: payment.id, method: payment.method, record };
+}
+
+async function retry(ctx: Ctx, paymentId: string): Promise<SubscriptionRefundResult> {
+  const payment = await pendingPayment(ctx, paymentId);
+  if (refused(payment)) return payment;
+  if (!payment.provider || !payment.providerChargeId) {
+    return pending(ctx, payment, { reason: "NO_CHARGE", message: null, at: ctx.now() });
+  }
+  const retrier = await retrierOf(ctx);
+  const key = keyOf(ctx, payment);
+  // A series still running (an attempt due or in flight) answers a press without
+  // sending anything: the sweep carries it on, so the person is told so.
+  const running = retrier.viewOf(await retrier.find(key));
+  if (running && (running.inFlight || !running.exhausted)) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  try {
+    await retrier.press(key);
+  } catch (error) {
+    return pending(ctx, payment, { reason: predispatchReason(error), message: messageOf(error), at: ctx.now() });
+  }
+  return outcomeOf(ctx, payment);
+}
+
+async function settleByHand(
+  ctx: Ctx,
+  paymentId: string,
+  byHand: { by: string; via: string; reason: string },
+): Promise<SettleByHandResult> {
+  const payment = await pendingPayment(ctx, paymentId);
+  if (refused(payment)) return payment;
+  const retrier = await retrierOf(ctx);
+  const key = keyOf(ctx, payment);
+  if (payment.provider && payment.providerChargeId && !(await retrier.settleByHand(key))) {
+    return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  }
+  const record: RefundRecord = { how: "BY_HAND", providerRefundId: null, refundedCents: null, confirmed: true, at: ctx.now(), byHand };
+  let wrote: boolean;
+  try {
+    wrote = await ctx.store.markRefunded(paymentId, record);
+  } catch (error) {
+    // The series was settled for a write that did not hold: it reads pending again, nothing sent.
+    await retrier.reopenByHand(key).catch(() => undefined);
+    throw error;
+  }
+  if (!wrote) return { outcome: "NOT_REFUNDABLE", paymentId, why: "ALREADY_REFUNDED" };
+  return { outcome: "REFUNDED", paymentId, record };
 }
 
 export function createSubscriptionRefund(deps: SubscriptionRefundDeps): SubscriptionRefund {
   const now = deps.now ?? (() => new Date());
-
-  async function pending(
-    store: RefundablePaymentStore,
-    payment: RefundablePayment,
-    record: RefundPendingRecord,
-  ): Promise<SubscriptionRefundResult> {
-    await store.markRefundPending(payment.id, record);
-    return { outcome: "PENDING", paymentId: payment.id, method: payment.method, record };
-  }
-
-  async function refunded(
-    store: RefundablePaymentStore,
-    payment: RefundablePayment,
-    record: RefundRecord,
-  ): Promise<SubscriptionRefundResult> {
-    await store.markRefunded(payment.id, record);
-    return { outcome: "REFUNDED", paymentId: payment.id, method: payment.method, record };
-  }
-
-  async function ask(
-    store: RefundablePaymentStore,
-    payment: RefundablePayment,
-    reason: string | undefined,
-  ): Promise<SubscriptionRefundResult> {
-    if (!payment.provider || !payment.providerChargeId) {
-      return pending(store, payment, { reason: "NO_CHARGE", message: null, at: now() });
-    }
-    let snapshot: RefundSnapshot;
-    try {
-      const { gateway } = await deps.payments();
-      snapshot = await gateway.refund(deps.merchant, payment.provider, {
-        providerChargeId: payment.providerChargeId,
-        reason,
-      });
-    } catch (error) {
-      if (isNothingToRefund(error)) {
-        return refunded(store, payment, { providerRefundId: null, confirmed: true, at: now() });
-      }
-      return pending(store, payment, { reason: pendingReasonOf(error), message: messageOf(error), at: now() });
-    }
-    const record = recordOfSnapshot(snapshot, now());
-    return "reason" in record ? pending(store, payment, record) : refunded(store, payment, record);
-  }
-
-  async function run(
-    paymentId: string,
-    accepts: readonly RefundablePaymentState[],
-    reason: string | undefined,
-  ): Promise<SubscriptionRefundResult> {
-    const store = await deps.store();
-    const payment = await store.find(paymentId);
-    if (!payment) return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_FOUND" };
-    if (payment.state === "REFUNDED") return { outcome: "NOT_REFUNDABLE", paymentId, why: "ALREADY_REFUNDED" };
-    if (!accepts.includes(payment.state)) return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_PAID" };
-    return ask(store, payment, reason);
-  }
-
+  const ctx = async (): Promise<Ctx> => ({ deps, now, store: await deps.store() });
   return {
-    refund: (paymentId, options) => run(paymentId, ["PAID", "REFUND_PENDING"], options?.reason),
-    retry: (paymentId, options) => run(paymentId, ["REFUND_PENDING"], options?.reason),
+    refund: async (paymentId, options) => refund(await ctx(), paymentId, options?.reason),
+    retry: async (paymentId) => retry(await ctx(), paymentId),
+    settleByHand: async (paymentId, byHand) => settleByHand(await ctx(), paymentId, byHand),
+    runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
   };
 }

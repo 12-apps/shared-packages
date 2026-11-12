@@ -71,20 +71,30 @@ port, never from the request. `forgetAll` detaches **every** pointer the owner
 holds, not the one on the screen: a card can live at yesterday's acquirer as
 well as today's.
 
-`createSubscriptionRefund` returns one paid payment in full, through the
-provider that took it and so by the channel it was paid (Pix to the payer's
-key, a card to the card), at the platform merchant. Every answer becomes one of
-three outcomes: `REFUNDED` (taken, or "nothing left to refund", which makes a
-retry safe), `PENDING` (refused, unsupported, no answer, no charge: recorded
-through `markRefundPending` with why, for a person to settle) and
-`NOT_REFUNDABLE` (not found, never paid, already refunded: nothing written).
-`retry` only accepts a payment whose refund is already pending. WHEN a payment
-is refundable, what a cancel does to the plan and who settles a pending refund
-by hand are the host's.
+`createSubscriptionRefund` returns one paid payment in full, at the platform
+merchant, by binding `@12-apps/payments-backend`'s refund retrier — the flow
+store refunds use — so it goes back by the channel it was paid (Pix to the
+payer's key, a card to the card). Attempt 1 is sent only by the caller whose
+`claim` moved the host's row from PAID to REFUND_PENDING; every later attempt
+(the background sweep, `runDue`, or a person's `retry`) is claimed behind the
+series row's version and consults the charge before it sends, so an answer
+that was lost is adopted rather than refunded twice. A refusal, an unsupported
+provider, lost credentials or a missing charge is recorded pending with why;
+`settleByHand` records a refund made another way (who, how, why), and waits
+while an attempt is in flight. The host's two writes are conditional, so a late
+"pending" never overwrites a refund. Keep the series rows apart from any other
+refund's: `runDue` drives every due row of the store it is given through this
+binding. A provider PENDING snapshot is recorded as refunded, `confirmed:
+false`; the host confirms it from the provider's refund notification. WHEN a
+payment is refundable, what a cancel does to the plan and who may settle are
+the host's.
 
 ```ts
-const refunds = createSubscriptionRefund({ payments, merchant, store: async () => paymentRows });
+const refunds = createSubscriptionRefund({ payments, merchant, store, series });
 await refunds.refund(paymentId, { reason: "withdrawal" }); // REFUNDED | PENDING | NOT_REFUNDABLE
+await refunds.retry(paymentId);                            // a person, after a refusal
+await refunds.settleByHand(paymentId, { by, via, reason });
+await refunds.runDue();                                    // the host's sweep
 ```
 
 Nothing here has a parameter a card could travel in. The number goes from the
