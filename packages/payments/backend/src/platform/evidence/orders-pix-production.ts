@@ -33,8 +33,11 @@ export interface EvidencePixView {
    * attempt was refused, and once it is refunded.
    */
   refund: EvidencePixRefundView | null;
-  /** The run's card cancels whose refund did not go back (FUT-4740, C33): their rows and the press. */
-  cards: EvidenceCardRefundView[];
+  /**
+   * The run's card cancels whose refund did not go back (FUT-4740, C33): their
+   * rows and the press. Absent while there are none, so the view keeps its shape.
+   */
+  cards?: EvidenceCardRefundView[];
 }
 
 const stepIn = (steps: readonly EvidenceStep[], key: EvidenceStep['key']) => steps.find((step) => step.key === key);
@@ -92,13 +95,14 @@ function pixExpiresAt(record: EvidenceRecord): string | null {
 /** The run's Pix as a screen shows it, read back from the recorded `pix.create` answer. */
 export function pixViewOf(record: EvidenceRecord, skippedNote: string): EvidencePixView {
   const state = pixStateOf(record, skippedNote);
+  const cards = cardRefundViewsOf(record);
   return {
     runId: record.id,
     state,
     qrText: state === 'AWAITING_PAYMENT' ? findString(qrPartOf(record), ['text']) : null,
     expiresAt: state === 'AWAITING_PAYMENT' ? pixExpiresAt(record) : null,
     refund: state === 'REFUND_PENDING' ? refundViewOf(record) : null,
-    cards: cardRefundViewsOf(record),
+    ...(cards.length > 0 ? { cards } : {}),
   };
 }
 

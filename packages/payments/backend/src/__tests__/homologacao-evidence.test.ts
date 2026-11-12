@@ -131,7 +131,7 @@ describe('homologação evidence', () => {
     const view = pixViewOf(await confirmEvidencePix(at(40), prepared.runId, 'RETRY_REFUND'), 'pulado');
 
     expect(cancels()).toHaveLength(4);
-    expect(view.cards).toEqual([]);
+    expect(view.cards).toBeUndefined();
     expect((await buildHomologacaoEvidenceFile(w.fileDeps)).content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
   });
 
