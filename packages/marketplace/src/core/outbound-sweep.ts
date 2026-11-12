@@ -23,15 +23,17 @@ import type { EngineContext } from "./ports";
  *   host's ACCEPTED history from before this engine from being confirmed on
  *   the first pass.
  *
- * Before any of that, a store's cancellation request the marketplace TOOK
- * (REQUESTED) and has not answered past its answer window — the engine's
- * `cancellationWindowMs`, else the adapter's `cancellationAnswerWindowMs`,
- * counted from the request — is FAILED as TIMEOUT, and the host hears it
- * through `onCancellationFailed` (FUT-4758): a request nobody answers must
- * never stay pending. The window is read at the sweep's own cadence, so a
- * request ends between the window and the window plus one pass. A PENDING
- * request is not "unanswered": it was never delivered, the job retries it and
- * this sweep re-queues it, and only the give-up below ends it (TIMEOUT too).
+ * Before any of that, a store's cancellation request still waiting (PENDING:
+ * never delivered, or REQUESTED: delivered and unanswered) past its
+ * marketplace's answer window — the engine's `cancellationWindowMs`, else the
+ * adapter's `cancellationAnswerWindowMs`, counted from the request — is FAILED
+ * as TIMEOUT, and the host hears it through `onCancellationFailed` (FUT-4758,
+ * the owner: "it cannot stay in that state with nothing happening"). The
+ * store then cancels in the marketplace's own app. A PENDING request's
+ * retries stop with it: the job re-reads the row and sends only from PENDING,
+ * a run that starts past the window ends TIMEOUT itself without calling, and
+ * this sweep re-queues no FAILED row. The window is read at the sweep's own
+ * cadence, so a request ends between the window and the window plus one pass.
  *
  * Re-queued under a key of its own per pass: a queue keeps a finished job's id
  * and would swallow a re-queue under the job's plain key. The job itself is
@@ -84,7 +86,7 @@ async function requeue(ctx: EngineContext, rows: readonly OwedRow[], action: Out
  * each, so a confirmation that lands meanwhile wins and its host hears nothing
  * twice. Returns how many moved.
  */
-async function failAsTimeout(ctx: EngineContext, rows: readonly OwedRow[]): Promise<number> {
+export async function failAsTimeout(ctx: EngineContext, rows: readonly OwedRow[]): Promise<number> {
   const db = await ctx.ports.db();
   let failed = 0;
   for (const row of rows) {
@@ -114,7 +116,7 @@ async function waitingSince(
   })) as OwedRow[];
 }
 
-/** Fail every request the marketplace took and did not answer inside its window; no window, only the give-up. */
+/** Fail every request still waiting past its marketplace's window; no window, only the give-up. */
 async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> {
   let expired = 0;
   for (const provider of ctx.registry.providers()) {
@@ -122,7 +124,7 @@ async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> 
     const window = adapter ? cancellationWindowMs(ctx, adapter) : null;
     if (window === null) continue;
     const cutoff = new Date(now.getTime() - window);
-    expired += await failAsTimeout(ctx, await waitingSince(ctx, cutoff, ["REQUESTED"], provider));
+    expired += await failAsTimeout(ctx, await waitingSince(ctx, cutoff, WAITING, provider));
   }
   return expired;
 }

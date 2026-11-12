@@ -31,7 +31,7 @@ error at mount, never a default that quietly adopts another host's policy.
 | `defaultAckSlaSeconds` | `number` | The acceptance window a new connection gets (the origin host: 300). |
 | `reconcileBatchSize` | `number` | Stored deliveries one reconciliation pass re-runs (origin: 50). |
 | `maxInboxAttempts` | `number` | Re-runs before a stored delivery is retired (origin: 5). |
-| `cancellationWindowMs` | OPTIONAL. `number` | How long a cancellation request the marketplace TOOK (REQUESTED) may wait for its answer before the outbound sweep fails it as TIMEOUT, for every adapter. Absent: each adapter's `capabilities.cancellationAnswerWindowMs` (iFood: 5 minutes, estimated); an adapter with none is given up on only after 24 hours. |
+| `cancellationWindowMs` | OPTIONAL. `number` | How long a store's cancellation request may wait (PENDING: not yet delivered, or REQUESTED: delivered and unanswered) before the outbound sweep fails it as TIMEOUT, for every adapter; a PENDING request's retries stop with it. Absent: each adapter's `capabilities.cancellationAnswerWindowMs` (iFood: 5 minutes, estimated); an adapter with none is given up on only after 24 hours. |
 
 Plus `adapters: readonly MarketplaceAdapter[]` — one per marketplace the host
 sells through. The list is validated at mount (ids, duplicates, reason lists).

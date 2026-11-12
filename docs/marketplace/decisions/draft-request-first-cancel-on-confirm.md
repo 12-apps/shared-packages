@@ -31,13 +31,18 @@ What follows for the engine:
    TIMEOUT (no answer). The host's OPTIONAL
    `onCancellationFailed(clientId, orderId, reason)` hears it once, from
    whichever path moved the row: the event, the job, or the sweep.
-4. **No request waits forever.** The outbound sweep fails a REQUESTED request
-   older than the marketplace's answer window as TIMEOUT. The adapter states
-   the window (`capabilities.cancellationAnswerWindowMs`); the engine's
+4. **No request waits forever.** The outbound sweep fails a request still
+   waiting — PENDING (never delivered) or REQUESTED (delivered, unanswered) —
+   older than the marketplace's answer window as TIMEOUT, and the store then
+   cancels in the marketplace's own app. The adapter states the window
+   (`capabilities.cancellationAnswerWindowMs`); the engine's
    `cancellationWindowMs` overrides it for every adapter. iFood's is 5 minutes,
-   ESTIMATED: iFood's documentation names no deadline. A PENDING request was
-   never delivered; the job retries it and the sweep re-queues it, and only
-   the 24-hour give-up ends it (TIMEOUT too).
+   ESTIMATED: iFood's documentation names no deadline. A PENDING request's
+   retries stop with it: the job sends only from PENDING, a run that starts
+   past the window ends the request TIMEOUT itself without calling, and the
+   sweep re-queues no FAILED row. A call already in flight when the window
+   passes may still reach the marketplace; its answer then stamps nothing,
+   and a later confirmation still confirms.
 5. **A FAILED request stands for nothing.** The order may be accepted (the
    accept clears the request) or the cancellation asked again. A waiting
    request (PENDING or REQUESTED) refuses both, and no confirm is sent for an

@@ -1,7 +1,8 @@
 import type { MarketplaceAdapter, OutboundOrderRef, OutboundResult } from "./adapter";
-import { failedRequestData, tellCancellationConfirmed, tellCancellationFailed } from "./cancellation-outcome";
+import { cancellationWindowMs, failedRequestData, tellCancellationConfirmed, tellCancellationFailed } from "./cancellation-outcome";
 import { readOutboundConnection, type OutboundConnection } from "./integration";
 import type { OutboundJobPayload } from "./outbound-queue";
+import { failAsTimeout } from "./outbound-sweep";
 import type { EngineContext } from "./ports";
 import { resolveReason } from "./registry";
 
@@ -57,6 +58,7 @@ interface OutboundRow {
   cancellationStatus: string | null;
   cancellationReasonCode: string | null;
   cancellationOffendingSkus: unknown;
+  cancellationRequestedAt: Date | null;
   preparationMinutes: number | null;
   createdAt: Date;
 }
@@ -72,6 +74,7 @@ const ROW_SELECT = {
   cancellationStatus: true,
   cancellationReasonCode: true,
   cancellationOffendingSkus: true,
+  cancellationRequestedAt: true,
   preparationMinutes: true,
   createdAt: true,
 } as const;
@@ -204,6 +207,13 @@ async function runConfirm(
   );
 }
 
+/** Whether a request is older than its marketplace's answer window, so it must not be sent any more. */
+function pastWindow(ctx: EngineContext, row: OutboundRow, adapter: MarketplaceAdapter): boolean {
+  const window = cancellationWindowMs(ctx, adapter);
+  if (window === null || row.cancellationRequestedAt === null) return false;
+  return ctx.ports.clock.now().getTime() - row.cancellationRequestedAt.getTime() > window;
+}
+
 /** The offending SKUs stored with the request. */
 function skusOf(row: OutboundRow): string[] {
   return Array.isArray(row.cancellationOffendingSkus) ? row.cancellationOffendingSkus.map(String) : [];
@@ -218,6 +228,12 @@ async function runCancellation(
 ): Promise<OutboundOutcome> {
   if (row.cancellationStatus !== "PENDING") {
     return { kind: "skipped", reason: `the request is ${row.cancellationStatus ?? "absent"}, not PENDING` };
+  }
+  if (pastWindow(ctx, row, adapter)) {
+    // A retry that comes after the window never delivers (FUT-4758): the host
+    // was, or is now, told TIMEOUT, and the store cancels in the marketplace's app.
+    await failAsTimeout(ctx, [{ clientId: payload.clientId, orderId: row.orderId, provider: row.provider }]);
+    return { kind: "failed", action: payload.action, reason: "past the marketplace's answer window" };
   }
   const reason = resolveReason(adapter, row.cancellationReasonCode);
   const connection = await connectionFor(ctx, payload.clientId, row.provider);

@@ -69,7 +69,8 @@ describe("the store's request leaves the order as it was", () => {
 
   it("sends no confirm for an accepted order while its cancellation waits, and the sweep re-queues none", async () => {
     const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
-    const h = createHarness({ http, cancellationHooks: true });
+    // Past the retry span but inside the window: the request is still waiting.
+    const h = createHarness({ http, cancellationHooks: true, cancellationWindowMs: 60 * 60_000 });
     const orderId = await placed(h);
     await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
     await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
@@ -211,6 +212,47 @@ describe("the marketplace never answers", () => {
       cancellationStatus: "FAILED",
       cancellationFailureReason: "TIMEOUT",
     });
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "TIMEOUT" }]);
+  });
+
+  it("a PENDING request iFood never received ends at the window too: TIMEOUT, told once, never re-queued or sent after", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true, queueDown: true });
+    const orderId = await placed(h);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
+    const queued = h.enqueued.length;
+
+    later(h, IFOOD_CANCELLATION_ANSWER_WINDOW_MS + 1);
+    const swept = await h.engine.sweepOutbound();
+    later(h, 30 * 60_000);
+    const again = await h.engine.sweepOutbound();
+    const lateRetry = await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, FIRST);
+
+    expect(swept.timedOut).toBe(1);
+    expect(again).toMatchObject({ timedOut: 0, requeued: 0 });
+    expect(h.acceptance(orderId)).toMatchObject({
+      status: "AWAITING",
+      cancellationStatus: "FAILED",
+      cancellationFailureReason: "TIMEOUT",
+    });
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "TIMEOUT" }]);
+    expect(h.enqueued.slice(queued)).toEqual([]);
+    expect(lateRetry.kind).toBe("skipped");
+    expect(http.requests).toEqual([]);
+  });
+
+  it("a retry that runs past the window ends the request TIMEOUT itself, without calling iFood", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true });
+    const orderId = await placed(h);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
+
+    later(h, IFOOD_CANCELLATION_ANSWER_WINDOW_MS + 1);
+    const outcome = await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, FIRST);
+
+    expect(outcome.kind).toBe("failed");
+    expect(http.requests).toEqual([]);
+    expect(h.acceptance(orderId)).toMatchObject({ cancellationStatus: "FAILED", cancellationFailureReason: "TIMEOUT" });
     expect(h.cancellationFailed).toEqual([{ orderId, reason: "TIMEOUT" }]);
   });
 
