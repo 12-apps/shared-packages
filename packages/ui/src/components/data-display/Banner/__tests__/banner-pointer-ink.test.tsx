@@ -64,7 +64,7 @@ const resolved = (el: Element | null, prop: 'color' | 'backgroundColor'): string
 function measure(variant: BannerVariant, mode: Mode, page: string, state: State) {
   const { unmount } = render(
     <ThemeProvider theme={themeOf(mode)}>
-      <Banner variant={variant} title="Atenção" description="mensagem" data-testid="b" />
+      <Banner variant={variant} title="Atenção" description="mensagem" dismissLabel="Fechar" data-testid="b" />
     </ThemeProvider>,
   );
   const root = document.querySelector('[data-testid="b"]');
@@ -130,7 +130,7 @@ describe('Given the rule the sheet emits', () => {
       render(
         <ThemeProvider theme={themeOf(mode)}>
           <Banner variant="info" title="Atenção" description="mensagem" dismissible dismissLabel="Fechar" data-testid="full" />
-          <Banner variant="warning" data-testid="bare">
+          <Banner variant="warning" dismissLabel="Fechar" data-testid="bare">
             Só o texto, como filho.
           </Banner>
         </ThemeProvider>,
