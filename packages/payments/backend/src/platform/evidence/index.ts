@@ -16,6 +16,7 @@ export { evidenceScenarioOutcomes, type EvidenceScenario, type EvidenceScenarioO
 export {
   completeEvidenceRun,
   EvidencePixOpenError,
+  EvidenceCardRefundOpenError,
   EvidenceRunNotFoundError,
   prepareEvidenceRun,
   type EvidenceRunDeps,
@@ -49,6 +50,7 @@ export {
 } from './mount';
 export { recordTraffic, type RecordedOutcome } from './record';
 export { pixStateOf, pixViewOf, type EvidencePixState, type EvidencePixView } from './orders-pix-production';
+export type { EvidenceCardRefundView } from './card-refund-state';
 export { PT_BR_HOMOLOGACAO_EVIDENCE_COPY } from './pt-BR';
 export { EN_US_HOMOLOGACAO_EVIDENCE_COPY } from './en-US';
 export { PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY } from './production-pt-BR';

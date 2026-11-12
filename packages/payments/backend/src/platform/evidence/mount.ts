@@ -100,7 +100,12 @@ export function createHomologacaoEvidenceMount(options: HomologacaoEvidenceMount
       attempts: 1,
       // More than one tick (a consult and a cancel at the adapter's timeouts), less than a dead worker's claim.
       lease: { ttlMs: 60_000 },
-      handle: async () => (await evidence('PRODUCTION')).retryDueRefund(),
+      // Both environments: the sandbox's card cancels meet 40008 too (FUT-3722), and their
+      // attempts 2 and 3 run here now instead of inside the run request (FUT-4740).
+      handle: async () => {
+        await (await evidence('PRODUCTION')).retryDueRefund();
+        await (await evidence('SANDBOX')).retryDueRefund();
+      },
     },
   };
 }

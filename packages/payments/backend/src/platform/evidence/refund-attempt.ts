@@ -1,8 +1,12 @@
-import { ProviderRequestError } from '../../core/errors';
-import { NOTHING_TO_REFUND, refundRetryAt, type RefundRefusal } from '../../core/refund-retry';
+import {
+  afterRefusal,
+  isNothingToRefund,
+  pg1Schedule,
+  refundRefusalOf,
+  type RefundRefusal,
+} from '../../core/refund-retry';
 import { reportProviderFailure } from '../../core/provider-failure';
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
-import { classifyPagBankRefundRefusal } from '../../providers/pagbank-rejections';
 import { idsOf } from './orders';
 import { paidChargeId, createdPixIds } from './orders-pix-production';
 import { recordTraffic, type RecordedOutcome } from './record';
@@ -10,7 +14,7 @@ import { REFUND_ATTEMPT_DEADLINE_MS, type EvidenceRefundState } from './refund-s
 import type { EvidenceRunDeps } from './run';
 import { usageStep } from './run';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf, withStep } from './steps';
-import type { EvidenceRecord, EvidenceStep } from './types';
+import type { EvidenceRecord, EvidenceStep, EvidenceStepKey } from './types';
 
 /**
  * ONE attempt of the production Pix's refund (FUT-4360), whoever runs it: the
@@ -33,9 +37,25 @@ export interface RefundSeller {
   token: string;
 }
 
-/** The record's `pix.refund` step, if any. */
-export const refundStepOf = (record: EvidenceRecord): EvidenceStep | undefined =>
-  record.steps.find((step) => step.key === 'pix.refund');
+/**
+ * Which refund an attempt is for: the production Pix's `pix.refund` step, or
+ * a card cancel step (FUT-4740), with the charge it cancels.
+ */
+export interface RefundTarget {
+  key: EvidenceStepKey;
+  chargeId: string;
+  orderId: string | null;
+}
+
+/** The production Pix's refund target, from the steps that created and paid it. */
+function pixRefundTarget(steps: readonly EvidenceStep[]): RefundTarget {
+  const ids = createdPixIds(steps);
+  return { key: 'pix.refund', chargeId: ids ? paidChargeId(steps, ids) : '', orderId: ids?.orderId ?? null };
+}
+
+/** The record's refund step for `key` (the Pix's by default), if any. */
+export const refundStepOf = (record: EvidenceRecord, key: EvidenceStepKey = 'pix.refund'): EvidenceStep | undefined =>
+  record.steps.find((step) => step.key === key);
 
 /** A stamp strictly after the stored one, so the next compare-and-set can tell them apart. */
 export function stampAfter(now: Date, stored: string): string {
@@ -52,8 +72,9 @@ export async function claimAttempt(
   record: EvidenceRecord,
   state: EvidenceRefundState,
   steps: readonly EvidenceStep[] = record.steps,
+  key: EvidenceStepKey = 'pix.refund',
 ): Promise<EvidenceRecord | null> {
-  const prior = steps.find((step) => step.key === 'pix.refund') ?? pendingStep('pix.refund', deps.copy);
+  const prior = steps.find((step) => step.key === key) ?? pendingStep(key, deps.copy);
   const next = { ...record, steps: withStep(steps, { ...prior, refund: state }), updatedAt: stampAfter(clockOf(deps)(), record.updatedAt) };
   return deps.store.saveIf(next, record.updatedAt);
 }
@@ -71,9 +92,8 @@ interface Settled {
  * `NOTHING_TO_REFUND` for a charge that is already refunded — a cancel whose
  * answer was lost, the owner in PagBank's panel — which is adopted as done.
  */
-async function settle(deps: EvidenceRunDeps, claimed: EvidenceRecord, found: boolean): Promise<Settled> {
-  const ids = createdPixIds(claimed.steps);
-  const chargeId = ids ? paidChargeId(claimed.steps, ids) : '';
+async function settle(deps: EvidenceRunDeps, claimed: EvidenceRecord, found: boolean, target: RefundTarget): Promise<Settled> {
+  const { chargeId } = target;
   // This caller owns the retry and reports a give-up once per charge (below), so the gateway stays
   // quiet for it; and its two provider calls run under one deadline shorter than the claim.
   const signal = AbortSignal.timeout(deps.refundAttemptMs ?? REFUND_ATTEMPT_DEADLINE_MS);
@@ -81,11 +101,11 @@ async function settle(deps: EvidenceRunDeps, claimed: EvidenceRecord, found: boo
     deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId, retriedByCaller: true, signal }),
   );
   // The attempt that FOUND the Pix paid has that very read as its `pix.consult`: only the cancel is its own.
-  const calls = [...(refundStepOf(claimed)?.calls ?? []), ...refunded.calls.filter((call) => !found || call.method !== 'GET')];
+  const calls = [...(refundStepOf(claimed, target.key)?.calls ?? []), ...refunded.calls.filter((call) => !found || call.method !== 'GET')];
   const record = (status: 'EXECUTED' | 'FAILED', observed: string): EvidenceStep =>
-    stepOf('pix.refund', status, clockOf(deps)(), {
+    stepOf(target.key, status, clockOf(deps)(), {
       calls,
-      ids: idsOf({ providerChargeId: chargeId }, undefined, ids?.orderId ?? null),
+      ids: idsOf({ providerChargeId: chargeId }, undefined, target.orderId),
       observed,
     });
   const answer = answerOf(deps, refunded);
@@ -98,7 +118,7 @@ function answerOf(deps: EvidenceRunDeps, refunded: RecordedOutcome<{ status: str
   if (refunded.ok && refunded.value.status === 'REFUNDED' && answered(refunded.calls)) {
     return { refusal: null, observed: deps.copy.canceled(pagbankWord(refunded)), error: null };
   }
-  const refusal = refunded.ok ? 'UNKNOWN' : classifyPagBankRefundRefusal(refunded.error);
+  const refusal = refunded.ok ? 'UNKNOWN' : refundRefusalOf(refunded.error);
   return { refusal, observed: failureOf(deps.copy, refunded), error: refunded.ok ? null : refunded.error };
 }
 
@@ -106,15 +126,6 @@ function answerOf(deps: EvidenceRunDeps, refunded: RecordedOutcome<{ status: str
 function pagbankWord(refunded: { calls: readonly RecordedHttpCall[]; value: { status: string } }): string {
   const said = (refunded.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
   return typeof said === 'string' ? said : refunded.value.status;
-}
-
-const isNothingToRefund = (error: unknown): boolean =>
-  error instanceof ProviderRequestError && error.options.providerCode === NOTHING_TO_REFUND;
-
-/** The state after an attempt that did not refund: the next one due, or none. */
-function afterRefusal(state: EvidenceRefundState, refusal: RefundRefusal, now: Date): EvidenceRefundState {
-  const nextAt = refusal === 'REFUSED' ? null : refundRetryAt(state.attempt, now);
-  return { ...state, refusal, nextAt: nextAt?.toISOString() ?? null, exhausted: nextAt === null, claimedAt: null };
 }
 
 /**
@@ -128,52 +139,37 @@ export async function runClaimedAttempt(
   state: EvidenceRefundState,
   seller: RefundSeller,
   found = false,
+  target: RefundTarget = pixRefundTarget(claimed.steps),
 ): Promise<EvidenceRecord> {
-  const settled = await settle(deps, claimed, found);
+  const settled = await settle(deps, claimed, found, target);
   const now = clockOf(deps)();
   const next: EvidenceRefundState =
     settled.refusal === null
       ? { ...state, refusal: null, nextAt: null, exhausted: false, claimedAt: null }
-      : afterRefusal(state, settled.refusal, now);
+      : afterRefusal(state, settled.refusal, now, pg1Schedule);
   const reportNow = next.exhausted && !next.reported;
   const final = reportNow ? { ...next, reported: true } : next;
   let steps = withStep(claimed.steps, { ...settled.step, refund: final });
   steps = withStep(steps, await usageStep(deps, steps, seller.token));
   const saved = await deps.store.saveIf({ ...claimed, steps, updatedAt: stampAfter(now, claimed.updatedAt) }, claimed.updatedAt);
   if (!saved) return (await deps.store.latest(PROVIDER, 'RUN')) ?? claimed;
-  if (reportNow) reportStuckRefund(deps, saved, settled);
+  if (reportNow) reportStuckRefund(deps, target, settled);
   return saved;
 }
 
 /** Sentry hears of a stuck refund ONCE per charge, when its first series gives up (FUT-4360). */
-function reportStuckRefund(deps: EvidenceRunDeps, record: EvidenceRecord, settled: Settled): void {
-  const ids = createdPixIds(record.steps);
+function reportStuckRefund(deps: EvidenceRunDeps, target: RefundTarget, settled: Settled): void {
   reportProviderFailure(deps.onProviderFailure, {
     path: 'REFUND',
     // A refusal for good is a fault; a "not yet" or no verdict that ran out of attempts is news.
     severity: settled.refusal === 'REFUSED' ? 'error' : 'warning',
     merchant: deps.merchant,
     provider: PROVIDER,
-    reference: ids ? paidChargeId(record.steps, ids) : null,
+    reference: target.chargeId || null,
     error: settled.error ?? undefined,
     message: errorDetail(settled.step.observed),
   });
 }
 
-/** The first series' state: attempt 1 claimed, nothing refused yet. */
-export function firstClaim(now: Date, previous: EvidenceRefundState | null): EvidenceRefundState {
-  return {
-    series: (previous?.series ?? 0) + 1,
-    attempt: 1,
-    nextAt: null,
-    exhausted: false,
-    refusal: previous?.refusal ?? null,
-    claimedAt: now.toISOString(),
-    reported: previous?.reported ?? false,
-  };
-}
-
-/** The attempt after a claimed one: the next number, claimed now. */
-export function nextClaim(now: Date, previous: EvidenceRefundState): EvidenceRefundState {
-  return { ...previous, attempt: previous.attempt + 1, nextAt: null, claimedAt: now.toISOString() };
-}
+// Moved to core (FUT-4740), re-exported for the evidence modules that claim through this one.
+export { firstClaim, nextClaim } from '../../core/refund-retry';

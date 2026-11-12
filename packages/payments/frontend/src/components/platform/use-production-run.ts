@@ -40,7 +40,7 @@ const PIX_POLL_WINDOW_MS = 15 * 60_000;
 const REFUND_POLL_WINDOW_MS = 20 * 60_000;
 
 const isPixOpen = (pix: ProductionPixView | null | undefined): boolean =>
-  pix?.state === 'AWAITING_PAYMENT' || pix?.state === 'REFUND_PENDING';
+  pix?.state === 'AWAITING_PAYMENT' || pix?.state === 'REFUND_PENDING' || (pix?.cards?.length ?? 0) > 0;
 
 /** The cardholder and the two cards, and whether they are enough to charge. */
 export function useProductionForm() {
@@ -94,7 +94,10 @@ const isRefundRetrying = (pix: ProductionPixView | null): boolean =>
 
 /** Open, and still moving by itself: not a refund whose attempts ran out. */
 const isSettling = (pix: ProductionPixView | null): boolean =>
-  isPixOpen(pix) && !(pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true);
+  pix?.state === 'AWAITING_PAYMENT' ||
+  (pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted !== true) ||
+  // A card's refund still retrying in the background (FUT-4740): the rows keep counting down.
+  (pix?.cards?.some((card) => !card.exhausted) ?? false);
 
 /**
  * Keep checking an open Pix, one call at a time, until the server says it is

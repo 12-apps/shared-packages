@@ -5,6 +5,7 @@ import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
+import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
 import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
@@ -304,11 +305,22 @@ export class EvidencePixOpenError extends Error {
   }
 }
 
-/** Refuse a new production run while the latest one still holds a Pix to settle. */
+/** A new production run over a paid, unrefunded CARD charge (FUT-4740, C34); a Pix-open subclass, named for the card. */
+export class EvidenceCardRefundOpenError extends EvidencePixOpenError {
+  constructor(runId: string) {
+    super(runId);
+    this.message = `A card charge of homologation evidence run ${runId} is paid and not refunded`;
+    this.name = 'EvidenceCardRefundOpenError';
+  }
+}
+
+/** Refuse a new production run while the latest one still holds a Pix — or a card — to settle (FUT-4740 C34). */
 async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
   if (environmentOf(deps) !== 'PRODUCTION') return;
   const latest = await deps.store.latest(PROVIDER, 'RUN');
-  if (latest && pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)())) throw new EvidencePixOpenError(latest.id);
+  if (!latest) return;
+  if (pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)())) throw new EvidencePixOpenError(latest.id);
+  if (cardHoldsMoney(latest)) throw new EvidenceCardRefundOpenError(latest.id);
 }
 
 /**

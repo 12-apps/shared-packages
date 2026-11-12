@@ -1,7 +1,16 @@
 import type { CardDetails } from '../../core/card-details';
 import type { StoredCharge } from '../../core/ports';
+import {
+  afterRefusal,
+  firstClaim,
+  isNothingToRefund,
+  pg1Schedule,
+  REFUND_ATTEMPT_DEADLINE_MS,
+  refundRefusalOf,
+  type RefundRefusal,
+} from '../../core/refund-retry';
 import { reasonOfFailedCalls, reasonOfStatus } from './failure-reason';
-import { recordTraffic } from './record';
+import { recordTraffic, type RecordedOutcome } from './record';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf } from './steps';
 import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
 import { amountsOf, environmentOf } from './environment';
@@ -304,59 +313,48 @@ export async function consultCharge(
   });
 }
 
-/**
- * The pauses before each retried cancel while PagBank says it cannot refund
- * yet: exponential, capped, three minutes in all. The fourth evidence run
- * (FUT-3722) got 40008 on four attempts spread over nine seconds, so the
- * sandbox needs minutes, not seconds, after a capture.
- */
-const CANCEL_BACKOFF_MS = [5_000, 10_000, 20_000, 40_000, 60_000, 45_000];
-
-/**
- * PagBank's "not yet": `40008 refund_temporarily_unavailable` ("Transaction is
- * not found"), answered by the sandbox to a cancel sent seconds after the
- * charge was captured (the third evidence run, FUT-3722).
- */
-function refundNotYet(outcome: { ok: boolean; calls: readonly { responseBody?: unknown }[] }): boolean {
-  if (outcome.ok) return false;
-  const body = outcome.calls.at(-1)?.responseBody as { error_messages?: { code?: unknown }[] } | undefined;
-  return body?.error_messages?.some((message) => String(message.code) === '40008') ?? false;
-}
-
-/**
- * Cancel the approved charge, retried with backoff while PagBank answers
- * that it cannot refund it yet. Every attempt stays in the evidence; only the
- * last one decides.
- */
-async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
-  const cancel = () => recordTraffic(() => deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId }));
-  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  let canceled = await cancel();
-  const calls = [...canceled.calls];
-  for (const pause of CANCEL_BACKOFF_MS) {
-    if (!refundNotYet(canceled)) break;
-    await sleep(pause);
-    canceled = await cancel();
-    calls.push(...canceled.calls);
+/** What a card cancel's answer comes to: done (cancelled, or nothing left), or the refusal; and its observed line. */
+function cancelOutcome(
+  deps: EvidenceRunDeps,
+  canceled: RecordedOutcome<{ status: string }>,
+): { done: boolean; refusal: RefundRefusal | null; observed: string } {
+  if (!canceled.ok) {
+    if (isNothingToRefund(canceled.error)) return { done: true, refusal: null, observed: deps.copy.canceled('REFUNDED') };
+    return { done: false, refusal: refundRefusalOf(canceled.error), observed: failureOf(deps.copy, canceled) };
   }
-  return { canceled, calls };
+  const done = canceled.value.status === 'REFUNDED' && answered(canceled.calls);
+  // PagBank's own word for the charge (CANCELED), which is what the scenario
+  // expects — not this package's normalized refund status.
+  const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
+  return { done, refusal: done ? null : 'UNKNOWN', observed: deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status) };
 }
 
+/**
+ * Cancel the approved charge ONCE (FUT-4740). PagBank answers a cancel sent
+ * seconds after a capture with 40008 "not yet"; that used to be retried here,
+ * inside the run request, for three minutes. Now the step keeps the refund's
+ * retry state (attempt 1, the next due at +5 min) and the evidence sweep sends
+ * attempts 2 and 3, as it does for the production Pix (FUT-4360).
+ */
 export async function cancelCharge(
   deps: EvidenceRunDeps,
   key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel',
   chargeId: string,
   orderId: string | null,
 ): Promise<EvidenceStep> {
-  const { canceled, calls } = await cancelUntilAnswered(deps, chargeId);
-  const done = canceled.ok && canceled.value.status === 'REFUNDED' && answered(canceled.calls);
-  // PagBank's own word for the charge (CANCELED), which is what the scenario
-  // expects — not this package's normalized refund status.
-  const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
-  return stepOf(key, done ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-    calls,
+  // This caller owns the retry (the sweep) and reports a give-up once, so the gateway stays quiet for it.
+  const signal = AbortSignal.timeout(deps.refundAttemptMs ?? REFUND_ATTEMPT_DEADLINE_MS);
+  const canceled = await recordTraffic(() =>
+    deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId, retriedByCaller: true, signal }),
+  );
+  const { done, refusal, observed } = cancelOutcome(deps, canceled);
+  const now = clockOf(deps)();
+  const refund = refusal === null ? null : afterRefusal({ ...firstClaim(now, null), reported: false }, refusal, now, pg1Schedule);
+  return stepOf(key, done ? 'EXECUTED' : 'FAILED', now, {
+    calls: canceled.calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),
-    observed: canceled.ok ? deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status) : failureOf(deps.copy, canceled),
+    observed,
+    ...(refund ? { refund } : {}),
   });
 }
 

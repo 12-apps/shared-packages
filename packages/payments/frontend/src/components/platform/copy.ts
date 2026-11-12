@@ -237,6 +237,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
   pixBlocksCharge: string;
   /** Why it is not pressable while the Pix is paid and its refund is not done (FUT-4360). */
   pixBlocksChargeRefund: string;
+  /** A card charge of the run is paid and not refunded (FUT-4740, C34). */
+  cardBlocksChargeRefund: string;
   /**
    * Beside the form after a run (FUT-4322): one row per scenario, `name · status`
    * and, after a dash, the reason — the server's outcome, never guessed here.
@@ -261,6 +263,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
       /** The status word of a paid Pix whose refund is not done: retrying, or out of attempts. */
       paid: string;
       paidNotRefunded: string;
+      /** A card's refund still retrying (T-18). */
+      refunding: string;
       /** PagBank has not released the refund yet; the countdown to the next attempt. */
       notYet: (attempt: number, of: number, minutes: number) => string;
       /** Every automatic attempt was refused (not yet, or no verdict). */
@@ -270,6 +274,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
     };
     /** The button under the list once the attempts ran out. */
     retryRefund: string;
+    /** C33: a card whose refund attempts ran out. */
+    retryCardRefund: string;
   };
   /** The primary action: charge R$ 1,00 per scenario and refund it. */
   charge: string;

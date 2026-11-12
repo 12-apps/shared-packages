@@ -4,6 +4,7 @@ import { NOTHING_TO_REFUND } from '../core/refund-retry';
 import type { Money, PaymentMethodKind, RefundSnapshot, ResolvedCredentials } from '../core/types';
 import { NAME, pagbankRequest } from './pagbank-http';
 import { chargeInOrder, ORDER_ID_PREFIX } from './pagbank-operations';
+import { classifyPagBankRefundRefusal } from './pagbank-rejections';
 import {
   chargeMethod,
   refundedCents,
@@ -123,7 +124,30 @@ function reportedRefundCents(res: PagBankOrderCharge): number {
   return typeof value === 'number' ? value : 0;
 }
 
-function cancel(chargeId: string, value: number | null, credentials: ResolvedCredentials, signal?: AbortSignal) {
+/**
+ * The cancel's refusal, tagged with what it means for a retry (FUT-4740):
+ * `NOT_YET` for 40008, `REFUSED` for any other answer waiting cannot change,
+ * `UNKNOWN` for no verdict — PagBank's vocabulary stays here, and core reads
+ * only the tag (`refundRefusalOf`).
+ */
+function tagged(error: unknown): unknown {
+  if (!(error instanceof ProviderRequestError) || error.options.refundRefusal) return error;
+  return new ProviderRequestError(error.provider, error.message, {
+    ...error.options,
+    refundRefusal: classifyPagBankRefundRefusal(error),
+    cause: error.options.cause ?? error.cause,
+  });
+}
+
+async function cancel(chargeId: string, value: number | null, credentials: ResolvedCredentials, signal?: AbortSignal) {
+  try {
+    return await sendCancel(chargeId, value, credentials, signal);
+  } catch (error) {
+    throw tagged(error);
+  }
+}
+
+function sendCancel(chargeId: string, value: number | null, credentials: ResolvedCredentials, signal?: AbortSignal) {
   // A full refund names its amount too (FUT-3722): the sandbox answered a
   // body-less cancel with 400 invalid_parameter. Only a charge that names no
   // amount is cancelled without a body. Never retried once possibly sent: the

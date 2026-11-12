@@ -31,6 +31,22 @@ export interface ProductionPixView {
     exhausted: boolean;
     refusal: 'NOT_YET' | 'REFUSED' | 'UNKNOWN' | null;
   } | null;
+  /**
+   * The run's card cancels whose refund did not go back (FUT-4740, C33): each
+   * card's row says where its retry stands, and one out of attempts offers
+   * "Tentar estornar o cartão de novo". Absent on an older server.
+   */
+  cards?: ProductionCardRefundView[];
+}
+
+/** One card cancel's refund, as the server answers it (`EvidenceCardRefundView`). */
+export interface ProductionCardRefundView {
+  scenario: 'credit' | 'debit' | 'googlePay' | 'applePay';
+  attempt: number;
+  of: number;
+  nextAt: string | null;
+  exhausted: boolean;
+  refusal: 'NOT_YET' | 'REFUSED' | 'UNKNOWN' | null;
 }
 
 /** `mm:ss` until `expiresAt`, ticking once a second; null when there is no expiry. */
