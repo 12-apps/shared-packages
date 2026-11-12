@@ -33,8 +33,9 @@ const basisOf = (mode: Mode): GradientBasis => {
     paper: theme.palette.background.paper,
     white,
     ink: dark ? white : theme.palette.text.primary,
-    absolute: dark ? white : black,
-    side: dark ? 'white' : 'black',
+    tint: black,
+    absolute: black,
+    side: dark ? null : 'black',
   };
 };
 
@@ -74,6 +75,16 @@ describe.each(['light', 'dark'] as const)('Given the %s-mode default palette', (
         const dir = mode === 'light' ? 1 : -1;
         expect(dir * ((derived[i] ?? 0) - h)).toBeGreaterThanOrEqual(dir * ((reference[i] ?? 0) - h) - 4);
       });
+    },
+  );
+
+  it.each(['info', 'success', 'warning', 'danger'] as const)(
+    'lands the dark %s sweep on the approved prototype\'s ends, since the black tint only helps',
+    (severity) => {
+      if (mode !== 'dark') return;
+      const look = gradientLook(theme, getColorFromTheme(theme, severity));
+      const want = { info: ['#22546a', '#015684'], success: ['#365437', '#235926'], warning: ['#66491f', '#7d3f00'], danger: ['#793d3d', '#a52525'] }[severity];
+      [look.from, look.to].forEach((got, i) => hex(want[i] ?? '#000000').forEach((w, c) => expect(Math.abs((rgb(got)[c] ?? 0) - w)).toBeLessThanOrEqual(4)));
     },
   );
 

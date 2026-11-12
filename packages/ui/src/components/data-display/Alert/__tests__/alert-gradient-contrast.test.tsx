@@ -15,12 +15,15 @@
  * its 0.9, at both endpoints, with and without the shimmer, at rest, hover and
  * press.
  */
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { createTheme } from '../../../../mui/styles';
+import { createTheme, ThemeProvider } from '../../../../mui/styles';
 import { muiThemeOptionsFrom } from '../../../../provider/mui-bridge';
 import { blend, decomposeColor, getContrastRatio } from '../../../../tokens/color';
 import { createUiTheme } from '../../../../tokens/theme';
+import { blocksFor } from '../../__tests__/pointer-states.helpers';
+import { Alert } from '../Alert';
 import { inkAbsolute, pointerInkStyles } from '../Alert.ink';
 import { ACTIVE, DESCRIPTION, GRADIENT, HOVER, POINTER_INK_STEP } from '../Alert.metrics';
 import { alertVariantStyles, getColorFromTheme } from '../Alert.styles';
@@ -50,14 +53,14 @@ function emitted(theme: ReturnType<typeof themeOf>, severity: string) {
 
 /** The worst title / description contrast over one stop, in one state, with or without the shimmer. */
 function worstAt(theme: ReturnType<typeof themeOf>, stop: string, ink: string, state: State, shimmer: boolean): number {
-  // The mode's side, which is what `inkAbsolute` answers: measured here whatever it answers, so a
-  // gradient that does not step fails on CONTRAST and not on a throw.
-  const side = theme.palette.mode === 'dark' ? 'white' : 'black';
-  const absolute = side === 'black' ? '#000000' : '#ffffff';
+  // The tint is BLACK in both modes (owner decision, FUT-4516): the ink's side in light mode, away
+  // from the white ink in dark mode. The ink steps only where the tint moves toward it.
+  const absolute = '#000000';
+  const side = theme.palette.mode === 'dark' ? null : 'black';
   const base = blend(theme.palette.background.paper, stop, GRADIENT.stopAlpha);
   const tinted = blend(base, absolute, TINT[state]);
   const surface = shimmer ? blend(tinted, '#ffffff', GRADIENT.shimmerAlpha) : tinted;
-  const step = state === 'rest' ? 0 : POINTER_INK_STEP[state][side];
+  const step = state === 'rest' || side === null ? 0 : POINTER_INK_STEP[state][side];
   const rgb = decomposeColor(ink).values.slice(0, 3).join(', ');
   const alpha0 = decomposeColor(ink).values[3] ?? 1;
   // color-mix() in srgb interpolates the alpha too: toward an opaque absolute.
@@ -89,9 +92,41 @@ describe.each(MODES)('Given a %s-mode gradient Alert on the default palette', (m
     expect(icon).toBe(ink);
   });
 
-  it('steps its ink toward the side it is on, like every other variant', () => {
-    expect(inkAbsolute(theme, 'gradient')).toBe(mode === 'light' ? 'black' : 'white');
-    expect(Object.keys(pointerInkStyles(theme, 'gradient').hover)).not.toEqual([]);
+  it('steps its ink only where the tint moves toward it', () => {
+    // Light: dark ink, black tint, so the ink steps toward black like every other variant. Dark:
+    // white ink under a black tint moves AWAY from the ink, so there is nothing to step.
+    expect(inkAbsolute(theme, 'gradient')).toBe(mode === 'light' ? 'black' : null);
+    const stepped = Object.keys(pointerInkStyles(theme, 'gradient').hover).length > 0;
+    expect(stepped).toBe(mode === 'light');
+  });
+
+  it('tints the surface toward black in both modes', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <Alert variant="gradient" title="Atenção" description="mensagem" />
+      </ThemeProvider>,
+    );
+    const css = Array.from(document.querySelectorAll('style'))
+      .map((el) => el.textContent ?? '')
+      .join('\n');
+    const tints = [...blocksFor(css, ':hover'), ...blocksFor(css, ':active')].join('\n');
+    expect(tints).toContain('inset 0 0 0 100vmax rgba(0, 0, 0');
+    // A white layer would be a lightening toward the white ink in dark mode.
+    expect(tints).not.toContain('inset 0 0 0 100vmax rgba(255, 255, 255');
+  });
+
+  it('never reads worse under the pointer than at rest in dark mode', () => {
+    if (mode !== 'dark') return;
+    for (const severity of SEVERITIES) {
+      const { stops, ink } = emitted(theme, severity);
+      for (const stop of stops) {
+        for (const shimmer of [false, true]) {
+          const rest = worstAt(theme, stop, ink, 'rest', shimmer);
+          expect(worstAt(theme, stop, ink, 'hover', shimmer)).toBeGreaterThanOrEqual(rest);
+          expect(worstAt(theme, stop, ink, 'press', shimmer)).toBeGreaterThanOrEqual(rest);
+        }
+      }
+    }
   });
 
   it('keeps the angle and the stop alpha', () => {

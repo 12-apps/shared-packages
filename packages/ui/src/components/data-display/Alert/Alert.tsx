@@ -7,7 +7,7 @@ import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { modeInk } from '../../../tokens/ink';
+import { absoluteInk, modeInk } from '../../../tokens/ink';
 
 import { AlertContent } from './Alert.content';
 import { pointerInkStyles } from './Alert.ink';
@@ -62,10 +62,18 @@ function pointerShadow(
   theme: Theme,
   colorPalette: AlertPalette,
   glow: boolean,
+  variant: string | undefined,
 ): (alpha_: number) => string {
   // The tint moves the surface TOWARD the mode's absolute — the side the ink
-  // is on, for every variant — the contrast cost `pointerInkStyles` pays back.
-  const ink = modeInk(theme);
+  // is on — for every variant but one: the contrast cost `pointerInkStyles`
+  // pays back.
+  //
+  // `gradient` is tinted toward BLACK in both modes (owner decision, FUT-4516).
+  // In light mode black is its dark ink's side, as for the others. In dark mode
+  // its ink is white, and a white layer would close on it; a black one moves
+  // the surface away from the ink, so the contrast RISES under the pointer and
+  // the deep sweep holds without being pushed toward black at rest.
+  const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
   const glowShadow = glow
     ? `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`
     : null;
@@ -85,7 +93,7 @@ const StyledAlert = styled(MuiAlert, {
 }>(({ theme, customVariant, customColor, glow, pulse, animate }) => {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
-  const withTint = pointerShadow(theme, colorPalette, Boolean(glow));
+  const withTint = pointerShadow(theme, colorPalette, Boolean(glow), customVariant);
   const ink = pointerInkStyles(theme, customVariant);
 
   return {

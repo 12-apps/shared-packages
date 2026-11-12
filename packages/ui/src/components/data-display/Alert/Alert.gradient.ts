@@ -43,9 +43,12 @@ export interface GradientBasis {
   white: string;
   /** The ink, as the alert paints it at rest. */
   ink: string;
-  /** The absolute the pointer tint and the ink's step move toward: the mode's. */
+  /** The colour of the pointer tint the variant paints: black in both modes. */
+  tint: string;
+  /** The absolute the ink steps toward under the pointer, or `null` where it does not step (dark). */
+  side: 'black' | 'white' | null;
+  /** That absolute, as a colour; unused when `side` is `null`. */
   absolute: string;
-  side: 'black' | 'white';
 }
 
 /**
@@ -53,12 +56,12 @@ export interface GradientBasis {
  * ({@link DESCRIPTION} opacity) reach over `stop` painted at the gradient's
  * alpha on the paper, with and without the shimmer's white wash on top, in one
  * pointer state. The tint layer sits under the shimmer and moves the surface
- * toward `absolute`; the ink steps toward it as `color-mix()` does, alpha too.
+ * toward `tint` (black in both modes); the ink steps toward it as `color-mix()` does, alpha too.
  */
 export function gradientWorstContrast(stop: string, basis: GradientBasis, state: keyof typeof POINTER_STATES | 'rest'): number {
   const { tintAlpha, inkStep } = state === 'rest' ? { tintAlpha: 0, inkStep: { black: 0, white: 0 } } : POINTER_STATES[state];
-  const step = inkStep[basis.side];
-  const tinted = blend(blend(basis.paper, stop, GRADIENT.stopAlpha), basis.absolute, tintAlpha);
+  const step = basis.side === null ? 0 : inkStep[basis.side];
+  const tinted = blend(blend(basis.paper, stop, GRADIENT.stopAlpha), basis.tint, tintAlpha);
   const surfaces = [tinted, blend(tinted, basis.white, GRADIENT.shimmerAlpha)];
   const inkRgb = blend(basis.ink, basis.absolute, step);
   const inkAlpha = channelAlpha(basis.ink) * (1 - step) + step;
@@ -107,8 +110,9 @@ export function gradientLook(theme: Theme, palette: AlertPalette): GradientLook 
     paper: theme.palette.background.paper,
     white,
     ink,
-    absolute: dark ? white : black,
-    side: dark ? 'white' : 'black',
+    tint: black,
+    absolute: black,
+    side: dark ? null : 'black',
   };
   const toward = dark ? 'black' : 'white';
   return {

@@ -114,15 +114,22 @@ describe('Given which absolute the ink steps toward', () => {
     expect(inkAbsolute(themeOf(mode), 'info')).toBe(sideOf(mode));
   });
 
-  it.each(MODES)('steps a %s-mode gradient toward the side its ink is on, like a semantic one', (mode) => {
-    // The gradient's ink follows the mode since FUT-4516 (dark text over a
-    // light sweep, white over a deep one), so its ink side is known and the
-    // step is the mode's like every other variant's. It was `null` while the
-    // ink was `getContrastText` of the hue and a host repaint could flip it.
-    const styles = pointerInkStyles(themeOf(mode), 'gradient');
-    expect(inkAbsolute(themeOf(mode), 'gradient')).toBe(sideOf(mode));
-    expect(styles).toEqual(pointerInkStyles(themeOf(mode), 'info'));
-    expect(JSON.stringify(styles.press)).toContain(mode === 'dark' ? ', #fff)' : ', #000)');
+  it('steps a light-mode gradient toward black, like a semantic one', () => {
+    // The ink follows the mode since FUT-4516 and the tint is black, which is
+    // the dark ink's side in light mode: the step is the semantic variants'.
+    const styles = pointerInkStyles(themeOf('light'), 'gradient');
+    expect(inkAbsolute(themeOf('light'), 'gradient')).toBe('black');
+    expect(styles).toEqual(pointerInkStyles(themeOf('light'), 'info'));
+    expect(JSON.stringify(styles.press)).toContain(', #000)');
+  });
+
+  it('does not step a dark-mode gradient: its tint is black, away from the white ink', () => {
+    // Owner decision (FUT-4516): the gradient's tint is black in both modes, so
+    // in dark mode it darkens the surface under a white ink and the contrast
+    // rises. There is nothing to step, and a step toward white would only
+    // spend the white ink's headroom for nothing.
+    expect(inkAbsolute(themeOf('dark'), 'gradient')).toBeNull();
+    expect(pointerInkStyles(themeOf('dark'), 'gradient')).toEqual({ rest: {}, hover: {}, press: {} });
   });
 });
 
