@@ -184,8 +184,11 @@ control in `children` steps with the words around it.
 light sweep, white over a deep one), and each end of the sweep is derived from
 the theme's `light` and `dark` of the hue, moved toward white (light mode) or
 black (dark mode) only as far as the ink needs, so the title and the
-description hold 4.5:1 over the whole sweep, the shimmer included, at rest,
-hovered and pressed (FUT-4516).
+description hold 4.5:1 over the whole sweep (judged at 21 points, not only the
+ends), the shimmer included, at rest, hovered and pressed (FUT-4516). The shimmer
+is stacked BEHIND the words (`isolation: isolate`, `::before` at `z-index: -1`),
+so a white wash never lies over dark ink. Native paints the derived first end
+under the same ink (no shimmer, no pointer states, so rest only).
 
 ### `announce` — whether the alert interrupts
 

@@ -83,6 +83,14 @@ describe.each(MODES)('Given a %s-mode gradient Alert on the default palette', (m
       );
       expect(rows.filter((row) => row.ratio < MIN_CONTRAST)).toEqual([]);
     });
+
+    it.each(STATES)('holds 4.5:1 at %s along the INTERIOR of the sweep, not only at its ends', (state) => {
+      const [from, to] = stops as [string, string];
+      const rows = Array.from({ length: 21 }, (_, i) => blend(from, to, i / 20)).flatMap((point, i) =>
+        [false, true].map((shimmer) => ({ t: i / 20, shimmer, ratio: worstAt(theme, point, ink, state, shimmer) })),
+      );
+      expect(rows.filter((row) => row.ratio < MIN_CONTRAST)).toEqual([]);
+    });
   });
 
   it('takes the ink side from the mode: dark text in light mode, white in dark', () => {
@@ -129,6 +137,15 @@ describe.each(MODES)('Given a %s-mode gradient Alert on the default palette', (m
     }
   });
 
+  it('stacks the shimmer behind the words: an isolated root, the ::before at z-index -1', () => {
+    const styles = alertVariantStyles(theme, 'gradient', getColorFromTheme(theme, 'info')) as Record<string, unknown>;
+    // Without this the positioned ::before paints over the in-flow title, icon and close button.
+    expect(styles.isolation).toBe('isolate');
+    expect((styles['&::before'] as { zIndex: number }).zIndex).toBe(-1);
+    // A negative z-index inside an isolated root stays above the root's own background and tint layer.
+    expect(styles.position).toBe('relative');
+  });
+
   it('keeps the angle and the stop alpha', () => {
     const styles = alertVariantStyles(theme, 'gradient', getColorFromTheme(theme, 'info')) as Record<string, string>;
     expect(styles.background).toContain(`linear-gradient(${GRADIENT.angleDeg}deg`);
@@ -147,8 +164,10 @@ describe.each(MODES)('Given a %s-mode theme with a host hue that is not MUI\'s',
   it.each(HOSTS)('derives a passing sweep for $main from the theme, at every state', (hue) => {
     const theme = themeOf(mode, { info: hue });
     const { stops, ink } = emitted(theme, 'info');
+    const [from, to] = stops as [string, string];
+    const points = Array.from({ length: 21 }, (_, i) => blend(from, to, i / 20));
     for (const state of STATES) {
-      for (const stop of stops) {
+      for (const stop of points) {
         for (const shimmer of [false, true]) {
           expect(worstAt(theme, stop, ink, state, shimmer)).toBeGreaterThanOrEqual(MIN_CONTRAST);
         }

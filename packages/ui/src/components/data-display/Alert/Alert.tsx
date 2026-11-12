@@ -218,8 +218,8 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
         // `currentColor` is the alert's own ink, inherited through
         // `color="inherit"`, so the ring is drawn in whatever colour was
         // already chosen to be READ on this surface. Measured 11.2:1 on the
-        // semantic variants; `gradient`'s ink holds 4.5:1 or more on its sweep
-        // (`alert-gradient-contrast.test.tsx`).
+        // semantic variants; `gradient`'s ink is derived to hold 4.5:1 or more
+        // across its sweep with the shimmer UNDER the words (`Alert.gradient.ts`).
         //
         // That is a reasoned choice, not a test-backed one, and the difference
         // matters: `alert-contrast.test.tsx` covers the ink of the four

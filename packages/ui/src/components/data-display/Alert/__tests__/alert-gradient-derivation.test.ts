@@ -7,15 +7,17 @@ import { describe, expect, it } from 'vitest';
 
 import { createTheme } from '../../../../mui/styles';
 import { muiThemeOptionsFrom } from '../../../../provider/mui-bridge';
-import { decomposeColor } from '../../../../tokens/color';
-import { absoluteInk } from '../../../../tokens/ink';
+import { decomposeColor, lighten } from '../../../../tokens/color';
 import { createUiTheme } from '../../../../tokens/theme';
 import {
   GRADIENT_POINTER_CONTRAST,
   GRADIENT_TARGET_CONTRAST,
+  gradientBasisOf,
   gradientLook,
   gradientWorstContrast,
+  holdsInEveryState,
   stepStopForInk,
+  sweepHolds,
   type GradientBasis,
 } from '../Alert.gradient';
 import { getColorFromTheme } from '../Alert.styles';
@@ -25,19 +27,7 @@ const themeOf = (mode: Mode) => createTheme(muiThemeOptionsFrom(createUiTheme({ 
 const rgb = (c: string) => decomposeColor(c.startsWith('#') ? c : c).values.slice(0, 3);
 const hex = (n: string) => [1, 3, 5].map((i) => parseInt(n.slice(i, i + 2), 16));
 
-const basisOf = (mode: Mode): GradientBasis => {
-  const theme = themeOf(mode);
-  const { white, black } = absoluteInk(theme);
-  const dark = mode === 'dark';
-  return {
-    paper: theme.palette.background.paper,
-    white,
-    ink: dark ? white : theme.palette.text.primary,
-    tint: black,
-    absolute: black,
-    side: dark ? null : 'black',
-  };
-};
+const basisOf = (mode: Mode): GradientBasis => gradientBasisOf(themeOf(mode));
 
 /**
  * The prototype's REST-only sweeps (the approved option B frames), default
@@ -98,14 +88,31 @@ describe.each(['light', 'dark'] as const)('Given the %s-mode default palette', (
 describe('Given a stop and an ink', () => {
   it('moves a failing stop until it holds in every state, and no further than the next 1%', () => {
     const basis = basisOf('light');
-    const out = stepStopForInk('#03a9f4', 'white', basis);
+    const out = stepStopForInk('#03a9f4', basis);
     expect(gradientWorstContrast(out, basis, 'press')).toBeGreaterThanOrEqual(GRADIENT_POINTER_CONTRAST);
     expect(gradientWorstContrast('#03a9f4', basis, 'rest')).toBeLessThan(GRADIENT_TARGET_CONTRAST + 2);
+  });
+
+  it.each(['#01579b', '#1b5e20', '#c62828', '#e65100'])('stops at the FIRST passing 1% mix of %s: one step less fails', (stop) => {
+    const basis = basisOf('light');
+    const candidates = Array.from({ length: 101 }, (_, i) => lighten(stop, i / 100));
+    const at = candidates.indexOf(stepStopForInk(stop, basis));
+    expect(at).toBeGreaterThan(0);
+    expect(holdsInEveryState(candidates[at] ?? '', basis)).toBe(true);
+    expect(holdsInEveryState(candidates[at - 1] ?? '', basis)).toBe(false);
+  });
+
+  it.each(['light', 'dark'] as const)('judges the interior: the derived %s sweep holds the floor at 21 points', (mode) => {
+    const theme = themeOf(mode);
+    for (const severity of ['info', 'success', 'warning', 'danger', 'primary', 'secondary'] as const) {
+      const { from, to } = gradientLook(theme, getColorFromTheme(theme, severity));
+      expect(sweepHolds(from, to, basisOf(mode))).toBe(true);
+    }
   });
 
   it('returns a stop that holds unchanged', () => {
     const basis = basisOf('light');
     const pale = '#e8f4fd';
-    expect(rgb(stepStopForInk(pale, 'white', basis))).toEqual(rgb(pale));
+    expect(rgb(stepStopForInk(pale, basis))).toEqual(rgb(pale));
   });
 });

@@ -1,12 +1,30 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import { absoluteInk } from '../../../tokens/ink';
-import { blend, darken, decomposeColor, getContrastRatio, lighten } from '../../../tokens/color';
 
-import { DESCRIPTION, GRADIENT, POINTER_STATES, type AlertPalette } from './Alert.metrics';
+import {
+  deriveGradient,
+  gradientBasis,
+  gradientWorstContrast as worstContrast,
+  holdsInEveryState as holds,
+  sweepHolds as sweepHoldsCore,
+  stepStopForInk as stepStop,
+  type GradientBasis,
+  type GradientLook,
+  type GradientState,
+} from './Alert.gradient.core';
+import { GRADIENT_MODEL, type AlertPalette } from './Alert.metrics';
+
+export {
+  GRADIENT_POINTER_CONTRAST,
+  GRADIENT_TARGET_CONTRAST,
+  sweepPoints,
+  type GradientBasis,
+  type GradientLook,
+} from './Alert.gradient.core';
 
 /**
- * THE GRADIENT'S SURFACE AND INK, DERIVED FROM THE HOST'S PALETTE (FUT-4516).
+ * THE WEB GRADIENT'S SURFACE AND INK, DERIVED FROM THE HOST'S PALETTE (FUT-4516).
  *
  * The variant used to paint the hue's `light` and `dark` as they came, under
  * `getContrastText(main)`. No single ink holds 4.5:1 across a sweep that long:
@@ -16,108 +34,45 @@ import { DESCRIPTION, GRADIENT, POINTER_STATES, type AlertPalette } from './Aler
  *
  * So the ink follows the MODE, as every other variant's does — the mode's dark
  * text in light mode, white in dark mode — and each end of the sweep is moved
- * only as far as that ink needs: toward white in light mode (the hue stays
- * vivid at the end that was already fine), toward black in dark mode. Derived
- * at style time from whatever `light` and `dark` the host's theme supplies, so
- * a host with its own hues gets its own passing sweep, and no hex lives here.
+ * only as far as that ink needs: toward white in light mode, toward black in
+ * dark mode. Derived at style time from whatever `light` and `dark` the host's
+ * theme supplies, so a host with its own hues gets its own passing sweep, and
+ * no hex lives here. The arithmetic is `Alert.gradient.core.ts`, shared with
+ * native.
+ *
+ * "As far as that ink needs" is judged across the states a reader meets: rest
+ * (with a margin), and hovered and pressed, where in light mode the black tint
+ * closes on the dark ink — an ink already near black has no room to step
+ * further, so the SURFACE has to start lighter. In dark mode the tint is black,
+ * away from the white ink, so the pointer states only help and rest decides.
  */
 
-/** AA is 4.5:1; the extra tenth is the margin the 1% steps and the colour parser's rounding eat. */
-export const GRADIENT_TARGET_CONTRAST = 4.6;
-/**
- * What a pointer state must still hold: the AA floor itself. Rest keeps the
- * margin above; hover and press are measured against the floor, because the
- * ink's own step (`POINTER_INK_STEP`) is already in the arithmetic.
- */
-export const GRADIENT_POINTER_CONTRAST = 4.5;
-
-/** How finely the mix is stepped: 1% of the way to the absolute per try. */
-const MIX_STEP = 0.01;
-
-const channelAlpha = (colour: string): number => decomposeColor(colour).values[3] ?? 1;
-
-/** The theme-derived colours the arithmetic composites with. */
-export interface GradientBasis {
-  paper: string;
-  /** The shimmer's colour. */
-  white: string;
-  /** The ink, as the alert paints it at rest. */
-  ink: string;
-  /** The colour of the pointer tint the variant paints: black in both modes. */
-  tint: string;
-  /** The absolute the ink steps toward under the pointer, or `null` where it does not step (dark). */
-  side: 'black' | 'white' | null;
-  /** That absolute, as a colour; unused when `side` is `null`. */
-  absolute: string;
+/** The basis for this theme: its paper and dark text, the palette's two absolutes. */
+export function gradientBasisOf(theme: Theme): GradientBasis {
+  const { white, black } = absoluteInk(theme);
+  return gradientBasis(theme.palette.mode === 'dark' ? 'dark' : 'light', {
+    paper: theme.palette.background.paper,
+    textPrimary: theme.palette.text.primary,
+    white,
+    black,
+  });
 }
 
-/**
- * The worst contrast the title (opacity 1) and the description
- * ({@link DESCRIPTION} opacity) reach over `stop` painted at the gradient's
- * alpha on the paper, with and without the shimmer's white wash on top, in one
- * pointer state. The tint layer sits under the shimmer and moves the surface
- * toward `tint` (black in both modes); the ink steps toward it as `color-mix()` does, alpha too.
- */
-export function gradientWorstContrast(stop: string, basis: GradientBasis, state: keyof typeof POINTER_STATES | 'rest'): number {
-  const { tintAlpha, inkStep } = state === 'rest' ? { tintAlpha: 0, inkStep: { black: 0, white: 0 } } : POINTER_STATES[state];
-  const step = basis.side === null ? 0 : inkStep[basis.side];
-  const tinted = blend(blend(basis.paper, stop, GRADIENT.stopAlpha), basis.tint, tintAlpha);
-  const surfaces = [tinted, blend(tinted, basis.white, GRADIENT.shimmerAlpha)];
-  const inkRgb = blend(basis.ink, basis.absolute, step);
-  const inkAlpha = channelAlpha(basis.ink) * (1 - step) + step;
-  const ratios = surfaces.flatMap((surface) =>
-    [1, DESCRIPTION.opacity].map((opacity) => getContrastRatio(blend(surface, inkRgb, inkAlpha * opacity), surface)),
-  );
-  return Math.min(...ratios);
-}
+/** {@link worstContrast} with the web's numbers. */
+export const gradientWorstContrast = (stop: string, basis: GradientBasis, state: GradientState): number =>
+  worstContrast(stop, basis, GRADIENT_MODEL, state);
 
-/** Whether `stop` holds in every state: the target at rest, the floor under the pointer. */
-export function holdsInEveryState(stop: string, basis: GradientBasis): boolean {
-  return (
-    gradientWorstContrast(stop, basis, 'rest') >= GRADIENT_TARGET_CONTRAST &&
-    (['hover', 'press'] as const).every((state) => gradientWorstContrast(stop, basis, state) >= GRADIENT_POINTER_CONTRAST)
-  );
-}
+/** {@link holds} with the web's numbers. */
+export const holdsInEveryState = (stop: string, basis: GradientBasis): boolean => holds(stop, basis, GRADIENT_MODEL);
 
-/**
- * `stop` moved toward `toward` ('white' lightens, 'black' darkens) in 1% steps,
- * as far as it takes for the ink to hold at rest, hovered and pressed; a stop
- * that already holds is returned as it was.
- */
-export function stepStopForInk(stop: string, toward: 'white' | 'black', basis: GradientBasis): string {
-  const mix = toward === 'white' ? lighten : darken;
-  const steps = Math.round(1 / MIX_STEP);
-  const hit = Array.from({ length: steps + 1 }, (_, i) => mix(stop, i * MIX_STEP)).find((candidate) =>
-    holdsInEveryState(candidate, basis),
-  );
-  return hit ?? mix(stop, 1);
-}
+/** {@link stepStop} with the web's numbers. */
+export const stepStopForInk = (stop: string, basis: GradientBasis): string => stepStop(stop, basis, GRADIENT_MODEL);
 
-export interface GradientLook {
-  /** The ink of the title, the description and the icon. */
-  ink: string;
-  /** The sweep's two ends, opaque: the variant paints them at `GRADIENT.stopAlpha`. */
-  from: string;
-  to: string;
-}
+/** Whether every point of the sweep between two ends holds the floor in every state. */
+export const sweepHolds = (from: string, to: string, basis: GradientBasis): boolean =>
+  sweepHoldsCore(from, to, basis, GRADIENT_MODEL);
 
 /** The gradient's ink and both ends for this theme and hue. */
 export function gradientLook(theme: Theme, palette: AlertPalette): GradientLook {
-  const dark = theme.palette.mode === 'dark';
-  const { white, black } = absoluteInk(theme);
-  const ink = dark ? white : theme.palette.text.primary;
-  const basis: GradientBasis = {
-    paper: theme.palette.background.paper,
-    white,
-    ink,
-    tint: black,
-    absolute: black,
-    side: dark ? null : 'black',
-  };
-  const toward = dark ? 'black' : 'white';
-  return {
-    ink,
-    from: stepStopForInk(palette.light || palette.main, toward, basis),
-    to: stepStopForInk(palette.dark || palette.main, toward, basis),
-  };
+  return deriveGradient(gradientBasisOf(theme), GRADIENT_MODEL, palette.light || palette.main, palette.dark || palette.main);
 }
