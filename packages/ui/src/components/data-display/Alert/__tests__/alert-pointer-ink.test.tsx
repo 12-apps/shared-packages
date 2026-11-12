@@ -114,13 +114,15 @@ describe('Given which absolute the ink steps toward', () => {
     expect(inkAbsolute(themeOf(mode), 'info')).toBe(sideOf(mode));
   });
 
-  it.each(MODES)('does not step a %s-mode gradient, whose ink side a host repaint can flip', (mode) => {
-    // A host that repaints alerts to a light pane and a dark ink repaints the
-    // gradient too, under its BLACK layer. Stepped by the package's own white
-    // ink, that dark ink went toward white: 1.02:1 pressed (FUT-4506 review).
+  it.each(MODES)('steps a %s-mode gradient toward the side its ink is on, like a semantic one', (mode) => {
+    // The gradient's ink follows the mode since FUT-4516 (dark text over a
+    // light sweep, white over a deep one), so its ink side is known and the
+    // step is the mode's like every other variant's. It was `null` while the
+    // ink was `getContrastText` of the hue and a host repaint could flip it.
     const styles = pointerInkStyles(themeOf(mode), 'gradient');
-    expect(inkAbsolute(themeOf(mode), 'gradient')).toBeNull();
-    expect(styles).toEqual({ rest: {}, hover: {}, press: {} });
+    expect(inkAbsolute(themeOf(mode), 'gradient')).toBe(sideOf(mode));
+    expect(styles).toEqual(pointerInkStyles(themeOf(mode), 'info'));
+    expect(JSON.stringify(styles.press)).toContain(mode === 'dark' ? ', #fff)' : ', #000)');
   });
 });
 

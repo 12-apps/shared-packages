@@ -7,7 +7,7 @@ import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { absoluteInk, modeInk } from '../../../tokens/ink';
+import { modeInk } from '../../../tokens/ink';
 
 import { AlertContent } from './Alert.content';
 import { pointerInkStyles } from './Alert.ink';
@@ -62,22 +62,10 @@ function pointerShadow(
   theme: Theme,
   colorPalette: AlertPalette,
   glow: boolean,
-  variant: string | undefined,
 ): (alpha_: number) => string {
-  // The tint's colour reads the variant and not only the mode. On every
-  // surface that tracks the mode it moves the surface TOWARD its ink's side —
-  // the contrast cost `pointerInkStyles` pays back.
-  //
-  // `gradient` is the one variant where the two disagree: it paints a
-  // mid-lightness sweep (L* 42–61) under WHITE ink in BOTH modes, so the
-  // mode-keyed answer tinted it white in dark mode — toward the text. Measured:
-  // white-on-gradient fell to 2.90:1 on hover and 2.41:1 pressed, under the 3:1
-  // floor and below its own idle. Every other variant's surface tracks the mode,
-  // so for them the two rules agree. (Not quite WHITE in both modes: dark
-  // mode's light hues get a dark `getContrastText` ink, which this black layer
-  // closes on. That ink is not stepped (`inkAbsolute`); its rest contrast is
-  // FUT-4516's.)
-  const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
+  // The tint moves the surface TOWARD the mode's absolute — the side the ink
+  // is on, for every variant — the contrast cost `pointerInkStyles` pays back.
+  const ink = modeInk(theme);
   const glowShadow = glow
     ? `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`
     : null;
@@ -97,7 +85,7 @@ const StyledAlert = styled(MuiAlert, {
 }>(({ theme, customVariant, customColor, glow, pulse, animate }) => {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
-  const withTint = pointerShadow(theme, colorPalette, Boolean(glow), customVariant);
+  const withTint = pointerShadow(theme, colorPalette, Boolean(glow));
   const ink = pointerInkStyles(theme, customVariant);
 
   return {
@@ -222,12 +210,13 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
         // `currentColor` is the alert's own ink, inherited through
         // `color="inherit"`, so the ring is drawn in whatever colour was
         // already chosen to be READ on this surface. Measured 11.2:1 on the
-        // semantic variants and 5.7:1 on `gradient`.
+        // semantic variants; `gradient`'s ink holds 4.5:1 or more on its sweep
+        // (`alert-gradient-contrast.test.tsx`).
         //
         // That is a reasoned choice, not a test-backed one, and the difference
         // matters: `alert-contrast.test.tsx` covers the ink of the four
         // semantic variants only — its `glass` case asserts the pane's alpha
-        // rather than its ink, and `gradient` it does not render at all. A
+        // rather than its ink, and `gradient` has its own file. A
         // translucent surface's contrast depends on what sits behind it, which
         // is why that test stops where it does and why this comment does not
         // borrow a guarantee it never made.

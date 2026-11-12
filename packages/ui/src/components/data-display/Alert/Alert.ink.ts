@@ -46,24 +46,16 @@ export type PointerInkState = keyof typeof POINTER_INK_STEP;
 export type InkAbsolute = 'black' | 'white';
 
 /**
- * The absolute the ink steps toward — the mode's, the side the ink is on — or
- * `null` for `gradient`, which does not step at all.
+ * The absolute the ink steps toward: the mode's, the side the ink is on.
  *
- * Every other variant's surface tracks the mode: a dark ink on a light tint,
- * a light ink on a dark one, so the step is toward black in light mode and
- * toward white in dark, the same absolute the tint layer moves the surface to.
- *
- * `gradient` is the one surface where the package cannot know which side its
- * ink is on. Its own ink is `getContrastText` of the hue, but a host that
- * repaints alerts repaints the gradient too: a light pane and a dark ink under
- * the variant's BLACK layer. Stepping by the package's own ink then moved that
- * dark ink toward white — 1.02:1 pressed. A step that reads `currentColor` for
- * its amount but not for its direction is only safe where the direction is the
- * mode's, so `gradient` keeps today's ink. Its rest contrast and its dark ink
- * on dark mode's light hues are FUT-4516's.
+ * Every variant's surface tracks the mode: a dark ink on a light tint, a light
+ * ink on a dark one, so the step is toward black in light mode and toward white
+ * in dark, the same absolute the tint layer moves the surface to. `gradient` is
+ * no exception since FUT-4516: its ink follows the mode too (dark text over a
+ * light sweep, white over a deep one), so the answer no longer depends on the
+ * variant. The parameter stays so a caller does not change.
  */
-export function inkAbsolute(theme: Theme, variant: string | undefined): InkAbsolute | null {
-  if (variant === 'gradient') return null;
+export function inkAbsolute(theme: Theme, _variant: string | undefined): InkAbsolute {
   return theme.palette.mode === 'dark' ? 'white' : 'black';
 }
 
@@ -91,8 +83,6 @@ export function steppedInkCss(absolute: string, step: number): string {
  *   same reason the root's `:active` does: a click's `:active` is too short to
  *   ease into. A `:hover` block declares no transition, ever (see `ACTIVE`).
  *
- * All three are empty for a variant that does not step.
- *
  * `words` is the selector list of the parts that step, relative to the root
  * (default: the Alert's own). `Banner` passes its title, message and children
  * so both surfaces step by the same table (FUT-4519).
@@ -103,7 +93,6 @@ export function pointerInkStyles(
   words: string = MESSAGE_INK,
 ): Record<'rest' | PointerInkState, CSSObject> {
   const side = inkAbsolute(theme, variant);
-  if (side === null) return { rest: {}, hover: {}, press: {} };
   const absolute = absoluteInk(theme)[side];
   const at = (state: PointerInkState): string => steppedInkCss(absolute, POINTER_INK_STEP[state][side]);
   return {

@@ -58,7 +58,9 @@ export const SEMANTIC_SURFACE = { tint: { light: 0.9, dark: 0.8 }, ink: 0.6, bor
 /** `glass`: 85% paper under a 20px blur, a 0.4 divider hairline. */
 export const GLASS = { backgroundAlpha: 0.85, borderAlpha: 0.4, blur: 20, saturatePercent: 180 } as const;
 /**
- * `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
+ * `gradient`: the hue's light and dark ends, each moved toward the mode's
+ * background side only as far as the mode's ink needs (`Alert.gradient.ts`,
+ * FUT-4516), at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
  *
  * It carries no hover of its own, and that is load-bearing rather than an
  * omission. `alertVariantStyles` is spread AFTER the root's `'&:hover'` in the
@@ -163,10 +165,10 @@ export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
  * light mode, white in dark. The web applies the step as `color-mix()` over
  * `currentColor`, so its AMOUNT lands on whatever ink is actually painted — a
  * host's repaint of a semantic or `glass` alert included. Its DIRECTION is the
- * mode's, which is only safe where the surface tracks the mode, so `gradient`
- * is not stepped at all (`inkAbsolute` in `Alert.ink.ts`): a host that
- * repaints it to a light pane and a dark ink would otherwise have its ink
- * stepped toward white under a black layer. DOM only; native has no pointer
+ * mode's, which is only safe where the surface tracks the mode: `gradient`
+ * does since FUT-4516 (dark ink over a light sweep, white over a deep one), so
+ * it steps like every other variant (`inkAbsolute` in `Alert.ink.ts`). DOM
+ * only; native has no pointer
  * states. `Banner` paints the same tint and steps its words by this same table
  * (FUT-4519).
  */
