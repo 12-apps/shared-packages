@@ -46,8 +46,10 @@ What follows for the engine:
    retries stop with it: the job sends only from PENDING, a run that starts
    past the window ends the request TIMEOUT itself without calling, and the
    sweep re-queues no FAILED row. A call already in flight when the window
-   passes may still reach the marketplace; its answer then stamps nothing,
-   and a later confirmation still confirms.
+   passes may still reach the marketplace: a marketplace that answers by event
+   confirms through it, and one that answers in the response confirms from that
+   answer, FAILED or not — a confirmation after a TIMEOUT still confirms, and
+   the host hears it once.
 5. **A FAILED request stands for nothing.** The order may be accepted (the
    accept clears the request) or the cancellation asked again. A waiting
    request (PENDING or REQUESTED) refuses both, and no confirm is sent for an
@@ -61,9 +63,13 @@ Request first is OPT-IN: a host turns it on by binding the order port's
 `recordStoreCancellation` stamp REJECTED at once, `decide` calls
 `onRefused(…, "REJECTED")`, and a confirmation calls `onRefused(…, "CANCELLED")`
 (also on the job's synchronous path now, which moves the row to REJECTED as the
-event path does). The additions are a column, an index, two optional
-callbacks, an optional window and a capability, so the release is a minor
-(`feat`).
+event path does — a call 1.0.0 did not make, harmless to an idempotent
+cancel). The event path keeps an accepted order's `acknowledged_at` where 1.0.0
+overwrote it with the cancel time (nothing reads it once REJECTED). The answer
+window applies to an opted-in host only: a 1.0.0 host's undelivered request is
+re-queued and given up after 24 hours, exactly as before. The additions are a
+column, an index, two optional callbacks, an optional window and a capability,
+so the release is a minor (`feat`).
 
 ## Consequences
 

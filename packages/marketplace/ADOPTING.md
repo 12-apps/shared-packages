@@ -31,7 +31,7 @@ error at mount, never a default that quietly adopts another host's policy.
 | `defaultAckSlaSeconds` | `number` | The acceptance window a new connection gets (the origin host: 300). |
 | `reconcileBatchSize` | `number` | Stored deliveries one reconciliation pass re-runs (origin: 50). |
 | `maxInboxAttempts` | `number` | Re-runs before a stored delivery is retired (origin: 5). |
-| `cancellationWindowMs` | OPTIONAL. `number` | How long a store's cancellation request may wait (PENDING: not yet delivered, or REQUESTED: delivered and unanswered) before the outbound sweep fails it as TIMEOUT, for every adapter; a PENDING request's retries stop with it. Absent: each adapter's `capabilities.cancellationAnswerWindowMs` (iFood: 5 minutes, estimated); an adapter with none is given up on only after 24 hours. |
+| `cancellationWindowMs` | OPTIONAL. `number` | For a host that requests first (binds `onCancellationConfirmed`): how long a store's cancellation request may wait (PENDING: not yet delivered, or REQUESTED: delivered and unanswered) before the outbound sweep fails it as TIMEOUT, for every adapter; a PENDING request's retries stop with it. A 1.0.0 host has no window: its requests are re-queued and given up after 24 hours, as before. Absent: each adapter's `capabilities.cancellationAnswerWindowMs` (iFood: 5 minutes, estimated); an adapter with none is given up on only after 24 hours. |
 
 Plus `adapters: readonly MarketplaceAdapter[]` — one per marketplace the host
 sells through. The list is validated at mount (ids, duplicates, reason lists).
@@ -146,7 +146,11 @@ each.
     runs one transaction at a time, a write on the global client hangs the ingest, and on
     Postgres a rolled-back ingest would leave an orphan order and a burnt order number.
 13. **Request first, cancel on confirm (1.1, FUT-4758) — opt in by binding
-    `order.onCancellationConfirmed`.** Without it nothing changes from 1.0.0. With it, the
+    `order.onCancellationConfirmed`.** Without it, 1.0.0's behaviour holds, with two
+    differences, both harmless to a host whose cancel is idempotent: a marketplace that
+    confirms in its response now also moves the row to REJECTED and calls
+    `onRefused(…, "CANCELLED")` (1.0.0 called nothing there), and the event path keeps an
+    accepted order's `acknowledged_at` instead of overwriting it with the cancel time. With it, the
     store's refusals and cancels (`decide` REJECT and `recordStoreCancellation`) only request
     the cancellation; the order keeps its status until the marketplace confirms, and the
     acceptance clock leaves an order with a waiting request alone (the request's window ends
@@ -157,6 +161,7 @@ each.
     - keep the store's own reason (its loss record, who asked) for that cancel: the engine
       carries only the marketplace's code;
     - bind `order.onCancellationFailed` (REFUSED or TIMEOUT: the order stays, show the app link);
+    - expect the answer window: a request still waiting past it (delivered or not) ends TIMEOUT;
     - run migration `20261112120000_marketplace_cancellation_failure` (one nullable column,
       its CHECK and an index), through the host's plugin-migration sync like the first.
 
