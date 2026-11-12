@@ -21,7 +21,7 @@ import type { MarketplaceProvider } from "./types";
  */
 
 /** No request of the store's is waiting on the marketplace: never asked, or asked and FAILED. */
-export function noStandingRequest(cancellationStatus: string | null): boolean {
+function noStandingRequest(cancellationStatus: string | null): boolean {
   return cancellationStatus === null || cancellationStatus === "FAILED";
 }
 
