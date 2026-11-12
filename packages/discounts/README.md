@@ -27,6 +27,11 @@ hold or by the buyer typing a **coupon code**. Money is integer cents
 throughout; a percentage is basis points, so "12,5%" needs no decimal column
 anywhere.
 
+A fixed amount scoped to **items** or **categories** comes off **each covered
+unit** — "R$ 10 off nos destaques" makes every highlighted item R$ 10 cheaper,
+which is the price the menu badge shows. On the **order** it comes off once, and
+on a **combo** once per application.
+
 The evaluator is a pure function of `{ lines, rules, couponCode, now }`:
 
 ```ts
