@@ -1,3 +1,4 @@
+import type { DiscountsBulkCopy } from "./copy-bulk";
 import type { AutocompleteCopy, CategorySelectCopy, ConfirmActionCopy } from "@12-apps/ui/copy";
 import type { DataViewsCopy } from "@12-apps/ui/data-display/DataViews";
 import type {
@@ -383,12 +384,10 @@ export interface DiscountsWebCopy {
    */
   readonly autocomplete: AutocompleteCopy;
   readonly dataViews: DataViewsCopy;
+  readonly bulk?: Partial<DiscountsBulkCopy>;
 }
 
-/**
- * Fill `{name}` placeholders. Unknown names are left alone rather than blanked,
- * so a pack with a typo shows the typo instead of a hole nobody can trace.
- */
+/** Fill `{name}` placeholders; unknown names stay, so a typo shows instead of a hole. */
 export function fill(template: string, values: Readonly<Record<string, string | number>>): string {
   return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
     key in values ? String(values[key]) : whole,
@@ -396,5 +395,4 @@ export function fill(template: string, values: Readonly<Record<string, string | 
 }
 
 export { missingWebCopy } from "./copy-completeness";
-
 export type { CompleteDiscountsWebCopy, DiscountsWindowFallbackKey } from "./copy-complete";

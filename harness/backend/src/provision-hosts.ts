@@ -31,6 +31,7 @@ import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './d
 import { createEntitlementsHost } from './entitlements-host';
 import { impersonationHost } from './impersonation-host';
 import { applyLifecycleMigrations } from './lifecycle-db';
+import { applyMarketplaceMigrations, marketplaceHost } from './marketplace-host';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyMcpMigrations, mcpOauthHost } from './mcp-oauth-host';
 import { applyNotificationMigrations } from './notifications-db';
@@ -127,10 +128,15 @@ async function provisionStored(pg: PGlite) {
   // @12-apps/chat is the second, and shares the ONE client: a host has one
   // generated client over one schema, and both packages' models are in it.
   await applyChatMigrations(pg);
+  // @12-apps/marketplace is the third on the ONE generated client: its engine
+  // writes through the Prisma delegates and its interactive `$transaction`,
+  // and its own migration (replay-safe) arrives out of its tarball.
+  await applyMarketplaceMigrations(pg);
   const prisma = await createPrismaClient(pg);
   const payments = paymentsHost(prisma);
   const chat = chatHost(prisma);
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat };
+  const marketplace = marketplaceHost(prisma);
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {
@@ -208,5 +214,6 @@ export interface Hosts {
   storage: Awaited<ReturnType<typeof createStorageHost>>;
   payments: ReturnType<typeof paymentsHost>;
   chat: ReturnType<typeof chatHost>;
+  marketplace: ReturnType<typeof marketplaceHost>;
 }
 

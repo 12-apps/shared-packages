@@ -165,7 +165,8 @@ export const { GET, POST } = handlers;
 | `adminEmails` | `ADMIN_EMAILS` | comma-separated, or an array |
 | `signInGate` | none → **refuse everything** | |
 | `sessionAdmin` | the allowlist | |
-| `signInPage` | `/login` | |
+| `signInPage` | `/login` | where every sign-in failure goes, unless `errorReturnsToStart` |
+| `errorReturnsToStart` | `false` | opt-in: a failed OAuth sign-in returns to its start page — see below |
 | `maxAge` | 30 days | seconds |
 
 ### Two settings that bite
@@ -223,6 +224,32 @@ performs a top-level navigation that follows the 302 to the provider.
 resolve them as protocol-relative external URLs, so a `startsWith("/")` check is
 an open redirect. Anything not provably same-origin falls back to the current
 page.
+
+### Opt-in: a failed OAuth sign-in returns to the page that started it
+
+**Off by default.** Auth.js sends every sign-in failure to one page,
+`signInPage`. With `errorReturnsToStart: true` (or `setErrorReturnsToStart(true)`
+on the legacy handler) the handler remembers instead the page the provider
+button sat on — the sign-in POST's `Referer`, same origin only, in a 15-minute
+`authjs.sign-in-start` cookie (`__Host-` on https) — and sends a failed round
+trip back there, its query kept, with `?error=` set on it. So a host with
+several sign-in pages, or one whose query carries a return, gets the person
+back where they were.
+
+**The condition for turning it on: every page of the host that can start a
+sign-in renders `?error`.** The routes from `createAuthRoutes` do; a page of
+the host's own must be checked. A start page that ignores `?error` would take
+the person back to where they were with no word of what happened, which is
+worse than today's `signInPage`.
+
+With it on, a refused consent (`?error=access_denied`) arrives as
+`error=OAuthCallback`, never as Auth.js's `OAuthCallbackError` or the
+`Configuration` it reports when its `iss` check trips first. Every other code
+— another provider error, a sign-in gate's `AccessDenied` — is Auth.js's.
+With no usable `Referer` (another origin, a `no-referrer` policy) the failure
+goes to `signInPage` as before, and so does a provider that answers with a
+cross-site form POST (Apple's `form_post`): the browser does not send the
+`SameSite=Lax` start cookie with it.
 
 ## Migrating from the legacy surface
 

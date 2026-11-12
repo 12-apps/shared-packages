@@ -14,6 +14,9 @@
  * the COMPUTED z-index of every marked root when it opens — whatever put the
  * sheet there. Only held sheets are marked: an uncontrolled sheet closes at
  * once, and nothing about its stacking changes.
+ *
+ * `useStyleAboveHeldSheets` is the one hook `AlertDialog` and `Dialog` (modal
+ * and drawer variants) share for it (FUT-4748).
  */
 
 /** The attribute an open, held sheet carries on its drawer root. */

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateManager, UpdateState } from "../../updates";
 import { TEST_MENU_COPY } from "../../updates/__tests__/menu-copy";
 import { installAppMenu } from "../app-menu";
-import { current, entry, recorded } from "./fake-electron";
+import { current, electronModule, entry, recorded } from "./fake-electron";
 
 vi.mock("electron", async () => (await import("./fake-electron")).electronModule);
 
@@ -243,5 +243,73 @@ describe("the manual check's answer", () => {
     } finally {
       process.off("unhandledRejection", watcher);
     }
+  });
+});
+
+/** A promise the case settles by hand, so a check or a box can be held open. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  const box: { resolve?: (value: T) => void } = {};
+  const promise = new Promise<T>((done) => {
+    box.resolve = done;
+  });
+  return { promise, resolve: (value) => box.resolve?.(value) };
+}
+
+describe("clicking Check for updates while an answer is pending", () => {
+  const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+  const click = (): void => void entry("Help", "Check for updates")?.click?.();
+
+  it("opens one box for two clicks during a running check", async () => {
+    const answer = deferred<void>();
+    const updates = { ...manager({ kind: "none" }), check: vi.fn(() => answer.promise) };
+    installAppMenu({ copy: TEST_MENU_COPY, updates });
+
+    click();
+    click();
+    answer.resolve();
+    await vi.waitFor(() => expect(recorded.boxes).toHaveLength(1));
+    await settled();
+
+    expect(updates.check).toHaveBeenCalledTimes(1);
+    expect(recorded.boxes).toHaveLength(1);
+  });
+
+  it("opens no second box while the first is still open, and answers again once it is closed", async () => {
+    const closed = deferred<{ response: number }>();
+    const open = vi
+      .spyOn(electronModule.dialog, "showMessageBox")
+      .mockImplementationOnce(() => closed.promise);
+    try {
+      const updates = manager({ kind: "none" });
+      installAppMenu({ copy: TEST_MENU_COPY, updates });
+
+      click();
+      await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+      click();
+      await settled();
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(updates.check).toHaveBeenCalledTimes(1);
+
+      closed.resolve({ response: 0 });
+      await settled();
+      click();
+      await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it("keeps the pending answer per menu, not shared between menus", async () => {
+    const first = manager({ kind: "none" });
+    first.check = vi.fn(() => new Promise<void>(() => undefined));
+    installAppMenu({ copy: TEST_MENU_COPY, updates: first });
+    click();
+
+    const second = manager({ kind: "none" });
+    installAppMenu({ copy: TEST_MENU_COPY, updates: second });
+    click();
+
+    await vi.waitFor(() => expect(recorded.boxes).toHaveLength(1));
+    expect(second.check).toHaveBeenCalledTimes(1);
   });
 });

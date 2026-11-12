@@ -610,3 +610,15 @@ or `DialogActions`; the variant does not reorder or resize caller actions.
   <DialogActions>{actions}</DialogActions>
 </Dialog>
 ```
+
+### Over a held sheet
+
+A `controlled` `Sheet` (every `UsableModal` phone sheet) stays open and may sit
+above `zIndex.modal`. A `Dialog` a host opens from it (a change dialog, a reason
+picker) reads the computed z-index of every held sheet on screen
+(`data-held-sheet`) when it opens and takes one above the highest, inline, the
+same way `AlertDialog` does (shared `useStyleAboveHeldSheets`). Both the modal
+and the `drawer` variant do it: the drawer opens at `zIndex.drawer`, below the
+modal, so a right panel opened from a sheet would otherwise hit the same bug.
+With no held sheet at or above its level nothing changes, and a theme that
+already puts the dialog higher is left alone (FUT-4748).

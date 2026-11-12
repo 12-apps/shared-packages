@@ -2,7 +2,8 @@ import { Auth, setEnvDefaults as coreSetEnvDefaults } from "@auth/core";
 import type { AuthConfig } from "@auth/core";
 import type { Session } from "@auth/core/types";
 
-import { authConfig } from "../config";
+import { authConfig, getErrorReturnsToStart } from "../config";
+import { withOAuthErrorReturn } from "../oauth-error-return";
 
 /**
  * The Auth.js entrypoint (FUT-665) — the RUNTIME-BOUND half of this package.
@@ -86,7 +87,12 @@ function reqWithEnvUrl(request: Request): Request {
  * `Auth(reqWithEnvURL(req), config)`.
  */
 export function authHandler(request: Request): Promise<Response> {
-  return Auth(reqWithEnvUrl(request), authConfig) as Promise<Response>;
+  const serve = (forwarded: Request): Promise<Response> =>
+    Auth(forwarded, authConfig) as Promise<Response>;
+  // Same opt-in as `createApiAuth`'s `errorReturnsToStart` (FUT-4595).
+  return getErrorReturnsToStart()
+    ? withOAuthErrorReturn(reqWithEnvUrl(request), serve, authConfig)
+    : serve(reqWithEnvUrl(request));
 }
 
 /** The GET/POST pair the auth route exports, keeping the old `handlers` shape. */

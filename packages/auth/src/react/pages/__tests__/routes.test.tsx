@@ -562,3 +562,71 @@ describe("createAuthRoutes — the notice keeps its heading and its close button
     await waitFor(() => expect(screen.queryByText("Falha ao entrar")).toBeNull());
   });
 });
+
+/**
+ * "Forgot my password" (FUT-4593).
+ *
+ * The host's callback IS the answer when there is one. It used to be chained
+ * as `onForgotPassword?.(navigate) ?? navigate("/forgot-password")`, so a
+ * callback that returned nothing — every `() => setScreen(...)` does — was
+ * followed by a navigation to a route the host never declared, which unmounted
+ * the in-place screen the callback had just opened.
+ */
+describe("createAuthRoutes — forgot my password", () => {
+  /** The form, stubbed down to the one link this block taps. */
+  function ForgotLinkFormStub({ onForgotPassword }: { onForgotPassword: () => void }): JSX.Element {
+    return (
+      <button type="button" data-testid="go-to-forgot-password" onClick={onForgotPassword}>
+        Esqueci minha senha
+      </button>
+    );
+  }
+
+  function withForgotLink(overrides: Partial<AuthRoutesConfig>): Harness {
+    return harness({
+      screens: { ...screensStub(), EmailPasswordForm: ForgotLinkFormStub } as unknown as EmailAuthScreens,
+      ...overrides,
+    });
+  }
+
+  it("runs a host callback that returns nothing, and navigates nowhere", async () => {
+    const opened = vi.fn();
+    const { config, navigate } = withForgotLink({
+      onForgotPassword: () => {
+        opened();
+      },
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    fireEvent.click(await screen.findByTestId("go-to-forgot-password"));
+
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("navigates only where the host's callback says", async () => {
+    const { config, navigate } = withForgotLink({
+      onForgotPassword: (go) => go("/recuperar"),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    fireEvent.click(await screen.findByTestId("go-to-forgot-password"));
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("/recuperar");
+    expect(navigate).not.toHaveBeenCalledWith("/forgot-password");
+  });
+
+  it("falls back to /forgot-password only when the host gives no callback", async () => {
+    const { config, navigate } = withForgotLink({});
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    fireEvent.click(await screen.findByTestId("go-to-forgot-password"));
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("/forgot-password");
+  });
+});

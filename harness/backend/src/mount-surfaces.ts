@@ -5,6 +5,7 @@ import type { Hosts } from './app';
 import { CHAT_MOUNT_PATH } from './chat-host';
 import { ROUTING_MOUNT_PATH } from './routing-host';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
+import { MARKETPLACE_MOUNT_PATH } from './marketplace-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
@@ -32,6 +33,12 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
  * order the header's more-specific-first rule requires.
  */
 function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
+  // @12-apps/marketplace (FUT-4762), before everything: its paths are under
+  // `/api`, and every one of them carries a literal (`/webhooks/marketplace`,
+  // `/admin/:tenantSlug/marketplace`) that no broader mount below may claim
+  // first. The webhook is unauthenticated by design; the bridge asks no actor.
+  app.route(MARKETPLACE_MOUNT_PATH, hosts.marketplace.router);
+
   // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
   // reversing these two blocks is a red test, not a silent 404.
   app.route('/api/admin/:tenantSlug', hosts.lifecycle.router);

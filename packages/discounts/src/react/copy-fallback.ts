@@ -44,6 +44,17 @@ function isComplete({ window, form }: DiscountsWebCopy): boolean {
   );
 }
 
+/** Whether a pack says every bulk sentence itself (FUT-4420). */
+function isBulkComplete({ bulk }: DiscountsWebCopy): boolean {
+  return bulk !== undefined && Object.keys(PT_BR_DISCOUNTS_WEB_COPY.bulk).every((key) => said((bulk as Record<string, unknown>)[key]));
+}
+
+/** The bulk group: the host's sentences where it says them, the package's pack for the language elsewhere. */
+function filledBulk(copy: DiscountsWebCopy, pack: CompleteDiscountsWebCopy): CompleteDiscountsWebCopy["bulk"] {
+  const own = Object.fromEntries(Object.entries(copy.bulk ?? {}).filter(([, sentence]) => said(sentence)));
+  return { ...pack.bulk, ...own };
+}
+
 /**
  * A host's pack with every optional sentence filled in. `locale` is the host's
  * (`DiscountsWebConfig.locale`, or the surface's); without one the pack's own
@@ -59,7 +70,9 @@ export function completeWebCopy(copy: DiscountsWebCopy, locale?: string): Comple
   // A declared calendar language as a BCP-47 tag (review round 8, N1): the
   // calendar hands it to `toLocaleDateString`, which throws on `pt_BR`.
   const declared = languageTagOf(calendar.locale);
-  if (isComplete(copy) && declared === calendar.locale) return copy as CompleteDiscountsWebCopy;
+  if (isComplete(copy) && declared === calendar.locale && isBulkComplete(copy)) {
+    return copy as CompleteDiscountsWebCopy;
+  }
   const tag = languageTagOf(locale) ?? languageTagOf(calendar.locale);
   const pack = tag ? packFor(tag) : nearestPack(copy, PT_BR_DISCOUNTS_WEB_COPY, EN_US_DISCOUNTS_WEB_COPY);
   const filledWindow = Object.fromEntries(
@@ -70,6 +83,7 @@ export function completeWebCopy(copy: DiscountsWebCopy, locale?: string): Comple
   ) as CompleteDiscountsWebCopy["form"]["calendar"];
   return {
     ...copy,
+    bulk: filledBulk(copy, pack),
     window: { ...window, ...filledWindow },
     form: {
       ...form,

@@ -70,3 +70,7 @@ packages/mcp
 packages/prisma
 packages/shared-helpers
 packages/discounts
+# `@12-apps/marketplace` needs nothing here at runtime (zod only; wiring and
+# hono are optional peers), so its position is free. It sits last because it is
+# the newest, and a reader scanning for it finds it at the end.
+packages/marketplace

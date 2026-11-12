@@ -22,6 +22,7 @@ import type { SessionAdminResolver, SignInGate } from "./build-config";
 
 let signInGate: SignInGate | null = null;
 let sessionAdminResolver: SessionAdminResolver | null = null;
+let errorReturnsToStart = false;
 
 /**
  * Install the sign-in gate (call once at startup).
@@ -41,6 +42,22 @@ export function setSessionAdminResolver(
   resolver: SessionAdminResolver | null,
 ): void {
   sessionAdminResolver = resolver;
+}
+
+/**
+ * Send a failed OAuth sign-in back to the page that started it (FUT-4595).
+ * Off by default; the conditions for turning it on are `createApiAuth`'s
+ * `errorReturnsToStart`.
+ *
+ * @deprecated Pass `errorReturnsToStart` to `createApiAuth` instead.
+ */
+export function setErrorReturnsToStart(on: boolean): void {
+  errorReturnsToStart = on;
+}
+
+/** Whether the legacy handler returns a failed OAuth sign-in to its start. */
+export function getErrorReturnsToStart(): boolean {
+  return errorReturnsToStart;
 }
 
 /**

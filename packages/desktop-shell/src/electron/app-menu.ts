@@ -35,6 +35,10 @@ export interface AppMenuOptions {
 
 export function installAppMenu(options: AppMenuOptions): AppMenu {
   let drawn: UpdateState | null = null;
+  // A manual answer in progress — its check running or its box still open.
+  // Another click meanwhile does nothing: no second box, no visible state.
+  // Per menu, so it is not shared with another one.
+  let answering = false;
   // Never replace the menu under an open popup — see `createMenuGate`.
   const gate = createMenuGate<UpdateState>();
   const draw = (state: UpdateState): void => {
@@ -48,7 +52,15 @@ export function installAppMenu(options: AppMenuOptions): AppMenu {
         actions: {
           // Caught: a rejected check in a tray process is an unhandled
           // rejection that takes the agent's work with it.
-          checkUpdates: () => void checkAndAnswer(options).catch(() => undefined),
+          checkUpdates: () => {
+            if (answering) return;
+            answering = true;
+            void checkAndAnswer(options)
+              .catch(() => undefined)
+              .finally(() => {
+                answering = false;
+              });
+          },
           installUpdate: () => options.updates.install(),
           // The shell's `before-quit` stops intercepting `close`, so this is
           // the same exit as the tray's Quit.

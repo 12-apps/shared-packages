@@ -3,7 +3,10 @@ import { HashRouter } from 'react-router-dom';
 
 import { discountsManifest } from '@12-apps/discounts/manifest';
 import { discountsWebManifest } from '@12-apps/discounts/manifest/web';
-import { PT_BR_DISCOUNTS_WEB_COPY } from '@12-apps/discounts/react';
+import {
+  PT_BR_DISCOUNTS_WEB_COPY,
+  type DiscountsBulkSlotProps,
+} from '@12-apps/discounts/react';
 import { Fields } from '@12-apps/ui/form/total-form';
 
 import { webLoggerFor, webWiringHost } from '../wiring-web';
@@ -73,6 +76,43 @@ const CurrencyField = ({ name, label }: { name: string; label: string }): JSX.El
  */
 const log = webLoggerFor('@12-apps/discounts');
 
+/**
+ * The host's report for the bulk actions (FUT-4420): what a real host draws in
+ * its own `bulk-report`. The package owns the state and the routes; the host
+ * renders the counts, each row's reason and Desfazer around the grid it is
+ * handed.
+ */
+function BulkReport({ state, undo, undoable, children }: DiscountsBulkSlotProps): JSX.Element {
+  return (
+    <div>
+      {state.phase === 'running' ? <p data-testid="bulk-running">Aplicando em {state.total}…</p> : null}
+      {state.phase === 'failed' ? <p data-testid="bulk-failed">{state.message}</p> : null}
+      {state.phase === 'done' ? (
+        <div data-testid="bulk-report">
+          <p data-testid="bulk-counts">
+            {state.result.counts.ok} alterados, {state.result.counts.unchanged} já estavam,{' '}
+            {state.result.counts.skipped} pulados, {state.result.counts.failed} falharam
+          </p>
+          <ul>
+            {state.result.rows.map((row) => (
+              <li key={row.id} data-testid={`bulk-row-${row.status}`}>
+                {row.name}: {row.message}
+              </li>
+            ))}
+          </ul>
+          {undoable.length > 0 ? (
+            <button type="button" data-testid="bulk-undo" onClick={() => void undo()}>
+              Desfazer ({undoable.length})
+            </button>
+          ) : null}
+          {state.undone ? <p data-testid="bulk-undone">{state.undone.counts.ok} desfeitos</p> : null}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
 const { surface } = webWiringHost.adoptWeb({
   // BOUND, not declined: the package ships its own promotions journeys plus the
   // `DiscountsWorld` port, and this harness implements that port in
@@ -90,6 +130,7 @@ const { surface } = webWiringHost.adoptWeb({
         currency: 'BRL',
         onError: (error: unknown, context: string) => log.error(context, error),
         currencyField: CurrencyField,
+        bulkSlot: BulkReport,
       },
     },
   },
