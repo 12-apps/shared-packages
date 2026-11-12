@@ -290,11 +290,20 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
     border: 'none',
     position: 'relative',
     overflow: 'hidden',
+    // The shimmer paints UNDER every piece of ink (FUT-4516). A positioned
+    // `::before` with no z-index paints OVER the in-flow title, icon and close
+    // button — a white wash on dark ink, which took the title to 3.8:1 where the
+    // arithmetic said 6.7. `isolation` makes the root its own stacking context
+    // (so the -1 cannot reach behind the page) and the -1 sends the wash behind
+    // the content but above the root's own background and its inset tint layer,
+    // which is what the contrast model assumes. Geometry and timing untouched.
+    isolation: 'isolate',
     '.MuiAlert-icon': {
       color: ink,
     },
     '&::before': {
       content: '""',
+      zIndex: -1,
       position: 'absolute',
       top: 0,
       left: rem(theme, -GRADIENT.shimmerTravel),
