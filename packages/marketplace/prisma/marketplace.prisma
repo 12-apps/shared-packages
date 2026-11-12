@@ -241,5 +241,8 @@ model MarketplaceAcceptance {
   @@index([clientId, status])
   @@index([acknowledgeBy])
   @@index([cancellationRequestedAt])
+  // Also `marketplace_acceptances_cancellation_waiting_idx`, a PARTIAL index on
+  // cancellation_requested_at WHERE cancellation_status IN ('PENDING','REQUESTED'):
+  // SQL-only (migration 20261112120000), since Prisma cannot express the WHERE.
   @@map("marketplace_acceptances")
 }

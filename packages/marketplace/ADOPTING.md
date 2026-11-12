@@ -17,9 +17,9 @@ error at mount, never a default that quietly adopts another host's policy.
 | `order.create` | `(clientId, order: NormalizedMarketplaceOrder, lines: readonly ResolvedOrderLine[], db: MarketplaceDb) => Promise<string>` | Create the host's own order from a normalized one; return its id. `lines[i].subjectRef` is the mapped catalog id or null (never refuse the order for a null). `db` is the ingest's transaction client: write the order through it, so the order and the acceptance row commit together (a lost race rolls the host's order back instead of leaving an orphan a redelivery would duplicate). |
 | `order.catalogHas` | `(clientId, subjectRef) => Promise<boolean>` | Does this catalog id exist and belong to this tenant? Asked before a SKU is mapped. |
 | `order.onAccepted` | `(clientId, orderId) => Promise<void>` | The store accepted, or the connection auto-accepts. Start whatever accepting means here (the ticket, the board). Runs after the commit and AFTER the confirm is queued; a throw is logged and cannot un-accept or lose the confirm. Atomic work (the stock draw) belongs in `admit`. |
-| `order.onRefused` | `(clientId, orderId, reason: "REJECTED" \| "EXPIRED" \| "CANCELLED") => Promise<void>` | Refuse/cancel the host order: the store refused on the clock, the clock lapsed, or the marketplace cancelled. After the commit and after the cancellation request is queued; a throw on a decision is logged. NOT called for `recordStoreCancellation`, and not for its confirmation when the host binds `onCancellationConfirmed`. |
-| `order.onCancellationConfirmed` | OPTIONAL. `(clientId, orderId) => Promise<void>` | The marketplace CONFIRMED the store's own cancellation request (its event, or the job's answer for a marketplace that answers in the response). Run the host's cancel here when the host requests first and cancels on confirm. Bound: called INSTEAD of `onRefused(…, "CANCELLED")` for a cancellation the store asked for, once (a redelivered confirmation calls nothing). Not bound (a 1.0.0 host): `onRefused(…, "CANCELLED")` as before. A throw is logged. |
-| `order.onCancellationFailed` | OPTIONAL. `(clientId, orderId, reason: "REFUSED" \| "TIMEOUT") => Promise<void>` | The store's request FAILED: REFUSED (the marketplace's refusal event, the job's 4xx, or its last attempt dying) or TIMEOUT (the outbound sweep, past the marketplace's answer window, or the 24-hour give-up). Called once, by the path that moved the row. The order stays as it was (AWAITING or ACCEPTED): show the adapter's app link and tell the person. A throw is logged. |
+| `order.onRefused` | `(clientId, orderId, reason: "REJECTED" \| "EXPIRED" \| "CANCELLED") => Promise<void>` | Refuse/cancel the host order: the store refused on the clock, the clock lapsed, or the marketplace cancelled. After the commit and after the cancellation request is queued; a throw on a decision is logged. NOT called for `recordStoreCancellation`. A host that binds `onCancellationConfirmed` (request first) does not get `"REJECTED"` from `decide` either, nor `"CANCELLED"` for a cancellation the store asked for: `onCancellationConfirmed` replaces both. |
+| `order.onCancellationConfirmed` | OPTIONAL — binding it OPTS IN to request first. `(clientId, orderId) => Promise<void>` | The marketplace CONFIRMED the store's own cancellation request (its event, or the job's answer for a marketplace that answers in the response); the row is REJECTED/CONFIRMED by then. Run the host's cancel here. Bound: the store's refusals and cancels (`decide` REJECT, `recordStoreCancellation`) only REQUEST the cancellation and keep the order as it was until this is called, once (a redelivered confirmation calls nothing), INSTEAD of `onRefused`. Not bound (a 1.0.0 host): everything as 1.0.0 — REJECTED at request time, `onRefused(…, "REJECTED")` from `decide`, and `onRefused(…, "CANCELLED")` on the confirmation. A throw is logged. |
+| `order.onCancellationFailed` | OPTIONAL. `(clientId, orderId, reason: "REFUSED" \| "TIMEOUT") => Promise<void>` | The store's request FAILED: REFUSED (the marketplace's refusal event, the job's 4xx, its last attempt dying, or — request first — a marketplace whose API cannot take it, at once) or TIMEOUT (the outbound sweep, past the marketplace's answer window, or the 24-hour give-up). Called once, by the path that moved the row. Request first: the order stays as it was (AWAITING or ACCEPTED) and may be accepted again; show the adapter's app link and tell the person. A throw is logged. |
 | `order.summarize` | `(clientId, orderIds: readonly string[]) => Promise<Map<string, MarketplaceOrderSummary>>` | The queue's host facts in one read: `{ buyerName, totalCents, unmappedLines, createdAt }`. |
 | `secrets` | `{ seal(plaintext): string; open(sealed): string }` | Seal and open the credential blob with the host's key. `open` THROWS on a blob that will not open. |
 | `http` | `(req: MarketplaceHttpRequest) => Promise<MarketplaceHttpResponse>` | The only way the engine reaches a marketplace. Answer any status; throw only when no answer arrived (timeout, network). The host owns the timeout, proxy and CA. |
@@ -64,7 +64,7 @@ export const engine = createMarketplaceEngine({
 | call | when |
 |---|---|
 | `decideMany({ clientId, decisions, validateOnly? })` / `decide({ clientId, ...decision })` | Every accept or refusal of an order on the clock, from every surface (the board, the admin route, the MCP tool). One decide path, all-or-nothing. A decision is `{ orderId, decision: "ACCEPT", admission?, preparationMinutes? }` or `{ orderId, decision: "REJECT", reasonCode?, offendingSkus? }`. `decide` answers `decided`, `stale` with `reason` (`ALREADY_DECIDED` with the `status` — answer an ACCEPTED one as done, I4 — `EXPIRED`, `NOT_FOUND`, `CONFLICT`), `invalidReason` (`INVALID_REASON`, `ITEMS_REQUIRED`, `UNKNOWN_ITEM`), or `refusedByHost` (your `admit`'s code). |
-| `recordStoreCancellation({ clientId, orderId, reasonCode?, offendingSkus? })` | The store asks to cancel a marketplace order (before or after accepting it). Stamps the REQUEST and queues it; the decision status stays AWAITING or ACCEPTED until the marketplace confirms (decisions draft "request first, cancel on confirm"). `stale` when the marketplace already cancelled it or a request is already waiting. A FAILED request may be asked again. Either cancel first and call this (1.0.0's way), or call this first and cancel in `onCancellationConfirmed`. |
+| `recordStoreCancellation({ clientId, orderId, reasonCode?, offendingSkus? })` | The store cancels a marketplace order (before or after accepting it). Stamps the request and queues it. A host that binds no `onCancellationConfirmed` cancelled first and gets 1.0.0's stamps (REJECTED at once). A host that binds it (request first) gets the REQUEST only: the status stays AWAITING or ACCEPTED (and `decided.status` says so) until the marketplace confirms; a FAILED request may be asked again. `stale` when the marketplace already cancelled it or a request is already waiting. |
 | `suggestReason(provider, { itemUnavailable })` | To preselect a reason in the refusal dialog. The host judges the shortage. |
 | `orderStates(clientId, orderIds)` | The order reads: `{ status, confirmedAt, confirmFailedAt, cancellation, cancellationReasonCode, cancellationFailure, appUrl }` per marketplace order, one query. `cancellation` PENDING or REQUESTED is a request still waiting: draw it as such. `cancellationFailure` is REFUSED or TIMEOUT when `cancellation` is FAILED. |
 | `adapter(provider)`, `reasons(provider)`, `appLink(provider, ref)` | The marketplace's capabilities, reasons and link, without naming it. |
@@ -145,14 +145,17 @@ each.
     number included, never the host's global client inside the callback: on PGlite, which
     runs one transaction at a time, a write on the global client hangs the ingest, and on
     Postgres a rolled-back ingest would leave an orphan order and a burnt order number.
-13. **Request first, cancel on confirm (1.1, FUT-4758).** `recordStoreCancellation` no longer
-    stamps the decision REJECTED: only the request moves, and the marketplace's confirmation
-    does the rest. A host that cancels first (1.0.0's way) keeps working: its own cancel ran,
-    and it never read the status back. To cancel only on confirm instead:
+13. **Request first, cancel on confirm (1.1, FUT-4758) — opt in by binding
+    `order.onCancellationConfirmed`.** Without it nothing changes from 1.0.0. With it, the
+    store's refusals and cancels (`decide` REJECT and `recordStoreCancellation`) only request
+    the cancellation; the order keeps its status until the marketplace confirms, and the
+    acceptance clock leaves an order with a waiting request alone (the request's window ends
+    it first). To opt in:
+    - bind `order.onCancellationConfirmed` (run the ordinary cancel there);
     - call `recordStoreCancellation` from every cancel entry point, without cancelling;
     - draw `orderStates(…).cancellation` PENDING/REQUESTED as "waiting for the marketplace";
-    - bind `order.onCancellationConfirmed` (run the ordinary cancel there, with the reason the
-      store chose: the host keeps it, the engine carries only the marketplace's code);
+    - keep the store's own reason (its loss record, who asked) for that cancel: the engine
+      carries only the marketplace's code;
     - bind `order.onCancellationFailed` (REFUSED or TIMEOUT: the order stays, show the app link);
     - run migration `20261112120000_marketplace_cancellation_failure` (one nullable column,
       its CHECK and an index), through the host's plugin-migration sync like the first.
@@ -169,7 +172,11 @@ migration:
 
 The migrations are replay-safe. `20261112120000_marketplace_cancellation_failure`
 (1.1) adds `marketplace_acceptances.cancellation_failure_reason` (REFUSED or
-TIMEOUT, CHECKed), and an index the expiry of waiting requests reads.
+TIMEOUT, CHECKed), and a PARTIAL index the expiry of waiting requests reads
+(`marketplace_acceptances_cancellation_waiting_idx`, `WHERE cancellation_status IN
+('PENDING','REQUESTED')`). Prisma cannot express a partial index, so it is SQL-only and
+the partial declares none: a host that diffs its schema against its database ignores it,
+as it already does for the first migration's partial indexes.
 
 The migration `20261111200000_marketplace_engine` is replay-safe. On a host
 that already has the predecessor's tables it adds the outbound columns

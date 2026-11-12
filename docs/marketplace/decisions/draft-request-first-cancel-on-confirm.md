@@ -15,11 +15,16 @@ with nothing happening."
 
 What follows for the engine:
 
-1. **`recordStoreCancellation` records a REQUEST and nothing else.** Only the
+0. **Opt in.** All of what follows applies to a host that binds
+   `onCancellationConfirmed`; see Compatibility.
+1. **The store's refusal or cancel records a REQUEST and nothing else** —
+   `recordStoreCancellation`, and `decide` REJECT (the admin route, the MCP). Only the
    cancellation columns move (`cancellation_status` PENDING, the reason code,
    the SKUs, the request instant). The decision status stays AWAITING or
-   ACCEPTED while the marketplace answers. 1.0.0 stamped REJECTED at request
-   time; its only host cancelled first and never read the status back.
+   ACCEPTED while the marketplace answers, and `decide` calls no
+   `onRefused(…, "REJECTED")`. A marketplace whose API cannot take the request
+   fails it at once (REFUSED): a person cancels in its app, and its event
+   confirms.
 2. **The marketplace's confirmation does the cancel.** Its CANCELLED event (or
    the job's answer, for a marketplace that answers in the response) moves the
    row to REJECTED/CONFIRMED and calls the host's OPTIONAL
@@ -50,12 +55,15 @@ What follows for the engine:
 
 ## Compatibility
 
-No option flag. The callbacks and the window are optional, so a 1.0.0 host
-compiles and behaves as before, except for point 1, which no 1.0.0 host can
-observe through the engine's API beyond `orderStates().status` (still ACCEPTED
-or AWAITING while a request waits) and the acceptance queue (a waiting order
-stays listed). Its only consumer, future-pay, adopts the callbacks in the same
-round. The change ships as a minor (`feat`), not a major.
+Request first is OPT-IN: a host turns it on by binding the order port's
+`onCancellationConfirmed`. A host that binds nothing new — every 1.0.0 host, the origin host included, which lists `pending()` and serves
+`orderStates().status` — keeps 1.0.0's behaviour exactly: `decide` REJECT and
+`recordStoreCancellation` stamp REJECTED at once, `decide` calls
+`onRefused(…, "REJECTED")`, and a confirmation calls `onRefused(…, "CANCELLED")`
+(also on the job's synchronous path now, which moves the row to REJECTED as the
+event path does). The additions are a column, an index, two optional
+callbacks, an optional window and a capability, so the release is a minor
+(`feat`).
 
 ## Consequences
 
@@ -63,7 +71,8 @@ round. The change ships as a minor (`feat`), not a major.
   PENDING or REQUESTED), or the order looks untouched.
 - The host keeps the store's own reason (its loss record, who asked): the
   engine carries only the marketplace's reason code.
-- An AWAITING order whose request waits is still on the acceptance clock: if
-  the clock lapses first, `onRefused(…, "EXPIRED")` cancels it and a later
-  confirmation calls `onCancellationConfirmed` again. Hosts make both
-  idempotent.
+- The acceptance clock leaves an AWAITING order whose request waits alone: the
+  request's own window (TIMEOUT) or answer ends it first, and only then does the
+  clock apply. So the host hears exactly one ending per request.
+- `decided.status` is the row's status after the call: AWAITING or ACCEPTED
+  for a request that waits.
