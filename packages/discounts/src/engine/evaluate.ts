@@ -45,7 +45,9 @@ import type {
  *      pristine cart, not a target intersection.
  * R4 — A discount's base is what is STILL discountable on its covered lines, so
  *      a later discount never discounts money an earlier one already removed.
- * R5 — Raw amount (`./allocate.ts`).
+ * R5 — Raw amount (`./allocate.ts`). A fixed amount aimed at products or
+ *      categories is taken off EACH covered unit, as the menu badge shows it;
+ *      on `ORDER` it is taken once, and on `COMBO` once per application.
  * R6 — Scope precedence `COMBO → ITEM → CATEGORY → ORDER`, in four passes
  *      (`./evaluate-passes.ts`). Narrowest first, so an order-wide percentage is
  *      computed on the already item-discounted amount and an order-wide fixed

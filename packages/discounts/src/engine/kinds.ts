@@ -16,7 +16,7 @@
  * | type | column | means |
  * |---|---|---|
  * | `PERCENTAGE` | `percentOffBp` | basis points off its base |
- * | `FIXED_AMOUNT` | `amountOffCents` | cents off its base |
+ * | `FIXED_AMOUNT` | `amountOffCents` | cents off its base; at `ITEM`/`CATEGORY` scope, off each unit |
  * | `BUNDLE_PRICE` | `bundlePriceCents` | the matched group costs exactly this |
  * | `FREE_UNITS` | `freeUnits` | the cheapest N units of the group are free |
  *

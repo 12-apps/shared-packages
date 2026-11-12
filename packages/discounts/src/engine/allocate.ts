@@ -48,6 +48,42 @@ export function rawAmountCents(rule: DiscountRule, baseCents: number): number {
 }
 
 /**
+ * Whether a rule's amount is taken off EACH covered unit rather than once off
+ * the covered lines together: a `FIXED_AMOUNT` aimed at products or categories.
+ *
+ * "R$ 10 off nos destaques" is a price for every highlighted item, and the menu
+ * badge (`./preview.ts`) has always shown it that way: R$ 49 struck to R$ 39 on
+ * one card and R$ 45 to R$ 35 on the next. Applying R$ 10 ONCE across the cart
+ * instead charged R$ 84 for the two, R$ 43,79 and R$ 40,21, so the price changed
+ * the moment the shopper added the second item. A percentage needs no such rule:
+ * its value against the lines together equals the sum of its values per unit.
+ *
+ * `ORDER` keeps "once": it names no item ("R$ 5 a menos no pedido"). `COMBO`
+ * keeps "once per application", which `./combo-match.ts` already counts.
+ */
+export function takesAmountPerUnit(rule: DiscountRule): boolean {
+  return rule.type === "FIXED_AMOUNT" && (rule.scope === "ITEM" || rule.scope === "CATEGORY");
+}
+
+/**
+ * R5 for a {@link takesAmountPerUnit} rule on ONE line: the amount off each of
+ * `units`, each unit clamped to its own price (R$ 10 off a R$ 6 soda removes R$ 6),
+ * and the whole clamped to what is still discountable on the line, so an earlier
+ * pass's money is never given away twice (R4). Units are whole: a fraction of a
+ * unit earns no part of the amount.
+ */
+export function perUnitAmountCents(
+  rule: DiscountRule,
+  unitPriceCents: number,
+  units: number,
+  discountableCents: number,
+): number {
+  const wholeUnits = Math.max(0, Math.floor(units));
+  const perUnit = rawAmountCents(rule, unitPriceCents);
+  return Math.max(0, Math.min(perUnit * wholeUnits, discountableCents));
+}
+
+/**
  * R9 — the most that may ever be taken off a gross amount: everything above
  * `MIN_PAYABLE_TOTAL_CENTS`, because an order the provider cannot charge is
  * worse for the buyer than an order that costs one cent more (see the constant's

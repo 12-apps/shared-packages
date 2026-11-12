@@ -1,4 +1,10 @@
-import { allocateByLargestRemainder, maxDiscountableCents, rawAmountCents } from "./allocate";
+import {
+  allocateByLargestRemainder,
+  maxDiscountableCents,
+  perUnitAmountCents,
+  rawAmountCents,
+  takesAmountPerUnit,
+} from "./allocate";
 import { freshComboPool, matchCombo, type ComboMatch } from "./combo-match";
 import type { AppliedDiscount, DiscountCartLine, DiscountRule } from "./types";
 
@@ -166,9 +172,33 @@ function comboPlan(state: EvaluationState, rule: DiscountRule): ApplicationPlan 
   return { base, rawCents: Math.min(match.rewardCents, sumValues(base)), match };
 }
 
+/**
+ * R5 per unit — a fixed amount aimed at products or categories comes off EVERY
+ * covered unit (`takesAmountPerUnit`). The plan's base becomes each line's own
+ * part, so R7 hands each line exactly that part, and splits proportionally only
+ * if R9's floor clamps the total.
+ *
+ * The units counted are the pool's: those no combo consumed, which are the ones
+ * R10 leaves visible to this pass.
+ */
+function perUnitPlan(
+  state: EvaluationState,
+  rule: DiscountRule,
+  discountable: ReadonlyMap<string, number>,
+): ApplicationPlan {
+  const base = new Map<string, number>();
+  for (const [lineId, cents] of discountable) {
+    const unitPriceCents = state.linesById.get(lineId)?.unitPriceCents ?? 0;
+    const units = state.comboPool.get(lineId) ?? 0;
+    base.set(lineId, perUnitAmountCents(rule, unitPriceCents, units, cents));
+  }
+  return { base, rawCents: sumValues(base), match: null };
+}
+
 function planFor(state: EvaluationState, candidate: Candidate): ApplicationPlan {
   if (candidate.rule.scope === "COMBO") return comboPlan(state, candidate.rule);
   const base = discountableFor(state, candidate);
+  if (takesAmountPerUnit(candidate.rule)) return perUnitPlan(state, candidate.rule, base);
   return { base, rawCents: rawAmountCents(candidate.rule, sumValues(base)), match: null };
 }
 
