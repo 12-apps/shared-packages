@@ -27,7 +27,7 @@ describe("the outbound sweep", () => {
     await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "503" });
     expect(h.logged.some((line) => line.message.includes("outbound sweep will re-queue"))).toBe(true);
 
-    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 0 });
+    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 0, timedOut: 0 });
     expect(h.enqueued).toHaveLength(1);
 
     later(h, OUTBOUND_STALE_MS + 1);
@@ -73,8 +73,9 @@ describe("the outbound sweep", () => {
     const queuedBefore = h.enqueued.length;
     later(h, OUTBOUND_GIVE_UP_MS + 1);
 
-    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 1 });
+    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 1, timedOut: 0 });
     expect(h.acceptance(refused)?.cancellationStatus).toBe("FAILED");
+    expect(h.acceptance(refused)?.cancellationFailureReason).toBe("TIMEOUT");
     expect(h.enqueued).toHaveLength(queuedBefore);
   });
 
