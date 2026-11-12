@@ -352,6 +352,36 @@ describe("a host that binds no onCancellationConfirmed keeps 1.0.0's behaviour",
   });
 });
 
+describe("a 1.0.0 host's undelivered request is retried, never timed out", () => {
+  it("past iFood's window and the retry span, the sweep re-queues it and stamps nothing", async () => {
+    const h = createHarness({ queueDown: true });
+    const orderId = await placed(h);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
+
+    later(h, 10 * 60_000 + 1);
+    const result = await h.engine.sweepOutbound();
+
+    // The queue is down, so the re-queue is the attempt itself, under the sweep's own key.
+    expect(result).toMatchObject({ timedOut: 0, givenUp: 0 });
+    expect(h.acceptance(orderId)).toMatchObject({ status: "REJECTED", cancellationStatus: "PENDING", cancellationFailureReason: null });
+    expect(h.enqueued.at(-1)?.payload).toEqual({ clientId: TENANT, orderId, action: "requestCancellation" });
+    expect(h.enqueued.at(-1)?.dedupeKey).toContain(":sweep:");
+  });
+
+  it("a retry past the window still sends the request", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http });
+    const orderId = await placed(h);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
+
+    later(h, IFOOD_CANCELLATION_ANSWER_WINDOW_MS + 1);
+    const outcome = await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, FIRST);
+
+    expect(outcome).toEqual({ kind: "done", action: "requestCancellation" });
+    expect(h.acceptance(orderId)?.cancellationStatus).toBe("REQUESTED");
+  });
+});
+
 describe("the acceptance clock leaves a waiting request alone", () => {
   it("an AWAITING order whose request waits is not expired, so the host hears one ending only", async () => {
     const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);

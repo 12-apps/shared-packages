@@ -221,6 +221,41 @@ describe("a second marketplace is an adapter and nothing else", () => {
     }
   });
 
+  it("a synchronous 'cancelled' that lands after the sweep timed the request out still confirms, told once", async () => {
+    const box: { h?: ReturnType<typeof createHarness> } = {};
+    const http = scriptedHttp(async (request) => {
+      if (request.url.startsWith("https://api.acme.test/") && request.url.endsWith("/reject") && box.h) {
+        // The call is in flight when the window passes and the sweep times the request out.
+        box.h.clock.at = new Date(box.h.clock.at.getTime() + 60_001);
+        await box.h.engine.sweepOutbound();
+      }
+      return request.url.startsWith("https://api.acme.test/") ? { status: 200, body: "{}" } : { status: 500, body: "" };
+    });
+    const h = createHarness({
+      http,
+      cancellationHooks: true,
+      cancellationWindowMs: 60_000,
+      adapters: [createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US }), acmeAdapter],
+    });
+    box.h = h;
+    await h.connect(ACME);
+    const outcome = await deliverAcme(h, { event: "new", ref: "A-1", basket: [{ sku: "X", qty: 1, price: 900 }] });
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+    const orderId = outcome.orderId;
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "CLOSED" });
+
+    await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, { attempt: 1, maxAttempts: 3 });
+
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "TIMEOUT" }]);
+    expect(h.acceptance(orderId)).toMatchObject({
+      status: "REJECTED",
+      cancellationStatus: "CONFIRMED",
+      cancellationFailureReason: null,
+    });
+    expect(h.cancellationConfirmed).toEqual([orderId]);
+    expect(h.refused).toEqual([]);
+  });
+
   it("[B4] refuses an item reason with no items, or with an item the order does not carry, writing nothing", async () => {
     const { h } = harness();
     await h.connect(ACME);

@@ -4,6 +4,7 @@ import {
   confirmedToHost,
   failedRequestData,
   rejectConfirmed,
+  requestsFirst,
   tellCancellationFailed,
 } from "./cancellation-outcome";
 import { readOutboundConnection, type OutboundConnection } from "./integration";
@@ -153,8 +154,12 @@ async function stampCancellation(
 async function stampConfirmedCancellation(ctx: EngineContext, row: OutboundRow, clientId: string): Promise<void> {
   const now = ctx.ports.clock.now();
   const moved = await ctx.ports.transaction(async (tx) => {
+    // From FAILED too: the sweep may have timed the request out while this
+    // call was in flight, and a marketplace that answers in the response sends
+    // no event — its "cancelled" is the only word that it did (the event path's
+    // own rule: a confirmation after a TIMEOUT still confirms).
     const confirmed = await tx.marketplaceAcceptance.updateMany({
-      where: { orderId: row.orderId, cancellationStatus: "PENDING" },
+      where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "FAILED"] } },
       data: { cancellationStatus: "CONFIRMED", cancellationFailureReason: null },
     });
     if (confirmed.count === 0) return false;
@@ -243,6 +248,8 @@ async function runConfirm(
 
 /** Whether a request is older than its marketplace's answer window, so it must not be sent any more. */
 function pastWindow(ctx: EngineContext, row: OutboundRow, adapter: MarketplaceAdapter): boolean {
+  // A 1.0.0 host (no `onCancellationConfirmed`) has no window: it retries, as before.
+  if (!requestsFirst(ctx)) return false;
   const window = cancellationWindowMs(ctx, adapter);
   if (window === null || row.cancellationRequestedAt === null) return false;
   return ctx.ports.clock.now().getTime() - row.cancellationRequestedAt.getTime() > window;

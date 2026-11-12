@@ -35,7 +35,9 @@ const open = (sealed: string): string => {
 };
 
 /** Answer each request with the next scripted response (the last one repeats). */
-export function scriptedHttp(responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse)) {
+export function scriptedHttp(
+  responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse | Promise<MarketplaceHttpResponse>),
+) {
   const requests: MarketplaceHttpRequest[] = [];
   const http = async (request: MarketplaceHttpRequest): Promise<MarketplaceHttpResponse> => {
     requests.push(request);

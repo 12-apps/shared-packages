@@ -1,5 +1,5 @@
 import { NO_STANDING_REQUEST } from "./cancellation";
-import { cancellationWindowMs, failedRequestData, tellCancellationFailed } from "./cancellation-outcome";
+import { cancellationWindowMs, failedRequestData, requestsFirst, tellCancellationFailed } from "./cancellation-outcome";
 import { MARKETPLACE_OUTBOUND_JOB, enqueueOutbound, type OutboundAction } from "./outbound-queue";
 import type { EngineContext } from "./ports";
 
@@ -23,7 +23,9 @@ import type { EngineContext } from "./ports";
  *   host's ACCEPTED history from before this engine from being confirmed on
  *   the first pass.
  *
- * Before any of that, a store's cancellation request still waiting (PENDING:
+ * For a host that REQUESTS FIRST (it binds `onCancellationConfirmed`; a 1.0.0
+ * host keeps the re-queue and the give-up below, unchanged), and before
+ * anything else, a store's cancellation request still waiting (PENDING:
  * never delivered, or REQUESTED: delivered and unanswered) past its
  * marketplace's answer window — the engine's `cancellationWindowMs`, else the
  * adapter's `cancellationAnswerWindowMs`, counted from the request — is FAILED
@@ -118,6 +120,9 @@ async function waitingSince(
 
 /** Fail every request still waiting past its marketplace's window; no window, only the give-up. */
 async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> {
+  // Only for a host that requests first: a 1.0.0 host (it cancelled already)
+  // keeps the re-queue and the 24-hour give-up exactly as before.
+  if (!requestsFirst(ctx)) return 0;
   let expired = 0;
   for (const provider of ctx.registry.providers()) {
     const adapter = ctx.registry.get(provider);
@@ -139,7 +144,8 @@ export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<Outb
   const giveUp = new Date(now.getTime() - OUTBOUND_GIVE_UP_MS);
 
   const timedOut = await expireUnanswered(ctx, now);
-  const givenUp = await failAsTimeout(ctx, await waitingSince(ctx, giveUp, WAITING));
+  // 1.0.0 gave up on PENDING requests only; a host that requests first, on any still waiting.
+  const givenUp = await failAsTimeout(ctx, await waitingSince(ctx, giveUp, requestsFirst(ctx) ? WAITING : ["PENDING"]));
   const cancellations = (await db.marketplaceAcceptance.findMany({
     where: { cancellationStatus: "PENDING", cancellationRequestedAt: { lt: stale, gte: giveUp } },
     select: OWED_SELECT,
