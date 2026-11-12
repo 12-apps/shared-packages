@@ -82,6 +82,7 @@
   "packages/prisma/prisma/migrations/20261029120000_rbac_effective_grants/migration.sql": "e2060a6f9817bdef02dc77e3fa68c6c065f83027c8ec29606c7bfe1301907b35",
   "packages/prisma/prisma/migrations/20261106140000_discount_window_in_zone/migration.sql": "ec7191451bfc87719e7da273d9b31d411d634638afdfa567e9aa4f7ab40f9654",
   "packages/prisma/prisma/migrations/20261111200000_marketplace_engine/migration.sql": "c79de2b44c34670ac60a2d91754ff5e741c821e5af7f7a015c3b4dff23c6ffae",
+  "packages/prisma/prisma/migrations/20261111210000_payment_refund_retries/migration.sql": "e3ebfccf3528e5b6dc99b69bcf07ecd30659bafbe2954fa7b4f2c28a3278bb41",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",
