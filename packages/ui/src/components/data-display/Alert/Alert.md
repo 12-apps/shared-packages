@@ -131,7 +131,7 @@ import Star from '@mui/icons-material/Star';
 - **warning**: Orange warning styling with warning icon  
 - **danger**: Red error styling with error icon
 - **glass**: Glass morphism effect with backdrop blur
-- **gradient**: Gradient background with shimmer animation
+- **gradient**: Gradient background with shimmer animation; the ink follows the mode and the ends are derived from the theme's hue to hold 4.5:1
 
 ## Accessibility
 
@@ -180,10 +180,15 @@ message column beside the title rather than inside it. The close button
 declares its own colour keep their colours and states; a `color="inherit"`
 control in `children` steps with the words around it.
 
-`gradient` is not stepped. The step's direction is the mode's, and a host that
-repaints a gradient to a light pane with a dark ink would have had that ink
-stepped toward white under the variant's black layer. Its rest contrast is
-FUT-4516's.
+`gradient` steps like the others. Its ink follows the mode (dark text over a
+light sweep, white over a deep one), and each end of the sweep is derived from
+the theme's `light` and `dark` of the hue, moved toward white (light mode) or
+black (dark mode) only as far as the ink needs, so the title and the
+description hold 4.5:1 over the whole sweep (judged at 21 points, not only the
+ends), the shimmer included, at rest, hovered and pressed (FUT-4516). The shimmer
+is stacked BEHIND the words (`isolation: isolate`, `::before` at `z-index: -1`),
+so a white wash never lies over dark ink. Native paints the derived first end
+under the same ink (no shimmer, no pointer states, so rest only).
 
 ### `announce` — whether the alert interrupts
 

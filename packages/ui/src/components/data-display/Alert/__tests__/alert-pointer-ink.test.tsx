@@ -114,13 +114,22 @@ describe('Given which absolute the ink steps toward', () => {
     expect(inkAbsolute(themeOf(mode), 'info')).toBe(sideOf(mode));
   });
 
-  it.each(MODES)('does not step a %s-mode gradient, whose ink side a host repaint can flip', (mode) => {
-    // A host that repaints alerts to a light pane and a dark ink repaints the
-    // gradient too, under its BLACK layer. Stepped by the package's own white
-    // ink, that dark ink went toward white: 1.02:1 pressed (FUT-4506 review).
-    const styles = pointerInkStyles(themeOf(mode), 'gradient');
-    expect(inkAbsolute(themeOf(mode), 'gradient')).toBeNull();
-    expect(styles).toEqual({ rest: {}, hover: {}, press: {} });
+  it('steps a light-mode gradient toward black, like a semantic one', () => {
+    // The ink follows the mode since FUT-4516 and the tint is black, which is
+    // the dark ink's side in light mode: the step is the semantic variants'.
+    const styles = pointerInkStyles(themeOf('light'), 'gradient');
+    expect(inkAbsolute(themeOf('light'), 'gradient')).toBe('black');
+    expect(styles).toEqual(pointerInkStyles(themeOf('light'), 'info'));
+    expect(JSON.stringify(styles.press)).toContain(', #000)');
+  });
+
+  it('does not step a dark-mode gradient: its tint is black, away from the white ink', () => {
+    // Owner decision (FUT-4516): the gradient's tint is black in both modes, so
+    // in dark mode it darkens the surface under a white ink and the contrast
+    // rises. There is nothing to step, and a step toward white would only
+    // spend the white ink's headroom for nothing.
+    expect(inkAbsolute(themeOf('dark'), 'gradient')).toBeNull();
+    expect(pointerInkStyles(themeOf('dark'), 'gradient')).toEqual({ rest: {}, hover: {}, press: {} });
   });
 });
 

@@ -46,24 +46,21 @@ export type PointerInkState = keyof typeof POINTER_INK_STEP;
 export type InkAbsolute = 'black' | 'white';
 
 /**
- * The absolute the ink steps toward — the mode's, the side the ink is on — or
- * `null` for `gradient`, which does not step at all.
+ * The absolute the ink steps toward: the mode's, the side the ink is on, or
+ * `null` where nothing needs stepping.
  *
- * Every other variant's surface tracks the mode: a dark ink on a light tint,
- * a light ink on a dark one, so the step is toward black in light mode and
- * toward white in dark, the same absolute the tint layer moves the surface to.
+ * Every variant's surface tracks the mode: a dark ink on a light tint, a light
+ * ink on a dark one, so the step is toward black in light mode and toward white
+ * in dark, the same absolute the tint layer moves the surface to.
  *
- * `gradient` is the one surface where the package cannot know which side its
- * ink is on. Its own ink is `getContrastText` of the hue, but a host that
- * repaints alerts repaints the gradient too: a light pane and a dark ink under
- * the variant's BLACK layer. Stepping by the package's own ink then moved that
- * dark ink toward white — 1.02:1 pressed. A step that reads `currentColor` for
- * its amount but not for its direction is only safe where the direction is the
- * mode's, so `gradient` keeps today's ink. Its rest contrast and its dark ink
- * on dark mode's light hues are FUT-4516's.
+ * `gradient` follows the mode too since FUT-4516 (dark text over a light sweep,
+ * white over a deep one) with one difference: its tint is black in both modes
+ * (`pointerShadow` in `Alert.tsx`). In light mode that is the ink's side, so it
+ * steps toward black. In dark mode the ink is already white and the tint moves
+ * AWAY from it, so no step is needed and the answer is `null`.
  */
 export function inkAbsolute(theme: Theme, variant: string | undefined): InkAbsolute | null {
-  if (variant === 'gradient') return null;
+  if (variant === 'gradient' && theme.palette.mode === 'dark') return null;
   return theme.palette.mode === 'dark' ? 'white' : 'black';
 }
 

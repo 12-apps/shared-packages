@@ -9,6 +9,7 @@ import React from 'react';
 import { sheen, softNeutral } from '../../../tokens/ink';
 
 import type { AlertVariant } from './Alert.base';
+import { gradientLook } from './Alert.gradient';
 import { VARIANT_ICON } from './Alert.helpers';
 import {
   ACTION_SLOT,
@@ -275,6 +276,35 @@ const semanticSurface = (theme: Theme, colorPalette: AlertPalette): CSSObject =>
   };
 };
 
+/** `gradient`: both ends and the ink derived from the host's hue to hold 4.5:1 (FUT-4516, `Alert.gradient.ts`). */
+const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => {
+  const { ink, from, to } = gradientLook(theme, colorPalette);
+  return {
+    background: `linear-gradient(${GRADIENT.angleDeg}deg, ${alpha(from, GRADIENT.stopAlpha)}, ${alpha(to, GRADIENT.stopAlpha)})`,
+    color: ink,
+    border: 'none',
+    position: 'relative',
+    overflow: 'hidden',
+    // The shimmer paints UNDER the ink (FUT-4516): unstacked, the `::before` lay over the
+    // words (3.8:1). Isolated, its -1 stays behind them and above the background and tint.
+    isolation: 'isolate',
+    '.MuiAlert-icon': {
+      color: ink,
+    },
+    '&::before': {
+      content: '""',
+      zIndex: -1,
+      position: 'absolute',
+      top: 0,
+      left: rem(theme, -GRADIENT.shimmerTravel),
+      width: '100%',
+      height: '100%',
+      background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
+      animation: `${shimmerAnimation(theme)} ${seconds(GRADIENT.shimmerMs)} infinite`,
+    },
+  };
+};
+
 // The six visual variants. Each block is spread in only when it matches, which
 // is how the original inline version read; keeping that shape here means the
 // styled() callback carries one branch instead of six. The four semantics were
@@ -312,26 +342,7 @@ export const alertVariantStyles = (
     },
   }),
 
-  ...(customVariant === 'gradient' && {
-    background: `linear-gradient(${GRADIENT.angleDeg}deg, ${alpha(colorPalette.light || colorPalette.main, GRADIENT.stopAlpha)}, ${alpha(colorPalette.dark || colorPalette.main, GRADIENT.stopAlpha)})`,
-    color: theme.palette.getContrastText(colorPalette.main),
-    border: 'none',
-    position: 'relative',
-    overflow: 'hidden',
-    '.MuiAlert-icon': {
-      color: theme.palette.getContrastText(colorPalette.main),
-    },
-    '&::before': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      left: rem(theme, -GRADIENT.shimmerTravel),
-      width: '100%',
-      height: '100%',
-      background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
-      animation: `${shimmerAnimation(theme)} ${seconds(GRADIENT.shimmerMs)} infinite`,
-    },
-  }),
+  ...(customVariant === 'gradient' && gradientStyles(theme, colorPalette)),
 });
 
 /** The web's glow: a soft shadow of the hue and a touch of brightness. */

@@ -1,7 +1,9 @@
 import type { AlertVariant } from './Alert.base';
 import { alpha, darken, lighten } from '../../../tokens/color';
-import { NEUTRAL_RAMP } from '../../../tokens/ink.core';
+import { ABSOLUTE_INK, NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import { contrastText, type UiGreyStep, type UiTheme } from '../../../tokens/theme';
+
+import { deriveGradient, gradientBasis } from './Alert.gradient.core';
 
 /**
  * THE NUMBERS BOTH `Alert` RENDERERS DRAW WITH.
@@ -58,7 +60,10 @@ export const SEMANTIC_SURFACE = { tint: { light: 0.9, dark: 0.8 }, ink: 0.6, bor
 /** `glass`: 85% paper under a 20px blur, a 0.4 divider hairline. */
 export const GLASS = { backgroundAlpha: 0.85, borderAlpha: 0.4, blur: 20, saturatePercent: 180 } as const;
 /**
- * `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
+ * `gradient`: on the web the hue's light and dark ends, each moved toward white
+ * (light mode) or black (dark mode) only as far as the mode's ink needs
+ * (`Alert.gradient.ts`; native paints the first derived end only, see
+ * `gradientSurface`; FUT-4516), at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
  *
  * It carries no hover of its own, and that is load-bearing rather than an
  * omission. `alertVariantStyles` is spread AFTER the root's `'&:hover'` in the
@@ -163,10 +168,10 @@ export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
  * light mode, white in dark. The web applies the step as `color-mix()` over
  * `currentColor`, so its AMOUNT lands on whatever ink is actually painted — a
  * host's repaint of a semantic or `glass` alert included. Its DIRECTION is the
- * mode's, which is only safe where the surface tracks the mode, so `gradient`
- * is not stepped at all (`inkAbsolute` in `Alert.ink.ts`): a host that
- * repaints it to a light pane and a dark ink would otherwise have its ink
- * stepped toward white under a black layer. DOM only; native has no pointer
+ * mode's, which is only safe where the surface tracks the mode: `gradient`
+ * does since FUT-4516 (dark ink over a light sweep, white over a deep one), so
+ * it steps like every other variant (`inkAbsolute` in `Alert.ink.ts`). DOM
+ * only; native has no pointer
  * states. `Banner` paints the same tint and steps its words by this same table
  * (FUT-4519).
  */
@@ -184,6 +189,14 @@ export const POINTER_INK_STEP = {
 export const POINTER_STATES = {
   hover: { tintAlpha: HOVER.tintAlpha, inkStep: POINTER_INK_STEP.hover },
   press: { tintAlpha: ACTIVE.tintAlpha, inkStep: POINTER_INK_STEP.press },
+} as const;
+
+/** What the gradient's derivation judges with (`Alert.gradient.core.ts`), shared by the web and native. */
+export const GRADIENT_MODEL = {
+  stopAlpha: GRADIENT.stopAlpha,
+  shimmerAlpha: GRADIENT.shimmerAlpha,
+  descriptionOpacity: DESCRIPTION.opacity,
+  states: POINTER_STATES,
 } as const;
 
 export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
@@ -266,14 +279,38 @@ export function gradientStops(palette: AlertPalette): { from: string; to: string
   };
 }
 
-export function gradientSurface(palette: AlertPalette): AlertSurface {
-  const ink = contrastText(palette.main);
-  return { backgroundColor: gradientStops(palette).from, color: ink, iconColor: ink };
+/**
+ * The gradient as a renderer with no gradient fill and no pointer paints it: the
+ * derived first end at its alpha under the mode's ink (FUT-4516), from the same
+ * arithmetic as the web (`Alert.gradient.core.ts`). The ends are judged with the
+ * web's shimmer and tint, which native does not draw — a stricter bar than
+ * native needs, so one derivation serves both. Native has no hover or press on
+ * the alert itself (only its close button presses), so rest is its only state.
+ * Without a theme it paints the hue's `light` end under `contrastText`, as
+ * before.
+ */
+export function gradientSurface(palette: AlertPalette, theme?: UiTheme): AlertSurface {
+  if (theme === undefined) {
+    const ink = contrastText(palette.main);
+    return { backgroundColor: gradientStops(palette).from, color: ink, iconColor: ink };
+  }
+  const { ink, from } = deriveGradient(
+    gradientBasis(theme.mode, {
+      paper: theme.palette.background.paper,
+      textPrimary: theme.palette.text.primary,
+      white: ABSOLUTE_INK.white,
+      black: ABSOLUTE_INK.black,
+    }),
+    GRADIENT_MODEL,
+    palette.light || palette.main,
+    palette.dark || palette.main,
+  );
+  return { backgroundColor: alpha(from, GRADIENT.stopAlpha), color: ink, iconColor: ink };
 }
 
 /** The surface for a variant, `glass` and `gradient` included. */
 export function alertSurface(theme: UiTheme, variant: AlertVariant, palette: AlertPalette): AlertSurface {
   if (variant === 'glass') return glassSurface(theme);
-  if (variant === 'gradient') return gradientSurface(palette);
+  if (variant === 'gradient') return gradientSurface(palette, theme);
   return semanticSurface(theme, palette);
 }

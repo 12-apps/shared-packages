@@ -99,9 +99,12 @@ describe('Alert (native)', () => {
     expect(glass.backgroundColor).toBe('rgba(255, 255, 255, 0.85)');
     expect(glass.borderColor).toBe(alpha(theme.palette.divider, 0.4));
     expect(glass.iconColor).toBe(theme.palette.primary.main);
-    const gradient = gradientSurface(theme.palette.primary);
-    expect(gradient.backgroundColor).toBe(alpha(theme.palette.primary.light, 0.9));
-    expect(gradient.color).toBe('#fff');
+    // FUT-4516: the first stop is DERIVED (paler than the hue's own `light` where the mode's ink needs it)
+    // and the ink follows the mode: the theme's dark text in light mode, as on the web.
+    const gradient = gradientSurface(theme.palette.primary, theme);
+    expect(gradient.backgroundColor).not.toBe(alpha(theme.palette.primary.light, 0.9));
+    expect(gradient.backgroundColor).toMatch(/^rgba\(\d+, \d+, \d+, 0\.9\)$/u);
+    expect(gradient.color).toBe(theme.palette.text.primary);
     render(
       <>
         <Alert variant="glass" dataTestId="g" title="T" />
@@ -110,9 +113,9 @@ describe('Alert (native)', () => {
     );
     expect(screen.getByTestId('g')).toHaveStyle({ backgroundColor: 'rgba(255, 255, 255, 0.85)' });
     expect(screen.getByTestId('g-title').style.color).toBe('rgba(0, 0, 0, 0.87)');
-    expect(screen.getByTestId('gr')).toHaveStyle({ backgroundColor: alpha(theme.palette.primary.light, 0.9) });
+    expect(screen.getByTestId('gr')).toHaveStyle({ backgroundColor: gradient.backgroundColor });
     expect(screen.getByTestId('gr').style.borderTopWidth).toBe('');
-    expect(screen.getByTestId('gr-title').style.color).toBe('rgb(255, 255, 255)');
+    expect(screen.getByTestId('gr-title').style.color).toBe('rgba(0, 0, 0, 0.87)');
   });
 
   it('lays out like the web: 14px 16px of padding, 12px corners, the slots where MUI puts them', () => {
