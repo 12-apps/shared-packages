@@ -47,6 +47,7 @@ export type {
   MarketplaceAdmission,
   MarketplaceAdmissionRequest,
   MarketplaceAdmissionResult,
+  CancellationFailureReason,
   MarketplaceAuditEntry,
   MarketplaceAuditPort,
   MarketplaceClockPort,

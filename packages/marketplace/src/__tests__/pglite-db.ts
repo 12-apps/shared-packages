@@ -6,7 +6,7 @@ import type { MarketplaceDb } from "../core/ports";
 
 /**
  * The engine's `MarketplaceDb` over REAL Postgres (PGlite), translating the
- * exact Prisma subset the engine writes — equality, `in`, `not`, `lt`, `gte`,
+ * exact Prisma subset the engine writes — equality, `in`, `not`, `lt`, `gte`, `OR`,
  * the compound unique keys, `increment`, `orderBy`, `take` — into SQL. It lets
  * the engine's guarded writes run against the shipped migration's tables and
  * CHECKs instead of an in-memory stand-in.
@@ -64,14 +64,23 @@ function conditionSql(sql: Sql, column: string, condition: unknown): string[] {
   });
 }
 
-function whereSql(sql: Sql, where: Where | undefined): string {
+/** The conditions of one `where`, ANDed; `OR` is any of its branches. */
+function conditionsSql(sql: Sql, where: Where | undefined): string[] {
   const parts: string[] = [];
   for (const [key, condition] of Object.entries(where ?? {})) {
     const columns = COMPOUND_KEYS[key];
-    if (columns && isPlain(condition)) {
+    if (key === "OR") {
+      const branches = (condition as Where[]).map((branch) => `(${conditionsSql(sql, branch).join(" AND ") || "TRUE"})`);
+      parts.push(`(${branches.join(" OR ")})`);
+    } else if (columns && isPlain(condition)) {
       for (const column of columns) parts.push(...conditionSql(sql, snake(column), condition[column]));
     } else parts.push(...conditionSql(sql, snake(key), condition));
   }
+  return parts;
+}
+
+function whereSql(sql: Sql, where: Where | undefined): string {
+  const parts = conditionsSql(sql, where);
   return parts.length > 0 ? `WHERE ${parts.join(" AND ")}` : "";
 }
 

@@ -224,6 +224,10 @@ model MarketplaceAcceptance {
   cancellationOffendingSkus Json? @map("cancellation_offending_skus")
   /// When the request was stamped PENDING: what the outbound sweep ages it by.
   cancellationRequestedAt DateTime? @map("cancellation_requested_at")
+  /// Why the request FAILED: REFUSED (the marketplace said no, or every
+  /// attempt failed) or TIMEOUT (no answer inside its window). CHECK in the
+  /// migration; NULL unless `cancellationStatus` is FAILED.
+  cancellationFailureReason String? @map("cancellation_failure_reason")
   /// The preparation time the accept stated, for a confirm that takes one.
   preparationMinutes Int? @map("preparation_minutes")
   /// The order's SKUs as the marketplace sent them (a JSON array): what

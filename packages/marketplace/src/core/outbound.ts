@@ -1,4 +1,5 @@
 import type { MarketplaceAdapter, OutboundOrderRef, OutboundResult } from "./adapter";
+import { failedRequestData, tellCancellationConfirmed, tellCancellationFailed } from "./cancellation-outcome";
 import { readOutboundConnection, type OutboundConnection } from "./integration";
 import type { OutboundJobPayload } from "./outbound-queue";
 import type { EngineContext } from "./ports";
@@ -87,6 +88,11 @@ function refOf(row: OutboundRow): OutboundOrderRef {
 /** Why a confirm is not owed, or null when it is. */
 function confirmSkip(row: OutboundRow, adapter: MarketplaceAdapter): string | null {
   if (row.status !== "ACCEPTED") return `the order is ${row.status}, not ACCEPTED`;
+  // A request to cancel stands (FUT-4758: the status stays ACCEPTED while it
+  // waits): confirming now would tell the marketplace the opposite.
+  if (row.cancellationStatus !== null && row.cancellationStatus !== "FAILED") {
+    return `a cancellation request is ${row.cancellationStatus}`;
+  }
   if (row.confirmedAt || row.confirmFailedAt) return "the confirm is already stamped";
   if (!adapter.capabilities.apiConfirm) return "the marketplace has no confirm API";
   return null;
@@ -106,17 +112,27 @@ async function stampConfirm(
   });
 }
 
-/** The cancellation stamp, predicated on the request still being PENDING. */
+/**
+ * The cancellation stamp, predicated on the request still being PENDING, and
+ * the host told how it ended when this run is what ended it (FUT-4758): a
+ * marketplace that answers in the response CONFIRMS here, and a refusal FAILS
+ * here. REQUESTED tells nobody: the answer is still to come, by event.
+ */
 async function stampCancellation(
   ctx: EngineContext,
   row: OutboundRow,
   status: "REQUESTED" | "CONFIRMED" | "FAILED",
+  clientId: string,
 ): Promise<void> {
   const db = await ctx.ports.db();
-  await db.marketplaceAcceptance.updateMany({
+  const data = status === "FAILED" ? failedRequestData("REFUSED") : { cancellationStatus: status };
+  const moved = await db.marketplaceAcceptance.updateMany({
     where: { orderId: row.orderId, cancellationStatus: "PENDING" },
-    data: { cancellationStatus: status },
+    data,
   });
+  if (moved.count === 0) return;
+  if (status === "FAILED") await tellCancellationFailed(ctx, clientId, row.orderId, "REFUSED");
+  if (status === "CONFIRMED") await tellCancellationConfirmed(ctx, clientId, row.orderId);
 }
 
 /** The connection, or the reason it cannot be used (a refusal: no retry fixes it). */
@@ -222,8 +238,8 @@ async function runCancellation(
     row,
     result,
     attempt,
-    () => stampCancellation(ctx, row, taken),
-    () => stampCancellation(ctx, row, "FAILED"),
+    () => stampCancellation(ctx, row, taken, payload.clientId),
+    () => stampCancellation(ctx, row, "FAILED", payload.clientId),
   );
 }
 
@@ -235,17 +251,20 @@ async function runCancellation(
 async function stampLastAttemptFailure(ctx: EngineContext, payload: OutboundJobPayload, error: unknown): Promise<OutboundOutcome> {
   const reason = error instanceof Error ? error.message : String(error);
   const db = await ctx.ports.db();
-  await (payload.action === "confirm"
+  const moved = await (payload.action === "confirm"
     ? db.marketplaceAcceptance.updateMany({
         where: { orderId: payload.orderId, clientId: payload.clientId, confirmedAt: null, confirmFailedAt: null },
         data: { confirmFailedAt: ctx.ports.clock.now() },
       })
     : db.marketplaceAcceptance.updateMany({
         where: { orderId: payload.orderId, clientId: payload.clientId, cancellationStatus: "PENDING" },
-        data: { cancellationStatus: "FAILED" },
+        data: failedRequestData("REFUSED"),
       }));
   ctx.ports.logger.error(`marketplace.outbound: ${payload.action} for order ${payload.orderId} failed: ${reason}`);
   ctx.ports.publishChanged(payload.clientId);
+  if (payload.action === "requestCancellation" && moved.count > 0) {
+    await tellCancellationFailed(ctx, payload.clientId, payload.orderId, "REFUSED");
+  }
   return { kind: "failed", action: payload.action, reason };
 }
 

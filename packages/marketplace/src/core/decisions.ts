@@ -1,9 +1,11 @@
 import type { AcceptanceStatus, CancellationStatus } from "./acceptance";
 import {
   CLAIM_SELECT,
+  NO_STANDING_REQUEST,
   notPendingProblem,
   planCancellation,
   refusalData,
+  requestData,
   type CancellationPlan,
   type ClaimRow,
   type DecisionProblem,
@@ -119,6 +121,15 @@ function decidedOf(input: DecisionInput, plan: CancellationPlan | null): Decided
 }
 
 /** Plan one decision against its row, or name what is wrong with it. */
+/** The columns of a request that no longer stands, cleared. */
+const CLEARED_REQUEST = {
+  cancellationStatus: null,
+  cancellationReasonCode: null,
+  cancellationOffendingSkus: null,
+  cancellationRequestedAt: null,
+  cancellationFailureReason: null,
+} as const;
+
 function planOne(
   ctx: EngineContext,
   input: DecisionInput,
@@ -130,7 +141,13 @@ function planOne(
   const stale = notPendingProblem(row, path);
   if (stale || !row) return stale ? [stale] : [];
   if (input.decision === "ACCEPT") {
-    const data = { status: "ACCEPTED", acknowledgedAt: now, preparationMinutes: input.preparationMinutes ?? null };
+    // An accept after a FAILED request (FUT-4758) leaves no request behind it.
+    const data = {
+      status: "ACCEPTED",
+      acknowledgedAt: now,
+      preparationMinutes: input.preparationMinutes ?? null,
+      ...(row.cancellationStatus === null ? {} : CLEARED_REQUEST),
+    };
     return { input, index, row, data, decided: decidedOf(input, null) };
   }
   const plan = planCancellation(ctx.registry.get(row.provider), input, row, path);
@@ -164,7 +181,7 @@ async function admitAndClaim(
     if (refused.length > 0) throw new Rollback(refused);
     for (const one of planned) {
       const claimed = await tx.marketplaceAcceptance.updateMany({
-        where: { orderId: one.input.orderId, clientId, status: "AWAITING" },
+        where: { orderId: one.input.orderId, clientId, status: "AWAITING", ...NO_STANDING_REQUEST },
         data: one.data,
       });
       if (claimed.count === 0) refused.push({ path: ["decisions", one.index, "orderId"], code: "CONFLICT" });
@@ -271,13 +288,22 @@ export async function decideOne(
 }
 
 /**
- * The STORE cancelled an order through the host's own cancel — before or
- * after accepting it. Stamps the request the marketplace must hear and queues
- * it. The host's own cancel already ran, so the engine neither admits nor
- * calls `onRefused`: it records and queues, and nothing else.
+ * The STORE asks to cancel an order — before or after accepting it. Stamps
+ * the request the marketplace must hear and queues it; the engine neither
+ * admits nor calls `onRefused`: it records and queues, and nothing else.
+ *
+ * REQUEST FIRST (FUT-4758): only the request moves. The decision status stays
+ * AWAITING or ACCEPTED while the marketplace answers, so a host that cancels
+ * on `onCancellationConfirmed` keeps the order as it was until then, and a
+ * refused or timed-out request (`onCancellationFailed`) leaves it acceptable
+ * and still on the acceptance clock. The marketplace's confirmation moves it
+ * to REJECTED. (1.0.0 stamped REJECTED here; its hosts cancelled first and
+ * never read the status back.) A FAILED request may be asked again.
+ *
+ * The returned row's `status` is the decision taken, REJECT, not the row's.
  *
  * `stale` (ALREADY_DECIDED) when the marketplace already cancelled it, the
- * clock lapsed (EXPIRED), or a request was already made.
+ * clock lapsed (EXPIRED), or a request is already waiting.
  */
 export async function recordStoreCancellation(
   ctx: EngineContext,
@@ -292,8 +318,8 @@ export async function recordStoreCancellation(
   const now = input.now ?? ctx.ports.clock.now();
   const db = await ctx.ports.db();
   const claimed = await db.marketplaceAcceptance.updateMany({
-    where: { orderId: input.orderId, clientId: input.clientId, status: row.status, cancellationStatus: null },
-    data: refusalData(plan, row.status, now),
+    where: { orderId: input.orderId, clientId: input.clientId, status: row.status, ...NO_STANDING_REQUEST },
+    data: requestData(plan, now),
   });
   if (claimed.count === 0) return { kind: "stale", reason: "CONFLICT", status: null };
   if (plan.status === "PENDING") {

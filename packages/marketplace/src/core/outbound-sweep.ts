@@ -1,3 +1,5 @@
+import { NO_STANDING_REQUEST } from "./cancellation";
+import { cancellationWindowMs, failedRequestData, tellCancellationFailed } from "./cancellation-outcome";
 import { MARKETPLACE_OUTBOUND_JOB, enqueueOutbound, type OutboundAction } from "./outbound-queue";
 import type { EngineContext } from "./ports";
 
@@ -14,11 +16,22 @@ import type { EngineContext } from "./ports";
  * - younger than {@link OUTBOUND_STALE_MS}: the original job may still be
  *   retrying, so it is left alone;
  * - older than {@link OUTBOUND_GIVE_UP_MS}: a marketplace has long since
- *   settled the order on its own clock. A PENDING request that old is stamped
- *   FAILED (a person finishes it on the marketplace, through the app link),
+ *   settled the order on its own clock. A request still waiting that old is
+ *   stamped FAILED, TIMEOUT (a person finishes it on the marketplace, through
+ *   the app link),
  *   and an accept that old is never confirmed — which is also what keeps a
  *   host's ACCEPTED history from before this engine from being confirmed on
  *   the first pass.
+ *
+ * Before any of that, a store's cancellation request the marketplace TOOK
+ * (REQUESTED) and has not answered past its answer window — the engine's
+ * `cancellationWindowMs`, else the adapter's `cancellationAnswerWindowMs`,
+ * counted from the request — is FAILED as TIMEOUT, and the host hears it
+ * through `onCancellationFailed` (FUT-4758): a request nobody answers must
+ * never stay pending. The window is read at the sweep's own cadence, so a
+ * request ends between the window and the window plus one pass. A PENDING
+ * request is not "unanswered": it was never delivered, the job retries it and
+ * this sweep re-queues it, and only the give-up below ends it (TIMEOUT too).
  *
  * Re-queued under a key of its own per pass: a queue keeps a finished job's id
  * and would swallow a re-queue under the job's plain key. The job itself is
@@ -34,8 +47,14 @@ export const OUTBOUND_GIVE_UP_MS = 24 * 60 * 60_000;
 /** What one sweep pass did. */
 export interface OutboundSweepResult {
   requeued: number;
+  /** Requests still waiting past {@link OUTBOUND_GIVE_UP_MS}, failed as TIMEOUT. */
   givenUp: number;
+  /** Requests failed as TIMEOUT past their marketplace's answer window. */
+  timedOut: number;
 }
+
+/** A store's cancellation request still waiting on the marketplace. */
+const WAITING = ["PENDING", "REQUESTED"];
 
 interface OwedRow {
   clientId: string;
@@ -60,15 +79,65 @@ async function requeue(ctx: EngineContext, rows: readonly OwedRow[], action: Out
 }
 
 /** Re-queue every owed call older than the job's retry span; give up on the ancient ones. */
+/**
+ * Fail as TIMEOUT every request in `rows` still waiting, one predicated write
+ * each, so a confirmation that lands meanwhile wins and its host hears nothing
+ * twice. Returns how many moved.
+ */
+async function failAsTimeout(ctx: EngineContext, rows: readonly OwedRow[]): Promise<number> {
+  const db = await ctx.ports.db();
+  let failed = 0;
+  for (const row of rows) {
+    const moved = await db.marketplaceAcceptance.updateMany({
+      where: { orderId: row.orderId, clientId: row.clientId, cancellationStatus: { in: WAITING } },
+      data: failedRequestData("TIMEOUT"),
+    });
+    if (moved.count === 0) continue;
+    failed += 1;
+    ctx.ports.publishChanged(row.clientId);
+    await tellCancellationFailed(ctx, row.clientId, row.orderId, "TIMEOUT");
+  }
+  return failed;
+}
+
+/** Every request in `statuses` since before `cutoff`, for one provider or all. */
+async function waitingSince(
+  ctx: EngineContext,
+  cutoff: Date,
+  statuses: readonly string[],
+  provider?: string,
+): Promise<OwedRow[]> {
+  const db = await ctx.ports.db();
+  return (await db.marketplaceAcceptance.findMany({
+    where: { ...(provider ? { provider } : {}), cancellationStatus: { in: statuses }, cancellationRequestedAt: { lt: cutoff } },
+    select: OWED_SELECT,
+  })) as OwedRow[];
+}
+
+/** Fail every request the marketplace took and did not answer inside its window; no window, only the give-up. */
+async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> {
+  let expired = 0;
+  for (const provider of ctx.registry.providers()) {
+    const adapter = ctx.registry.get(provider);
+    const window = adapter ? cancellationWindowMs(ctx, adapter) : null;
+    if (window === null) continue;
+    const cutoff = new Date(now.getTime() - window);
+    expired += await failAsTimeout(ctx, await waitingSince(ctx, cutoff, ["REQUESTED"], provider));
+  }
+  return expired;
+}
+
+/**
+ * One sweep pass: expire the requests nobody answered, give up on the very old,
+ * and re-queue what is still owed.
+ */
 export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<OutboundSweepResult> {
   const db = await ctx.ports.db();
   const stale = new Date(now.getTime() - OUTBOUND_STALE_MS);
   const giveUp = new Date(now.getTime() - OUTBOUND_GIVE_UP_MS);
 
-  const abandoned = await db.marketplaceAcceptance.updateMany({
-    where: { cancellationStatus: "PENDING", cancellationRequestedAt: { lt: giveUp } },
-    data: { cancellationStatus: "FAILED" },
-  });
+  const timedOut = await expireUnanswered(ctx, now);
+  const givenUp = await failAsTimeout(ctx, await waitingSince(ctx, giveUp, WAITING));
   const cancellations = (await db.marketplaceAcceptance.findMany({
     where: { cancellationStatus: "PENDING", cancellationRequestedAt: { lt: stale, gte: giveUp } },
     select: OWED_SELECT,
@@ -79,12 +148,14 @@ export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<Outb
       confirmedAt: null,
       confirmFailedAt: null,
       acknowledgedAt: { lt: stale, gte: giveUp },
+      // An accept the store asked to cancel is not confirmed while the request waits.
+      ...NO_STANDING_REQUEST,
     },
     select: OWED_SELECT,
   })) as OwedRow[];
 
   const requeued =
     (await requeue(ctx, cancellations, "requestCancellation", now)) + (await requeue(ctx, confirms, "confirm", now));
-  if (abandoned.count > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${abandoned.count} cancellation request(s).`);
-  return { requeued, givenUp: abandoned.count };
+  if (givenUp > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${givenUp} cancellation request(s).`);
+  return { requeued, givenUp, timedOut };
 }
