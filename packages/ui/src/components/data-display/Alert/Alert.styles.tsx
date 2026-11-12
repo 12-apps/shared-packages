@@ -276,12 +276,7 @@ const semanticSurface = (theme: Theme, colorPalette: AlertPalette): CSSObject =>
   };
 };
 
-/**
- * `gradient`: the hue's two ends under the mode's ink (FUT-4516, option B).
- * `gradientLook` derives both from the host's palette — see `Alert.gradient.ts`
- * — so the title and the description hold 4.5:1 over the whole sweep, with the
- * shimmer on it. The icon follows the ink.
- */
+/** `gradient`: both ends and the ink derived from the host's hue to hold 4.5:1 (FUT-4516, `Alert.gradient.ts`). */
 const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => {
   const { ink, from, to } = gradientLook(theme, colorPalette);
   return {
@@ -290,13 +285,8 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
     border: 'none',
     position: 'relative',
     overflow: 'hidden',
-    // The shimmer paints UNDER every piece of ink (FUT-4516). A positioned
-    // `::before` with no z-index paints OVER the in-flow title, icon and close
-    // button — a white wash on dark ink, which took the title to 3.8:1 where the
-    // arithmetic said 6.7. `isolation` makes the root its own stacking context
-    // (so the -1 cannot reach behind the page) and the -1 sends the wash behind
-    // the content but above the root's own background and its inset tint layer,
-    // which is what the contrast model assumes. Geometry and timing untouched.
+    // The shimmer paints UNDER the ink (FUT-4516): unstacked, the `::before` lay over the
+    // words (3.8:1). Isolated, its -1 stays behind them and above the background and tint.
     isolation: 'isolate',
     '.MuiAlert-icon': {
       color: ink,
