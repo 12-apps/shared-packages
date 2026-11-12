@@ -1,5 +1,5 @@
 import type { MarketplaceAdapter } from "./adapter";
-import type { CancellationFailureReason, EngineContext } from "./ports";
+import type { CancellationFailureReason, EngineContext, MarketplaceDb } from "./ports";
 
 /**
  * How the store's own cancellation request ENDS, told to the host (FUT-4758).
@@ -22,6 +22,41 @@ async function tell(ctx: EngineContext, what: string, orderId: string, call: () 
         (error instanceof Error ? error.message : String(error)),
     );
   }
+}
+
+/**
+ * Whether the host REQUESTS FIRST and cancels on the marketplace's
+ * confirmation: it binds `onCancellationConfirmed` (FUT-4758). A host that
+ * does not keeps 1.0.0's behaviour exactly — the store's cancel is stamped
+ * REJECTED at request time and `onRefused` runs then.
+ */
+export function requestsFirst(ctx: EngineContext): boolean {
+  return ctx.ports.order.onCancellationConfirmed !== undefined;
+}
+
+/**
+ * Move a row whose cancellation was just confirmed off the clock: REJECTED,
+ * acknowledged now when it was still AWAITING (the table's CHECK pairs the
+ * two); an accepted row keeps its acceptance instant.
+ */
+export async function rejectConfirmed(db: MarketplaceDb, orderId: string, now: Date): Promise<void> {
+  await db.marketplaceAcceptance.updateMany({
+    where: { orderId, status: "AWAITING" },
+    data: { status: "REJECTED", acknowledgedAt: now },
+  });
+  await db.marketplaceAcceptance.updateMany({
+    where: { orderId, status: { in: ["ACCEPTED", "EXPIRED"] } },
+    data: { status: "REJECTED" },
+  });
+}
+
+/**
+ * The store's confirmed request, told to the host: `onCancellationConfirmed`
+ * when bound, else `onRefused(…, "CANCELLED")` as in 1.0.0.
+ */
+export async function confirmedToHost(ctx: EngineContext, clientId: string, orderId: string): Promise<void> {
+  if (await tellCancellationConfirmed(ctx, clientId, orderId)) return;
+  await ctx.ports.order.onRefused(clientId, orderId, "CANCELLED");
 }
 
 /** The marketplace confirmed the store's request. Returns whether the host took it (it has the callback). */

@@ -4,11 +4,13 @@ import { IFOOD_CANCELLATION_ANSWER_WINDOW_MS } from "../ifood";
 import { TENANT, createHarness, deliverIfood, ifoodEvent, ifoodPlaced, scriptedHttp, type Harness } from "./harness";
 
 /**
- * Request first, cancel on confirm (FUT-4758). The store's cancellation is a
- * REQUEST: the order stays as it was while the marketplace answers, and the
- * host hears how it ended through the two optional order-port callbacks —
- * confirmed (it runs its cancel then), or failed, REFUSED or TIMEOUT (the
- * order is still the marketplace's, and still acceptable here).
+ * Request first, cancel on confirm (FUT-4758). For a host that binds
+ * `onCancellationConfirmed`, the store's cancellation is a REQUEST: the order
+ * stays as it was while the marketplace answers, and the host hears how it
+ * ended through the two optional order-port callbacks — confirmed (it runs its
+ * cancel then), or failed, REFUSED or TIMEOUT (the order is still the
+ * marketplace's, and still acceptable here). A host that binds neither keeps
+ * 1.0.0's stamps exactly.
  */
 
 const TOKEN = { status: 200, body: JSON.stringify({ accessToken: "tok-1", expiresIn: 3600 }) };
@@ -41,7 +43,7 @@ describe("the store's request leaves the order as it was", () => {
 
     const result = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "503" });
 
-    expect(result).toMatchObject({ kind: "decided", cancellation: "PENDING", reasonCode: "503" });
+    expect(result).toMatchObject({ kind: "decided", status: "AWAITING", cancellation: "PENDING", reasonCode: "503" });
     expect(h.acceptance(orderId)).toMatchObject({
       status: "AWAITING",
       acknowledgedAt: null,
@@ -278,6 +280,90 @@ describe("the marketplace never answers", () => {
     await deliverIfood(h, ifoodEvent("ext-1", "CAN"));
 
     expect(h.acceptance(orderId)).toMatchObject({ cancellationStatus: "CONFIRMED", cancellationFailureReason: null });
+    expect(h.cancellationConfirmed).toEqual([orderId]);
+  });
+});
+
+describe("decide REJECT follows the same rule (the admin route, the MCP's decideMarketplaceOrders)", () => {
+  async function rejected(h: Harness): Promise<string> {
+    const orderId = await placed(h);
+    const decided = await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "503" });
+    expect(decided).toMatchObject({ kind: "decided", status: "AWAITING", cancellation: "PENDING" });
+    await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, FIRST);
+    return orderId;
+  }
+
+  it("writes the request only, never onRefused up front, and the confirmation cancels once", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true });
+    const orderId = await rejected(h);
+    expect(h.acceptance(orderId)).toMatchObject({ status: "AWAITING", cancellationStatus: "REQUESTED" });
+    expect(h.refused).toEqual([]);
+
+    await deliverIfood(h, ifoodEvent("ext-1", "CAN"));
+
+    expect(h.acceptance(orderId)).toMatchObject({ status: "REJECTED", cancellationStatus: "CONFIRMED" });
+    expect(h.cancellationConfirmed).toEqual([orderId]);
+    expect(h.refused).toEqual([]);
+  });
+
+  it("a refusal leaves the order acceptable, told once", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true });
+    const orderId = await rejected(h);
+
+    await deliverIfood(h, ifoodEvent("ext-1", "CARF"));
+    const accept = await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
+
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "REFUSED" }]);
+    expect(accept).toMatchObject({ kind: "decided", status: "ACCEPTED" });
+    expect(h.refused).toEqual([]);
+  });
+
+  it("a timeout leaves the order acceptable, told once", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true });
+    const orderId = await rejected(h);
+
+    later(h, IFOOD_CANCELLATION_ANSWER_WINDOW_MS + 1);
+    await h.engine.sweepOutbound();
+    await h.engine.sweepOutbound();
+
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "TIMEOUT" }]);
+    expect(h.acceptance(orderId)).toMatchObject({ status: "AWAITING", cancellationFailureReason: "TIMEOUT" });
+    expect(h.refused).toEqual([]);
+  });
+});
+
+describe("a host that binds no onCancellationConfirmed keeps 1.0.0's behaviour", () => {
+  it("decide REJECT and the store's cancel stamp REJECTED at once, and decide calls onRefused then", async () => {
+    const h = createHarness();
+    const first = await placed(h, "ext-1");
+    const second = await placed(h, "ext-2");
+
+    const decided = await h.engine.decide({ clientId: TENANT, orderId: first, decision: "REJECT", reasonCode: "503" });
+    const recorded = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId: second, reasonCode: "503" });
+
+    expect(decided).toMatchObject({ status: "REJECTED", cancellation: "PENDING" });
+    expect(recorded).toMatchObject({ status: "REJECTED", cancellation: "PENDING" });
+    expect(h.acceptance(first)?.status).toBe("REJECTED");
+    expect(h.acceptance(second)?.status).toBe("REJECTED");
+    expect(h.refused).toEqual([{ orderId: first, reason: "REJECTED" }]);
+  });
+});
+
+describe("the acceptance clock leaves a waiting request alone", () => {
+  it("an AWAITING order whose request waits is not expired, so the host hears one ending only", async () => {
+    const http = scriptedHttp([TOKEN, { status: 202, body: "" }]);
+    const h = createHarness({ http, cancellationHooks: true, cancellationWindowMs: 60 * 60_000 });
+    const orderId = await requested(h);
+
+    later(h, 10 * 60_000);
+    const expired = await h.engine.expireLapsed();
+    await deliverIfood(h, ifoodEvent("ext-1", "CAN"));
+
+    expect(expired.expired).toBe(0);
+    expect(h.refused).toEqual([]);
     expect(h.cancellationConfirmed).toEqual([orderId]);
   });
 });

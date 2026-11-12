@@ -1,5 +1,11 @@
 import type { MarketplaceAdapter, OutboundOrderRef, OutboundResult } from "./adapter";
-import { cancellationWindowMs, failedRequestData, tellCancellationConfirmed, tellCancellationFailed } from "./cancellation-outcome";
+import {
+  cancellationWindowMs,
+  confirmedToHost,
+  failedRequestData,
+  rejectConfirmed,
+  tellCancellationFailed,
+} from "./cancellation-outcome";
 import { readOutboundConnection, type OutboundConnection } from "./integration";
 import type { OutboundJobPayload } from "./outbound-queue";
 import { failAsTimeout } from "./outbound-sweep";
@@ -127,15 +133,43 @@ async function stampCancellation(
   status: "REQUESTED" | "CONFIRMED" | "FAILED",
   clientId: string,
 ): Promise<void> {
+  if (status === "CONFIRMED") return stampConfirmedCancellation(ctx, row, clientId);
   const db = await ctx.ports.db();
   const data = status === "FAILED" ? failedRequestData("REFUSED") : { cancellationStatus: status };
   const moved = await db.marketplaceAcceptance.updateMany({
     where: { orderId: row.orderId, cancellationStatus: "PENDING" },
     data,
   });
-  if (moved.count === 0) return;
-  if (status === "FAILED") await tellCancellationFailed(ctx, clientId, row.orderId, "REFUSED");
-  if (status === "CONFIRMED") await tellCancellationConfirmed(ctx, clientId, row.orderId);
+  if (moved.count > 0 && status === "FAILED") await tellCancellationFailed(ctx, clientId, row.orderId, "REFUSED");
+}
+
+/**
+ * A marketplace that confirms in its answer: the same stamps as its
+ * CANCELLED event (`cancelAcceptance`) — CONFIRMED and REJECTED in one
+ * transaction — then the host's `onCancellationConfirmed`, or
+ * `onRefused(…, "CANCELLED")` when it binds none. A host failure is logged:
+ * the stamps have committed.
+ */
+async function stampConfirmedCancellation(ctx: EngineContext, row: OutboundRow, clientId: string): Promise<void> {
+  const now = ctx.ports.clock.now();
+  const moved = await ctx.ports.transaction(async (tx) => {
+    const confirmed = await tx.marketplaceAcceptance.updateMany({
+      where: { orderId: row.orderId, cancellationStatus: "PENDING" },
+      data: { cancellationStatus: "CONFIRMED", cancellationFailureReason: null },
+    });
+    if (confirmed.count === 0) return false;
+    await rejectConfirmed(tx, row.orderId, now);
+    return true;
+  });
+  if (!moved) return;
+  try {
+    await confirmedToHost(ctx, clientId, row.orderId);
+  } catch (error) {
+    ctx.ports.logger.error(
+      `marketplace.outbound: order ${row.orderId} was cancelled on the store's request but the host's half failed: ` +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
 }
 
 /** The connection, or the reason it cannot be used (a refusal: no retry fixes it). */

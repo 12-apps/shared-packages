@@ -1,4 +1,5 @@
-import { tellCancellationConfirmed } from "./cancellation-outcome";
+import { NO_STANDING_REQUEST } from "./cancellation";
+import { rejectConfirmed, tellCancellationConfirmed } from "./cancellation-outcome";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -126,13 +127,16 @@ export async function expireLapsedAcceptances(
 ): Promise<ExpirySweepResult> {
   const db = await ctx.ports.db();
   const lapsed = (await db.marketplaceAcceptance.findMany({
-    where: { status: "AWAITING", acknowledgeBy: { lt: now } },
+    // An order whose cancellation request waits is left to that request: its
+    // answer, or its window's TIMEOUT, ends it first (FUT-4758), so the host
+    // never hears EXPIRED and then the confirmation for one order.
+    where: { status: "AWAITING", acknowledgeBy: { lt: now }, ...NO_STANDING_REQUEST },
     select: { id: true, clientId: true, orderId: true },
   })) as { id: string; clientId: string; orderId: string }[];
   if (lapsed.length === 0) return { expired: 0, tenants: 0 };
 
   const result = await db.marketplaceAcceptance.updateMany({
-    where: { id: { in: lapsed.map((row) => row.id) }, status: "AWAITING" },
+    where: { id: { in: lapsed.map((row) => row.id) }, status: "AWAITING", ...NO_STANDING_REQUEST },
     data: { status: "EXPIRED", acknowledgedAt: now },
   });
 
@@ -189,10 +193,7 @@ export async function cancelAcceptance(
   // still PENDING. The host's cancel runs after; if it throws, the inbox row
   // is FAILED and the retry sweep re-runs this, whose stamps are idempotent.
   const answered = await ctx.ports.transaction(async (tx) => {
-    await tx.marketplaceAcceptance.updateMany({
-      where: { orderId: row.orderId, status: { not: "REJECTED" } },
-      data: { status: "REJECTED", acknowledgedAt: input.now ?? ctx.ports.clock.now() },
-    });
+    await rejectConfirmed(tx, row.orderId, input.now ?? ctx.ports.clock.now());
     const confirmed = await tx.marketplaceAcceptance.updateMany({
       where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "REQUESTED", "FAILED"] } },
       data: { cancellationStatus: "CONFIRMED", cancellationFailureReason: null },

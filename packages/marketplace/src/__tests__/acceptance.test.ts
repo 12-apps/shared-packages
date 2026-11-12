@@ -150,7 +150,7 @@ describe("refusing an order on the clock", () => {
 });
 
 describe("the store's own cancel, through the host's cancel", () => {
-  it("[R2] stamps an ACCEPTED order's request PENDING with the code, keeps it ACCEPTED at its instant, queues once", async () => {
+  it("[R2] stamps an ACCEPTED order REJECTED with PENDING and the code, keeps its acceptance instant, queues once", async () => {
     const h = createHarness();
     await h.connect();
     const orderId = await ingestOne(h);
@@ -161,9 +161,8 @@ describe("the store's own cancel, through the host's cancel", () => {
     const result = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "509" });
 
     expect(result).toMatchObject({ kind: "decided", status: "REJECTED", cancellation: "PENDING", reasonCode: "509" });
-    // Request first (FUT-4758): the decision stays until the marketplace confirms.
     expect(h.acceptance(orderId)).toMatchObject({
-      status: "ACCEPTED",
+      status: "REJECTED",
       acknowledgedAt: acceptedAt,
       cancellationStatus: "PENDING",
       cancellationReasonCode: "509",
@@ -181,8 +180,7 @@ describe("the store's own cancel, through the host's cancel", () => {
     await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "509" });
     const second = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "501" });
 
-    // The request waits; the row is still on the clock (FUT-4758).
-    expect(second).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "AWAITING" });
+    expect(second).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "REJECTED" });
     expect(h.acceptance(orderId)?.cancellationReasonCode).toBe("509");
     expect(h.enqueued).toHaveLength(1);
   });
