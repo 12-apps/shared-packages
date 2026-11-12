@@ -14,7 +14,7 @@ config**. The package owns the mechanism and none of the policy — see
 | entry | contains | dependencies |
 |---|---|---|
 | `@12-apps/billing` | periods, the lifecycle vocabulary and its ageing, the entitlement seam | **none** |
-| `@12-apps/billing/server` | the retry policy, the cycle collection binding, the card vault, the HTTP surface | `@12-apps/payments-backend` (peer) |
+| `@12-apps/billing/server` | the retry policy, the cycle collection binding, the subscription refund, the card vault, the HTTP surface | `@12-apps/payments-backend` (peer) |
 
 A browser that needs to say "this account is past due" imports the root entry
 and pays nothing for the money path. The split is not taste: the payments
@@ -70,6 +70,22 @@ adapter comes from the host's own subscription row through the `findTarget`
 port, never from the request. `forgetAll` detaches **every** pointer the owner
 holds, not the one on the screen: a card can live at yesterday's acquirer as
 well as today's.
+
+`createSubscriptionRefund` returns one paid payment in full, through the
+provider that took it and so by the channel it was paid (Pix to the payer's
+key, a card to the card), at the platform merchant. Every answer becomes one of
+three outcomes: `REFUNDED` (taken, or "nothing left to refund", which makes a
+retry safe), `PENDING` (refused, unsupported, no answer, no charge: recorded
+through `markRefundPending` with why, for a person to settle) and
+`NOT_REFUNDABLE` (not found, never paid, already refunded: nothing written).
+`retry` only accepts a payment whose refund is already pending. WHEN a payment
+is refundable, what a cancel does to the plan and who settles a pending refund
+by hand are the host's.
+
+```ts
+const refunds = createSubscriptionRefund({ payments, merchant, store: async () => paymentRows });
+await refunds.refund(paymentId, { reason: "withdrawal" }); // REFUNDED | PENDING | NOT_REFUNDABLE
+```
 
 Nothing here has a parameter a card could travel in. The number goes from the
 cardholder's keyboard to the provider's SDK to the provider; what crosses these
