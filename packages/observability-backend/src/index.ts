@@ -108,6 +108,26 @@ interface LogInfo {
   message: unknown;
   feature?: string;
   [key: string]: unknown;
+  [key: symbol]: unknown;
+}
+
+/** Where Winston keeps a log call's extra arguments (`log.error(msg, error)`). */
+const SPLAT = Symbol.for('splat');
+
+/**
+ * The real `Error` a log call carried, if any.
+ *
+ * `log.error('…:', error)` does NOT put the error among `info`'s values:
+ * Winston folds its message into `info.message`, copies its `stack`, and keeps
+ * the object itself only under the `splat` symbol, which `Object.values` never
+ * lists. Reading the values alone sent every such call as a bare message, so
+ * no server event carried a stack trace and uploaded source maps had nothing
+ * to symbolicate (FUT-3968).
+ */
+function reportedError(info: LogInfo): Error | undefined {
+  const isError = (value: unknown): value is Error => value instanceof Error;
+  const splat = info[SPLAT];
+  return Object.values(info).find(isError) ?? (Array.isArray(splat) ? splat.find(isError) : undefined);
 }
 
 /**
@@ -135,9 +155,13 @@ class SentryTransport extends Transport {
       // A real Error anywhere in the extras gives Sentry a stack to group on;
       // without one an event groups by message alone, which buries distinct
       // failures under a shared prefix.
-      const cause = Object.values(info).find((value): value is Error => value instanceof Error);
-      if (cause) Sentry.captureException(cause);
-      else Sentry.captureMessage(String(info.message));
+      const cause = reportedError(info);
+      if (cause) {
+        // The log line names WHERE it failed ("[api] route handler threw…");
+        // the exception's own title is only the error's message.
+        scope.setExtra('log', String(info.message));
+        Sentry.captureException(cause);
+      } else Sentry.captureMessage(String(info.message));
     });
     next();
   }
