@@ -3,13 +3,17 @@
  * white (light mode) or black (dark mode) only as far as the ink needs, judged
  * across rest, hover and press, and never by a table of hexes.
  */
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { createTheme } from '../../../../mui/styles';
+import { createTheme, ThemeProvider } from '../../../../mui/styles';
 import { muiThemeOptionsFrom } from '../../../../provider/mui-bridge';
 import { decomposeColor, lighten } from '../../../../tokens/color';
 import { createUiTheme } from '../../../../tokens/theme';
+import { Alert } from '../Alert';
 import {
+  clearGradientCache,
+  gradientDerivationCount,
   GRADIENT_POINTER_CONTRAST,
   GRADIENT_TARGET_CONTRAST,
   gradientBasisOf,
@@ -114,5 +118,48 @@ describe('Given a stop and an ink', () => {
     const basis = basisOf('light');
     const pale = '#e8f4fd';
     expect(rgb(stepStopForInk(pale, basis))).toEqual(rgb(pale));
+  });
+});
+
+describe('Given the derivation is memoised', () => {
+  it('computes once per palette and mode, however many renders ask', () => {
+    clearGradientCache();
+    const theme = themeOf('light');
+    const palette = getColorFromTheme(theme, 'info');
+    const before = gradientDerivationCount();
+    const first = gradientLook(theme, palette);
+    for (let i = 0; i < 50; i += 1) gradientLook(theme, palette);
+    expect(gradientDerivationCount() - before).toBe(1);
+    expect(gradientLook(theme, palette)).toBe(first);
+    // Another mode or another hue is another derivation.
+    gradientLook(themeOf('dark'), palette);
+    gradientLook(theme, getColorFromTheme(theme, 'danger'));
+    expect(gradientDerivationCount() - before).toBe(3);
+  });
+
+  it('keeps the cache bounded', () => {
+    clearGradientCache();
+    const theme = themeOf('light');
+    const before = gradientDerivationCount();
+    for (let i = 0; i < 100; i += 1) gradientLook(theme, { main: '#336699', light: `#33${(i + 16).toString(16)}99`, dark: '#112233' });
+    expect(gradientDerivationCount() - before).toBe(100);
+    // The oldest entries were dropped, so asking again recomputes rather than growing without end.
+    gradientLook(theme, { main: '#336699', light: '#331099', dark: '#112233' });
+    expect(gradientDerivationCount() - before).toBe(101);
+  });
+
+  it('renders a gradient Alert 50 times with one derivation', () => {
+    clearGradientCache();
+    const before = gradientDerivationCount();
+    const theme = themeOf('dark');
+    for (let i = 0; i < 50; i += 1) {
+      const { unmount } = render(
+        <ThemeProvider theme={theme}>
+          <Alert variant="gradient" title="t" description="d" />
+        </ThemeProvider>,
+      );
+      unmount();
+    }
+    expect(gradientDerivationCount() - before).toBeLessThanOrEqual(1);
   });
 });

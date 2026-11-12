@@ -16,6 +16,8 @@ import {
 import { GRADIENT_MODEL, type AlertPalette } from './Alert.metrics';
 
 export {
+  clearGradientCache,
+  gradientDerivationCount,
   GRADIENT_POINTER_CONTRAST,
   GRADIENT_TARGET_CONTRAST,
   sweepPoints,

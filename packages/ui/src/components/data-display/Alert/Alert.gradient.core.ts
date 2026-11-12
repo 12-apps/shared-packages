@@ -138,17 +138,52 @@ export interface GradientLook {
   to: string;
 }
 
+/** How many derivations are kept; a host has a handful of palettes, so this is never reached in practice. */
+const CACHE_LIMIT = 64;
+const cache = new Map<string, GradientLook>();
+let computed = 0;
+
+/** How many derivations were computed rather than read from the cache (a test hook). */
+export const gradientDerivationCount = (): number => computed;
+/** Empty the cache (a test hook). */
+export const clearGradientCache = (): void => cache.clear();
+
+/** Everything the derivation reads, as one key: the two hue ends, the basis and the model's numbers. */
+const keyOf = (basis: GradientBasis, model: GradientModel, light: string, dark: string): string =>
+  [
+    light, dark, basis.paper, basis.white, basis.ink, basis.tint, basis.absolute, basis.side, basis.toward,
+    model.stopAlpha, model.shimmerAlpha, model.descriptionOpacity,
+    model.states.hover.tintAlpha, model.states.hover.inkStep.black, model.states.hover.inkStep.white,
+    model.states.press.tintAlpha, model.states.press.inkStep.black, model.states.press.inkStep.white,
+  ].join('|');
+
+/** Both ends moved on together, 1% at a time, until the interior of the sweep holds (at most 100 steps). */
+function settle(ends: { from: string; to: string }, basis: GradientBasis, model: GradientModel): { from: string; to: string } {
+  const mix = basis.toward === 'white' ? lighten : darken;
+  const next = (acc: { from: string; to: string }, left: number): { from: string; to: string } =>
+    left === 0 || sweepHolds(acc.from, acc.to, basis, model)
+      ? acc
+      : next({ from: mix(acc.from, MIX_STEP), to: mix(acc.to, MIX_STEP) }, left - 1);
+  return next(ends, Math.round(1 / MIX_STEP));
+}
+
 /**
- * Both ends, each moved only as far as it needs, then both moved on together,
- * 1% at a time, while the INTERIOR of the sweep still dips under the floor
- * (the middle of a two-stop sRGB sweep is darker than the chord of its ends).
+ * Both ends, each moved only as far as it needs, then both moved on together
+ * while the INTERIOR of the sweep still dips under the floor (the middle of a
+ * two-stop sRGB sweep is darker than the chord of its ends).
+ *
+ * Memoised on everything it reads: the styled callback runs on every render of
+ * every gradient Alert, and the derivation is a few thousand contrast
+ * evaluations, which the unit suite felt as a 3x slowdown of its alert files.
  */
 export function deriveGradient(basis: GradientBasis, model: GradientModel, light: string, dark: string): GradientLook {
-  const mix = basis.toward === 'white' ? lighten : darken;
+  const key = keyOf(basis, model, light, dark);
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  computed += 1;
   const ends = { from: stepStopForInk(light, basis, model), to: stepStopForInk(dark, basis, model) };
-  const settled = Array.from({ length: Math.round(1 / MIX_STEP) }).reduce<{ from: string; to: string }>(
-    (acc) => (sweepHolds(acc.from, acc.to, basis, model) ? acc : { from: mix(acc.from, MIX_STEP), to: mix(acc.to, MIX_STEP) }),
-    ends,
-  );
-  return { ink: basis.ink, ...settled };
+  const look: GradientLook = { ink: basis.ink, ...settle(ends, basis, model) };
+  if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+  cache.set(key, look);
+  return look;
 }
