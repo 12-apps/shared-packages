@@ -1,5 +1,5 @@
 import type { AcceptanceStatus, CancellationStatus } from "./acceptance";
-import type { EngineContext } from "./ports";
+import type { CancellationFailureReason, EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
 /**
@@ -17,6 +17,8 @@ export interface MarketplaceOrderState {
   confirmFailedAt: Date | null;
   cancellation: CancellationStatus | null;
   cancellationReasonCode: string | null;
+  /** Why the request FAILED (REFUSED or TIMEOUT); null unless `cancellation` is FAILED, and on rows from before it. */
+  cancellationFailure: CancellationFailureReason | null;
   /** The adapter's app link, or null when no adapter is registered for it. */
   appUrl: string | null;
 }
@@ -31,6 +33,7 @@ interface StateRow {
   confirmFailedAt: Date | null;
   cancellationStatus: string | null;
   cancellationReasonCode: string | null;
+  cancellationFailureReason: string | null;
 }
 
 /** The state of each of these orders that is a marketplace order, keyed by id. */
@@ -53,6 +56,7 @@ export async function readOrderStates(
       confirmFailedAt: true,
       cancellationStatus: true,
       cancellationReasonCode: true,
+      cancellationFailureReason: true,
     },
   })) as StateRow[];
   return new Map(
@@ -68,6 +72,7 @@ export async function readOrderStates(
         confirmFailedAt: row.confirmFailedAt,
         cancellation: row.cancellationStatus as CancellationStatus | null,
         cancellationReasonCode: row.cancellationReasonCode,
+        cancellationFailure: row.cancellationFailureReason as CancellationFailureReason | null,
         appUrl: adapter ? adapter.appLink(row) : null,
       };
       return [row.orderId, state];

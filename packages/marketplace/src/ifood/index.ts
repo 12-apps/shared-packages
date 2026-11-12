@@ -25,6 +25,9 @@ export const IFOOD_PROVIDER = "IFOOD";
 /** The one reason that means "an item is unavailable". */
 const ITEM_UNAVAILABLE: IfoodReasonCode = "503";
 
+/** How long iFood may take to answer a cancellation request: 5 minutes, ESTIMATED (see the adapter's capabilities). */
+export const IFOOD_CANCELLATION_ANSWER_WINDOW_MS = 5 * 60_000;
+
 export interface IfoodAdapterConfig {
   /** The words the adapter needs: reason labels and the missing-number text. Required. */
   copy: IfoodAdapterCopy;
@@ -48,6 +51,12 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
       asyncCancellationOutcome: true,
       perOrderAppLink: false,
       confirmTakesPreparationTime: false,
+      // How long iFood takes, at most, to answer a cancellation request: its
+      // CANCELLED or CANCELLATION_REQUEST_FAILED event. ESTIMATED, not read off
+      // iFood's documentation, which names no answer deadline: iFood answers a
+      // request in seconds when it answers at all, so 5 minutes is generous.
+      // A host overrides it with the engine's `cancellationWindowMs`.
+      cancellationAnswerWindowMs: IFOOD_CANCELLATION_ANSWER_WINDOW_MS,
     },
     normalize: (payload) => normalizeIfoodEvent(payload, normalizeOptions),
     readSignature: (header) => header("x-ifood-signature") ?? header("x-signature"),

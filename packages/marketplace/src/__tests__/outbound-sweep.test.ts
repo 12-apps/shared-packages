@@ -21,13 +21,14 @@ const later = (h: Harness, ms: number) => {
 
 describe("the outbound sweep", () => {
   it("re-queues a refusal whose job the queue refused, under its own dedupe key, once older than the retry span", async () => {
-    const h = createHarness({ queueDown: true });
+    // A window longer than the retry span, so the re-queue is what this case sees (iFood's own 5 minutes would end it first).
+    const h = createHarness({ queueDown: true, cancellationWindowMs: 60 * 60_000 });
     await h.connect();
     const orderId = await ingest(h);
     await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "503" });
     expect(h.logged.some((line) => line.message.includes("outbound sweep will re-queue"))).toBe(true);
 
-    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 0 });
+    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 0, timedOut: 0 });
     expect(h.enqueued).toHaveLength(1);
 
     later(h, OUTBOUND_STALE_MS + 1);
@@ -64,7 +65,8 @@ describe("the outbound sweep", () => {
   });
 
   it("gives an ancient PENDING request up as FAILED, and never confirms an ancient accept", async () => {
-    const h = createHarness({ queueDown: true });
+    // A window longer than the give-up, so the give-up is what this case sees.
+    const h = createHarness({ queueDown: true, cancellationWindowMs: 2 * OUTBOUND_GIVE_UP_MS });
     await h.connect();
     const refused = await ingest(h, "ext-1");
     const accepted = await ingest(h, "ext-2");
@@ -73,8 +75,9 @@ describe("the outbound sweep", () => {
     const queuedBefore = h.enqueued.length;
     later(h, OUTBOUND_GIVE_UP_MS + 1);
 
-    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 1 });
+    expect(await h.engine.sweepOutbound()).toEqual({ requeued: 0, givenUp: 1, timedOut: 0 });
     expect(h.acceptance(refused)?.cancellationStatus).toBe("FAILED");
+    expect(h.acceptance(refused)?.cancellationFailureReason).toBe("TIMEOUT");
     expect(h.enqueued).toHaveLength(queuedBefore);
   });
 

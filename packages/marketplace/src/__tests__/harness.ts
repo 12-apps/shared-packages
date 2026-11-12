@@ -11,6 +11,7 @@ import type {
   MarketplaceAdmissionResult,
   MarketplaceAuditEntry,
   MarketplaceRefusal,
+  CancellationFailureReason,
 } from "../core/ports";
 import type { NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
@@ -34,7 +35,9 @@ const open = (sealed: string): string => {
 };
 
 /** Answer each request with the next scripted response (the last one repeats). */
-export function scriptedHttp(responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse)) {
+export function scriptedHttp(
+  responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse | Promise<MarketplaceHttpResponse>),
+) {
   const requests: MarketplaceHttpRequest[] = [];
   const http = async (request: MarketplaceHttpRequest): Promise<MarketplaceHttpResponse> => {
     requests.push(request);
@@ -61,6 +64,10 @@ interface HarnessOptions {
   failAudit?: boolean;
   /** The host's own write inside `create`, through the ingest's transaction client. */
   onCreate?: (db: MarketplaceDb, order: NormalizedMarketplaceOrder) => Promise<void>;
+  /** The host requests first and cancels on confirm: it has the two optional cancellation callbacks (FUT-4758). */
+  cancellationHooks?: boolean;
+  /** The engine's override of every adapter's cancellation answer window. */
+  cancellationWindowMs?: number;
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -79,6 +86,18 @@ export function createHarness(options: HarnessOptions = {}) {
   const audited: MarketplaceAuditEntry[] = [];
   const auditDbs: MarketplaceDb[] = [];
   const admitted: MarketplaceAdmissionRequest[] = [];
+  const cancellationConfirmed: string[] = [];
+  const cancellationFailed: { orderId: string; reason: CancellationFailureReason }[] = [];
+  const cancellationHooks = options.cancellationHooks
+    ? {
+        onCancellationConfirmed: async (_clientId: string, orderId: string) => {
+          cancellationConfirmed.push(orderId);
+        },
+        onCancellationFailed: async (_clientId: string, orderId: string, reason: CancellationFailureReason) => {
+          cancellationFailed.push({ orderId, reason });
+        },
+      }
+    : {};
 
   const engine = createMarketplaceEngine({
     db: async () => (options.store ?? memory).db,
@@ -106,6 +125,7 @@ export function createHarness(options: HarnessOptions = {}) {
       },
       summarize: async (_clientId, ids) =>
         new Map(ids.map((id) => [id, { buyerName: "Buyer", totalCents: 1000, unmappedLines: 0, createdAt: null }])),
+      ...cancellationHooks,
     },
     secrets: { seal, open },
     http: http.http,
@@ -132,6 +152,7 @@ export function createHarness(options: HarnessOptions = {}) {
     defaultAckSlaSeconds: 300,
     reconcileBatchSize: 50,
     maxInboxAttempts: 5,
+    ...(options.cancellationWindowMs === undefined ? {} : { cancellationWindowMs: options.cancellationWindowMs }),
     adapters: options.adapters ?? [createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US })],
   });
 
@@ -181,6 +202,8 @@ export function createHarness(options: HarnessOptions = {}) {
     audited,
     auditDbs,
     admitted,
+    cancellationConfirmed,
+    cancellationFailed,
     connect,
     acceptance,
   };

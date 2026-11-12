@@ -70,6 +70,12 @@ export interface MarketplaceCapabilities {
   perOrderAppLink: boolean;
   /** Confirming states a preparation time. */
   confirmTakesPreparationTime: boolean;
+  /**
+   * OPTIONAL. How long the marketplace takes, at most, to answer a store's
+   * cancellation request, in milliseconds: past it the outbound sweep fails
+   * the request as TIMEOUT. Absent: only the 24-hour give-up applies.
+   */
+  cancellationAnswerWindowMs?: number;
 }
 
 /** One reason a store may give for refusing or cancelling an order. */

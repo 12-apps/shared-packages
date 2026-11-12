@@ -2,7 +2,7 @@ import type { MarketplaceDb } from "../core/ports";
 
 /**
  * An in-memory stand-in for the four Prisma delegates the engine uses — just
- * the query subset the engine actually writes (equality, `in`, `not`, `lt`,
+ * the query subset the engine actually writes (equality, `in`, `not`, `lt`, `OR`,
  * compound unique keys, `increment`), so a test reads real rows back instead
  * of asserting on mock call shapes. Unique indexes are enforced the way the
  * migration enforces them, with Prisma's `P2002` code.
@@ -59,7 +59,10 @@ function expandWhere(where: Where): Where {
 
 function matches(row: Row, where: Where | undefined): boolean {
   if (!where) return true;
-  return Object.entries(expandWhere(where)).every(([key, condition]) => matchesCondition(row[key], condition));
+  return Object.entries(expandWhere(where)).every(([key, condition]) =>
+    // `OR`: any of its branches, as Prisma reads it.
+    key === "OR" ? (condition as Where[]).some((branch) => matches(row, branch)) : matchesCondition(row[key], condition),
+  );
 }
 
 function applyData(row: Row, data: Row): void {
@@ -215,6 +218,7 @@ export function createMemoryDb() {
         cancellationReasonCode: null,
         cancellationOffendingSkus: null,
         cancellationRequestedAt: null,
+        cancellationFailureReason: null,
         preparationMinutes: null,
         lineSkus: null,
         createdAt: EPOCH,
