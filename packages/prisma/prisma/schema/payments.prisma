@@ -216,3 +216,48 @@ model PaymentChargeAttempt {
   @@index([merchantKind, merchantId, createdAt])
   @@map("payment_charge_attempts")
 }
+
+// A store refund's retry series (FUT-4740): a refund the provider could not
+// take yet ("not yet", or no answer) is retried in the background, 3 or 4
+// attempts per series, every attempt claimed behind `version`. One row per
+// charge and subject; a new series (a person's press, a new cancel) rewrites
+// it. Merchant-scoped, no foreign key into a host table.
+model PaymentRefundRetry {
+  id               String    @id @default(uuid())
+  merchantKind     String    @map("merchant_kind")
+  merchantId       String    @map("merchant_id")
+  provider         String
+  providerChargeId String    @map("provider_charge_id")
+  // The host's reference (the order id).
+  reference        String
+  // 'order' for the whole charge; 'problem-report:<id>' for a part.
+  subject          String
+  // What the series was opened for: the cancel's canceledAt (ISO), a report id.
+  boundTo          String    @map("bound_to")
+  // Null = the whole charge; a part's amount otherwise.
+  amountCents      Int?      @map("amount_cents")
+  // The host's cause, carried into every trail entry.
+  cause            String?
+  series           Int
+  attempt          Int
+  // The series' length: 3 ("not yet"), 4 (no answer). Null until attempt 1 answered.
+  attempts         Int?
+  // The next attempt; while one is claimed, the claim's expiry.
+  nextAt           DateTime? @map("next_at")
+  claimedAt        DateTime? @map("claimed_at")
+  exhausted        Boolean   @default(false)
+  // NOT_YET | REFUSED | UNKNOWN (CHECK in migration).
+  refusal          String?
+  reported         Boolean   @default(false)
+  settledAt        DateTime? @map("settled_at")
+  // REFUNDED | ADOPTED | BY_HAND | ENDED (CHECK in migration).
+  settledHow       String?   @map("settled_how")
+  // The compare-and-set counter.
+  version          Int       @default(0)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([provider, providerChargeId, subject])
+  @@index([merchantKind, merchantId, reference])
+  @@map("payment_refund_retries")
+}
