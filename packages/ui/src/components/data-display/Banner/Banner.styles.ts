@@ -56,8 +56,8 @@ export const bannerInk = (theme: Theme, main: string): string =>
 /** The class `Banner` wraps its `children` in, at `display: contents`, so they can step with the words. */
 export const BANNER_CHILDREN_CLASS = 'banner-children';
 
-/** What steps under a pointer: the title, the message and the children, none nested in another. */
-const BANNER_WORDS = `& .banner-title, & .banner-description, & .${BANNER_CHILDREN_CLASS}`;
+/** What steps under a pointer: the title, the message, the children and the secondary action's label, none nested in another. */
+const BANNER_WORDS = `& .banner-title, & .banner-description, & .${BANNER_CHILDREN_CLASS}, & .banner-actions .MuiButton-outlined`;
 
 /** The dismiss button: opacity and a wash only, no spin. */
 const bannerDismissStyles = (theme: Theme, colorPalette: PaletteColor): CSSObject => ({
@@ -177,11 +177,11 @@ export const bannerPointerStates = (theme: Theme): CSSObject => {
       ...ink.hover,
     },
 
-  // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
-  // an ancestor of whatever is pressed, so without it pressing the dismiss or
-  // an action dimmed the message that owns it. Excluding `:has(:active)`
-  // wholesale does not work — pressing the TEXT makes that text `:active` too,
-  // so the guard matched on every press and the state never fired.
+    // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
+    // an ancestor of whatever is pressed, so without it pressing the dismiss or
+    // an action dimmed the message that owns it. Excluding `:has(:active)`
+    // wholesale does not work — pressing the TEXT makes that text `:active` too,
+    // so the guard matched on every press and the state never fired.
     '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
       boxShadow: tint(theme, ACTIVE.tintAlpha),
       transition: 'none',

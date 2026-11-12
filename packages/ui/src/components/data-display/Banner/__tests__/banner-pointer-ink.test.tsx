@@ -60,11 +60,39 @@ const resolved = (el: Element | null, prop: 'color' | 'backgroundColor'): string
   return getComputedStyle(el)[prop];
 };
 
-/** What a reader sees in one state: the surface under the tint, and the stepped ink of each word. */
-function measure(variant: BannerVariant, mode: Mode, page: string, state: State) {
+/** The colour the contained action's `:hover` rule paints its label in. */
+function hoverLabelOf(variant: BannerVariant, mode: Mode, restLabel: string): string {
+  const css = blocksFor(emittedCss(), ':hover').join('\n');
+  const hue = themeOf(mode).palette[HUE[variant]];
+  const fill = hue.dark.replace(/\s/gu, '');
+  const block = css.split(/(?=background-color)/u).find((chunk) => chunk.replace(/\s/gu, '').startsWith(`background-color:${fill}`));
+  const color = block?.match(/(?:^|;)\s*color:\s*([^;]+);/u)?.[1];
+  // A hover that declares no colour keeps the rest label.
+  return color ?? restLabel;
+}
+
+const HUE = { info: 'info', success: 'success', warning: 'warning', critical: 'error' } as const;
+
+/**
+ * What a reader sees in one state: the surface under the tint, and the ink of
+ * each word, stepped as the sheet steps it (or not, with `stepped: false`).
+ * The secondary action's label sits on the same surface plus the button's own
+ * hover wash, which is on while the pointer is over the banner.
+ */
+function measure(variant: BannerVariant, mode: Mode, page: string, state: State, stepped = true) {
   const { unmount } = render(
     <ThemeProvider theme={themeOf(mode)}>
-      <Banner variant={variant} title="Atenção" description="mensagem" dismissLabel="Fechar" data-testid="b" />
+      <Banner
+        variant={variant}
+        title="Atenção"
+        description="mensagem"
+        dismissLabel="Fechar"
+        actions={[
+          { label: 'Ver', onClick: () => undefined, variant: 'primary' },
+          { label: 'Depois', onClick: () => undefined, variant: 'secondary' },
+        ]}
+        data-testid="b"
+      />
     </ThemeProvider>,
   );
   const root = document.querySelector('[data-testid="b"]');
@@ -75,40 +103,71 @@ function measure(variant: BannerVariant, mode: Mode, page: string, state: State)
   const side = sideOf(mode);
   const surface = blend(rest, ABSOLUTE[side], TINT[state]);
   const ink = (el: Element | null, opacity: number): string => {
-    // The message declares `color: inherit`: it reads the root's ink.
+    // The message and the actions declare `color: inherit`: they read the root's ink.
     const declared = resolved(el, 'color');
     const own = declared === 'inherit' ? resolved(root, 'color') : declared;
-    const kept = state === 'rest' ? 1 : keptBy(state, side);
-    const stepped = blend(ABSOLUTE[side], own, kept);
-    return blend(surface, stepped, opacity);
+    const kept = state === 'rest' || !stepped ? 1 : keptBy(state, side);
+    return blend(surface, blend(ABSOLUTE[side], own, kept), opacity);
   };
-  const title = ink(root?.querySelector('.banner-title') ?? null, 1);
-  const message = ink(root?.querySelector('.banner-description') ?? null, 0.9);
+  const buttons = Array.from(root?.querySelectorAll('.MuiButton-root') ?? []);
+  const primary = buttons.find((el) => el.classList.contains('MuiButton-contained')) ?? null;
+  const secondary = buttons.find((el) => el.classList.contains('MuiButton-outlined')) ?? null;
+  const hue = themeOf(mode).palette[HUE[variant]];
+  const secondarySurface = state === 'hover' ? blend(surface, resolved(root?.querySelector('.banner-icon') ?? null, 'color'), 0.1) : surface;
+  // The primary's fill is opaque and paints above the tint layer: its label
+  // is read against the fill, and against the darker fill under the button's hover.
+  const label = resolved(primary, 'color');
+  // jsdom does not resolve `:hover`: the hover label is the one the sheet declares for it.
+  const hoverLabel = hoverLabelOf(variant, mode, label);
+  const result = {
+    title: getContrastRatio(ink(root?.querySelector('.banner-title') ?? null, 1), surface),
+    message: getContrastRatio(ink(root?.querySelector('.banner-description') ?? null, 0.9), surface),
+    secondary: getContrastRatio(ink(secondary, 1), secondarySurface),
+    primary: getContrastRatio(label, hue.main),
+    primaryHover: getContrastRatio(hoverLabel, hue.dark),
+  };
   unmount();
-  return {
-    title: getContrastRatio(title, surface),
-    message: getContrastRatio(message, surface),
-  };
+  return result;
 }
+
+const rounded = (n: number): number => Number(n.toFixed(2));
+const atLeastFloor = expect.toSatisfy((v: number) => v >= MIN_CONTRAST);
 
 describe.each(MODES)('Given a %s-mode Banner on the default palette', (mode) => {
   const ui = createUiTheme({ mode });
-  describe.each([['paper', ui.palette.background.paper]] as const)(
-    'on the %s page',
-    (_name, page) => {
-      describe.each(VARIANTS)('and the %s variant', (variant) => {
-        it.each(STATES)('holds the title and the message at 4.5:1 or more %s', (state) => {
-          const { title, message } = measure(variant, mode, page, state);
-          // Print the numbers so a failing run records what was measured.
-          expect({ state, title: Number(title.toFixed(2)), message: Number(message.toFixed(2)) }).toEqual({
-            state,
-            title: expect.toSatisfy((v: number) => v >= MIN_CONTRAST),
-            message: expect.toSatisfy((v: number) => v >= MIN_CONTRAST),
-          });
-        });
+  const page = ui.palette.background.paper;
+  describe.each(VARIANTS)('and the %s variant', (variant) => {
+    it.each(STATES)('holds the title and the message at 4.5:1 or more %s', (state) => {
+      const { title, message } = measure(variant, mode, page, state);
+      // The numbers are in the failure output, so a red run records what was measured.
+      expect({ state, title: rounded(title), message: rounded(message) }).toEqual({
+        state,
+        title: atLeastFloor,
+        message: atLeastFloor,
       });
-    },
-  );
+    });
+
+    it.each(STATES)('holds the secondary action label at 4.5:1 or more %s', (state) => {
+      const { secondary } = measure(variant, mode, page, state);
+      expect({ state, secondary: rounded(secondary) }).toEqual({ state, secondary: atLeastFloor });
+    });
+
+    it('holds the primary action label at 4.5:1 or more on its fill and on its hover fill', () => {
+      const { primary, primaryHover } = measure(variant, mode, page, 'rest');
+      expect({ primary: rounded(primary), primaryHover: rounded(primaryHover) }).toEqual({
+        primary: atLeastFloor,
+        primaryHover: atLeastFloor,
+      });
+    });
+
+    it.each(['hover', 'press'] as const)('reads better %s with the ink step than with the tint alone', (state) => {
+      const withStep = measure(variant, mode, page, state);
+      const tintOnly = measure(variant, mode, page, state, false);
+      expect(withStep.title).toBeGreaterThan(tintOnly.title);
+      expect(withStep.message).toBeGreaterThan(tintOnly.message);
+      expect(withStep.secondary).toBeGreaterThan(tintOnly.secondary);
+    });
+  });
 });
 
 /** Split a selector list at its TOP-LEVEL commas: the press's `:has(...)` carries commas of its own. */
@@ -149,7 +208,7 @@ describe('Given the rule the sheet emits', () => {
   };
 
   it('steps the title, the message and the children, and nothing else, while hovered or pressed', () => {
-    expect(steppedTargets().sort()).toEqual(['.banner-children', '.banner-description', '.banner-title']);
+    expect(steppedTargets().sort()).toEqual(['.MuiButton-outlined', '.banner-children', '.banner-description', '.banner-title']);
   });
 
   it('steps by the Alert\'s own hover and press amounts, toward the mode\'s side', () => {
@@ -169,7 +228,7 @@ describe('Given the rule the sheet emits', () => {
     expect(steppedTargets().some((target) => words?.matches(target))).toBe(true);
   });
 
-  it('keeps the icon, the actions and the dismiss outside every stepped part', () => {
+  it('keeps the icon and the dismiss outside every stepped part', () => {
     emitted();
     const targets = steppedTargets();
     for (const id of ['full-icon', 'full-close']) {

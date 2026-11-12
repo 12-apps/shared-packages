@@ -14,6 +14,7 @@ import React from 'react';
 import { BANNER_CHILDREN_CLASS, BANNER_TINT_S, bannerInk, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
 import { FOCUS } from '../Alert/Alert.metrics';
 import type { BannerProps, BannerVariant } from './Banner.types';
+import { inkOver } from '../../../tokens/ink-over';
 import { rem } from '../../../tokens/relative';
 
 
@@ -136,19 +137,26 @@ const buildActionSx = (
 
     ...(actionVariant === 'primary' && {
       backgroundColor: palette.main,
-      color: theme.palette.getContrastText(palette.main),
+      // The ink that reads best on each fill (FUT-4519): `getContrastText`
+      // keeps white wherever it clears 3:1, and white on the info blue is
+      // 3.86:1. The fills stay the variant's hues; the label is chosen per
+      // fill, so the hover declares its own.
+      color: inkOver([palette.main], theme.palette.getContrastText(palette.main)),
 
       // Colour only. The banner itself moves nothing under a pointer, and an
       // action that lifts inside one that does not is the inconsistency a
       // reader notices without being able to name it (FUT-1458).
       '&:hover': {
         backgroundColor: palette.dark || palette.main,
+        color: inkOver([palette.dark || palette.main], theme.palette.getContrastText(palette.dark || palette.main)),
       },
     }),
 
     ...(actionVariant === 'secondary' && {
       borderColor: palette.main,
-      color: palette.main,
+      // The banner's own ink, so the label steps with the words (`BANNER_WORDS`);
+      // the outline keeps the hue.
+      color: 'inherit',
 
       '&:hover': {
         backgroundColor: alpha(palette.main, 0.1),
