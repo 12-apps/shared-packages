@@ -15,7 +15,7 @@ import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { SigningIdentities } from "./signing";
 import { type FiscalDocument, type FiscalDocumentModel, OWED_VOIDS, type SeriesKind } from "./types";
 
-export { computeAccessKey, draftOf, drawKeyCode, issuerOf, keyCheckDigit, localIso, totalsOf, xmlKeys } from "./helpers";
+export { computeAccessKey, draftOf, drawKeyCode, issuerOf, localIso, totalsOf, xmlKeys } from "./helpers";
 
 /** Twin of `@12-apps/wiring/ports`' `NotifyPort`: never throws. */
 export interface FiscalNotifyPort {
@@ -97,7 +97,7 @@ export function assertReason(text: unknown, name: string): asserts text is strin
 const MAX_BACKOFF_DOUBLINGS = 6;
 
 /** Whether a document still owes the sweep (or the transmission) a call. */
-export function owesWork(document: FiscalDocument): boolean {
+function owesWork(document: FiscalDocument): boolean {
   if (document.status === "PENDING" || document.status === "SUBMITTED" || document.status === "CONTINGENCY") return true;
   return document.numberVoid !== null && OWED_VOIDS.includes(document.numberVoid);
 }

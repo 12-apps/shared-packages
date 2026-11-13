@@ -13,7 +13,7 @@ import type { FiscalDocument } from "../types";
 /** The fiscal service's own NFC-e fixture, the document every suite here starts from. */
 export const SALE = nfceSimples as unknown as SaleForDocument;
 
-export const KEY = "35261112345678000195650010000000011123456780";
+const KEY = "35261112345678000195650010000000011123456780";
 
 export function aDocument(overrides: Partial<FiscalDocument> = {}): FiscalDocument {
   return {

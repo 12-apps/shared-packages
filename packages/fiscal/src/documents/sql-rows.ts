@@ -11,7 +11,7 @@ import type { FiscalDocument, FiscalDocumentEvent } from "./types";
 export type Row = Record<string, unknown>;
 
 /** A timestamp column as ISO 8601 UTC; the columns are UTC by the Prisma convention. */
-export function iso(value: unknown): string | null {
+function iso(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const date = value instanceof Date ? value : new Date(`${String(value).replace(" ", "T")}${/Z|[+-]\d{2}:?\d{2}$/.test(String(value)) ? "" : "Z"}`);
   return date.toISOString();

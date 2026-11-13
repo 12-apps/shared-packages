@@ -89,7 +89,7 @@ const UF_CODES: Readonly<Record<Uf, string>> = {
 };
 
 /** The access key's modulo-11 check digit (weights 2–9 from the right). */
-export function keyCheckDigit(body: string): number {
+function keyCheckDigit(body: string): number {
   let sum = 0;
   let weight = 2;
   for (let i = body.length - 1; i >= 0; i -= 1) {

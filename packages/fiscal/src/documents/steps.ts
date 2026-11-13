@@ -23,7 +23,7 @@ import { digestOf } from "./nfe-proc";
 import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { FiscalDocument } from "./types";
 
-export const FINAL_FAILURES = new Set<IssuerFailure["class"]>(["REJECTED", "INVALID", "INTERNAL"]);
+const FINAL_FAILURES = new Set<IssuerFailure["class"]>(["REJECTED", "INVALID", "INTERNAL"]);
 
 async function reject(ctx: FiscalContext, document: FiscalDocument, error: IssuerFailure): Promise<FiscalDocument> {
   const rejected = await ctx.advance(document, { kind: "REJECT", error });
@@ -54,12 +54,12 @@ function canGoOffline(document: FiscalDocument, point: IssuingPoint): boolean {
 }
 
 /** An online NFC-e whose `dhEmi` SEFAZ would now refuse as late. */
-export function pastOnlineTolerance(ctx: FiscalContext, document: FiscalDocument): boolean {
+function pastOnlineTolerance(ctx: FiscalContext, document: FiscalDocument): boolean {
   return ctx.config.now().getTime() - Date.parse(document.createdAt) > ctx.config.nfceOnlineToleranceMs;
 }
 
 /** Sign a contingency-series document offline. On a failure it is left as it was, for the caller to defer. */
-export async function signOffline(
+async function signOffline(
   ctx: FiscalContext,
   document: FiscalDocument,
   profile: EmitterProfile,
@@ -97,7 +97,7 @@ export async function signPending(
  * crash can never leave the online document to be sent again beside its twin.
  * Signing follows; if it fails, the new document waits PENDING for the sweep.
  */
-export async function goOffline(
+async function goOffline(
   ctx: FiscalContext,
   document: FiscalDocument,
   profile: EmitterProfile,
