@@ -191,6 +191,39 @@ describe("the refund said never returned lands after all", () => {
     expect(h.confirmations.doubleReturned).not.toHaveBeenCalled();
   });
 
+  it("a second refund sent after it, its answer lost, then both land: the late word is a double return", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    // The retry sends rf-2 and its answer never comes back.
+    h.refund.mockRejectedValueOnce(new Error("socket hang up"));
+    await h.flow.retry("pay-1");
+    expect(h.refund).toHaveBeenCalledTimes(2);
+    expect(h.held.row.sentAgain).toBe(true);
+    // rf-1 and rf-2 both land; the series' next consult adopts the money back with no id.
+    const { refreshCharge, later, flow } = h;
+    refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    later(HOUR);
+    await flow.runDue();
+    expect(h.held.row.state).toBe("REFUNDED");
+    expect(h.payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED", providerRefundId: null });
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("DOUBLE_RETURN");
+    expect(h.held.doubleReturn).toMatchObject({ providerRefundId: "rf-1" });
+  });
+
+  it("no second send: the adoption records the refund said never returned, so its late word counts once", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    h.refund.mockClear();
+    await h.flow.retry("pay-1");
+    expect(h.refund).not.toHaveBeenCalled();
+    expect(h.held.row.sentAgain).toBe(false);
+    expect(h.payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED", providerRefundId: "rf-1" });
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+  });
+
   it("a redelivery of the word that adopted it is ignored", async () => {
     const h = await overdueRefund();
     await h.flow.markNotReturned("pay-1", BY);

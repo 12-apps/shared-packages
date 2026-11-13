@@ -137,10 +137,8 @@ async function lateReturn(
     if (await payments.markRefunded(reopened.id, record)) return "ADOPTED";
     return "IGNORED";
   }
+  // Settled by this very refund (a word, or a charge read with no second send): once.
   if (reopened.settledRefundId === update.providerRefundId) return "IGNORED";
-  // Adopted off a charge read (a retry's consult, a hand settlement's check):
-  // the money seen back WAS this refund, so the customer got it once.
-  if (reopened.settledHow === "ADOPTED" && reopened.settledRefundId === null) return "IGNORED";
   const recorded = await store.doubleReturned(reopened.id, { providerRefundId: update.providerRefundId, at });
   return recorded ? "DOUBLE_RETURN" : "IGNORED";
 }

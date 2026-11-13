@@ -46,6 +46,8 @@ const PAID: RefundablePayment = {
   requestedAt: null,
   pendingReason: null,
   requestId: null,
+  notReturnedRefundId: null,
+  sentAgain: false,
 };
 
 /** The host's rows, with the conditional writes the port asks for. */
@@ -72,6 +74,7 @@ function paymentRows(initial: RefundablePayment | null) {
       pendingWith.push(record);
       return true;
     }),
+    sendingAgain: vi.fn(async () => undefined),
   } satisfies RefundablePaymentStore;
   return { store, refundedWith, pendingWith, current: () => held.row };
 }

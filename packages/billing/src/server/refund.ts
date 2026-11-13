@@ -85,6 +85,8 @@ import { confirmDue, markNotReturned, readCharge, refundUpdated, refundWebhookHa
  * Server-only.
  */
 
+type SendingGateway = Awaited<ReturnType<SubscriptionRefundDeps["payments"]>>["gateway"];
+
 /** One call's context: the deps, the clock and this request's stores. */
 interface Ctx {
   deps: SubscriptionRefundDeps;
@@ -132,12 +134,33 @@ function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSer
   };
 }
 
+/**
+ * The money a charge read sees back on a payment reopened NOT_RETURNED is the
+ * refund said never returned — unless a second refund was sent since, when it
+ * may be either: then no id is recorded, and that refund's late word is a
+ * double return.
+ */
+function adoptedRefundId(payment: RefundablePayment | null): string | null {
+  return payment?.notReturnedRefundId && !payment.sentAgain ? payment.notReturnedRefundId : null;
+}
+
+/** The gateway, telling the host before every refund it sends (`sendingAgain`). */
+function recordingSends(gateway: SendingGateway, store: RefundablePaymentStore, now: () => Date): SendingGateway {
+  return {
+    refreshCharge: (...args) => gateway.refreshCharge(...args),
+    refund: async (merchant, provider, input) => {
+      await store.sendingAgain(provider, input.providerChargeId, now());
+      return gateway.refund(merchant, provider, input);
+    },
+  };
+}
+
 /** The retrier over this request's stores, with the subscription host half bound. */
 async function retrierOf(ctx: Ctx): Promise<RefundRetrier> {
   const { deps, store, now } = ctx;
   const [{ gateway }, series] = await Promise.all([deps.payments(), deps.series()]);
   return createRefundRetrier({
-    gateway,
+    gateway: recordingSends(gateway, store, now),
     store: series,
     now: deps.now,
     attemptMs: deps.attemptMs,
@@ -151,7 +174,13 @@ async function retrierOf(ctx: Ctx): Promise<RefundRetrier> {
       refunded: async (row, outcome) => {
         const record: RefundRecord = outcome.snapshot
           ? snapshotRecord(outcome.snapshot, now())
-          : { how: "ADOPTED", providerRefundId: null, refundedCents: outcome.refundedCents ?? null, confirmed: true, at: now() };
+          : {
+              how: "ADOPTED",
+              providerRefundId: adoptedRefundId(await store.find(row.reference)),
+              refundedCents: outcome.refundedCents ?? null,
+              confirmed: true,
+              at: now(),
+            };
         await store.markRefunded(row.reference, record);
       },
     },
@@ -301,7 +330,7 @@ async function notReturnedYet(ctx: Ctx, payment: RefundablePayment): Promise<Set
   const read = await readCharge(ctx.deps, payment);
   if (read === "NOT_BACK") return null;
   if (read === "UNREADABLE") return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "CHARGE_UNREADABLE" };
-  const record: RefundRecord = { how: "ADOPTED", providerRefundId: null, refundedCents: null, confirmed: true, at: ctx.now() };
+  const record: RefundRecord = { how: "ADOPTED", providerRefundId: adoptedRefundId(payment), refundedCents: null, confirmed: true, at: ctx.now() };
   const wrote = await ctx.store.markRefunded(payment.id, record);
   return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: wrote ? "MONEY_BACK" : "ALREADY_REFUNDED" };
 }

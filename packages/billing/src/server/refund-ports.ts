@@ -64,6 +64,18 @@ export interface RefundablePayment {
    * it, so a refund asked for again is a new series.
    */
   requestId: string | null;
+  /**
+   * The provider refund a person said never came back, kept from `reopen`
+   * (`notReturnedRefundId`); null on any other payment.
+   */
+  notReturnedRefundId: string | null;
+  /**
+   * True once this binding asked the provider for a refund again after that
+   * (`sendingAgain`). A charge read that later sees the money back can then
+   * not tell which refund it was; while false, the money seen back is the
+   * refund said never returned.
+   */
+  sentAgain: boolean;
 }
 
 /** How the money went back. */
@@ -112,6 +124,14 @@ export interface RefundablePaymentStore {
   markRefunded(paymentId: string, record: RefundRecord): Promise<boolean>;
   /** Record why it is pending, ONLY on a row still REFUND_PENDING; false otherwise. */
   markRefundPending(paymentId: string, record: RefundPendingRecord): Promise<boolean>;
+  /**
+   * Called BEFORE every refund this binding sends: on a payment reopened
+   * NOT_RETURNED (it carries a `notReturnedRefundId`) the host records that a
+   * second refund was asked for, so `find` answers `sentAgain: true` from then
+   * on. A no-op for any other payment. Keyed by the charge, the one handle the
+   * provider call carries.
+   */
+  sendingAgain(provider: string, providerChargeId: string, at: Date): Promise<void>;
 }
 
 /** A refund recorded unconfirmed (`confirmed: false`), waiting for the provider to finish it. */
@@ -185,14 +205,14 @@ export interface NotReturnedRefund {
   id: string;
   /** REFUND_PENDING: not returned again yet. REFUNDED: returned again since. */
   state: "REFUND_PENDING" | "REFUNDED";
-  /** REFUNDED only: the provider's refund id recorded by what returned it again; null by hand. */
-  settledRefundId: string | null;
   /**
-   * REFUNDED only: how it was recorded returned (`markRefunded`'s `how`).
-   * ADOPTED with no refund id is the charge read seeing the money back — the
-   * refund said never returned, landing — so its own late word is no double return.
+   * REFUNDED only: the provider's refund id recorded by what returned it again
+   * — the refund said never returned itself when a charge read adopted it with
+   * no second send (its late word is then no double return); null by hand, or
+   * when a charge read adopted money after a second send (which refund it was
+   * is unknown, so its late word is a double return).
    */
-  settledHow: RefundSettlement | null;
+  settledRefundId: string | null;
 }
 
 /** How a charge read back answered: money back, not back (yet), or not readable at all. */

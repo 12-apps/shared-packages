@@ -104,7 +104,10 @@ reopens the refund as pending (`NOT_RETURNED`) under a new request, and never
 sends. The host keeps the reopened refund's id (`notReturnedRefundId`): if that
 refund lands after all, its REFUNDED word adopts it while the payment is still
 pending, or — when the payment was returned again meanwhile — is recorded once
-as a double return (`doubleReturned`) for a person to recover; and
+as a double return (`doubleReturned`) for a person to recover. A charge read
+that adopts money back records it as that refund only while no second refund
+was sent (`sendingAgain` tells the host before every send); after one, which
+refund landed is unknown and the late word counts as a double return; and
 `settleByHand` on such a payment reads the charge first, refusing with
 `MONEY_BACK` or `CHARGE_UNREADABLE`. WHEN a payment is refundable, what a cancel
 does to the plan and who may settle are the host's.
