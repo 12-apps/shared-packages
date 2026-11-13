@@ -122,6 +122,12 @@ export function createRappiAdapter(config: RappiAdapterConfig): MarketplaceAdapt
   const normalizeOptions = { amountUnit: config.amountUnit, missingStreetNumber: config.copy.missingStreetNumber };
   return {
     provider: RAPPI_PROVIDER,
+    // No `catalogue` (FUT-4768). Rappi's public menu write, `POST …/menu`,
+    // replaces the store's WHOLE menu, goes to an approval, and ignores every
+    // further menu while one is in approval: a per-product switch on it would
+    // wipe what the store keeps on Rappi's portal and report "in the catalogue"
+    // for a menu Rappi may have dropped. Its availability endpoints only turn
+    // items Rappi already has on and off. See the README, "Catalogue publishing".
     capabilities: {
       apiConfirm: true,
       apiCancel: true,

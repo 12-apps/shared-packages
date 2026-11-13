@@ -1,4 +1,5 @@
 import { NO_STANDING_REQUEST } from "./cancellation";
+import { sweepCatalogue } from "./catalogue-sweep";
 import { cancellationWindowMs, failedRequestData, requestsFirst, tellCancellationFailed } from "./cancellation-outcome";
 import { MARKETPLACE_OUTBOUND_JOB, enqueueOutbound, type OutboundAction } from "./outbound-queue";
 import type { EngineContext } from "./ports";
@@ -55,6 +56,8 @@ export interface OutboundSweepResult {
   givenUp: number;
   /** Requests failed as TIMEOUT past their marketplace's answer window. */
   timedOut: number;
+  /** Catalogue publishes and withdraws still owed, re-queued (FUT-4768). */
+  catalogueRequeued: number;
 }
 
 /** A store's cancellation request still waiting on the marketplace. */
@@ -136,7 +139,8 @@ async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> 
 
 /**
  * One sweep pass: expire the requests nobody answered, give up on the very old,
- * and re-queue what is still owed.
+ * and re-queue what is still owed, the catalogue's publishes and withdraws
+ * included (`./catalogue-sweep.ts`).
  */
 export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<OutboundSweepResult> {
   const db = await ctx.ports.db();
@@ -165,5 +169,6 @@ export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<Outb
   const requeued =
     (await requeue(ctx, cancellations, "requestCancellation", now)) + (await requeue(ctx, confirms, "confirm", now));
   if (givenUp > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${givenUp} cancellation request(s).`);
-  return { requeued, givenUp, timedOut };
+  const catalogueRequeued = await sweepCatalogue(ctx, now);
+  return { requeued, givenUp, timedOut, catalogueRequeued };
 }

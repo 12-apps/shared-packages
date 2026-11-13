@@ -211,6 +211,7 @@ describe("the job blueprints", () => {
     const wired = host.assemble();
 
     expect(wired.jobs.map((job) => job.name).sort()).toEqual([
+      "marketplace.catalogue",
       "marketplace.expire-acceptances",
       "marketplace.fetch-order",
       "marketplace.outbound",

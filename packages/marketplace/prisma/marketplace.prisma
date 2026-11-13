@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @12-apps/marketplace — CANONICAL Prisma model partial.
 //
-// The four tables the marketplace engine owns. A host does NOT copy these
+// The six tables the marketplace engine owns. A host does NOT copy these
 // models by hand: it composes this file into its multi-file schema folder from
 // the `db` capability (`package.json` "wiring.db"), and discovers the
 // migrations beside it.
@@ -249,4 +249,95 @@ model MarketplaceAcceptance {
   // cancellation_requested_at WHERE cancellation_status IN ('PENDING','REQUESTED'):
   // SQL-only (migration 20261112120000), since Prisma cannot express the WHERE.
   @@map("marketplace_acceptances")
+}
+
+/// One host product's place in one marketplace's catalogue (FUT-4768).
+///
+/// One row per (store, marketplace, product): the store's switch for that
+/// marketplace, and what the marketplace made of it. `productId` is an OPAQUE
+/// host catalog id, like `menuItemId` above; the engine never reads the
+/// product, the host maps it at send time.
+///
+/// `status` is the MECHANISM's vocabulary (CHECK in the migration):
+/// PUBLISHING (asked, not yet in the catalogue) → PUBLISHED, WITHDRAWING (asked
+/// out) → WITHDRAWN, and FAILED with the marketplace's own reason. A FAILED row
+/// is asked again by the same publish or withdraw.
+model MarketplaceCataloguePublication {
+  id        String @id @default(uuid())
+  clientId  String @map("client_id")
+  provider  String
+  /// The host product this row publishes. Opaque here.
+  productId String @map("product_id")
+
+  status String @default("PUBLISHING")
+
+  /// The store's price for THIS marketplace, in the smallest currency unit.
+  /// NULL is "the store's own price"; it never changes the store's price.
+  priceCents     Int? @map("price_cents")
+  /// The price the last successful publish sent, whichever rule chose it.
+  sentPriceCents Int? @map("sent_price_cents")
+
+  /// The marketplace's id for the item, from the last successful publish.
+  externalId String? @map("external_id")
+
+  /// The photo the marketplace holds for the item: the adapter's reference to
+  /// it (iFood's uploaded `imagePath`) and the photo URL it was made from, so a
+  /// re-publish of the same photo does not upload it again.
+  imageRef       String? @map("image_ref")
+  imageSourceUrl String? @map("image_source_url")
+  /// What the last successful publish could not do: IMAGE_TOO_LARGE |
+  /// IMAGE_REFUSED (CHECK); NULL when it did everything.
+  warningCode    String? @map("warning_code")
+
+  /// Which action FAILED: PUBLISH | WITHDRAW (CHECK); NULL unless FAILED.
+  failedAction  String? @map("failed_action")
+  /// Why it FAILED, a code the host words (CHECK): REFUSED, UNAVAILABLE,
+  /// TIMEOUT, NOT_CONNECTED, CREDENTIALS, PRODUCT_GONE, UNSUPPORTED, INTERNAL.
+  failureCode   String? @map("failure_code")
+  /// The marketplace's OWN words for a REFUSED (truncated by the writer);
+  /// NULL for every other code. Never an engine message.
+  failureReason String? @map("failure_reason")
+
+  /// When the current action was asked: what the job matches its run to, and
+  /// what the outbound sweep ages a row still owed by.
+  requestedAt DateTime  @map("requested_at")
+  publishedAt DateTime? @map("published_at")
+  withdrawnAt DateTime? @map("withdrawn_at")
+  failedAt    DateTime? @map("failed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Named: Prisma's default (68 characters) is past Postgres's 63, which
+  // truncates it, and the database and the schema would then disagree.
+  @@unique([clientId, provider, productId], map: "marketplace_catalogue_publications_client_provider_product_key")
+  @@index([clientId, productId])
+  @@index([status, requestedAt])
+  @@map("marketplace_catalogue_publications")
+}
+
+/// The marketplace's id for one host category on one connection (FUT-4768).
+///
+/// A marketplace that is written to (push) groups items in categories it
+/// issues ids for, found or created by name. Stored so every publish into
+/// the same category reuses one id, and CLAIMED while it is being created
+/// (`claimedAt` set, `externalId` still NULL), so two products switched on at
+/// once into a new category create it once, not twice.
+model MarketplaceCatalogueCategory {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  provider String
+  /// The host category's name, as the item carried it.
+  name     String
+
+  /// The marketplace's id for it; NULL while it is being found or created.
+  externalId String?   @map("external_id")
+  /// When a publish claimed the creation; a claim past its staleness is taken over.
+  claimedAt  DateTime? @map("claimed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider, name])
+  @@map("marketplace_catalogue_categories")
 }

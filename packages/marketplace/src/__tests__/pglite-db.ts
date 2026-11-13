@@ -26,12 +26,15 @@ const TABLES = {
   marketplaceMenuLink: "marketplace_menu_links",
   marketplaceInboxEvent: "marketplace_inbox_events",
   marketplaceAcceptance: "marketplace_acceptances",
+  marketplaceCataloguePublication: "marketplace_catalogue_publications",
+  marketplaceCatalogueCategory: "marketplace_catalogue_categories",
 } as const;
 
 const COMPOUND_KEYS: Record<string, readonly string[]> = {
   provider_eventId: ["provider", "eventId"],
   clientId_provider: ["clientId", "provider"],
   clientId_provider_externalSku: ["clientId", "provider", "externalSku"],
+  clientId_provider_productId: ["clientId", "provider", "productId"],
 };
 
 const snake = (name: string): string => name.replace(/[A-Z]/gu, (letter) => `_${letter.toLowerCase()}`);
@@ -155,7 +158,7 @@ function delegate(conn: () => Queryable, table: string, hasUpdatedAt: boolean) {
   };
 }
 
-/** The four delegates over a connection, plus the transaction port. */
+/** The six delegates over a connection, plus the transaction port. */
 export function pgliteDb(pg: PGlite) {
   let current: Queryable = pg;
   const conn = () => current;
@@ -164,6 +167,8 @@ export function pgliteDb(pg: PGlite) {
     marketplaceMenuLink: delegate(conn, TABLES.marketplaceMenuLink, true),
     marketplaceInboxEvent: delegate(conn, TABLES.marketplaceInboxEvent, false),
     marketplaceAcceptance: delegate(conn, TABLES.marketplaceAcceptance, true),
+    marketplaceCataloguePublication: delegate(conn, TABLES.marketplaceCataloguePublication, true),
+    marketplaceCatalogueCategory: delegate(conn, TABLES.marketplaceCatalogueCategory, true),
   } as unknown as MarketplaceDb;
   async function transaction<T>(fn: (tx: MarketplaceDb) => Promise<T>): Promise<T> {
     return pg.transaction(async (tx) => {
