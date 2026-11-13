@@ -23,11 +23,17 @@ import { IFOOD_API, bearer, ifoodTokenKey } from "./outbound";
  * iFood's developer portal refuses our reader (403), so the paths, verbs and
  * the body's `description`/`start`/`end` come from two public third-party
  * clients of the API (README, "Pausing a store"): ESTIMATED until the
- * homologation run. Also ESTIMATED: that iFood takes the client's own `id`
- * (it is sent, and an interruption a lost answer created is also found by
- * listing before every create, so a retry never makes a second one); that
- * there is no call to move an interruption's end (so no `extend`: the engine
- * creates the later one, then deletes the earlier); and how iFood reads a
+ * homologation run. Also ESTIMATED: that iFood takes the client's own `id`.
+ * It is sent, but the adapter does not rely on it: every create is preceded
+ * by a list, and an interruption is ours when it carries our id OR, where
+ * iFood assigned its own, exactly the end and the description the create
+ * sent, so a retry after a lost answer never makes a second one and a resume
+ * by key deletes the one that landed. An interruption the owner made by hand
+ * is neither. ESTIMATED too: that there is no call to move an interruption's
+ * end (so no `extend`: the engine creates the new one, then deletes the old);
+ * that iFood ACCEPTS the two overlapping for that moment (if it refuses an
+ * overlap, the renewal is FAILED with iFood's words and the old interruption
+ * still holds to its own end); and how iFood reads a
  * time: one client says the offset is discarded and the time read as the
  * store's own clock, so the time goes out as the store's wall clock WITH its
  * offset, which reads the same either way. A 404 on delete is "already gone".
@@ -68,8 +74,15 @@ function notOk(response: MarketplaceHttpResponse): Settled | null {
   return result.kind === "accepted" ? null : result;
 }
 
-/** The interruption ids on the merchant, or the result that ends the call. */
-async function listIds(ctx: AdapterCallContext, merchantId: string): Promise<string[] | Settled> {
+/** One interruption as the list answers it, read defensively. */
+interface Interruption {
+  id: string;
+  end: string | null;
+  description: string | null;
+}
+
+/** The interruptions on the merchant, or the result that ends the call. */
+async function listInterruptions(ctx: AdapterCallContext, merchantId: string): Promise<Interruption[] | Settled> {
   const response = await call(ctx, { method: "GET", url: interruptionsUrl(merchantId) });
   if (settled(response)) return response;
   const failure = notOk(response);
@@ -77,12 +90,46 @@ async function listIds(ctx: AdapterCallContext, merchantId: string): Promise<str
   try {
     const parsed = JSON.parse(response.body === "" ? "[]" : response.body) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((entry) => (entry && typeof entry === "object" ? (entry as { id?: unknown }).id : null))
-      .filter((id): id is string => typeof id === "string");
+    return parsed.flatMap((entry: unknown) => {
+      const value = (entry ?? {}) as { id?: unknown; end?: unknown; description?: unknown };
+      if (typeof value.id !== "string") return [];
+      return [
+        {
+          id: value.id,
+          end: typeof value.end === "string" ? value.end : null,
+          description: typeof value.description === "string" ? value.description : null,
+        },
+      ];
+    });
   } catch {
     return { kind: "retry", reason: "iFood answered the interruption list with something that is not JSON" };
   }
+}
+
+/**
+ * Whether iFood's `end` is the instant the create sent: the same string, the
+ * same instant once parsed, or the same wall clock with the offset dropped
+ * (iFood may echo the store's clock without it).
+ */
+function sameEnd(end: string, until: Date, timeZone: string): boolean {
+  const sent = ifoodLocalTime(until, timeZone);
+  if (end === sent) return true;
+  const parsed = Date.parse(end);
+  if (!Number.isNaN(parsed) && /[zZ]|[+-]\d{2}:?\d{2}$/u.test(end) && parsed === Math.floor(until.getTime() / 1000) * 1000) return true;
+  return end.slice(0, 19) === sent.slice(0, 19);
+}
+
+/** The interruption the create under `key` made: by our id, or by the end and description it carried. */
+function ours(
+  list: readonly Interruption[],
+  key: string,
+  sent: { until: Date; reason: string; timeZone: string } | null,
+): Interruption | undefined {
+  const byKey = list.find((entry) => entry.id === key);
+  if (byKey || !sent) return byKey;
+  return list.find(
+    (entry) => entry.description === sent.reason && entry.end !== null && sameEnd(entry.end, sent.until, sent.timeZone),
+  );
 }
 
 interface WallClock {
@@ -144,9 +191,10 @@ function createdId(body: string, sent: string): string {
 /** Close the store until `request.until`: find one a lost answer created under the key, else create it. */
 export function ifoodPause(ctx: AdapterCallContext, request: StorePauseRequest): Promise<StorePauseResult> {
   return answeredPause(async () => {
-    const ids = await listIds(ctx, request.merchantId);
-    if (!Array.isArray(ids)) return ids;
-    if (ids.includes(request.key)) return { kind: "paused", externalId: request.key, until: request.until };
+    const list = await listInterruptions(ctx, request.merchantId);
+    if (!Array.isArray(list)) return list;
+    const landed = ours(list, request.key, { until: request.until, reason: request.reason, timeZone: request.timeZone });
+    if (landed) return { kind: "paused", externalId: landed.id, until: request.until };
     const response = await call(ctx, {
       method: "POST",
       url: interruptionsUrl(request.merchantId),
@@ -164,14 +212,14 @@ export function ifoodPause(ctx: AdapterCallContext, request: StorePauseRequest):
   });
 }
 
-/** Delete THIS interruption (by its id, or found under the key a lost answer created it with). */
+/** Delete THIS interruption: by its id, or the one a lost answer created under the key (by id, or by its end and description). */
 export function ifoodResume(ctx: AdapterCallContext, ref: StorePauseRef): Promise<OutboundResult> {
   return answered(async () => {
     let id = ref.externalId;
     if (id === null && ref.key !== null) {
-      const ids = await listIds(ctx, ref.merchantId);
-      if (!Array.isArray(ids)) return ids;
-      id = ids.includes(ref.key) ? ref.key : null;
+      const list = await listInterruptions(ctx, ref.merchantId);
+      if (!Array.isArray(list)) return list;
+      id = ours(list, ref.key, ref.sent)?.id ?? null;
     }
     // Nothing of ours stands: there is nothing to delete.
     if (id === null) return { kind: "accepted" };

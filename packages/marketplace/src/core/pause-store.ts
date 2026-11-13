@@ -17,10 +17,12 @@ import type { MarketplaceProvider } from "./types";
  *
  * What the engine holds on the marketplace is `externalId` (the closure's id,
  * for an `interruption`), `sentUntil` (the end the marketplace was given; the
- * only proof of a `switch` the engine turned off) and `attemptKey` (the key a
- * create went out under, kept while its answer is in doubt). `retiredExternalId`
- * is the previous closure an extend replaced, still to be deleted. Nothing
- * else is ever deleted: a closure the owner made by hand is in none of them.
+ * only proof of a `switch` the engine turned off) and `attemptKey` with
+ * `attemptUntil` (the key a create goes out under, written BEFORE the call,
+ * and the end it carried, kept while its answer is in doubt).
+ * `retiredExternalIds` are the closures a renewal replaced, still to be
+ * deleted. Nothing else is ever deleted: a closure the owner made by hand is
+ * in none of them.
  */
 
 /** Where the marketplace stands, as far as the engine knows. Vocabulary, not copy. */
@@ -60,7 +62,9 @@ export interface StorePauseRow {
   externalId: string | null;
   sentUntil: Date | null;
   attemptKey: string | null;
-  retiredExternalId: string | null;
+  attemptUntil: Date | null;
+  /** Space-separated ids, oldest first; null when none. */
+  retiredExternalIds: string | null;
   failureCode: StorePauseFailureCode | null;
   failureDetail: string | null;
   requestedAt: Date;
@@ -110,8 +114,18 @@ export async function readPause(ctx: EngineContext, clientId: string, provider: 
 }
 
 /** Whether anything of ours may stand on the marketplace for this record. */
-export function holdsSomething(row: Pick<StorePauseRow, "externalId" | "sentUntil" | "attemptKey" | "retiredExternalId">): boolean {
-  return row.externalId !== null || row.sentUntil !== null || row.attemptKey !== null || row.retiredExternalId !== null;
+export function holdsSomething(row: Pick<StorePauseRow, "externalId" | "sentUntil" | "attemptKey" | "retiredExternalIds">): boolean {
+  return row.externalId !== null || row.sentUntil !== null || row.attemptKey !== null || retiredOf(row).length > 0;
+}
+
+/** The replaced closures still to be deleted, oldest first. */
+export function retiredOf(row: Pick<StorePauseRow, "retiredExternalIds">): string[] {
+  return (row.retiredExternalIds ?? "").split(" ").filter((id) => id !== "");
+}
+
+/** The column's value for a list of replaced closures. */
+export function retiredValue(ids: readonly string[]): string | null {
+  return ids.length === 0 ? null : ids.join(" ");
 }
 
 /** A fresh key for one closure's create. */

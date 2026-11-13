@@ -224,7 +224,8 @@ export interface MarketplaceEngine {
   /**
    * The kitchen paused (or renewed its pause): close the store until `until`
    * on every live connection whose marketplace can be paused (FUT-4851).
-   * Idempotent: an equal or earlier `until` than one standing does nothing.
+   * Idempotent: the `until` already standing does nothing; any other, an
+   * earlier one included, renews the closure.
    */
   pauseStore(input: PauseStoreInput): Promise<PauseStoreResult>;
   /** The kitchen's pause is over: delete every closure the engine created, and nothing else. */

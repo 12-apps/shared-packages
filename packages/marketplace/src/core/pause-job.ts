@@ -8,6 +8,8 @@ import {
   newAttemptKey,
   pauseTable,
   readPause,
+  retiredOf,
+  retiredValue,
   type AvailabilityJobPayload,
   type StorePauseFailureCode,
   type StorePauseRow,
@@ -42,7 +44,7 @@ export class AvailabilityRetryError extends Error {
 }
 
 /** How many steps one run takes at most: a pause, its retirement, a flip to resume and its deletes. */
-const MAX_STEPS = 6;
+const MAX_STEPS = 8;
 
 interface Run {
   ctx: EngineContext;
@@ -60,50 +62,66 @@ async function write(ctx: EngineContext, where: Record<string, unknown>, data: R
   return (await table.updateMany({ where, data })).count;
 }
 
-/** FAILED with a code, predicated on the ask the step acted on still standing. Returns whether it moved. */
+/**
+ * FAILED with a code, predicated on the ask the step acted on still standing.
+ * `detail` is the marketplace's own words (a refusal's) or null: an engine
+ * sentence never reaches the row a host renders; `log` goes to the logger.
+ * Returns whether it moved.
+ */
 async function failRow(
   ctx: EngineContext,
   now: Date,
   row: StorePauseRow,
   code: StorePauseFailureCode,
-  detail: string | null,
+  failure: { detail: string | null; log: string },
 ): Promise<boolean> {
   const moved = await write(
     ctx,
     { id: row.id, wanted: row.wanted },
-    { state: "FAILED", failureCode: code, failureDetail: detail === null ? null : detailOf(detail), failedAt: now },
+    {
+      state: "FAILED",
+      failureCode: code,
+      failureDetail: failure.detail === null || failure.detail === "" ? null : detailOf(failure.detail),
+      failedAt: now,
+    },
   );
   if (moved === 0) return false;
-  ctx.ports.logger.error(`marketplace.availability: ${row.provider} for ${row.clientId} failed: ${code} ${detail ?? ""}`);
+  ctx.ports.logger.error(`marketplace.availability: ${row.provider} for ${row.clientId} failed: ${code} (${failure.log})`);
   ctx.ports.publishChanged(row.clientId);
   return true;
 }
 
-async function fail(run: Run, row: StorePauseRow, code: StorePauseFailureCode, detail: string | null): Promise<Step> {
-  const moved = await failRow(run.ctx, run.call.now, row, code, detail);
+async function fail(run: Run, row: StorePauseRow, code: StorePauseFailureCode, failure: { detail: string | null; log: string }): Promise<Step> {
+  const moved = await failRow(run.ctx, run.call.now, row, code, failure);
   return moved ? { settled: true, outcome: { kind: "failed", code } } : AGAIN;
 }
 
-/** A refusal fails at once; a retry throws until the last attempt, which fails. */
+/** A refusal fails at once with the marketplace's words; a retry throws until the last attempt, which fails. */
 async function unanswered(
   run: Run,
   row: StorePauseRow,
   result: Exclude<OutboundResult, { kind: "accepted" }>,
   codes: { refused: StorePauseFailureCode; unanswered: StorePauseFailureCode },
 ): Promise<Step> {
-  if (result.kind === "refused") return fail(run, row, codes.refused, `${result.status}: ${result.message}`);
+  if (result.kind === "refused") {
+    return fail(run, row, codes.refused, { detail: result.message, log: `refused ${result.status}: ${result.message}` });
+  }
   if (run.attempt.attempt < run.attempt.maxAttempts) {
     throw new AvailabilityRetryError(`${row.provider} for ${row.clientId}: ${result.reason}`);
   }
-  return fail(run, row, codes.unanswered, result.reason);
+  return fail(run, row, codes.unanswered, { detail: null, log: result.reason });
 }
 
 const PAUSE_CODES = { refused: "PAUSE_REFUSED", unanswered: "PAUSE_UNANSWERED" } as const;
 const RESUME_CODES = { refused: "RESUME_REFUSED", unanswered: "RESUME_UNANSWERED" } as const;
 
-/** Whether the marketplace already holds a closure to this end or a later one. */
+/**
+ * Whether the marketplace holds a closure to exactly this end. An earlier end
+ * is renewed like a later one: the store is never closed on a marketplace
+ * longer than the kitchen's own pause (the owner, 2026-11-12).
+ */
 const upToDate = (row: StorePauseRow): boolean =>
-  row.sentUntil !== null && row.until !== null && row.sentUntil.getTime() >= row.until.getTime();
+  row.sentUntil !== null && row.until !== null && row.sentUntil.getTime() === row.until.getTime();
 
 /** The closure the engine holds and still stands: an interruption's id, or a switch it turned off. */
 const holds = (row: StorePauseRow): boolean => row.externalId !== null || row.sentUntil !== null;
@@ -116,85 +134,124 @@ async function calledSafely<T extends StorePauseResult | OutboundResult>(call: (
   }
 }
 
+/** What a create under the row's key carried, for recognising its closure. */
+const sentOf = (row: StorePauseRow, until: Date | null) =>
+  row.attemptKey !== null && until !== null ? { until, reason: row.reason ?? "", timeZone: row.timeZone ?? "UTC" } : null;
+
+/**
+ * Write a fresh key and the end it will carry BEFORE the call, predicated on
+ * no key being in doubt: a resume that lands meanwhile then knows a closure
+ * may exist, and a switch is never turned on before the engine tried to turn
+ * it off. False when the row moved under us.
+ */
+async function claimKey(run: Run, row: StorePauseRow): Promise<string | null> {
+  const key = newAttemptKey();
+  const moved = await write(run.ctx, { id: row.id, attemptKey: null, wanted: "PAUSED" }, { attemptKey: key, attemptUntil: row.until });
+  return moved > 0 ? key : null;
+}
+
 /** Close the store, or move the end of the closure the engine holds. */
 async function sendPause(run: Run, row: StorePauseRow): Promise<Step> {
-  const key = row.attemptKey ?? newAttemptKey();
-  const request = {
-    merchantId: run.merchantId,
-    until: row.until as Date,
-    reason: row.reason ?? "",
-    key,
-    timeZone: row.timeZone ?? "UTC",
-  };
+  const until = row.until as Date;
+  const key = row.attemptKey ?? (await claimKey(run, row));
+  if (key === null) return AGAIN;
+  const request = { merchantId: run.merchantId, until, reason: row.reason ?? "", key, timeZone: row.timeZone ?? "UTC" };
   const extend = run.availability.extend;
-  const ref: StorePauseRef = { merchantId: run.merchantId, externalId: row.externalId, key: null };
+  const ref: StorePauseRef = { merchantId: run.merchantId, externalId: row.externalId, key: null, sent: null };
   const result = await calledSafely(() =>
     holds(row) && extend ? extend(run.call, ref, request) : run.availability.pause(run.call, request),
   );
   if (result.kind === "refused") {
     // A final refusal created nothing: no key is left in doubt.
-    await write(run.ctx, { id: row.id, attemptKey: row.attemptKey }, { attemptKey: null });
+    await write(run.ctx, { id: row.id, attemptKey: key }, { attemptKey: null, attemptUntil: null });
     return unanswered(run, row, result, PAUSE_CODES);
   }
-  if (result.kind !== "paused") {
-    // The key stays on the row: a create whose answer was lost is found under it.
-    if (row.attemptKey === null) await write(run.ctx, { id: row.id, attemptKey: null }, { attemptKey: key });
-    return unanswered(run, row, result, PAUSE_CODES);
-  }
-  // A new closure replaced the one the engine held: the old one is deleted next.
+  // Otherwise the key stays on the row: a create whose answer was lost is found under it.
+  if (result.kind !== "paused") return unanswered(run, row, result, PAUSE_CODES);
+  // A new closure replaced the one the engine held: the old one joins the list to delete.
   const replaced = row.externalId !== null && result.externalId !== row.externalId;
+  const retired = replaced ? [...retiredOf(row), row.externalId as string] : retiredOf(row);
   await write(
     run.ctx,
     { id: row.id },
-    {
-      externalId: result.externalId,
-      sentUntil: result.until,
-      attemptKey: null,
-      ...(replaced ? { retiredExternalId: row.externalId } : {}),
-    },
+    { externalId: result.externalId, sentUntil: result.until, attemptKey: null, attemptUntil: null, retiredExternalIds: retiredValue(retired) },
   );
   return AGAIN;
 }
 
-/** Delete the closure an extend replaced; it ends on its own if this fails, so a failure only logs. */
-async function retire(run: Run, row: StorePauseRow, retired: string): Promise<void> {
-  const result = await calledSafely(() =>
-    run.availability.resume(run.call, { merchantId: run.merchantId, externalId: retired, key: null }),
-  );
-  if (result.kind === "accepted") {
-    await write(run.ctx, { id: row.id, retiredExternalId: retired }, { retiredExternalId: null });
-    return;
-  }
-  run.ctx.ports.logger.warn(
-    `marketplace.availability: ${row.provider} for ${row.clientId}: the replaced closure ${retired} was not deleted ` +
-      `(${result.kind === "refused" ? `${result.status}: ${result.message}` : result.reason}); the sweep retries it`,
-  );
+/**
+ * A key whose create carried another end than the one now asked is resolved
+ * first: its closure, if the lost answer created one, is deleted, so it can
+ * never outlive the kitchen's pause unrecorded.
+ */
+async function resolveStaleKey(run: Run, row: StorePauseRow): Promise<Step | null> {
+  if (row.attemptKey === null || row.attemptUntil === null || row.attemptUntil.getTime() === row.until?.getTime()) return null;
+  const ref = { merchantId: run.merchantId, externalId: null, key: row.attemptKey, sent: sentOf(row, row.attemptUntil) };
+  const result = await calledSafely(() => run.availability.resume(run.call, ref));
+  if (result.kind !== "accepted") return unanswered(run, row, result, PAUSE_CODES);
+  await write(run.ctx, { id: row.id, attemptKey: row.attemptKey }, { attemptKey: null, attemptUntil: null });
+  return AGAIN;
 }
 
-async function stepPause(run: Run, row: StorePauseRow): Promise<Step> {
-  if (row.until === null) return fail(run, row, "PAUSE_REFUSED", null);
+/** Delete every closure a renewal replaced; each id leaves the list only once its delete answered. */
+async function retire(run: Run, row: StorePauseRow): Promise<void> {
+  for (const retired of retiredOf(row)) {
+    const result = await calledSafely(() =>
+      run.availability.resume(run.call, { merchantId: run.merchantId, externalId: retired, key: null, sent: null }),
+    );
+    if (result.kind === "accepted") {
+      const current = await readPause(run.ctx, row.clientId, row.provider);
+      const left = current ? retiredOf(current).filter((id) => id !== retired) : [];
+      await write(run.ctx, { id: row.id }, { retiredExternalIds: retiredValue(left) });
+      continue;
+    }
+    run.ctx.ports.logger.warn(
+      `marketplace.availability: ${row.provider} for ${row.clientId}: the replaced closure ${retired} was not deleted ` +
+        `(${result.kind === "refused" ? `${result.status}: ${result.message}` : result.reason}); the sweep retries it`,
+    );
+  }
+}
+
+async function stepPause(run: Run, current: StorePauseRow): Promise<Step> {
+  let row = current;
+  if (row.until === null) return fail(run, row, "PAUSE_REFUSED", { detail: null, log: "no end on the record" });
+  const stale = await resolveStaleKey(run, row);
+  if (stale) return stale;
+  // A closure an earlier renewal replaced is deleted before the next one is made.
+  // A failed delete stays on the list (the sweep retries it) and never blocks the renewal.
+  if (retiredOf(row).length > 0) {
+    await retire(run, row);
+    row = (await readPause(run.ctx, row.clientId, row.provider)) ?? row;
+  }
   if (!upToDate(row)) return sendPause(run, row);
-  if (row.retiredExternalId !== null) await retire(run, row, row.retiredExternalId);
-  await write(
+  const moved = await write(
     run.ctx,
     { id: row.id, wanted: "PAUSED", until: row.until },
     { state: "PAUSED", pausedAt: row.pausedAt ?? run.call.now, failureCode: null, failureDetail: null, failedAt: null },
   );
+  // The ask moved under us: the next step reads it.
+  if (moved === 0) return AGAIN;
   run.ctx.ports.publishChanged(row.clientId);
   return { settled: true, outcome: { kind: "done", state: "PAUSED" } };
 }
 
 /** The next closure of ours to delete, and what deleting it clears; null when nothing of ours stands. */
-function nextDelete(row: StorePauseRow, kind: MarketplaceAvailability["kind"]): { ref: StorePauseRef; clear: Record<string, null> } | null {
-  const ref = (externalId: string | null, key: string | null) => ({ merchantId: "", externalId, key });
+function nextDelete(row: StorePauseRow, kind: MarketplaceAvailability["kind"]): { ref: StorePauseRef; clear: Record<string, null | string> } | null {
+  const ref = (externalId: string | null, key: string | null): StorePauseRef => ({
+    merchantId: "",
+    externalId,
+    key,
+    sent: key === null ? null : sentOf(row, row.attemptUntil),
+  });
   if (kind === "switch") {
     // A switch has one closure: the store the engine turned off (or may have, while an answer is in doubt).
     if (row.sentUntil === null && row.attemptKey === null) return null;
-    return { ref: ref(null, row.attemptKey), clear: { sentUntil: null, attemptKey: null, externalId: null } };
+    return { ref: ref(null, row.attemptKey), clear: { sentUntil: null, attemptKey: null, attemptUntil: null, externalId: null } };
   }
   if (row.externalId !== null) return { ref: ref(row.externalId, null), clear: { externalId: null, sentUntil: null } };
-  if (row.retiredExternalId !== null) return { ref: ref(row.retiredExternalId, null), clear: { retiredExternalId: null } };
-  if (row.attemptKey !== null) return { ref: ref(null, row.attemptKey), clear: { attemptKey: null, sentUntil: null } };
+  const [retired, ...rest] = retiredOf(row);
+  if (retired !== undefined) return { ref: ref(retired, null), clear: { retiredExternalIds: retiredValue(rest) } };
+  if (row.attemptKey !== null) return { ref: ref(null, row.attemptKey), clear: { attemptKey: null, attemptUntil: null, sentUntil: null } };
   return null;
 }
 
@@ -237,14 +294,11 @@ async function callContext(ctx: EngineContext, row: StorePauseRow): Promise<{ ca
   }
 }
 
-/** Take the record's lease; false when another run holds it. */
-async function lease(ctx: EngineContext, row: StorePauseRow, now: Date): Promise<boolean> {
-  const taken = await write(
-    ctx,
-    { id: row.id, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
-    { leaseUntil: new Date(now.getTime() + STORE_PAUSE_LEASE_MS) },
-  );
-  return taken > 0;
+/** Take the record's lease; the instant written, or null when another run holds it. */
+async function lease(ctx: EngineContext, row: StorePauseRow, now: Date): Promise<Date | null> {
+  const until = new Date(now.getTime() + STORE_PAUSE_LEASE_MS);
+  const taken = await write(ctx, { id: row.id, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] }, { leaseUntil: until });
+  return taken > 0 ? until : null;
 }
 
 async function steps(run: Run, first: StorePauseRow): Promise<AvailabilityOutcome> {
@@ -264,22 +318,24 @@ async function runOnce(ctx: EngineContext, payload: AvailabilityJobPayload, atte
   const availability = ctx.registry.get(row.provider)?.availability;
   const now = ctx.ports.clock.now();
   if (!availability) {
-    await failRow(ctx, now, row, "UNSUPPORTED", null);
+    await failRow(ctx, now, row, "UNSUPPORTED", { detail: null, log: "the adapter has no availability capability" });
     return { kind: "failed", code: "UNSUPPORTED" };
   }
-  if (!(await lease(ctx, row, now))) {
+  const held = await lease(ctx, row, now);
+  if (held === null) {
     if (attempt.attempt < attempt.maxAttempts) throw new AvailabilityRetryError(`${row.provider} for ${row.clientId}: another run holds it`);
     return { kind: "skipped", reason: "another run holds the record" };
   }
   try {
     const opened = await callContext(ctx, row);
     if (typeof opened === "string") {
-      await failRow(ctx, now, row, "NOT_CONNECTED", opened);
+      await failRow(ctx, now, row, "NOT_CONNECTED", { detail: null, log: opened });
       return { kind: "failed", code: "NOT_CONNECTED" };
     }
     return await steps({ ctx, availability, attempt, ...opened }, row);
   } finally {
-    await write(ctx, { id: row.id }, { leaseUntil: null });
+    // Only this run's own lease: one that expired and was taken by another run is that run's.
+    await write(ctx, { id: row.id, leaseUntil: held }, { leaseUntil: null });
   }
 }
 
@@ -301,7 +357,7 @@ export async function runAvailability(
     const row = await readPause(ctx, payload.clientId, payload.provider);
     if (!row) return { kind: "skipped", reason: "no pause record" };
     const code = row.wanted === "PAUSED" ? "PAUSE_UNANSWERED" : "RESUME_UNANSWERED";
-    await failRow(ctx, ctx.ports.clock.now(), row, code, error instanceof Error ? error.message : String(error));
+    await failRow(ctx, ctx.ports.clock.now(), row, code, { detail: null, log: error instanceof Error ? error.message : String(error) });
     return { kind: "failed", code };
   }
 }

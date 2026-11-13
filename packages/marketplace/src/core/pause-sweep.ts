@@ -115,7 +115,7 @@ export async function sweepAvailability(ctx: EngineContext, now: Date): Promise<
   const waiting = (await table.findMany({
     where: { state: { in: ["PAUSING", "RESUMING"] }, requestedAt: { lt: stale, gte: cutoff } },
   })) as StorePauseRow[];
-  const retired = (await table.findMany({ where: { state: "PAUSED", retiredExternalId: { not: null } } })) as StorePauseRow[];
+  const retired = (await table.findMany({ where: { state: "PAUSED", retiredExternalIds: { not: null } } })) as StorePauseRow[];
   const failedResumes = await retryFailedResumes(ctx, stale, cutoff);
   const requeued = await requeue(ctx, [...waiting, ...retired, ...failedResumes], now);
   if (givenUp > 0) ctx.ports.logger.error(`marketplace.availability-sweep: gave up on ${givenUp} store pause ask(s).`);

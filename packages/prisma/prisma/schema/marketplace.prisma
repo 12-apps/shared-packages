@@ -348,7 +348,7 @@ model MarketplaceCatalogueCategory {
 /// The owner's rule this row exists to keep: "never reopen a store the owner
 /// closed by hand on the marketplace, and never close one beyond what the
 /// kitchen's pause asked". The engine deletes only what it recorded here
-/// (`externalId`, `retiredExternalId`, or a closure found under `attemptKey`);
+/// (`externalId`, `retiredExternalIds`, or a closure found under `attemptKey`);
 /// a closure the owner made by hand is in none of them.
 ///
 /// `wanted` is the host's LAST ask (PAUSED | OPEN), and the last ask wins;
@@ -376,10 +376,15 @@ model MarketplaceStorePause {
   /// The end the marketplace was given and took. For a switch, the only proof
   /// the engine turned the store off.
   sentUntil         DateTime? @map("sent_until")
-  /// The key a create went out under, kept while its answer is in doubt.
-  attemptKey        String?   @map("attempt_key")
-  /// The closure an extend replaced, still to be deleted.
-  retiredExternalId String?   @map("retired_external_id")
+  /// The key a create went out under, written BEFORE the call and kept while
+  /// its answer is in doubt.
+  attemptKey         String?   @map("attempt_key")
+  /// The end that create carried: how a closure the marketplace named with
+  /// its own id is still recognised as ours.
+  attemptUntil       DateTime? @map("attempt_until")
+  /// The closures a renewal replaced, still to be deleted: their ids,
+  /// space-separated, oldest first. Never dropped until each delete answers.
+  retiredExternalIds String?   @map("retired_external_ids")
 
   failureCode   String? @map("failure_code")
   failureDetail String? @map("failure_detail")

@@ -88,20 +88,72 @@ describe("iFood: interruptions", () => {
 
   it("deletes exactly its own interruption, and a 404 is already gone", async () => {
     const { ctx, sent } = context(() => ({ status: 204, body: "" }));
-    expect(await ifood.availability!.resume(ctx, { merchantId: "merchant-1", externalId: "key-1", key: null })).toEqual({ kind: "accepted" });
+    expect(await ifood.availability!.resume(ctx, { merchantId: "merchant-1", externalId: "key-1", key: null, sent: null })).toEqual({ kind: "accepted" });
     expect(sent()).toEqual([expect.objectContaining({ method: "DELETE", url: `${INTERRUPTIONS}/key-1` })]);
     const gone = context(() => ({ status: 404, body: "" }));
-    expect(await ifood.availability!.resume(gone.ctx, { merchantId: "merchant-1", externalId: "key-1", key: null })).toEqual({ kind: "accepted" });
+    expect(await ifood.availability!.resume(gone.ctx, { merchantId: "merchant-1", externalId: "key-1", key: null, sent: null })).toEqual({ kind: "accepted" });
   });
 
   it("finds an interruption a lost answer created by its key, and deletes nothing when none stands", async () => {
     const found = context((req) => (req.method === "GET" ? { status: 200, body: JSON.stringify([{ id: "key-1" }]) } : { status: 204, body: "" }));
-    expect(await ifood.availability!.resume(found.ctx, { merchantId: "merchant-1", externalId: null, key: "key-1" })).toEqual({ kind: "accepted" });
+    expect(await ifood.availability!.resume(found.ctx, { merchantId: "merchant-1", externalId: null, key: "key-1", sent: null })).toEqual({ kind: "accepted" });
     expect(found.sent().map((req) => `${req.method} ${req.url}`)).toEqual([`GET ${INTERRUPTIONS}`, `DELETE ${INTERRUPTIONS}/key-1`]);
 
     const none = context(() => ({ status: 200, body: JSON.stringify([{ id: "by-hand" }]) }));
-    expect(await ifood.availability!.resume(none.ctx, { merchantId: "merchant-1", externalId: null, key: "key-1" })).toEqual({ kind: "accepted" });
+    expect(await ifood.availability!.resume(none.ctx, { merchantId: "merchant-1", externalId: null, key: "key-1", sent: null })).toEqual({ kind: "accepted" });
     expect(none.sent().map((req) => req.method)).toEqual(["GET"]);
+  });
+});
+
+describe("iFood assigning its own ids (B1): a lost create answer never makes a second interruption", () => {
+  /** iFood as a store of interruptions that names each one itself and drops the first create's answer. */
+  function ifoodAssigningIds() {
+    const stored = new Map<string, { description: string; start: string; end: string }>();
+    const state = { next: 0, loseNext: true };
+    const { ctx, sent } = context((req) => {
+      if (req.method === "GET") {
+        return { status: 200, body: JSON.stringify([...stored].map(([id, body]) => ({ id, ...body }))) };
+      }
+      if (req.method === "POST") {
+        state.next += 1;
+        const id = `ifood-${state.next}`;
+        const body = JSON.parse(req.body!) as { description: string; start: string; end: string };
+        stored.set(id, { description: body.description, start: body.start, end: body.end });
+        if (state.loseNext) {
+          state.loseNext = false;
+          throw new Error("socket hang up");
+        }
+        return { status: 201, body: JSON.stringify({ id }) };
+      }
+      const id = decodeURIComponent(req.url.split("/").pop()!);
+      return { status: stored.delete(id) ? 204 : 404, body: "" };
+    });
+    return { ctx, sent, stored };
+  }
+
+  it("finds the interruption the lost answer created by its end and description, and creates no second one", async () => {
+    const ifoodSide = ifoodAssigningIds();
+    // A hand-made interruption with the same reason but another end is not ours.
+    ifoodSide.stored.set("by-hand", { description: "Cozinha cheia", start: "x", end: "2026-11-13T18:00:00-03:00" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, request)).toEqual({ kind: "retry", reason: "socket hang up" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, request)).toEqual({ kind: "paused", externalId: "ifood-1", until: UNTIL });
+    expect([...ifoodSide.stored.keys()].sort()).toEqual(["by-hand", "ifood-1"]);
+  });
+
+  it("deletes, on a resume by key, the interruption the lost answer created, and leaves the hand-made one", async () => {
+    const ifoodSide = ifoodAssigningIds();
+    ifoodSide.stored.set("by-hand", { description: "Fechado", start: "x", end: "2026-11-13T12:25:00-03:00" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, request)).toMatchObject({ kind: "retry" });
+    const ref = { merchantId: "merchant-1", externalId: null, key: "key-1", sent: { until: UNTIL, reason: "Cozinha cheia", timeZone: "America/Sao_Paulo" } };
+    expect(await ifood.availability!.resume(ifoodSide.ctx, ref)).toEqual({ kind: "accepted" });
+    expect([...ifoodSide.stored.keys()]).toEqual(["by-hand"]);
+  });
+
+  it("recognises an end iFood echoes in UTC or without its offset", async () => {
+    for (const end of ["2026-11-13T15:25:00Z", "2026-11-13T12:25:00", "2026-11-13T15:25:00.000+00:00"]) {
+      const { ctx } = context(() => ({ status: 200, body: JSON.stringify([{ id: "ifood-7", description: "Cozinha cheia", end }]) }));
+      expect(await ifood.availability!.pause(ctx, request)).toEqual({ kind: "paused", externalId: "ifood-7", until: UNTIL });
+    }
   });
 });
 
@@ -127,7 +179,7 @@ describe("the switches: offered only when the host opts in", () => {
       status: 200,
       body: JSON.stringify({ results: [{ store_id: "store-9", operation_result: false, operation_result_message: "store suspended" }] }),
     }));
-    expect(await rappi.availability!.resume(suspended.ctx, { merchantId: "store-9", externalId: null, key: null })).toEqual({
+    expect(await rappi.availability!.resume(suspended.ctx, { merchantId: "store-9", externalId: null, key: null, sent: null })).toEqual({
       kind: "refused",
       status: 200,
       message: "store suspended",
@@ -139,7 +191,7 @@ describe("the switches: offered only when the host opts in", () => {
     const od = createNinetyNineFoodAdapter({ ...odConfig, pauseByStoreSwitch: true });
     const { ctx, sent } = context(() => ({ status: 204, body: "" }));
     expect(await od.availability!.pause(ctx, request)).toEqual({ kind: "paused", externalId: null, until: UNTIL });
-    expect(await od.availability!.resume(ctx, { merchantId: "merchant-1", externalId: null, key: null })).toEqual({ kind: "accepted" });
+    expect(await od.availability!.resume(ctx, { merchantId: "merchant-1", externalId: null, key: null, sent: null })).toEqual({ kind: "accepted" });
     expect(sent().map((req) => [req.method, req.url, JSON.parse(req.body!)])).toEqual([
       ["POST", `${OD_BASE.SANDBOX}/v1/merchantUpdate`, { merchantStatus: "UNAVAILABLE" }],
       ["POST", `${OD_BASE.SANDBOX}/v1/merchantUpdate`, { merchantStatus: "AVAILABLE" }],

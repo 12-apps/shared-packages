@@ -6,8 +6,8 @@
 -- One row per (store, marketplace). `wanted` is the host's last ask (PAUSED
 -- or OPEN); `state` is where the marketplace stands (OPEN, PAUSING, PAUSED,
 -- RESUMING, FAILED). The engine deletes on a marketplace only what a row
--- records: `external_id`, `retired_external_id`, or a closure created under
--- `attempt_key`.
+-- records: `external_id`, `retired_external_ids` (space-separated), or a
+-- closure created under `attempt_key` (recognised by `attempt_until`).
 
 CREATE TABLE IF NOT EXISTS "marketplace_store_pauses" (
     "id" TEXT NOT NULL,
@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS "marketplace_store_pauses" (
     "external_id" TEXT,
     "sent_until" TIMESTAMP(3),
     "attempt_key" TEXT,
-    "retired_external_id" TEXT,
+    "attempt_until" TIMESTAMP(3),
+    "retired_external_ids" TEXT,
     "failure_code" TEXT,
     "failure_detail" TEXT,
     "requested_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

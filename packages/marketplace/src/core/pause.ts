@@ -3,7 +3,6 @@ import {
   availabilityDedupeKey,
   enqueueAvailability,
   holdsSomething,
-  newAttemptKey,
   pauseTable,
   readPause,
   type StorePauseFailureCode,
@@ -26,7 +25,7 @@ import type { MarketplaceProvider } from "./types";
 export type PauseOutcome =
   /** The ask was recorded and the job queued. */
   | "queued"
-  /** A pause with this end or a later one already stands or is on its way. */
+  /** A pause with exactly this end already stands or is on its way. */
   | "unchanged"
   /** The marketplace's adapter cannot pause a store: the host says so. */
   | "unsupported"
@@ -54,7 +53,7 @@ export interface PauseStoreInput {
 }
 
 export type PauseStoreResult =
-  | { kind: "invalid"; code: "UNTIL_NOT_FUTURE" }
+  | { kind: "invalid"; code: "UNTIL_NOT_FUTURE" | "TIME_ZONE_INVALID" }
   | { kind: "ok"; marketplaces: { provider: MarketplaceProvider; outcome: PauseOutcome }[] };
 
 /** One marketplace's pause as the screen shows it. */
@@ -98,11 +97,25 @@ async function liveConnections(ctx: EngineContext, clientId: string): Promise<Co
 
 const isConnected = (row: ConnectionRow): boolean => row.credentials !== "" && Boolean(row.externalMerchantId);
 
-/** Whether a pause with this end or a later one already stands, or is on its way. */
+/** Whether an IANA zone name is one this runtime knows. */
+function validTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return timeZone !== "";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a pause with exactly this end already stands, or is on its way. An
+ * earlier end is asked like a later one: the store is never closed on a
+ * marketplace longer than the kitchen's own pause.
+ */
 function alreadyAsked(row: StorePauseRow | null, until: Date): boolean {
   if (!row || row.wanted !== "PAUSED") return false;
   if (row.state !== "PAUSING" && row.state !== "PAUSED") return false;
-  return row.until !== null && row.until.getTime() >= until.getTime();
+  return row.until !== null && row.until.getTime() === until.getTime();
 }
 
 /** Record one marketplace's pause and queue its job, unless it already stands. */
@@ -117,8 +130,9 @@ async function askPause(ctx: EngineContext, input: Required<PauseStoreInput>, pr
     reason: input.reason,
     timeZone: input.timeZone,
     requestedAt: input.now,
-    // A key still in doubt is kept: a retry must find the closure a lost answer created.
-    attemptKey: existing?.attemptKey ?? newAttemptKey(),
+    // No key is minted here: the job writes one just before its call, so a
+    // resume that lands first knows nothing of ours can stand there. A key
+    // still in doubt stays on the row (its create may have landed).
     failureCode: null,
     failureDetail: null,
     failedAt: null,
@@ -135,13 +149,14 @@ async function askPause(ctx: EngineContext, input: Required<PauseStoreInput>, pr
 
 /**
  * Pause the store on every live connection whose marketplace can be paused.
- * Idempotent: a pause already standing (or on its way) with this end or a
- * later one does nothing; a later end extends it. Called again on every
- * renewal of the kitchen's pause.
+ * Idempotent: a pause already standing (or on its way) with exactly this end
+ * does nothing; any other end renews it, an earlier one included. Called again
+ * on every renewal of the kitchen's pause.
  */
 export async function pauseStore(ctx: EngineContext, input: PauseStoreInput): Promise<PauseStoreResult> {
   const now = input.now ?? ctx.ports.clock.now();
   if (input.until.getTime() <= now.getTime()) return { kind: "invalid", code: "UNTIL_NOT_FUTURE" };
+  if (!validTimeZone(input.timeZone)) return { kind: "invalid", code: "TIME_ZONE_INVALID" };
   pauseTable(await ctx.ports.db());
   const full = { ...input, now };
   const marketplaces: { provider: MarketplaceProvider; outcome: PauseOutcome }[] = [];

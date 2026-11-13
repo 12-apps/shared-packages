@@ -25,7 +25,7 @@ const NOPAUSE = "NOPAUSE";
 const NOW = new Date("2026-11-11T12:00:00.000Z");
 const minutes = (n: number): Date => new Date(NOW.getTime() + n * 60_000);
 
-type Script = "retry" | "refused" | "lost";
+type Script = "ok" | "retry" | "refused" | "lost";
 
 /** A marketplace that holds closures by id, with scripted failures. */
 function interruptionMarketplace() {
@@ -187,7 +187,7 @@ describe("the availability job", () => {
     expect(h.published).toContain(TENANT);
   });
 
-  it("does nothing for an equal or earlier end, and renews a later one without opening the store in between", async () => {
+  it("does nothing for the same end, and renews a later one without opening the store in between", async () => {
     const { h, acme } = setup();
     await h.connect(ACME);
     const seen = { count: 0 };
@@ -196,17 +196,59 @@ describe("the availability job", () => {
     const first = pauseRow(h)!.externalId as string;
 
     expect(await pause(h, minutes(20))).toMatchObject({ marketplaces: [{ provider: ACME, outcome: "unchanged" }] });
-    expect(await pause(h, minutes(10))).toMatchObject({ marketplaces: [{ provider: ACME, outcome: "unchanged" }] });
     expect(takeJobs(h, { count: seen.count })).toHaveLength(0);
 
     await pause(h, minutes(35));
     await drain(h, seen);
     const row = pauseRow(h)!;
-    expect(row).toMatchObject({ state: "PAUSED", sentUntil: minutes(35), retiredExternalId: null });
+    expect(row).toMatchObject({ state: "PAUSED", sentUntil: minutes(35), retiredExternalIds: null });
     expect(row.externalId).not.toBe(first);
     // Created the later one FIRST, then deleted the earlier: never open in between.
     expect(acme.calls.slice(-2)).toEqual([`pause:${minutes(35).toISOString()}`, `resume:${first}`]);
     expect([...acme.closures.keys()]).toEqual([row.externalId]);
+  });
+
+  it("renews an EARLIER end too: never closed longer than the kitchen's pause (N6)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    await pause(h, minutes(40));
+    await drain(h, seen);
+    const first = pauseRow(h)!.externalId as string;
+    expect(await pause(h, minutes(15))).toMatchObject({ marketplaces: [{ provider: ACME, outcome: "queued" }] });
+    await drain(h, seen);
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", sentUntil: minutes(15) });
+    expect(acme.calls.slice(-2)).toEqual([`pause:${minutes(15).toISOString()}`, `resume:${first}`]);
+    expect([...acme.closures.values()]).toEqual([{ until: minutes(15), byHand: false }]);
+  });
+
+  it("refuses a time zone the runtime does not know (N7)", async () => {
+    const { h } = setup();
+    await h.connect(ACME);
+    const result = await h.engine.pauseStore({ clientId: TENANT, until: minutes(20), reason: "x", timeZone: "Not/AZone", now: NOW });
+    expect(result).toEqual({ kind: "invalid", code: "TIME_ZONE_INVALID" });
+    expect(h.memory.tables.marketplaceStorePause.rows).toHaveLength(0);
+  });
+
+  it("keeps a replaced closure whose delete failed, and deletes it before the next renewal (N4)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    await drain(h, seen);
+    const first = pauseRow(h)!.externalId as string;
+    await pause(h, minutes(30));
+    // The new closure is made; deleting the replaced one is refused.
+    acme.script.push("ok", "refused");
+    await drain(h, seen);
+    const second = pauseRow(h)!.externalId as string;
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", retiredExternalIds: first });
+    await pause(h, minutes(45));
+    await drain(h, seen);
+    // The pending one goes first, then the next renewal retires the second.
+    expect(acme.calls.slice(-3)).toEqual([`resume:${first}`, `pause:${minutes(45).toISOString()}`, `resume:${second}`]);
+    expect(pauseRow(h)).toMatchObject({ retiredExternalIds: null, sentUntil: minutes(45) });
+    expect(acme.closures.size).toBe(1);
   });
 
   it("fails a refusal with a code and the marketplace's own words, never a sentence of its own", async () => {
@@ -222,7 +264,8 @@ describe("the availability job", () => {
       kind: "interruption",
       state: "FAILED",
       failureCode: "PAUSE_REFUSED",
-      failureDetail: "409: Loja fechada pelo parceiro",
+      // The marketplace's words, verbatim: no status, no engine sentence (B3).
+      failureDetail: "Loja fechada pelo parceiro",
     });
   });
 
@@ -239,6 +282,22 @@ describe("the availability job", () => {
       kind: "failed",
       code: "PAUSE_UNANSWERED",
     });
+    // An unanswered call has no words of the marketplace's: nothing for the host to show (B3).
+    expect(pauseRow(h)).toMatchObject({ failureDetail: null });
+    expect(h.logged.some((line) => line.level === "error" && line.message.includes("status 503"))).toBe(true);
+  });
+
+  it("releases only its own lease: one another run took after it expired stays (N10)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    const other = minutes(99);
+    acme.during.pause.push(async () => {
+      pauseRow(h)!.leaseUntil = other;
+    });
+    await drain(h, seen);
+    expect(pauseRow(h)!.leaseUntil).toEqual(other);
   });
 });
 
@@ -290,17 +349,30 @@ describe("never deleting what the engine did not create", () => {
 });
 
 describe("races: the last ask wins", () => {
-  it("resume before the pause job runs: no closure is ever created", async () => {
+  it("resume before the pause job runs: nobody is called, no closure is ever created", async () => {
     const { h, acme } = setup();
     await h.connect(ACME);
     const seen = { count: 0 };
     await pause(h, minutes(20));
-    await h.engine.resumeStore({ clientId: TENANT, now: NOW });
-    const [first, ...later] = await drain(h, seen);
-    expect(first).toEqual({ kind: "done", state: "OPEN" });
-    for (const outcome of later) expect(outcome).toMatchObject({ kind: "skipped" });
+    expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({
+      marketplaces: [{ provider: ACME, outcome: "open" }],
+    });
+    for (const outcome of await drain(h, seen)) expect(outcome).toMatchObject({ kind: "skipped" });
     expect(acme.closures.size).toBe(0);
-    expect(acme.calls.some((call) => call.startsWith("pause:"))).toBe(false);
+    expect(acme.calls).toEqual([]);
+  });
+
+  it("a switch resumed before its pause job runs is never turned on (B2)", async () => {
+    const { h, switchy } = setup();
+    await h.connect(SWITCHY);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({
+      marketplaces: [{ provider: SWITCHY, outcome: "open" }],
+    });
+    await drain(h, seen);
+    expect(switchy.calls).toEqual([]);
+    expect(switchy.state.enabled).toBe(true);
   });
 
   it("resume while the pause call is in flight: the closure it created is recorded, then deleted", async () => {

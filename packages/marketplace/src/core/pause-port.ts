@@ -43,9 +43,10 @@ export interface StorePauseRequest {
   reason: string;
   /**
    * A stable key for THIS closure, the same on every retry of it. An adapter
-   * that can name its own closure (iFood takes an id) sends it, and one that
-   * can list closures finds a closure a lost answer already created under it,
-   * so a retry never creates a second one.
+   * that can name its own closure sends it; one that can list closures finds
+   * the closure a lost answer already created, by the key or, where the
+   * marketplace assigns its own id, by the end and the reason it carries, so
+   * a retry never creates a second one.
    */
   key: string;
   /** The store's IANA time zone, for a marketplace that reads times as the store's wall clock. */
@@ -59,6 +60,12 @@ export interface StorePauseRef {
   externalId: string | null;
   /** The key the closure was created under; null once nothing of ours is in doubt. */
   key: string | null;
+  /**
+   * What the create under `key` carried, for a marketplace that names a
+   * closure with its own id: the closure whose end and description are these
+   * is the one a lost answer created. Null with no key in doubt.
+   */
+  sent: { until: Date; reason: string; timeZone: string } | null;
 }
 
 /** One pause or extend's answer. */
