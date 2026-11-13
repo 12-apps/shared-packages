@@ -27,18 +27,13 @@ const ownClass = (el: HTMLElement): string => {
 };
 
 /** The declarations of every rule whose selector is exactly `selector`, last one wins. */
-const declared = (selector: string, property: string): string | undefined => {
-  let value: string | undefined;
-  for (const sheet of Array.from(document.styleSheets)) {
-    for (const rule of Array.from(sheet.cssRules)) {
-      if (rule instanceof CSSStyleRule && rule.selectorText === selector) {
-        const v = rule.style.getPropertyValue(property);
-        if (v) value = v;
-      }
-    }
-  }
-  return value;
-};
+const declared = (selector: string, property: string): string | undefined =>
+  Array.from(document.styleSheets)
+    .flatMap((sheet) => Array.from(sheet.cssRules))
+    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule && rule.selectorText === selector)
+    .map((rule) => rule.style.getPropertyValue(property))
+    .filter(Boolean)
+    .pop();
 
 const renderButton = (mode: 'light' | 'dark', props: ButtonProps): HTMLElement => {
   render(
@@ -62,7 +57,7 @@ describe('Button ripple layer (FUT-4861)', () => {
         expect(declared(`.${cls} .MuiTouchRipple-root`, 'z-index')).toBe('-1');
         // The ripple is still there to be painted (MUI mounts it on the first press): only its layer moved.
         fireEvent.mouseDown(button);
-        expect(button.querySelector('.MuiTouchRipple-root')).not.toBeNull();
+        expect(button.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(1);
       },
     );
   });
@@ -74,12 +69,12 @@ describe('Button ripple layer (FUT-4861)', () => {
     // paint above a `z-index: -1` ripple.
     expect(screen.getByTestId('b-loading').parentElement?.style.zIndex).toBe('');
     expect(screen.getByTestId('b-icon').style.zIndex).toBe('');
-    expect(button.querySelector('.MuiTouchRipple-root')).toBeNull();
+    expect(button.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
   });
 
   it('leaves a disabled button with no ripple at all', () => {
     const button = renderButton('light', { disabled: true });
     fireEvent.mouseDown(button);
-    expect(button.querySelector('.MuiTouchRipple-root')).toBeNull();
+    expect(button.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
   });
 });

@@ -140,8 +140,8 @@ export const buttonSize =
  * the pulsate keep their colour and their timing; only the layer moves. The
  * loading spinner and the progress fill are positioned and paint above it too.
  *
- * A host that corrects the ink of a control from outside (Future Pay inside an
- * Alert) moves the ripple the same way, so the two rules agree.
+ * A host that corrects the ink of a control from outside (inside an Alert, say)
+ * moves the ripple the same way, so the two rules agree.
  */
 export const rippleUnderLabelStyles = (): CSSObject => ({
   isolation: 'isolate',

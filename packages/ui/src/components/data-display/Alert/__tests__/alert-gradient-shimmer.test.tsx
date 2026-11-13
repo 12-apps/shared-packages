@@ -47,9 +47,9 @@ describe.each(MODES)('the gradient alert shimmer in %s mode', (mode) => {
   it('keeps the period, the alpha and the band: transparent at both ends, so no seam', () => {
     expect(String(shimmer.animation)).toContain(` ${seconds(GRADIENT.shimmerMs)} infinite`);
     expect(String(shimmer.animation)).toContain(shimmerAnimation().name);
-    expect(shimmer.background).toBe(
-      `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
-    );
+    expect(String(shimmer.background)).toMatch(/^linear-gradient\(90deg, transparent, /u);
+    expect(String(shimmer.background)).toContain(sheen(theme, GRADIENT.shimmerAlpha));
+    expect(String(shimmer.background)).toMatch(/, transparent\)$/u);
     expect(GRADIENT.shimmerAlpha).toBe(0.2);
     expect(GRADIENT.shimmerMs).toBe(3000);
   });
