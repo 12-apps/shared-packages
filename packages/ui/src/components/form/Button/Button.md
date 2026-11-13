@@ -98,6 +98,16 @@ button with `progress` draw a two-tone `:focus-visible` ring (ink ring, page
 halo), since MUI gives them only a ripple. Any other button is not held, so navigation stays live; a host
 control opts in by reading `useFormBusy()`.
 
+## Press ripple and focus pulsate
+
+The press ripple and the focus pulsate (an outline or text button's only
+keyboard focus indicator) paint ABOVE the button's own surface and BELOW its
+label, icons and spinner, in every variant, colour and mode. The button is its
+own stacking context (`isolation: isolate`) and MUI's `.MuiTouchRipple-root`
+sits at `z-index: -1`, so a held contained button keeps its label contrast and a
+focused one keeps its pulsate. Colour and timing are MUI's. A host that restyles
+the ripple keeps it under the label by leaving that `z-index` alone.
+
 ## Rendering as something else
 
 `component` swaps the element the button renders as, and the button's props are

@@ -127,6 +127,28 @@ export const buttonSize =
   };
 
 /**
+ * THE PRESS RIPPLE AND THE FOCUS PULSATE PAINT UNDER THE LABEL (FUT-4861).
+ *
+ * MUI appends `.MuiTouchRipple-root` as the last child, absolutely positioned
+ * at `z-index: 0`, so it painted OVER the label: a contained button held down
+ * dropped its label to 2.9 to 3.5:1, and the focus pulsate (the only keyboard
+ * focus indicator an outline or text button has) read 2.95 to 4.17:1 over it.
+ *
+ * `isolation: isolate` makes the button its own stacking context, so a
+ * `z-index: -1` ripple stays ABOVE the button's own surface (fill, gradient,
+ * border) and BELOW everything in flow: the label, the icons. The ripple and
+ * the pulsate keep their colour and their timing; only the layer moves. The
+ * loading spinner and the progress fill are positioned and paint above it too.
+ *
+ * A host that corrects the ink of a control from outside (Future Pay inside an
+ * Alert) moves the ripple the same way, so the two rules agree.
+ */
+export const rippleUnderLabelStyles = (): CSSObject => ({
+  isolation: 'isolate',
+  '& .MuiTouchRipple-root': { zIndex: -1 },
+});
+
+/**
  * MUI centres icons with a negative margin that fights our own padding, so the
  * flex alignment is restated here rather than fought with `!important`.
  */

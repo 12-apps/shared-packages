@@ -17,6 +17,7 @@ import {
   getColorFromTheme,
   iconAlignmentStyles,
   buttonSize,
+  rippleUnderLabelStyles,
 } from './Button.styles';
 import type { ButtonComponent, ButtonProps } from './Button.types';
 
@@ -43,6 +44,7 @@ const StyledButton = styled(MuiButton, {
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
+    ...rippleUnderLabelStyles(),
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
