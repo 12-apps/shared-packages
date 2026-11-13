@@ -30,6 +30,9 @@ packages/thermal-printing
 # and arithmetic. Same reasoning as the two above — a reader scanning for "what
 # needs nothing first" should meet it here.
 packages/qr
+# `@12-apps/fiscal` needs nothing here at runtime (pure arithmetic; wiring is an
+# optional, type-only peer), so its position is free; it sits with the leaves.
+packages/fiscal
 # `@12-apps/desktop-shell` has no runtime dependency on anything here, so its
 # position is free; it sits beside the other leaves.
 packages/desktop-shell

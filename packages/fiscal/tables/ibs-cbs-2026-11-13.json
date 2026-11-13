@@ -1,0 +1,95 @@
+{
+  "version": "ibs-cbs/2026-11-13",
+  "notes": [
+    "IBS/CBS rates by period of the date of the supply, in basis points (1 bp = 0.01%).",
+    "status LAW: every figure of the period is fixed by statute. status ESTIMATE: at least one figure is not yet published (the CBS reference rate fixed by Senate resolution, the IBS reference rates of 2029 onward) and carries the government's announced estimate; a result computed on an ESTIMATE period is stamped provisional.",
+    "A new table is a new file with a new version, never an edit of this one: a result stamped with this version must reproduce from it."
+  ],
+  "gorjetaCapBp": 1500,
+  "gorjetaCapSource": "LC 214/2025 art. 274 par. unico I",
+  "specialRegimes": {
+    "BARES_RESTAURANTES": {
+      "reductionBp": 4000,
+      "source": "LC 214/2025 art. 275"
+    }
+  },
+  "periods": [
+    {
+      "from": "2026-01-01",
+      "to": "2026-12-31",
+      "status": "LAW",
+      "source": "LC 214/2025 arts. 343 (IBS 0.1% state), 346 (CBS 0.9%), 348 par. 1 (payment waived), 348 III c (not applied to Simples Nacional optants)",
+      "informative": true,
+      "appliesToSimplesNacional": false,
+      "cbsBp": 90,
+      "ibsUf": { "referenceBp": 10, "byUf": {} },
+      "ibsMun": { "referenceBp": 0, "byMunicipality": {} }
+    },
+    {
+      "from": "2027-01-01",
+      "to": "2028-12-31",
+      "status": "ESTIMATE",
+      "source": "LC 214/2025 art. 344 (IBS 0.05% state + 0.05% municipal); CBS: Fazenda's estimated reference rate 8.8% less 0.1 point, pending the Senate resolution (arts. 349 I, 353-359)",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 870,
+      "ibsUf": { "referenceBp": 5, "byUf": {} },
+      "ibsMun": { "referenceBp": 5, "byMunicipality": {} }
+    },
+    {
+      "from": "2029-01-01",
+      "to": "2029-12-31",
+      "status": "ESTIMATE",
+      "source": "IBS at one tenth of the estimated reference (17.7%: 10.0% state + 7.7% municipal) as ICMS/ISS step down (LC 214/2025 art. 342; arts. 501, 508); CBS at the estimated reference 8.8%",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 880,
+      "ibsUf": { "referenceBp": 100, "byUf": {} },
+      "ibsMun": { "referenceBp": 77, "byMunicipality": {} }
+    },
+    {
+      "from": "2030-01-01",
+      "to": "2030-12-31",
+      "status": "ESTIMATE",
+      "source": "IBS at two tenths of the estimated reference; CBS at the estimated reference",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 880,
+      "ibsUf": { "referenceBp": 200, "byUf": {} },
+      "ibsMun": { "referenceBp": 154, "byMunicipality": {} }
+    },
+    {
+      "from": "2031-01-01",
+      "to": "2031-12-31",
+      "status": "ESTIMATE",
+      "source": "IBS at three tenths of the estimated reference; CBS at the estimated reference",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 880,
+      "ibsUf": { "referenceBp": 300, "byUf": {} },
+      "ibsMun": { "referenceBp": 231, "byMunicipality": {} }
+    },
+    {
+      "from": "2032-01-01",
+      "to": "2032-12-31",
+      "status": "ESTIMATE",
+      "source": "IBS at four tenths of the estimated reference; CBS at the estimated reference",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 880,
+      "ibsUf": { "referenceBp": 400, "byUf": {} },
+      "ibsMun": { "referenceBp": 308, "byMunicipality": {} }
+    },
+    {
+      "from": "2033-01-01",
+      "to": null,
+      "status": "ESTIMATE",
+      "source": "ICMS and ISS extinct; IBS and CBS at the estimated full reference rates (17.7% + 8.8%, inside the 26-28% band of the government's estimate)",
+      "informative": false,
+      "appliesToSimplesNacional": true,
+      "cbsBp": 880,
+      "ibsUf": { "referenceBp": 1000, "byUf": {} },
+      "ibsMun": { "referenceBp": 770, "byMunicipality": {} }
+    }
+  ]
+}

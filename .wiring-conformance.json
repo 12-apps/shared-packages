@@ -255,6 +255,10 @@
     "kind": "exempt",
     "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
   },
+  "@12-apps/fiscal": {
+    "kind": "exempt",
+    "why": "the IBS/CBS engine alone is a pure function a host calls in-process: no route, table, job or env to wire. The wiring manifest skeleton follows in the next commit of this delivery."
+  },
   "@12-apps/forms-core": {
     "kind": "exempt",
     "why": "a form-state library hosts embed inside their own screens; it mounts nothing and owns nothing host-wired — the contract must stay something only packages with host-wired capabilities carry"
