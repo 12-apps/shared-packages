@@ -20,13 +20,39 @@ export interface LifecycleDraftDataValidator {
     | { success: true; data: unknown }
     | {
         success: false;
-        error: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
+        error: { issues: ReadonlyArray<LifecycleDraftDataIssue> };
       };
+}
+
+/**
+ * One issue a validator reports, as far as this module reads it. `code` and
+ * `keys` are zod's `unrecognized_keys` shape: ONE issue naming every unknown
+ * key at the object's path.
+ */
+export interface LifecycleDraftDataIssue {
+  path: ReadonlyArray<PropertyKey>;
+  message: string;
+  code?: string;
+  keys?: ReadonlyArray<string>;
 }
 
 /** A validator's issue path, dotted under `data` the way every other problem is written. */
 function issuePath(path: ReadonlyArray<PropertyKey>): string {
   return ['data', ...path.map((step) => String(step))].join('.');
+}
+
+/**
+ * The problems one issue stands for. zod reports every unknown key of an
+ * object as a single `unrecognized_keys` issue at the OBJECT's path; the hand
+ * check (`unrecognizedKeys`) writes one problem per key, at the key's own
+ * path — so this expands the one into the many, and a caller reads the same
+ * shape whichever layer refused it.
+ */
+function problemsOf(issue: LifecycleDraftDataIssue): Array<{ path: string; message: string }> {
+  if (issue.code === 'unrecognized_keys' && issue.keys && issue.keys.length > 0) {
+    return issue.keys.map((key) => ({ path: issuePath([...issue.path, key]), message: 'Unrecognized key' }));
+  }
+  return [{ path: issuePath(issue.path), message: issue.message }];
 }
 
 /**
@@ -37,7 +63,7 @@ function issuePath(path: ReadonlyArray<PropertyKey>): string {
  *
  * With the collection's `draftData` validator (FUT-4867), `data` must also
  * pass it: a refusal is the same 422, one problem per issue at its dotted path
- * (`data.name`), and what is stored is the validator's OUTPUT. Without one,
+ * (`data.name`; an unknown key at its own, `data.meta.extra`), and what is stored is the validator's OUTPUT. Without one,
  * any JSON object is a draft, as before.
  */
 export function parseSnapshotBody(
@@ -60,7 +86,7 @@ export function parseSnapshotBody(
   if (!parsed.success) {
     throw invalidInput(
       messages,
-      parsed.error.issues.map((issue) => ({ path: issuePath(issue.path), message: issue.message })),
+      parsed.error.issues.flatMap(problemsOf),
     );
   }
   return parsed.data as Snapshot;

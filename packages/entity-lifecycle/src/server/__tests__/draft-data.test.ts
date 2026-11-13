@@ -114,11 +114,18 @@ describe('draftData on a registration', () => {
       const top = await call(route, params, { data: { name: 'Quebra', colour: 'red' } });
       expect(`${route.method} ${route.path} -> ${top.status}`).toBe(`${route.method} ${route.path} -> 422`);
       expect((top.body as Refusal).error).toBe(PT_BR_LIFECYCLE_MESSAGES.invalidBody);
-      expect((top.body as Refusal).problems.map((problem) => problem.path)).toEqual(['data']);
+      expect((top.body as Refusal).problems).toEqual([{ path: 'data.colour', message: 'Unrecognized key' }]);
 
       const deep = await call(route, params, { data: { meta: { note: 'x', extra: 1 } } });
       expect(deep.status).toBe(422);
-      expect((deep.body as Refusal).problems.map((problem) => problem.path)).toEqual(['data.meta']);
+      expect((deep.body as Refusal).problems.map((problem) => problem.path)).toEqual(['data.meta.extra']);
+
+      // Two unknown keys in one object are two problems, as the hand check writes them.
+      const two = await call(route, params, { data: { colour: 'red', size: 2 } });
+      expect((two.body as Refusal).problems).toEqual([
+        { path: 'data.colour', message: 'Unrecognized key' },
+        { path: 'data.size', message: 'Unrecognized key' },
+      ]);
 
       const wrongType = await call(route, params, { data: { category: 'OUTRA' } });
       expect((wrongType.body as Refusal).problems.map((problem) => problem.path)).toEqual(['data.category']);
