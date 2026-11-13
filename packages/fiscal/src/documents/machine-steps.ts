@@ -15,7 +15,7 @@ import type {
 } from "../sidecar/types";
 import type { SaleForDocument } from "../sale/types";
 import { FiscalDocumentError } from "./errors";
-import type { DocumentEventKind, FiscalDocument, NumberVoid } from "./types";
+import type { DocumentEventKind, DocumentTotals, FiscalDocument, NumberVoid } from "./types";
 
 export type SidecarError = SidecarErrorBody["error"];
 
@@ -28,7 +28,8 @@ export type DocumentInput =
   | { readonly kind: "AUTHORIZE"; readonly answer: IssuedDocument; readonly xmlKey: string }
   | { readonly kind: "DENY"; readonly answer: IssuedDocument; readonly xmlKey: string }
   | { readonly kind: "REJECT"; readonly error: SidecarError }
-  | { readonly kind: "RETRY"; readonly error: SidecarError }
+  /** `xmlKey`: where the signed XML the failed call returned was stored, when it returned one. */
+  | { readonly kind: "RETRY"; readonly error: SidecarError; readonly xmlKey?: string }
   | {
       readonly kind: "SIGN_OFFLINE";
       readonly answer: ContingencySignedDocument;
@@ -37,7 +38,12 @@ export type DocumentInput =
     }
   | { readonly kind: "REPLACE"; readonly replacedById: string }
   | { readonly kind: "CANCEL"; readonly answer: CancelledDocument; readonly reason: string; readonly eventXmlKey: string | null }
-  | { readonly kind: "LOOKUP"; readonly answer: LookedUpDocument }
+  /**
+   * `xmlKey`: the `nfeProc` assembled from the stored signed XML and the
+   * lookup's protocol. Without it a lookup never makes a SUBMITTED document
+   * final: an authorised document always has its XML.
+   */
+  | { readonly kind: "LOOKUP"; readonly answer: LookedUpDocument; readonly xmlKey?: string }
   | { readonly kind: "INUTILIZE"; readonly answer: InutilizedRange; readonly eventXmlKey: string | null }
   /**
    * A step that made no progress (a settlement refused or unanswered, a step
@@ -46,7 +52,14 @@ export type DocumentInput =
    */
   | { readonly kind: "DEFER"; readonly reason: string; readonly error: SidecarError | null; readonly attention: boolean }
   /** A rejected contingency NFC-e, corrected by the store and signed again under the same number. */
-  | { readonly kind: "RESIGN"; readonly answer: ContingencySignedDocument; readonly sale: SaleForDocument; readonly xmlKey: string }
+  | {
+      readonly kind: "RESIGN";
+      readonly answer: ContingencySignedDocument;
+      readonly sale: SaleForDocument;
+      readonly totals: DocumentTotals;
+      readonly buyerTaxId: string | null;
+      readonly xmlKey: string;
+    }
   /** A person took a document back from `attention`: the sweep may try again. */
   | { readonly kind: "RELEASE" }
   /** The 24-hour contingency deadline warning went out. */
@@ -120,17 +133,24 @@ function lookupOfSettledNumber(document: FiscalDocument, answer: LookedUpDocumen
   };
 }
 
-function lookupOfSubmitted(document: FiscalDocument, answer: LookedUpDocument): Partial<FiscalDocument> {
+/**
+ * A lookup of a SUBMITTED document. It settles it as AUTHORIZED or DENIED
+ * only with the XML in hand (`xmlKey`); otherwise it keeps what SEFAZ said —
+ * the protocol marks the number as SEFAZ's — and the document stays
+ * SUBMITTED, for the sweep to fetch the XML by sending the same call again.
+ */
+function lookupOfSubmitted(document: FiscalDocument, answer: LookedUpDocument, xmlKey: string | undefined): Partial<FiscalDocument> {
   const known = { statusCode: answer.statusCode, statusReason: answer.statusReason, outcomeUnknown: false };
   // A key found cancelled elsewhere is left to the next issue call, which the service settles: CANCELLED is entered only from AUTHORIZED.
   const settles = answer.status === "AUTHORIZED" || answer.status === "DENIED";
   if (!settles || answer.protocol === null || document.accessKey === null) return known;
-  return { ...known, ...SETTLED, status: answer.status, protocol: answer.protocol, lastErrorClass: null };
+  if (xmlKey === undefined) return { ...known, protocol: answer.protocol };
+  return { ...known, ...SETTLED, status: answer.status, protocol: answer.protocol, lastErrorClass: null, xmlKey };
 }
 
-function lookupFields(document: FiscalDocument, answer: LookedUpDocument): Partial<FiscalDocument> {
+function lookupFields(document: FiscalDocument, answer: LookedUpDocument, xmlKey?: string): Partial<FiscalDocument> {
   if (document.status === "REPLACED" || document.status === "REJECTED") return lookupOfSettledNumber(document, answer);
-  if (document.status === "SUBMITTED") return lookupOfSubmitted(document, answer);
+  if (document.status === "SUBMITTED") return lookupOfSubmitted(document, answer, xmlKey);
   if (answer.status === "CANCELLED") return { status: "CANCELLED", statusCode: answer.statusCode, statusReason: answer.statusReason };
   return { statusCode: answer.statusCode, statusReason: answer.statusReason };
 }
@@ -162,7 +182,11 @@ export const STEPS: Step = {
   AUTHORIZE: (_document, input) => ({ status: "AUTHORIZED", ...issuedFields(input.answer, input.xmlKey) }),
   DENY: (_document, input) => ({ status: "DENIED", ...issuedFields(input.answer, input.xmlKey) }),
   REJECT: (document, input) => rejectFields(document, input.error),
-  RETRY: (document, input) => ({ ...failedFields(document, input.error), ...failure(document, false) }),
+  RETRY: (document, input) => ({
+    ...failedFields(document, input.error),
+    ...failure(document, false),
+    ...(input.xmlKey === undefined ? {} : { xmlKey: input.xmlKey }),
+  }),
   SIGN_OFFLINE: (document, input) => {
     if (document.seriesKind !== "CONTINGENCY") refuse(document, input.kind, "only a contingency-series number is signed offline");
     return { ...SETTLED, status: "CONTINGENCY", accessKey: input.answer.accessKey, contingency: input.contingency, xmlKey: input.xmlKey };
@@ -171,10 +195,14 @@ export const STEPS: Step = {
     ...SETTLED,
     status: "REPLACED",
     replacedById: input.replacedById,
-    numberVoid: document.status === "SUBMITTED" && document.outcomeUnknown ? "LOOKUP_FIRST" : "INUTILIZE",
+    // A SUBMITTED document may have reached SEFAZ whatever was recorded (a process
+    // that died mid-call, a receipt with no protocol yet): its key is always
+    // known, so it is looked up before its number is voided. Only a PENDING one
+    // was never sent.
+    numberVoid: document.status === "SUBMITTED" ? "LOOKUP_FIRST" : "INUTILIZE",
   }),
   CANCEL: cancelFields,
-  LOOKUP: (document, input) => lookupFields(document, input.answer),
+  LOOKUP: (document, input) => lookupFields(document, input.answer, input.xmlKey),
   INUTILIZE: (document, input) => {
     if (document.numberVoid !== "INUTILIZE") refuse(document, input.kind, "its number is not owed an inutilization");
     return { ...SETTLED, numberVoid: "INUTILIZED", eventXmlKey: input.eventXmlKey };
@@ -186,7 +214,18 @@ export const STEPS: Step = {
   }),
   RESIGN: (document, input) => {
     if (document.seriesKind !== "CONTINGENCY") refuse(document, input.kind, "only a rejected contingency NFC-e is resent");
-    return { ...SETTLED, status: "CONTINGENCY", sale: input.sale, accessKey: input.answer.accessKey, xmlKey: input.xmlKey, statusCode: null, statusReason: null, lastErrorClass: null };
+    return {
+      ...SETTLED,
+      status: "CONTINGENCY",
+      sale: input.sale,
+      totals: input.totals,
+      buyerTaxId: input.buyerTaxId,
+      accessKey: input.answer.accessKey,
+      xmlKey: input.xmlKey,
+      statusCode: null,
+      statusReason: null,
+      lastErrorClass: null,
+    };
   },
   RELEASE: (document) => {
     if (!document.attention) refuse(document, "RELEASE", "it is not waiting for a person");

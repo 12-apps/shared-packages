@@ -37,7 +37,7 @@ const INPUTS: readonly DocumentInput[] = [
   { kind: "DEFER", reason: "unanswered", error: null, attention: false },
   { kind: "RELEASE" },
   { kind: "WARN" },
-  { kind: "RESIGN", answer: SIGNED, sale: aDocument().sale, xmlKey: "x" },
+  { kind: "RESIGN", answer: SIGNED, sale: aDocument().sale, totals: aDocument().totals, buyerTaxId: null, xmlKey: "x" },
 ];
 
 const AT = "2026-11-20T15:31:00.000Z";

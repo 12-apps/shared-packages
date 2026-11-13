@@ -115,6 +115,30 @@ export async function goOffline(
   return signPending(ctx, offline, profile, signing);
 }
 
+/**
+ * The signed XML a failed call returned, stored: a lookup that later finds the
+ * key authorised joins it to the protocol to make the `nfeProc`.
+ */
+async function keepSigned(ctx: FiscalContext, document: FiscalDocument, error: IssuerFailure): Promise<{ xmlKey?: string }> {
+  const key = document.accessKey ?? error.accessKey;
+  if (error.signedXml === null || key === null) return {};
+  const xmlKey = xmlKeys.signed(key);
+  await ctx.config.storage.put(xmlKey, error.signedXml, "application/xml");
+  return { xmlKey };
+}
+
+/**
+ * An online NFC-e SEFAZ would now refuse as late, at a point that can go
+ * offline. A document a lookup found authorised (its protocol is kept) is
+ * SEFAZ's: sending the same call again fetches its XML (the service settles
+ * the duplicate by a lookup), and it must never go offline beside its own
+ * authorisation.
+ */
+function staleOnline(ctx: FiscalContext, document: FiscalDocument, point: IssuingPoint): boolean {
+  const knownToSefaz = document.status === "SUBMITTED" && document.protocol !== null;
+  return !knownToSefaz && canGoOffline(document, point) && pastOnlineTolerance(ctx, document);
+}
+
 /** Issue (or re-issue, for a SUBMITTED one) a document on its online series. */
 export async function submit(
   ctx: FiscalContext,
@@ -123,14 +147,12 @@ export async function submit(
   point: IssuingPoint,
   signing: SigningMaterial,
 ): Promise<FiscalDocument> {
-  if (document.model === "NFCE" && canGoOffline(document, point) && pastOnlineTolerance(ctx, document)) {
-    return goOffline(ctx, document, profile, point, signing);
-  }
+  if (staleOnline(ctx, document, point)) return goOffline(ctx, document, profile, point, signing);
   const sent = document.status === "PENDING" ? await ctx.advance(document, { kind: "SUBMIT" }) : document;
   const outcome = await ctx.config.issuer.issue({ model: sent.model, environment: sent.environment, signing, document: sent.sale });
   if (outcome.ok) return accept(ctx, sent, outcome.answer);
   if (FINAL_FAILURES.has(outcome.error.class)) return reject(ctx, sent, outcome.error);
-  const retried = await ctx.advance(sent, { kind: "RETRY", error: outcome.error });
+  const retried = await ctx.advance(sent, { kind: "RETRY", error: outcome.error, ...(await keepSigned(ctx, sent, outcome.error)) });
   return outcome.error.class === "CONTINGENCY" && canGoOffline(retried, point) ? goOffline(ctx, retried, profile, point, signing) : retried;
 }
 

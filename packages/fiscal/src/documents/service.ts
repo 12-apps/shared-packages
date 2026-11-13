@@ -13,13 +13,14 @@
 import type { IssuerFailure } from "../issuer/port";
 import { FISCAL_ISSUE } from "../manifest/permissions";
 import type { LookedUpDocument } from "../sidecar/types";
-import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertReason, issuerOf, xmlKeys } from "./context";
+import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertReason, issuerOf, totalsOf, xmlKeys } from "./context";
 import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
 import { settleNumber } from "./settle";
 import { signPending, submit, transmit } from "./steps";
-import { type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
+import { type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
+import { assembleNfeProc } from "./nfe-proc";
 
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
 
@@ -106,6 +107,20 @@ async function issueOffline(deps: Deps, input: Omit<IssueInput, "model">): Promi
  * host's `SaleSource` answers the corrected one) and it is signed again
  * under the SAME series, number and key code, then transmitted by the job.
  */
+/** The fields a buyer's DANFE prints and its QR code encodes, which a resend may never change. */
+function printedFieldsChange(document: FiscalDocument, totals: DocumentTotals, buyerTaxId: string | null): boolean {
+  return totals.totalCents !== document.totals.totalCents || buyerTaxId !== document.buyerTaxId;
+}
+
+/**
+ * A contingency NFC-e SEFAZ rejected on transmission: the buyer holds its
+ * DANFE, so the number is never voided. The store corrects the sale (the
+ * host's `SaleSource` answers the corrected one) and it is signed again
+ * under the SAME series, number and key code, then transmitted by the job.
+ * A correction that would change the total or the buyer's document — what
+ * the DANFE prints and its QR encodes — is refused: that sale needs a new
+ * note, issued by a person (decided on FUT-2237).
+ */
 async function resendContingency(deps: Deps, input: { ownerId: string; documentId: string }): Promise<FiscalDocument> {
   const document = await requireDocument(deps, input.ownerId, input.documentId);
   if (document.status !== "REJECTED" || document.seriesKind !== "CONTINGENCY" || document.contingency === null) {
@@ -113,6 +128,14 @@ async function resendContingency(deps: Deps, input: { ownerId: string; documentI
   }
   const profile = await deps.ctx.requireProfile(input.ownerId);
   const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: document.subjectId, model: document.model });
+  const totals = totalsOf(draft);
+  const buyerTaxId = draft.buyer?.document.number ?? null;
+  if (printedFieldsChange(document, totals, buyerTaxId)) {
+    throw new FiscalDocumentError(
+      "RESEND_CHANGES_PRINTED_FIELDS",
+      `the correction changes document ${document.id}'s total or buyer, which its DANFE prints: issue a new note.`,
+    );
+  }
   const sale = { ...draft, series: document.series, number: document.number, keyCode: document.keyCode, issuedAt: document.issuedAt, issuer: issuerOf(profile) };
   const outcome = await deps.config.issuer.signContingency({
     environment: document.environment,
@@ -123,7 +146,7 @@ async function resendContingency(deps: Deps, input: { ownerId: string; documentI
   if (!outcome.ok) throw new FiscalDocumentError("NOT_ISSUABLE", `the corrected sale could not be signed: ${outcome.error.class} ${outcome.error.code ?? ""}`.trim());
   const xmlKey = xmlKeys.signed(outcome.answer.accessKey);
   await deps.config.storage.put(xmlKey, outcome.answer.signedXml, "application/xml");
-  return deps.ctx.advance(document, { kind: "RESIGN", answer: outcome.answer, sale, xmlKey });
+  return deps.ctx.advance(document, { kind: "RESIGN", answer: outcome.answer, sale, totals, buyerTaxId, xmlKey });
 }
 
 async function cancel(
@@ -151,6 +174,23 @@ async function cancel(
   return { document: cancelled, failure: null };
 }
 
+/**
+ * A SUBMITTED document a lookup finds authorised or denied: its `nfeProc`,
+ * from the signed XML a failed call returned and the protocol the lookup
+ * carries, stored. `undefined` when either is missing — the document then
+ * stays SUBMITTED, and the sweep sends the same call again for the XML.
+ */
+async function storeNfeProc(deps: Deps, document: FiscalDocument, answer: LookedUpDocument): Promise<string | undefined> {
+  if ((answer.status !== "AUTHORIZED" && answer.status !== "DENIED") || document.accessKey === null || document.xmlKey === null) return undefined;
+  const signedXml = await deps.config.storage.get(document.xmlKey);
+  if (signedXml === null) return undefined;
+  const nfeProc = assembleNfeProc({ signedXml, sefazReply: answer.sefazReply, accessKey: document.accessKey });
+  if (nfeProc === null) return undefined;
+  const xmlKey = xmlKeys.authorized(document.accessKey);
+  await deps.config.storage.put(xmlKey, nfeProc, "application/xml");
+  return xmlKey;
+}
+
 /** Whether a lookup's answer moves this document (a settled number moves only while it is owed one). */
 function lookupMoves(document: FiscalDocument): boolean {
   if (!canTransition(document.status, "LOOKUP")) return false;
@@ -172,7 +212,9 @@ async function lookup(
     accessKey: document.accessKey,
   });
   if (!outcome.ok) return { document, answer: null, failure: outcome.error };
-  const after = lookupMoves(document) ? await deps.ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer }) : document;
+  if (!lookupMoves(document)) return { document, answer: outcome.answer, failure: null };
+  const xmlKey = document.status === "SUBMITTED" ? await storeNfeProc(deps, document, outcome.answer) : undefined;
+  const after = await deps.ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer, ...(xmlKey === undefined ? {} : { xmlKey }) });
   return { document: after, answer: outcome.answer, failure: null };
 }
 

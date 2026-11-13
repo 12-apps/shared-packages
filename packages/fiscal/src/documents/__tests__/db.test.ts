@@ -81,7 +81,7 @@ const INPUTS: readonly DocumentInput[] = [
   { kind: "DEFER", reason: "refused", error: sidecarError("REJECTED", { code: "241" }), attention: true },
   { kind: "RELEASE" },
   { kind: "WARN" },
-  { kind: "RESIGN", answer: SIGNED, sale: SALE, xmlKey: "y" },
+  { kind: "RESIGN", answer: SIGNED, sale: SALE, totals: aDocument().totals, buyerTaxId: null, xmlKey: "y" },
 ];
 
 function reachable(): Map<string, FiscalDocument> {

@@ -194,7 +194,16 @@ nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
 - **A rejected contingency NFC-e is never voided.** The buyer holds its
   DANFE: it stays `REJECTED` with SEFAZ's code, the store corrects the sale,
   and `resendContingency` signs it again under the same series, number and
-  key code (`POST …/resend`).
+  key code (`POST …/resend`), with the corrected sale's totals. A correction
+  that changes the total or the buyer's document — what the DANFE the buyer
+  holds prints and its QR encodes — is refused (`RESEND_CHANGES_PRINTED_FIELDS`):
+  that sale needs a new note, issued by a person.
+- **An authorised document always has its XML.** A lookup that finds a
+  SUBMITTED document authorised joins the signed XML the service returned to
+  the lookup's `protNFe`; without both, the document stays SUBMITTED (its
+  protocol kept, so it never goes offline) and the sweep sends the same call
+  again, which the service settles with the XML. A REPLACED number that was
+  ever SUBMITTED is always looked up before it is voided.
 - **Nothing is retried silently.** Each failed step counts (`failures`) and
   backs off (`nextAttemptAt`, doubling to 64 × `staleAfterMs`); the queues
   are ordered by the next attempt, so a failing row never pins their head. A

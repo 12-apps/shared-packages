@@ -195,7 +195,8 @@ describe("the document service", () => {
     const offline = await service.issue(ISSUE);
     expect(offline).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY", series: 2, number: 1 });
     const [online] = await store.listBySubject("owner-1", "order-77", "NFCE");
-    expect(online).toMatchObject({ status: "REPLACED", replacedById: offline.id, numberVoid: "INUTILIZE" });
+    // It was SUBMITTED: SEFAZ may hold it, so its number is looked up before it is voided (review R2-1).
+    expect(online).toMatchObject({ status: "REPLACED", replacedById: offline.id, numberVoid: "LOOKUP_FIRST" });
 
     expect((await service.transmitContingency(10)).advanced).toEqual([]);
     later(6 * 60_000);

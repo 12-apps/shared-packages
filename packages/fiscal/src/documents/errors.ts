@@ -22,7 +22,13 @@ export type FiscalDocumentErrorCode =
   /** The subject already has a live document of that model (the per-subject guard). */
   | "SUBJECT_HAS_DOCUMENT"
   /** The document's state has no paper to print (only AUTHORIZED, or CONTINGENCY awaiting transmission). */
-  | "NOT_PRINTABLE";
+  | "NOT_PRINTABLE"
+  /**
+   * A resend of a rejected contingency NFC-e would change what the buyer's
+   * DANFE prints and its QR encodes (the total, the buyer's document): such a
+   * sale needs a new note, issued by a person.
+   */
+  | "RESEND_CHANGES_PRINTED_FIELDS";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;
