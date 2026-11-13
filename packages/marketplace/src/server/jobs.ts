@@ -1,6 +1,7 @@
 import type { JobsContribution, WireJobBlueprint } from "@12-apps/wiring";
 
 import type { MarketplaceEngine } from "../core/engine";
+import { FetchOrderRetryError, type FetchOrderJobPayload } from "../core/fetch-order";
 import { OutboundRetryError } from "../core/outbound";
 import type { OutboundJobPayload } from "../core/outbound-queue";
 
@@ -17,6 +18,9 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  * - `outbound`, on demand: one call to a marketplace, three attempts with
  *   backoff. Its idempotency is the ROW's (the engine re-reads it), never the
  *   queue's dedupe alone.
+ * - `fetch-order`, on demand: one GET of an order a marketplace's event only
+ *   announced (`orderToFetch`), then the one ingest path. Three attempts with
+ *   backoff; the reconciliation sweep re-queues a row still owed.
  * - `outbound-sweep`, every five minutes: re-queues every call a row still
  *   owes (a PENDING request, an accept with no confirm stamp) once it is older
  *   than the job's own retry span, so a refused enqueue or a dead process
@@ -27,12 +31,16 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  *
  * Bound with `{ engine }`, these arrive at a runner as
  * `marketplace.expire-acceptances`, `marketplace.reconcile-inbox`,
- * `marketplace.outbound` and `marketplace.outbound-sweep`.
+ * `marketplace.outbound`, `marketplace.fetch-order` and
+ * `marketplace.outbound-sweep`.
  */
 
 /** What the host closes over at bind time: the mounted engine. */
 export interface MarketplaceJobDeps {
-  engine: Pick<MarketplaceEngine, "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "sweepOutbound">;
+  engine: Pick<
+    MarketplaceEngine,
+    "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "runFetchOrder" | "sweepOutbound"
+  >;
 }
 
 /** The single-flight queue name (`@12-apps/jobs`' `SWEEP_QUEUE`), as a literal. */
@@ -103,6 +111,30 @@ const outbound: WireJobBlueprint<OutboundJobPayload, MarketplaceJobDeps> = {
   },
 };
 
+/** The fetch job's attempts: the last one settles the inbox row FAILED. */
+export const MARKETPLACE_FETCH_ORDER_ATTEMPTS = 3;
+
+const fetchOrder: WireJobBlueprint<FetchOrderJobPayload, MarketplaceJobDeps> = {
+  name: "fetch-order",
+  attempts: MARKETPLACE_FETCH_ORDER_ATTEMPTS,
+  // Short: an order waiting for its body is on the store's acceptance clock.
+  backoff: { type: "exponential", delayMs: 5_000 },
+  handle: async (payload, deps, context) => {
+    try {
+      const outcome = await deps.engine.runFetchOrder(payload, {
+        attempt: context.attempt,
+        maxAttempts: context.maxAttempts,
+      });
+      if (outcome.kind === "skipped") {
+        context.logger.info(`marketplace.fetch-order: inbox ${payload.inboxId} skipped: ${outcome.reason}`);
+      }
+    } catch (error) {
+      if (error instanceof FetchOrderRetryError) context.logger.warn(`marketplace.fetch-order: ${error.message}`);
+      throw error;
+    }
+  },
+};
+
 const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
   name: "outbound-sweep",
   queue: MARKETPLACE_SWEEP_QUEUE,
@@ -127,6 +159,7 @@ export const MARKETPLACE_JOBS = {
     "expire-acceptances": expireAcceptances,
     "reconcile-inbox": reconcileInbox,
     outbound,
+    "fetch-order": fetchOrder,
     "outbound-sweep": outboundSweep,
   },
 } as const satisfies JobsContribution<MarketplaceJobDeps>;

@@ -20,6 +20,11 @@ import {
   type DecisionInput,
   type DecisionResult,
 } from "./decisions";
+import {
+  runFetchOrder,
+  type FetchOrderJobPayload,
+  type FetchOrderOutcome,
+} from "./fetch-order";
 import { sweepOutbound, type OutboundSweepResult } from "./outbound-sweep";
 import type {
   AdapterTokenCache,
@@ -163,6 +168,8 @@ export interface MarketplaceEngine {
   sweepOutbound(now?: Date): Promise<OutboundSweepResult>;
   /** Run one queued outbound call (the `marketplace.outbound` job's body). */
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
+  /** Fetch and ingest one announced order (the `marketplace.fetch-order` job's body). */
+  runFetchOrder(payload: FetchOrderJobPayload, attempt: OutboundAttempt): Promise<FetchOrderOutcome>;
 }
 
 /**
@@ -225,5 +232,6 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     reprocess: (event) => reprocessStoredDelivery(ctx, event),
     sweepOutbound: (now) => sweepOutbound(ctx, now ?? ports.clock.now()),
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
+    runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
   };
 }

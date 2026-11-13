@@ -1,4 +1,4 @@
-import type { MarketplaceProvider, NormalizedEvent } from "./types";
+import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 /**
  * The adapter port: everything one marketplace is, behind one shape.
@@ -122,6 +122,15 @@ export type OutboundResult =
   /** 408, 425, 429, 5xx, a timeout, a network error: retried until the last attempt. */
   | { kind: "retry"; reason: string };
 
+/**
+ * One order-body fetch's answer: the order, normalized, or the same refusal and
+ * retry shapes an outbound call answers with (a 404 for an expired order is a
+ * refusal; a 5xx, a timeout or a 429 is a retry).
+ */
+export type FetchOrderResult =
+  | { kind: "order"; order: NormalizedMarketplaceOrder }
+  | Exclude<OutboundResult, { kind: "accepted" }>;
+
 /** What a cancellation request carries. */
 export interface CancellationRequestInput {
   reason: CancellationReason;
@@ -155,6 +164,13 @@ export interface MarketplaceAdapter {
     order: OutboundOrderRef,
     input: CancellationRequestInput,
   ): Promise<OutboundResult>;
+  /**
+   * OPTIONAL. Fetch the order an event announced with `orderToFetch` (a
+   * marketplace whose events carry no order body). Called only from the
+   * `marketplace.fetch-order` job. An adapter whose events always carry the
+   * order (iFood) leaves it out.
+   */
+  fetchOrder?(ctx: AdapterCallContext, order: { externalOrderId: string }): Promise<FetchOrderResult>;
   /** Where "open it on the marketplace" goes: the order when `perOrderAppLink`, else the portal. Always https. */
   appLink(order: Pick<OutboundOrderRef, "externalOrderId" | "externalDisplayId">): string;
 }

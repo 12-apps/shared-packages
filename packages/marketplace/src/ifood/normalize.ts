@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 import type {
   MarketplaceDeliveredBy,
   MarketplaceOrderType,
@@ -9,6 +7,14 @@ import type {
   NormalizedMarketplaceOrder,
   NormalizedOrderLine,
 } from "../core/types";
+import {
+  asString,
+  firstCents,
+  firstDate,
+  firstString,
+  pick,
+  verifyHmacSha256Hex,
+} from "../core/payload-read";
 
 /**
  * The iFood adapter's INBOUND half: one delivery → a {@link NormalizedEvent}.
@@ -30,99 +36,20 @@ const ORDER_CANCELLED = new Set(["CAN", "CANCELLED", "ORDER_CANCELLED"]);
 /** iFood refused the store's own cancellation request. */
 const CANCELLATION_REQUEST_FAILED = new Set(["CARF", "CANCELLATION_REQUEST_FAILED"]);
 
-/** Read a nested value without asserting the shape of anything on the way. */
-function pick(source: unknown, ...path: string[]): unknown {
-  let cursor: unknown = source;
-  for (const key of path) {
-    if (typeof cursor !== "object" || cursor === null) return undefined;
-    cursor = (cursor as Record<string, unknown>)[key];
-  }
-  return cursor;
-}
-
-function asString(value: unknown): string | null {
-  if (typeof value === "string" && value.trim() !== "") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return null;
-}
-
 /**
- * The first of several candidate paths that yields a string.
- *
- * iFood states the same fact under different keys depending on which API
- * version delivered the order, so nearly every read here is a fallback chain.
- * Expressed as data rather than as `??` so a chain can grow by one entry
- * instead of by one branch.
- */
-function firstString(source: unknown, paths: string[][]): string | null {
-  for (const path of paths) {
-    const found = asString(pick(source, ...path));
-    if (found !== null) return found;
-  }
-  return null;
-}
-
-/** {@link firstString} for money. Same reason, same shape. */
-function firstCents(source: unknown, paths: string[][]): number | null {
-  for (const path of paths) {
-    const found = toCents(pick(source, ...path));
-    if (found !== null) return found;
-  }
-  return null;
-}
-
-/**
- * iFood states money in DECIMAL reais (`12.9`), this app in integer cents.
- *
- * Rounded rather than truncated: `Math.trunc(12.9 * 100)` is 1289 on IEEE-754,
- * so truncation loses a cent on ordinary prices — per line, on every order,
- * always in the store's disfavour.
- */
-function toCents(value: unknown): number | null {
-  const numeric = typeof value === "string" ? Number(value) : value;
-  if (typeof numeric !== "number" || !Number.isFinite(numeric)) return null;
-  return Math.round(numeric * 100);
-}
-
-function toDate(value: unknown): Date | null {
-  const raw = asString(value);
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-/** {@link firstString} for timestamps. */
-function firstDate(source: unknown, paths: string[][]): Date | null {
-  for (const path of paths) {
-    const found = toDate(pick(source, ...path));
-    if (found !== null) return found;
-  }
-  return null;
-}
-
-/**
- * Verify a delivery against the merchant's webhook secret.
- *
- * Unsigned deliveries are refused whenever a secret is CONFIGURED. A store that
- * has not set one yet is accepted — iFood's own onboarding issues the secret
- * after the merchant is certified, so refusing before then would make the
- * connection untestable — and that state is visible on the integration screen
- * rather than silent.
- *
- * Compared in constant time over bytes: an early-exit `===` on a hex digest
- * leaks the prefix a forger already got right, one request at a time.
+ * Verify a delivery against the merchant's webhook secret: iFood signs the raw
+ * body with HMAC-SHA256, hex. The rule (an unset secret accepts; a set one
+ * refuses an unsigned delivery; constant-time compare) is the engine's
+ * {@link verifyHmacSha256Hex}. iFood's own onboarding issues the secret after
+ * the merchant is certified, so refusing before then would make the
+ * connection untestable.
  */
 export function verifyIfoodSignature(
   rawBody: string,
   signature: string | null,
   webhookSecret: string | null,
 ): boolean {
-  if (!webhookSecret) return true;
-  if (!signature) return false;
-  const expected = createHmac("sha256", webhookSecret).update(rawBody, "utf8").digest("hex");
-  const given = Buffer.from(signature.trim().toLowerCase().replace(/^sha256=/u, ""), "utf8");
-  const mine = Buffer.from(expected, "utf8");
-  return given.length === mine.length && timingSafeEqual(given, mine);
+  return verifyHmacSha256Hex(rawBody, signature, webhookSecret);
 }
 
 /** The buyer, as much of them as iFood discloses on the order. */

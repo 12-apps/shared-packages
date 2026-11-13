@@ -1,5 +1,6 @@
 import { cancelAcceptance } from "./acceptance";
 import { failCancellationRequest } from "./cancellation";
+import { awaitOrderBody } from "./fetch-order";
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { resolveIngestionTarget } from "./integration";
@@ -34,6 +35,8 @@ export type DeliveryOutcome =
   | { kind: "ingested"; orderId: string; unmappedSkus: string[] }
   | { kind: "cancelled" }
   | { kind: "cancellationFailed" }
+  /** Recorded; the order body is fetched by the `marketplace.fetch-order` job. */
+  | { kind: "awaitingOrder" }
   | { kind: "duplicate" }
   | { kind: "ignored"; reason: string }
   | { kind: "failed"; reason: string };
@@ -126,6 +129,14 @@ async function applyEvent(
     });
     await settleInboxEvent(ctx, inboxId, "PROCESSED");
     return { kind: "cancelled" };
+  }
+
+  if (!event.order && event.orderToFetch && event.externalOrderId) {
+    // The event announces an order whose body the marketplace serves apart.
+    // Fetching is a call to the marketplace, so it is a job's, never this
+    // request's: the row waits PENDING and the fetch is queued.
+    await awaitOrderBody(ctx, clientId, inboxId);
+    return { kind: "awaitingOrder" };
   }
 
   if (!event.order) {

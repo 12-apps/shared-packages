@@ -128,4 +128,12 @@ export interface NormalizedEvent {
    * one. A `cancelled: true` event reads as `CONFIRMED` when this is absent.
    */
   cancellationOutcome?: CancellationOutcome | null;
+  /**
+   * OPTIONAL. This event announces an order whose body the marketplace serves
+   * separately (Open Delivery's `CREATED` carries only the order's id): the
+   * engine fetches it through the adapter's `fetchOrder`, in the
+   * `marketplace.fetch-order` job, never inside the request that delivered
+   * the event. Ignored when `order` is present.
+   */
+  orderToFetch?: boolean;
 }
