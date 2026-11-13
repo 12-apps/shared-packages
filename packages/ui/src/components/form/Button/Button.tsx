@@ -5,6 +5,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
+import { pressRippleStyles } from './Button.ripple';
 import { buttonHeldStyles } from './Button.held';
 import { ButtonProgressContent, buttonProgressStyles, useButtonPress } from './Button.progress';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
@@ -16,7 +17,9 @@ import {
   buttonVariantStyles,
   getColorFromTheme,
   iconAlignmentStyles,
+  buttonInk,
   buttonSize,
+  rippleUnderLabelStyles,
 } from './Button.styles';
 import type { ButtonComponent, ButtonProps } from './Button.types';
 
@@ -43,6 +46,9 @@ const StyledButton = styled(MuiButton, {
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
+    ...rippleUnderLabelStyles(pulse),
+    // A pulse button keeps MUI's ripple layer (over the label), so it keeps MUI's ripple colour too.
+    ...pressRippleStyles(theme, pulse ? undefined : customVariant, buttonInk(theme, customVariant, colorPalette, customColor), colorPalette.main),
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
@@ -211,8 +217,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
       onBlur,
       ...others
     } = resolveButtonProps(rawProps);
-    // Every spelling of the test id the shared contract allows, mapped to the
-    // one the DOM reads; the native Button does the same in reverse.
+    // Every spelling of the test id the contract allows, mapped to the one the DOM reads.
     const ownTestId = resolveTestId(others, 'button');
     const testId = (suffix: string) => childTestId(others, suffix, 'button');
     const props = withoutTestIdProps(others);
@@ -258,6 +263,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onBlur={onBlur}
         sx={buttonSize(size, iconOnly)}
         data-testid={ownTestId}
+        data-variant={variant}
         {...props}
         className={mergedClassName}
       >

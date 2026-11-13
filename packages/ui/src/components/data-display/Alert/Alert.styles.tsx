@@ -83,12 +83,13 @@ export const pulseAnimation = (theme: Theme) => keyframes`
 
 // Removed unused slideInAnimation - can be re-added if needed for future features
 
-export const shimmerAnimation = (theme: Theme) => keyframes`
+/** The sweep in the alert's OWN width: one width to its left to one to its right (FUT-4874), so no hard edge. */
+export const shimmerAnimation = () => keyframes`
   0% {
-    background-position: ${rem(theme, -GRADIENT.shimmerTravel)} 0;
+    transform: translateX(-100%);
   }
   100% {
-    background-position: ${rem(theme, GRADIENT.shimmerTravel)} 0;
+    transform: translateX(100%);
   }
 `;
 
@@ -285,8 +286,7 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
     border: 'none',
     position: 'relative',
     overflow: 'hidden',
-    // The shimmer paints UNDER the ink (FUT-4516): unstacked, the `::before` lay over the
-    // words (3.8:1). Isolated, its -1 stays behind them and above the background and tint.
+    // UNDER the ink (FUT-4516): unstacked the `::before` lay over the words (3.8:1); isolated, its -1 stays behind them.
     isolation: 'isolate',
     '.MuiAlert-icon': {
       color: ink,
@@ -296,11 +296,12 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
       zIndex: -1,
       position: 'absolute',
       top: 0,
-      left: rem(theme, -GRADIENT.shimmerTravel),
+      left: 0,
       width: '100%',
       height: '100%',
       background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
-      animation: `${shimmerAnimation(theme)} ${seconds(GRADIENT.shimmerMs)} infinite`,
+      animation: `${shimmerAnimation()} ${seconds(GRADIENT.shimmerMs)} infinite`,
+      '@media (prefers-reduced-motion: reduce)': { display: 'none' },
     },
   };
 };

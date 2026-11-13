@@ -98,6 +98,42 @@ button with `progress` draw a two-tone `:focus-visible` ring (ink ring, page
 halo), since MUI gives them only a ripple. Any other button is not held, so navigation stays live; a host
 control opts in by reading `useFormBusy()`.
 
+## Host-facing selectors
+
+Every Button carries `data-variant` with the variant it was given (`solid`,
+`outline`, `ghost`, `text`, `glass`, `gradient`; `solid` when none is set). It
+exists because `ghost` renders as MUI's `contained` and `gradient`, `glass` and
+`solid` share classes too, so the DOM class names cannot tell them apart:
+
+```css
+.my-panel button[data-variant='ghost'] { /* correct a ghost button's ink here */ }
+```
+
+A `data-variant` you pass yourself wins over the mark. The attribute is stable
+API: it is never renamed or dropped without a major.
+
+## Press ripple and focus pulsate
+
+The press ripple and the focus pulsate (an outline or text button's only
+keyboard focus indicator) paint ABOVE the button's own surface and BELOW its
+label, icons and spinner, in every variant, colour and mode. The button is its
+own stacking context (`isolation: isolate`) and MUI's `.MuiTouchRipple-root`
+sits at `z-index: -1`. The DOM is MUI's own: no wrapper around the label and no
+`z-index` on the content, so full-width and `flex: 1` children, ellipsis and
+overlays behave as before. Truncate the label (a child), not the button root.
+
+A `pulse` button is the exception: its ring (`::after`, `z-index: -1`) is meant
+to paint behind the fill, which a stacking context would reverse, so it keeps
+MUI's ripple layer and MUI's ripple colour exactly as before.
+
+A button that paints its own fill (`solid`, `gradient`) also tints its PRESS
+ripple against the label: in the absolute on the fill's side of the ink (black
+under a light label, white under a dark one), so holding it down never moves the
+fill toward the ink. `outline`, `text`, `ghost` and `glass` sit on whatever the
+host paints, which the button cannot read, so they keep MUI's `currentColor`
+ripple (a host-coloured pane is not read for any variant). The focus pulsate
+keeps `currentColor` everywhere, and opacity and timing are MUI's.
+
 ## Rendering as something else
 
 `component` swaps the element the button renders as, and the button's props are

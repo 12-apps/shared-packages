@@ -127,6 +127,32 @@ export const buttonSize =
   };
 
 /**
+ * THE PRESS RIPPLE AND THE FOCUS PULSATE PAINT UNDER THE LABEL (FUT-4861).
+ *
+ * MUI appends `.MuiTouchRipple-root` as the last child, absolutely positioned
+ * at `z-index: 0`, so it painted OVER the label: a contained button held down
+ * dropped its label to 2.9 to 3.5:1, and the focus pulsate (the only keyboard
+ * focus indicator an outline or text button has) read 2.95 to 4.17:1 over it.
+ *
+ * `isolation: isolate` makes the button its own stacking context, so a
+ * `z-index: -1` ripple stays ABOVE the button's own surface (fill, gradient,
+ * border) and BELOW everything in flow: the label, the icons. The DOM is MUI's
+ * own: no wrapper, no z-index on the content. MUI's root is already
+ * `position: relative`, so the context changes nothing among its siblings.
+ *
+ * Not when `pulse` is set: a pulse button's `::after` sits at `z-index: -1` and
+ * is meant to paint BEHIND the fill, which a context of its own would turn
+ * into a layer over it. A pulse button keeps MUI's ripple layer, exactly as before.
+ */
+export const rippleUnderLabelStyles = (pulse?: boolean): CSSObject =>
+  pulse
+    ? {}
+    : {
+        isolation: 'isolate',
+        '& .MuiTouchRipple-root': { zIndex: -1 },
+      };
+
+/**
  * MUI centres icons with a negative margin that fights our own padding, so the
  * flex alignment is restated here rather than fought with `!important`.
  */
@@ -278,6 +304,14 @@ const VARIANT_STYLES: Record<
     },
   }),
 };
+
+/** The colour a variant paints its label in, or `undefined` for a variant with none of its own. */
+export const buttonInk = (
+  theme: Theme,
+  variant: string | undefined,
+  palette: ColorPalette,
+  color: string,
+): string | undefined => VARIANT_STYLES[variant ?? '']?.(theme, palette, color).color as string | undefined;
 
 export const buttonVariantStyles = (
   theme: Theme,
