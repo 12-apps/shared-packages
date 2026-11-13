@@ -1,4 +1,4 @@
-import { resolveCategory } from "./catalogue-category";
+import { resolveCategory, type CategoryRunState } from "./catalogue-category";
 import type { CatalogueCallContext, CatalogueWarningCode } from "./catalogue-port";
 import { connectionMerchantId, readOutboundConnection } from "./integration";
 import type { EngineContext, MarketplaceDb } from "./ports";
@@ -146,6 +146,7 @@ export async function catalogueConnection(
   ctx: EngineContext,
   clientId: string,
   provider: MarketplaceProvider,
+  categoryState?: CategoryRunState,
 ): Promise<Omit<CatalogueCallContext, "now"> | ConnectionProblem> {
   const merchantId = await connectionMerchantId(ctx, clientId, provider);
   if (merchantId === null) return { problem: "NOT_CONNECTED" };
@@ -159,7 +160,7 @@ export async function catalogueConnection(
       tokens: ctx.tokens,
       externalMerchantId: merchantId,
       loadImage: (url) => (catalogue ? catalogue.image(url) : Promise.resolve(null)),
-      category: (name, resolve) => resolveCategory(ctx, { clientId, provider }, name, resolve),
+      category: (name, resolve) => resolveCategory(ctx, { clientId, provider }, name, resolve, categoryState),
     };
   } catch (error) {
     ctx.ports.logger.error(

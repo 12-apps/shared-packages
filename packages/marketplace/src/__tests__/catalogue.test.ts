@@ -620,6 +620,91 @@ describe("a category created once", () => {
   });
 });
 
+describe("a category creation that did not finish", () => {
+  /** iFood with an empty category list that grows with each create; `failFirstCreate` times the first one out. */
+  function ifoodCategories(options: { failFirstCreate?: boolean } = {}) {
+    const categories: { id: string; name: string }[] = [];
+    const creates: string[] = [];
+    const http = scriptedHttp((request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok" }) };
+      if (request.method === "GET") return { status: 200, body: JSON.stringify(categories) };
+      if (request.url.endsWith("/categories")) {
+        creates.push(request.url);
+        if (options.failFirstCreate && creates.length === 1) throw new Error("ETIMEDOUT");
+        categories.push({ id: `cat-${categories.length + 1}`, name: "Drinks" });
+        return { status: 201, body: JSON.stringify(categories.at(-1)) };
+      }
+      return { status: 200, body: "{}" };
+    });
+    return { http, categories, creates };
+  }
+  const drink: CatalogueItem = { ...BURGER, categoryName: "Drinks", imageUrl: null };
+
+  it("a create that timed out releases its claim: the next attempt creates the category once and publishes", async () => {
+    const fake = ifoodCategories({ failFirstCreate: true });
+    const h = createHarness({ http: fake.http, catalogue: hostCatalogue({ "p-1": drink }) });
+    await h.connect("IFOOD");
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    await expect(runLatest(h, FIRST)).rejects.toBeInstanceOf(CatalogueRetryError);
+    h.clock.at = new Date(h.clock.at.getTime() + 10_000);
+    await runLatest(h, { attempt: 2, maxAttempts: 3 });
+
+    expect(fake.categories).toEqual([{ id: "cat-1", name: "Drinks" }]);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
+  });
+
+  it("a claim whose holder died is taken over within the waiting publish's retries", async () => {
+    const fake = ifoodCategories();
+    const h = createHarness({ http: fake.http, catalogue: hostCatalogue({ "p-1": drink }) });
+    await h.connect("IFOOD");
+    h.memory.tables.marketplaceCatalogueCategory.rows.push({
+      id: "claim-1",
+      clientId: TENANT,
+      provider: "IFOOD",
+      name: "Drinks",
+      externalId: null,
+      claimedAt: h.clock.at,
+    });
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    await expect(runLatest(h, FIRST)).rejects.toBeInstanceOf(CatalogueRetryError);
+    h.clock.at = new Date(h.clock.at.getTime() + 10_000);
+    await expect(runLatest(h, { attempt: 2, maxAttempts: 3 })).rejects.toBeInstanceOf(CatalogueRetryError);
+    h.clock.at = new Date(h.clock.at.getTime() + 20_000);
+    await runLatest(h, LAST);
+
+    expect(fake.creates).toHaveLength(1);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
+  });
+
+  it("a publish that only waited for another's category is left PUBLISHING for the sweep, never FAILED", async () => {
+    const fake = ifoodCategories();
+    const h = createHarness({ http: fake.http, catalogue: hostCatalogue({ "p-1": drink }) });
+    await h.connect("IFOOD");
+    h.memory.tables.marketplaceCatalogueCategory.rows.push({
+      id: "claim-1",
+      clientId: TENANT,
+      provider: "IFOOD",
+      name: "Drinks",
+      externalId: null,
+      claimedAt: h.clock.at,
+    });
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    expect(await runLatest(h, LAST)).toMatchObject({ kind: "skipped" });
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHING", failureCode: null });
+
+    // The holder finished meanwhile; the sweep re-queues the row and it publishes into that category.
+    h.memory.tables.marketplaceCatalogueCategory.rows[0]!.externalId = "cat-9";
+    h.clock.at = new Date(h.clock.at.getTime() + 11 * 60_000);
+    expect((await h.engine.sweepOutbound()).catalogueRequeued).toBe(1);
+    await runLatest(h, FIRST);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
+    expect(fake.creates).toEqual([]);
+  });
+});
+
 describe("a host with no catalogue port", () => {
   it("answers UNSUPPORTED and states no mode, though iFood's adapter is push", async () => {
     const h = createHarness({ http: scriptedHttp([{ status: 200, body: "{}" }]) });

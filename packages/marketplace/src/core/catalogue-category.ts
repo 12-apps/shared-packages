@@ -16,8 +16,19 @@ import type { MarketplaceProvider } from "./types";
  * whose publish died is taken over once it is older than {@link CLAIM_STALE_MS}.
  */
 
-/** A claim older than this was left by a publish that died; another takes it over. */
-export const CLAIM_STALE_MS = 2 * 60_000;
+/**
+ * A claim older than this was left by a publish that died (or is stuck on a
+ * call that will time out); another takes it over. Shorter than the catalogue
+ * job's retry span (attempts at 0 s, 10 s and 30 s), so a waiting publish's
+ * last attempt finds a dead holder's claim stale and goes on itself; an
+ * adapter finds before it creates, so a category the holder did make is found.
+ */
+export const CLAIM_STALE_MS = 15_000;
+
+/** What one publish learnt about the category claims it met: whether another held one. */
+export interface CategoryRunState {
+  waited: boolean;
+}
 
 type CategoryTable = NonNullable<MarketplaceDb["marketplaceCatalogueCategory"]>;
 
@@ -54,6 +65,7 @@ export async function resolveCategory(
   connection: { clientId: string; provider: MarketplaceProvider },
   name: string,
   resolve: () => Promise<{ id: string } | CatalogueFailure>,
+  state: CategoryRunState = { waited: false },
 ): Promise<{ id: string } | CatalogueFailure> {
   const table = (await ctx.ports.db()).marketplaceCatalogueCategory;
   if (!table) return resolve();
@@ -62,13 +74,23 @@ export async function resolveCategory(
   if (row?.externalId) return { id: row.externalId };
   const now = ctx.ports.clock.now();
   if (!(await claim(table, key, row, now))) {
+    state.waited = true;
     return { kind: "retry", reason: `another publish is creating the category "${key.name}"` };
   }
-  const result = await resolve();
-  const resolved = "id" in result;
-  await table.updateMany({
-    where: { ...key, externalId: null },
-    data: resolved ? { externalId: result.id, claimedAt: null } : { claimedAt: null },
-  });
+  let result: { id: string } | CatalogueFailure = { kind: "retry", reason: "the category was not resolved" };
+  try {
+    result = await resolve();
+  } catch (error) {
+    // A call that never got an answer (a timeout) is a retry, like every outbound call.
+    result = { kind: "retry", reason: error instanceof Error ? error.message : String(error) };
+  } finally {
+    // The claim is released whatever happened, so the next attempt (this
+    // publish's or another's) goes on at once instead of waiting it out.
+    const id = "id" in result ? result.id : null;
+    await table.updateMany({
+      where: { ...key, externalId: null },
+      data: id === null ? { claimedAt: null } : { externalId: id, claimedAt: null },
+    });
+  }
   return result;
 }

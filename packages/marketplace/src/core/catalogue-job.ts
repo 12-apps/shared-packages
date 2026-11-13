@@ -81,7 +81,9 @@ export async function enqueueCatalogue(ctx: EngineContext, payload: CatalogueJob
 type RunResult = CataloguePublishResult | OutboundResult;
 
 /** What a run did instead of a call: an engine-side reason it cannot be made. */
-type Run = { result: RunResult; sentPriceCents: number | null; name?: string } | { code: CatalogueFailureCode };
+type Run =
+  | { result: RunResult; sentPriceCents: number | null; name?: string; waited?: boolean }
+  | { code: CatalogueFailureCode };
 
 /** The call this run makes, or the code that stands in for it. */
 async function callFor(
@@ -229,13 +231,26 @@ function failureOf(result: CatalogueFailure): Failure {
 async function runFor(ctx: EngineContext, row: CatalogueRow, action: CatalogueAction): Promise<Run> {
   const catalogue = ctx.registry.get(row.provider)?.catalogue;
   if (!catalogue) return { code: "UNSUPPORTED" };
-  const connection = await catalogueConnection(ctx, row.clientId, row.provider);
+  const categoryState = { waited: false };
+  const connection = await catalogueConnection(ctx, row.clientId, row.provider, categoryState);
   // A withdraw for a connection that is gone (archived, removed) has nobody to tell: it is out.
   if ("problem" in connection && connection.problem === "NOT_CONNECTED" && action === "withdraw") {
     return { result: { kind: "accepted" }, sentPriceCents: null };
   }
   if ("problem" in connection) return { code: connection.problem };
-  return callFor(ctx, row, action, catalogue, { ...connection, now: ctx.ports.clock.now() });
+  const run = await callFor(ctx, row, action, catalogue, { ...connection, now: ctx.ports.clock.now() });
+  return "result" in run ? { ...run, waited: categoryState.waited } : run;
+}
+
+/**
+ * The last attempt of a publish that only ever WAITED for another publish to
+ * create its category: not a failure of this item. The row stays PUBLISHING
+ * (the store still sees "sending…") and the outbound sweep re-queues it; by
+ * then the category is stored, or its claim is stale and taken over.
+ */
+function waitedOut(ctx: EngineContext, row: CatalogueRow, action: CatalogueAction, detail: string): CatalogueOutcome {
+  ctx.ports.logger.warn(`${MARKETPLACE_CATALOGUE_JOB}: ${action} of ${row.productId} on ${row.provider} left for the sweep: ${detail}`);
+  return { kind: "skipped", reason: detail };
 }
 
 async function fail(ctx: EngineContext, table: CatalogueTable, row: CatalogueRow, action: CatalogueAction, failure: Failure, detail: string) {
@@ -257,6 +272,18 @@ async function runOnce(
   if (row.status !== WANTED[action]) return { kind: "skipped", reason: `the publication is ${row.status}, not ${WANTED[action]}` };
   const run = await runFor(ctx, row, action);
   if ("code" in run) return fail(ctx, table, row, action, { code: run.code, reason: null }, run.code);
+  return settle(ctx, table, row, action, run, attempt);
+}
+
+/** Turn a call's answer into the row's stamp, a retry, a wait for the sweep, or a failure. */
+async function settle(
+  ctx: EngineContext,
+  table: CatalogueTable,
+  row: CatalogueRow,
+  action: CatalogueAction,
+  run: Exclude<Run, { code: CatalogueFailureCode }>,
+  attempt: { attempt: number; maxAttempts: number },
+): Promise<CatalogueOutcome> {
   const { result } = run;
   if (result.kind === "accepted" || result.kind === "published") {
     await stampSuccess(ctx, table, row, action, result, run.sentPriceCents);
@@ -268,6 +295,7 @@ async function runOnce(
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
     throw new CatalogueRetryError(`${action} of ${row.productId} on ${row.provider}: ${detail}`);
   }
+  if (result.kind === "retry" && run.waited) return waitedOut(ctx, row, action, detail);
   return fail(ctx, table, row, action, failureOf(result), detail);
 }
 
