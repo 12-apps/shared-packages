@@ -4,6 +4,7 @@ import type {
   ProviderFailureReporter,
   RefundRefusal,
   RefundRetryStore,
+  WebhookEventHandler,
 } from "@12-apps/payments-backend";
 
 /**
@@ -144,12 +145,52 @@ export interface RefundConfirmationStore {
    */
   followed(paymentId: string, at: Date, overdue: boolean): Promise<void>;
   /**
-   * The provider said the refund FAILED: REFUNDED → REFUND_PENDING with
-   * `record`, the refund asked for again at `record.at` under `requestId` (the
-   * payment's new `requestedAt` and `requestId`), for a person.
+   * The provider said the refund FAILED, or a person said it was never
+   * returned: REFUNDED → REFUND_PENDING with `record`, the refund asked for
+   * again at `record.at` under `requestId` (the payment's new `requestedAt` and
+   * `requestId`), for a person.
    */
-  reopen(paymentId: string, record: RefundPendingRecord & { requestId: string; byHand?: NotReturnedBy }): Promise<boolean>;
+  reopen(paymentId: string, record: ReopenRecord): Promise<boolean>;
+  /**
+   * The payment whose refund `providerRefundId` of that charge was reopened
+   * NOT_RETURNED (the id `reopen` was handed as `notReturnedRefundId`), as it
+   * stands now — still pending, or returned since — or null. Read when that
+   * refund lands after all.
+   */
+  findNotReturned(provider: string, providerChargeId: string, providerRefundId: string): Promise<NotReturnedRefund | null>;
+  /**
+   * The refund reopened NOT_RETURNED landed AFTER the payment was returned
+   * again (by hand, or by a second refund): the customer got the money twice.
+   * Recorded once on the row for a person (the host surfaces and audits it);
+   * false when it was recorded already.
+   */
+  doubleReturned(paymentId: string, record: { providerRefundId: string; at: Date }): Promise<boolean>;
 }
+
+/** What `reopen` is handed. */
+export interface ReopenRecord extends RefundPendingRecord {
+  requestId: string;
+  /** NOT_RETURNED only: who said so and why (the host audits these with the write). */
+  byHand?: NotReturnedBy;
+  /**
+   * NOT_RETURNED only: the provider's id of the refund said never returned.
+   * The host KEEPS it on the row: if that refund lands after all, its update
+   * finds the payment by it (`findNotReturned`). Null when the provider gave none.
+   */
+  notReturnedRefundId?: string | null;
+}
+
+/** A payment reopened NOT_RETURNED, as `findNotReturned` reads it. */
+export interface NotReturnedRefund {
+  id: string;
+  /** REFUND_PENDING: not returned again yet. REFUNDED: returned again since. */
+  state: "REFUND_PENDING" | "REFUNDED";
+  /** REFUNDED only: the provider's refund id recorded by what returned it again; null by hand. */
+  settledRefundId: string | null;
+}
+
+/** How a charge read back answered: money back, not back (yet), or not readable at all. */
+export type ChargeRead = "BACK" | "NOT_BACK" | "UNREADABLE";
 
 /**
  * Who said a refund was never returned, and why — handed to `reopen` so the
@@ -161,18 +202,37 @@ export interface NotReturnedBy {
 }
 
 export type NotReturnedResult =
-  | { outcome: "REOPENED"; paymentId: string; record: RefundPendingRecord }
+  | {
+      outcome: "REOPENED";
+      paymentId: string;
+      record: RefundPendingRecord;
+      /**
+       * What the last charge read said: NOT_BACK, or UNREADABLE — the provider
+       * could not be asked, so the reopen rests on the person's word alone
+       * (the host says so to them).
+       */
+      chargeRead: "NOT_BACK" | "UNREADABLE";
+    }
   | {
       outcome: "NOT_REOPENED";
       paymentId: string;
       /**
        * NOT_FOUND: no unconfirmed refund on that payment (never refunded, or
-       * confirmed or reopened meanwhile). NOT_OVERDUE: still inside the
-       * deadline. MONEY_BACK: the charge read shows the money returned — the
-       * refund was confirmed instead.
+       * confirmed long ago). NOT_OVERDUE: still inside the deadline.
+       * MONEY_BACK: the charge read shows the money returned — the refund was
+       * confirmed instead. ALREADY_RESOLVED: a confirm, a provider update or
+       * another person's mark won the race between the read and the write.
+       * INCOMPLETE: who said so, or why, was blank — nothing was read or written.
        */
-      why: "NOT_FOUND" | "NOT_OVERDUE" | "MONEY_BACK";
+      why: "NOT_FOUND" | "NOT_OVERDUE" | "MONEY_BACK" | "ALREADY_RESOLVED" | "INCOMPLETE";
     };
+
+/**
+ * What the provider's word on a refund did. ADOPTED: a refund reopened
+ * NOT_RETURNED landed after all and was recorded returned. DOUBLE_RETURN: it
+ * landed after the payment had been returned again — recorded for a person.
+ */
+export type RefundUpdateOutcome = "CONFIRMED" | "REOPENED" | "ADOPTED" | "DOUBLE_RETURN" | "IGNORED";
 
 /** What one `confirmDue` pass came to. */
 export interface ConfirmationPass {
@@ -209,7 +269,17 @@ export type SubscriptionRefundResult =
 
 export type SettleByHandResult =
   | { outcome: "REFUNDED"; paymentId: string; record: RefundRecord }
-  | { outcome: "NOT_REFUNDABLE"; paymentId: string; why: NotRefundableWhy };
+  | {
+      outcome: "NOT_REFUNDABLE";
+      paymentId: string;
+      /**
+       * On a payment reopened NOT_RETURNED the charge is read first, since the
+       * refund said never returned may still land. MONEY_BACK: it did — the
+       * payment was recorded returned (ADOPTED), nothing settled by hand.
+       * CHARGE_UNREADABLE: the provider could not be asked; settle later.
+       */
+      why: NotRefundableWhy | "MONEY_BACK" | "CHARGE_UNREADABLE";
+    };
 
 export interface SubscriptionRefund {
   /**
@@ -241,7 +311,15 @@ export interface SubscriptionRefund {
    * refund — reopens it as pending (REFUSED), asked for again under a new
    * request; PENDING changes nothing. Needs `confirmations`.
    */
-  refundUpdated(update: RefundUpdate): Promise<"CONFIRMED" | "REOPENED" | "IGNORED">;
+  refundUpdated(update: RefundUpdate): Promise<RefundUpdateOutcome>;
+  /**
+   * `refundUpdated`, shaped as payments-backend's `WebhookEventHandler`, for a
+   * host to hand to ONE delivery (`handleWebhook(…, { onWebhookEvent })`): a
+   * REFUND_UPDATED event carrying a refund, on THIS binding's merchant, is
+   * handed to `refundUpdated`; every other event is left alone. A throw marks
+   * the delivery FAILED, so the provider's redelivery runs it again.
+   */
+  onWebhookEvent: WebhookEventHandler;
   /**
    * A person's escape for a refund the provider accepted and never confirmed:
    * only past `confirmations.confirmWithinMs`, after one more read of the

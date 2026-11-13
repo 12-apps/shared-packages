@@ -9,6 +9,7 @@ import type {
   RefundConfirmationStore,
   RefundPendingRecord,
   RefundRecord,
+  ReopenRecord,
   UnconfirmedRefund,
 } from "../server/refund-ports";
 import { MERCHANT } from "./fixtures";
@@ -44,6 +45,9 @@ export function world(start: Partial<RefundablePayment> = {}) {
     providerRefundId: null as string | null,
     confirmed: false,
     overdue: false,
+    /** The refund a person said never came back, kept on the row by `reopen`. */
+    notReturnedRefundId: null as string | null,
+    doubleReturn: null as { providerRefundId: string; at: Date } | null,
   };
   const payments = {
     find: vi.fn(async () => ({ ...held.row })),
@@ -91,16 +95,28 @@ export function world(start: Partial<RefundablePayment> = {}) {
     followed: vi.fn(async (_id: string, _at: Date, overdue: boolean) => {
       held.overdue = overdue;
     }),
-    reopen: vi.fn(async (_id: string, record: RefundPendingRecord & { requestId: string; byHand?: { by: string; reason: string } }) => {
+    reopen: vi.fn(async (_id: string, record: ReopenRecord) => {
       if (!unconfirmedNow()) return false;
       held.row = { ...held.row, state: "REFUND_PENDING", requestedAt: record.at, requestId: record.requestId, pendingReason: record.reason };
+      if (record.notReturnedRefundId !== undefined) held.notReturnedRefundId = record.notReturnedRefundId;
+      return true;
+    }),
+    findNotReturned: vi.fn(async (_provider: string, _charge: string, providerRefundId: string) => {
+      if (held.notReturnedRefundId === null || held.notReturnedRefundId !== providerRefundId) return null;
+      if (held.row.state === "REFUND_PENDING") return { id: held.row.id, state: "REFUND_PENDING" as const, settledRefundId: null };
+      if (held.row.state === "REFUNDED") return { id: held.row.id, state: "REFUNDED" as const, settledRefundId: held.providerRefundId };
+      return null;
+    }),
+    doubleReturned: vi.fn(async (_id: string, record: { providerRefundId: string; at: Date }) => {
+      if (held.doubleReturn) return false;
+      held.doubleReturn = record;
       return true;
     }),
   } satisfies RefundConfirmationStore;
   return { held, payments, confirmations };
 }
 
-export const ACCEPTED = async () => ({ providerRefundId: "rf-1", status: "PENDING", amount: { amountCents: 5900, currency: "BRL" } });
+const ACCEPTED = async () => ({ providerRefundId: "rf-1", status: "PENDING", amount: { amountCents: 5900, currency: "BRL" } });
 
 export function harness(options: { charge?: () => Promise<unknown>; start?: Partial<RefundablePayment> } = {}) {
   const clock = { at: new Date(T0_MS) };

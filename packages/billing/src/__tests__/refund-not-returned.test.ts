@@ -34,7 +34,7 @@ describe("O provedor não devolveu", () => {
     expect(h.refund).not.toHaveBeenCalled();
   });
 
-  it("then retry and settle by hand work as for any pending refund", async () => {
+  it("then a retry works as for any pending refund, consulting the charge first", async () => {
     const h = await overdueRefund();
     await h.flow.markNotReturned("pay-1", BY);
     h.refund.mockClear();
@@ -59,6 +59,43 @@ describe("O provedor não devolveu", () => {
     expect(h.confirmations.reopen).not.toHaveBeenCalled();
   });
 
+  it("money back but confirmed by someone else first: says it was resolved, not that it confirmed", async () => {
+    const h = await overdueRefund(async () => ({ status: "REFUNDED" }));
+    h.confirmations.confirm.mockResolvedValueOnce(false);
+    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "ALREADY_RESOLVED" });
+    expect(h.confirmations.reopen).not.toHaveBeenCalled();
+  });
+
+  it("says when the charge could not be read: the reopen rests on the person's word", async () => {
+    const h = await overdueRefund(async () => {
+      throw new Error("provider down");
+    });
+    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "REOPENED", chargeRead: "UNREADABLE" });
+  });
+
+  it("reports a charge read that showed the money not back", async () => {
+    const h = await overdueRefund();
+    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "REOPENED", chargeRead: "NOT_BACK" });
+  });
+
+  it.each([
+    ["who", { by: "  ", reason: "Provedor não devolveu" }],
+    ["why", { by: "fin@paladira.com", reason: "" }],
+  ])("is refused with a blank %s, reading and writing nothing", async (_label, byHand) => {
+    const h = await overdueRefund();
+    h.refreshCharge.mockClear();
+    await expect(h.flow.markNotReturned("pay-1", byHand)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "INCOMPLETE" });
+    expect(h.refreshCharge).not.toHaveBeenCalled();
+    expect(h.held.row.state).toBe("REFUNDED");
+  });
+
+  it("keeps the refund said never returned on the row", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    expect(h.confirmations.reopen.mock.calls[0]?.[1]).toMatchObject({ notReturnedRefundId: "rf-1" });
+    expect(h.held.notReturnedRefundId).toBe("rf-1");
+  });
+
   it("is refused for a refund confirmed meanwhile", async () => {
     const h = await overdueRefund();
     await h.flow.refundUpdated({ provider: "acquirer-a", providerChargeId: "chg-1", providerRefundId: "rf-1", status: "REFUNDED" });
@@ -72,7 +109,7 @@ describe("O provedor não devolveu", () => {
       h.held.confirmed = true;
       return { status: "PAID" };
     });
-    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "NOT_FOUND" });
+    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "ALREADY_RESOLVED" });
     expect(h.held.row.state).toBe("REFUNDED");
   });
 
@@ -82,7 +119,7 @@ describe("O provedor não devolveu", () => {
       await h.flow.refundUpdated({ provider: "acquirer-a", providerChargeId: "chg-1", providerRefundId: "rf-1", status: "FAILED" });
       return { status: "PAID" };
     });
-    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "NOT_FOUND" });
+    await expect(h.flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "ALREADY_RESOLVED" });
     // The provider's reopen stands; this act's write found nothing to move.
     expect(h.held.row.pendingReason).toBe("REFUSED");
   });
@@ -91,5 +128,81 @@ describe("O provedor não devolveu", () => {
     const { flow, later } = harness();
     later(HOUR);
     await expect(flow.markNotReturned("pay-1", BY)).resolves.toMatchObject({ outcome: "NOT_REOPENED", why: "NOT_FOUND" });
+  });
+});
+
+const LATE = { provider: "acquirer-a", providerChargeId: "chg-1", providerRefundId: "rf-1", status: "REFUNDED" } as const;
+
+describe("the refund said never returned lands after all", () => {
+  it("still pending: recorded returned (ADOPTED), and the new request sends nothing more", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refund.mockClear();
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("ADOPTED");
+    expect(h.held.row.state).toBe("REFUNDED");
+    expect(h.payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED", providerRefundId: "rf-1", confirmed: true });
+    await expect(h.flow.retry("pay-1")).resolves.toMatchObject({ why: "ALREADY_REFUNDED" });
+    expect(h.refund).not.toHaveBeenCalled();
+  });
+
+  it("after it was settled by hand: recorded once as a double return for a person", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "REFUNDED" });
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("DOUBLE_RETURN");
+    expect(h.held.doubleReturn).toMatchObject({ providerRefundId: "rf-1" });
+    // The provider's redelivery records nothing twice.
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+    expect(h.confirmations.doubleReturned).toHaveBeenCalledTimes(2);
+  });
+
+  it("after a second refund was recorded: a double return, while that refund's own word still confirms it", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refund.mockResolvedValue({ providerRefundId: "rf-2", status: "PENDING", amount: { amountCents: 5900, currency: "BRL" } });
+    await h.flow.retry("pay-1");
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("DOUBLE_RETURN");
+    await expect(h.flow.refundUpdated({ ...LATE, providerRefundId: "rf-2" })).resolves.toBe("CONFIRMED");
+  });
+
+  it("a redelivery of the word that adopted it is ignored", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    await h.flow.refundUpdated(LATE);
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+    expect(h.confirmations.doubleReturned).not.toHaveBeenCalled();
+  });
+});
+
+describe("settling by hand a refund said never returned", () => {
+  it("reads the charge first: still not back (the first refund still processing), it settles", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockClear();
+
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "REFUNDED", record: { how: "BY_HAND" } });
+    expect(h.refreshCharge).toHaveBeenCalledOnce();
+  });
+
+  it("money back: recorded returned (ADOPTED) and the hand settlement refused", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "MONEY_BACK" });
+    expect(h.held.row.state).toBe("REFUNDED");
+    expect(h.payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED" });
+  });
+
+  it("an unreadable charge refuses it: nothing settled", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockRejectedValue(new Error("provider down"));
+
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "CHARGE_UNREADABLE" });
+    expect(h.held.row.state).toBe("REFUND_PENDING");
   });
 });

@@ -24,7 +24,7 @@ import {
   type SubscriptionRefundDeps,
   type SubscriptionRefundResult,
 } from "./refund-ports";
-import { confirmDue, markNotReturned, refundUpdated } from "./refund-confirm";
+import { confirmDue, markNotReturned, readCharge, refundUpdated, refundWebhookHandler } from "./refund-confirm";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -79,7 +79,8 @@ import { confirmDue, markNotReturned, refundUpdated } from "./refund-confirm";
  * completed (common for Pix). It is recorded as refunded with
  * `confirmed: false`: the money is the provider's to return now, and a person
  * must not be asked to settle it. Confirming it (or a later failure) is the
- * provider's refund notification, which the host's webhook already receives.
+ * provider's refund notification: the host hands `onWebhookEvent` to its
+ * platform webhook delivery, and the sweep (`confirmDue`) reads the charge.
  *
  * Server-only.
  */
@@ -290,6 +291,21 @@ async function retry(ctx: Ctx, paymentId: string): Promise<SubscriptionRefundRes
   return outcomeOf(ctx, payment);
 }
 
+/**
+ * A payment reopened NOT_RETURNED: the refund a person said never came back
+ * may still land, so the charge is read before anything is settled by hand.
+ * Money back → recorded returned (ADOPTED) and the settlement refused; an
+ * unreadable charge refuses it too (settle later). Null: not back, go on.
+ */
+async function notReturnedYet(ctx: Ctx, payment: RefundablePayment): Promise<SettleByHandResult | null> {
+  const read = await readCharge(ctx.deps, payment);
+  if (read === "NOT_BACK") return null;
+  if (read === "UNREADABLE") return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "CHARGE_UNREADABLE" };
+  const record: RefundRecord = { how: "ADOPTED", providerRefundId: null, refundedCents: null, confirmed: true, at: ctx.now() };
+  await ctx.store.markRefunded(payment.id, record);
+  return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "MONEY_BACK" };
+}
+
 async function settleByHand(
   ctx: Ctx,
   paymentId: string,
@@ -297,6 +313,10 @@ async function settleByHand(
 ): Promise<SettleByHandResult> {
   const payment = await pendingPayment(ctx, paymentId);
   if (refused(payment)) return payment;
+  if (payment.pendingReason === "NOT_RETURNED") {
+    const notYet = await notReturnedYet(ctx, payment);
+    if (notYet) return notYet;
+  }
   const retrier = await retrierOf(ctx);
   const key = keyOf(ctx, payment);
   if (payment.provider && payment.providerChargeId && !(await retrier.settleByHand(key))) {
@@ -325,6 +345,7 @@ export function createSubscriptionRefund(deps: SubscriptionRefundDeps): Subscrip
     runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
     confirmDue: (limit) => confirmDue(deps, limit),
     refundUpdated: (update) => refundUpdated(deps, update),
+    onWebhookEvent: refundWebhookHandler(deps),
     markNotReturned: (paymentId, byHand) => markNotReturned(deps, paymentId, byHand),
   };
 }
