@@ -108,13 +108,15 @@ describe('saveDraftBodyOf', () => {
   });
 });
 
-describe('lifecycleMcpEndpoints({ draftData })', () => {
-  const writes = ['saveKitchenStationDraft', 'createKitchenStationDraft'];
+/** The two draft writes every plugged collection advertises. */
+const isDraftWrite = (operationId: string): boolean =>
+  operationId === 'saveKitchenStationDraft' || operationId === 'createKitchenStationDraft';
 
+describe('lifecycleMcpEndpoints({ draftData })', () => {
   it('advertises the collection body on both draft writes, and only there', () => {
     const tools = lifecycleMcpEndpoints(vocabulary({ draftData: stationDraftData }));
     for (const tool of tools) {
-      if (writes.includes(tool.operationId)) {
+      if (isDraftWrite(tool.operationId)) {
         expect(openPlaces(tool.body), tool.operationId).toEqual([]);
         expect(tool.body?.safeParse({ data: { name: 'Chapa', colour: 'red' } }).success).toBe(false);
       } else {
@@ -127,7 +129,7 @@ describe('lifecycleMcpEndpoints({ draftData })', () => {
 
   it('keeps the shared open body, the same object, when no schema is given', () => {
     const tools = lifecycleMcpEndpoints(vocabulary());
-    const bodies = tools.filter((tool) => writes.includes(tool.operationId)).map((tool) => tool.body);
+    const bodies = tools.filter((tool) => isDraftWrite(tool.operationId)).map((tool) => tool.body);
     expect(bodies).toEqual([saveDraftBody, saveDraftBody]);
     expect(bodies.every((body) => body === saveDraftBody)).toBe(true);
   });

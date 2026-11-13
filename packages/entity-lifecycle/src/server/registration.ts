@@ -10,7 +10,8 @@
  * plan/permission gates guard the collection's surface.
  */
 
-import type { LifecycleAuthorizeGate, LifecycleDraftDataValidator } from './context';
+import type { LifecycleAuthorizeGate } from './context';
+import type { LifecycleDraftDataValidator } from './draft-body';
 import type { NewItemDraftsOptions } from '../new-item-drafts';
 import type { DiffOptions, EntityOps, FeatureFlagMap, RetentionPolicy, Snapshot } from '../types';
 

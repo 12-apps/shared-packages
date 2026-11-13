@@ -14,6 +14,7 @@ export {
 } from './create-api-entity-lifecycle';
 export type { ApprovalsChangedListener } from './approvals-changed';
 export type { LifecycleEntityRegistration } from './registration';
+export type { LifecycleDraftDataValidator } from './draft-body';
 export {
   LifecycleApiError,
   contextOf,
@@ -25,7 +26,6 @@ export {
   type LifecycleActor,
   type LifecycleAuthorization,
   type LifecycleAuthorizeGate,
-  type LifecycleDraftDataValidator,
   type LifecycleMessages,
   type LifecycleCopyResolver,
   type LifecycleCopySource,

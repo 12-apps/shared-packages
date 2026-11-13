@@ -46,9 +46,9 @@ import {
   type LifecycleRoute,
   type LifecycleUserDirectory,
   invalidInput,
-  parseSnapshotBody,
   unrecognizedKeys,
 } from './context';
+import { parseSnapshotBody } from './draft-body';
 import type { LifecycleEntityRegistration } from './registration';
 import type { VersionComparisonWire, VersionsWire } from '../wire';
 
