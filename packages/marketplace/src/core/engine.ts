@@ -184,7 +184,11 @@ export interface MarketplaceEngine {
   /** Fetch and ingest one announced order (the `marketplace.fetch-order` job's body). */
   runFetchOrder(payload: FetchOrderJobPayload, attempt: OutboundAttempt): Promise<FetchOrderOutcome>;
 
-  /** How this marketplace's catalogue is published (`push`, `pull`), or null when it cannot be (FUT-4768). */
+  /**
+   * How this marketplace's catalogue is published (`push`, `pull`), or null
+   * when it cannot be: the adapter states no catalogue, or the host bound no
+   * catalogue port (FUT-4768).
+   */
   catalogueMode(provider: string): "push" | "pull" | null;
   /** Put a product in a marketplace's catalogue (or send it again), with an optional price for it. Queued. */
   publish(input: CataloguePublishInput): Promise<CatalogueActionResult>;
@@ -268,7 +272,8 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
     runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
 
-    catalogueMode: (provider) => registry.get(provider)?.catalogue?.mode ?? null,
+    // Null too when the host bound no catalogue port: nothing could be published.
+    catalogueMode: (provider) => (ports.catalogue ? (registry.get(provider)?.catalogue?.mode ?? null) : null),
     publish: (input) => publishToCatalogue(ctx, input),
     withdraw: (input) => withdrawFromCatalogue(ctx, input),
     catalogueState: (input) => readCatalogueState(ctx, input),

@@ -621,7 +621,7 @@ describe("a category created once", () => {
 });
 
 describe("a host with no catalogue port", () => {
-  it("answers UNSUPPORTED, and iFood states its catalogue as push", async () => {
+  it("answers UNSUPPORTED and states no mode, though iFood's adapter is push", async () => {
     const h = createHarness({ http: scriptedHttp([{ status: 200, body: "{}" }]) });
     await h.connect("IFOOD");
 
@@ -629,6 +629,7 @@ describe("a host with no catalogue port", () => {
       kind: "refused",
       code: "UNSUPPORTED",
     });
+    expect(h.engine.catalogueMode("IFOOD")).toBeNull();
     expect(createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US }).catalogue?.mode).toBe("push");
   });
 });
