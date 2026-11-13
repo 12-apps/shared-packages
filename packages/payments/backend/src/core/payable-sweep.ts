@@ -182,14 +182,40 @@ async function reconcileOne(
 }
 
 /**
+ * Charges already warned about, per host binding. Keyed on the deps object the
+ * host supplies once and passes on every pass (the job blueprint does exactly
+ * that), so each binding has its own memory and nothing is shared between
+ * hosts or tests. Bounded so a long-lived process cannot grow it forever.
+ */
+const warnedByDeps = new WeakMap<PendingSweepDeps, Set<string>>();
+const WARNED_CHARGES_CAP = 1_000;
+
+/**
  * No HTTP answer is the network's, not the charge's: the next pass asks again,
- * so only the pass that will not is a warning (FUT-4268). Anything else is as before.
+ * so only the pass that will not is a warning (FUT-4268).
+ *
+ * And a charge that keeps failing the same way is one problem: it is warned
+ * about ONCE per process, and every later pass logs at info. One InfinitePay
+ * charge stuck this way warned on every sweep, 376 times in 14 days, against an
+ * error-tracker quota that ran out (FUT-3968).
  */
 function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown, last: boolean): void {
   const line =
     `[payments] pending-charge sweep could not reconcile ${charge.provider} ` +
     `${charge.providerChargeId} (${charge.merchant.kind}:${charge.merchant.id}): ` +
     `${error instanceof Error ? error.message : String(error)}`;
-  if ((isTransportError(error) || isRequestTimeout(error)) && !last) deps.logInfo?.(line);
+  const transient = (isTransportError(error) || isRequestTimeout(error)) && !last;
+  if (transient || !firstWarningFor(deps, charge)) deps.logInfo?.(line);
   else deps.logWarn?.(line);
+}
+
+/** True the first time this binding sees the charge fail for good; it is remembered from then on. */
+function firstWarningFor(deps: PendingSweepDeps, charge: StoredCharge): boolean {
+  const key = `${charge.provider}:${charge.providerChargeId}`;
+  let warned = warnedByDeps.get(deps);
+  if (!warned) warnedByDeps.set(deps, (warned = new Set()));
+  if (warned.has(key)) return false;
+  if (warned.size >= WARNED_CHARGES_CAP) warned.clear();
+  warned.add(key);
+  return true;
 }
