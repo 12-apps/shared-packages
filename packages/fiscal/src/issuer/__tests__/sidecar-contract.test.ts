@@ -137,6 +137,19 @@ describe("the sidecar issuer, against the service's recorded answers", () => {
     expect(expectFailure(await issuerFor(late.fetch).cancel({ model: "NFCE", environment, signing: SIGNING, ...request }), "nfce-cancel-late").code).toBe("501");
   });
 
+  it("cancels by substitution (110112), naming the contingency document that replaced it", async () => {
+    const request = RECORDINGS["nfce-cancel-substitution"]!.request as {
+      accessKey: string;
+      protocol: string;
+      reason: string;
+      substituteAccessKey: string;
+    };
+    const { fetch, sent } = replaying("nfce-cancel-substitution");
+    const outcome = await issuerFor(fetch).cancelBySubstitution({ environment, signing: SIGNING, ...request });
+    expectSentAsRecorded("nfce-cancel-substitution", sent[0]!);
+    expect(outcome.ok && outcome.answer).toMatchObject({ status: "CANCELLED", protocol: "135260000200002" });
+  });
+
   it.each([
     ["nfce-lookup-authorized", "AUTHORIZED"],
     ["nfce-lookup-not-found", "NOT_FOUND"],

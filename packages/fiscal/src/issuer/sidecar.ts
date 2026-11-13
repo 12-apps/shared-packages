@@ -13,6 +13,7 @@
  */
 
 import type {
+  CancelBySubstitutionRequest,
   CancelRequest,
   InutilizeRequest,
   IssueRequest,
@@ -128,6 +129,15 @@ export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
         protocol,
         reason,
       } satisfies CancelRequest),
+    cancelBySubstitution: ({ environment, signing, accessKey, protocol, reason, substituteAccessKey }) =>
+      call("/nfce/cancel-substitution", {
+        environment,
+        certificate: signing.certificate,
+        accessKey,
+        protocol,
+        reason,
+        substituteAccessKey,
+      } satisfies CancelBySubstitutionRequest),
     lookup: ({ model, environment, signing, accessKey }) =>
       call(`/${modelPath(model)}/lookup`, { environment, certificate: signing.certificate, accessKey } satisfies LookupRequest),
     inutilize: ({ model, environment, signing, uf, cnpj, year, series, from, to, reason }) =>

@@ -65,6 +65,14 @@ export interface CancelCall extends Call {
   readonly reason: string;
 }
 
+/** NFC-e only: cancel an online document whose sale was issued again in contingency (event 110112). */
+export interface CancelBySubstitutionCall extends Call {
+  readonly accessKey: string;
+  readonly protocol: string;
+  readonly reason: string;
+  readonly substituteAccessKey: string;
+}
+
 export interface LookupCall extends Call {
   readonly model: FiscalDocumentModel;
   readonly accessKey: string;
@@ -89,6 +97,7 @@ export interface Issuer {
   /** Send an already signed XML (a contingency document). */
   transmit(call: TransmitCall): Promise<IssuerOutcome<IssuedDocument>>;
   cancel(call: CancelCall): Promise<IssuerOutcome<CancelledDocument>>;
+  cancelBySubstitution(call: CancelBySubstitutionCall): Promise<IssuerOutcome<CancelledDocument>>;
   lookup(call: LookupCall): Promise<IssuerOutcome<LookedUpDocument>>;
   inutilize(call: InutilizeCall): Promise<IssuerOutcome<InutilizedRange>>;
   health(): Promise<SidecarHealth>;

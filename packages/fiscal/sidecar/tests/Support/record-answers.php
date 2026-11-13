@@ -46,6 +46,7 @@ $cases = [
     'nfce-sign-contingency' => ['/nfce/sign-contingency', $nfce + ['contingency' => $contingency], []],
     'nfce-cancel' => ['/nfce/cancel', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Customer gave up the order'], ['cancel-135-registered']],
     'nfce-cancel-late' => ['/nfce/cancel', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Customer gave up the order'], ['cancel-501-late']],
+    'nfce-cancel-substitution' => ['/nfce/cancel-substitution', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Replaced by the document issued in contingency', 'substituteAccessKey' => '35261111222333000181650020000000019482139071'], ['cancel-substitution-135-registered']],
     'nfce-lookup-authorized' => ['/nfce/lookup', $auth + ['accessKey' => $key], ['lookup-100-authorized']],
     'nfce-lookup-not-found' => ['/nfce/lookup', $auth + ['accessKey' => $key], ['lookup-217-not-found']],
     'inutilize' => ['/inutilize', $inutilization, ['inutilize-102-homologated']],
