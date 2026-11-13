@@ -1,5 +1,6 @@
 import type { CancellationReason, MarketplaceAdapter } from "../core/adapter";
 import { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from "./copy";
+import { IFOOD_CATALOGUE } from "./catalogue";
 import { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodRequestCancellation } from "./outbound";
 import { IFOOD_AVAILABILITY } from "./pause";
@@ -63,6 +64,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
     readSignature: (header) => header("x-ifood-signature") ?? header("x-signature"),
     verifySignature: verifyIfoodSignature,
     cancellationReasons: () => reasons,
+    // The Catalog API v2.0: each item is written and paused through the API (FUT-4768).
+    catalogue: IFOOD_CATALOGUE,
     confirm: (ctx, order) => ifoodConfirm(ctx, order),
     requestCancellation: ifoodRequestCancellation,
     // The Merchant API's interruptions: an id and an end per closure (FUT-4851).
@@ -75,4 +78,5 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
 
 export { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from "./copy";
 export { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
+export { IFOOD_CATALOGUE, ifoodItemBody, ifoodItemId, ifoodProductId } from "./catalogue";
 export { IFOOD_AVAILABILITY, ifoodLocalTime, ifoodPause, ifoodResume } from "./pause";

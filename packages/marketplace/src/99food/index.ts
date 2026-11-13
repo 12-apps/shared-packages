@@ -4,6 +4,7 @@ import {
   type NinetyNineFoodAdapterCopy,
   type NinetyNineFoodReasonCode,
 } from "./copy";
+import { openDeliveryCatalogue } from "./catalogue";
 import { NINETY_NINE_FOOD_PROVIDER, normalizeOpenDeliveryEvent, verifyOpenDeliverySignature } from "./normalize";
 import {
   openDeliveryConfirm,
@@ -113,6 +114,8 @@ export function createNinetyNineFoodAdapter(config: NinetyNineFoodAdapterConfig)
     readSignature: (header) => header("x-app-signature"),
     verifySignature: verifyOpenDeliverySignature,
     cancellationReasons: () => reasons,
+    // PULL: 99Food reads the menu the host serves (`GET /v1/merchant`) and is told when it changed (FUT-4768).
+    catalogue: openDeliveryCatalogue(bases),
     fetchOrder: (ctx, order) => openDeliveryFetchOrder(ctx, bases, order, normalizeOptions),
     confirm: (ctx, order, input) => openDeliveryConfirm(ctx, bases, order, input),
     requestCancellation: (ctx, order, input) => openDeliveryRequestCancellation(ctx, bases, order, input),
@@ -128,4 +131,5 @@ export {
 } from "./copy";
 export { normalizeOpenDeliveryEvent, normalizeOpenDeliveryOrder, verifyOpenDeliverySignature } from "./normalize";
 export type { NinetyNineFoodApiBaseUrls } from "./outbound";
+export { openDeliveryCatalogue, openDeliveryMenuDocument } from "./catalogue";
 export { openDeliveryAvailability, openDeliverySetMerchantStatus } from "./pause";

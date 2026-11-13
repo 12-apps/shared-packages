@@ -85,7 +85,7 @@ async function hostOrder(id: string) {
 }
 
 describe('the adoption', () => {
-  it('assembles a clean report with every route claimed and the five jobs bound', () => {
+  it('assembles a clean report with every route claimed and the six jobs bound', () => {
     const marketplace = backend.hosts.marketplace;
     const [entry] = marketplace.report.packages;
     expect(entry?.packageName).toBe('@12-apps/marketplace');
@@ -95,6 +95,9 @@ describe('the adoption', () => {
     expect(unclaimedRoutes(marketplace.routes, claimed), renderWiringReport(marketplace.report)).toEqual([]);
     expect(marketplace.routes).toHaveLength(7);
     expect(marketplace.jobs.map((job) => job.name).sort()).toEqual([
+      'marketplace.availability',
+      'marketplace.availability-sweep',
+      'marketplace.catalogue',
       'marketplace.expire-acceptances',
       'marketplace.fetch-order',
       'marketplace.outbound',

@@ -21,6 +21,7 @@
  */
 
 export { createMarketplaceEngine, type MarketplaceEngine } from "./core/engine";
+export { stableUuid } from "./core/catalogue-ids";
 export {
   answered,
   outboundResultOf,
@@ -52,6 +53,7 @@ export type {
   CancellationFailureReason,
   MarketplaceAuditEntry,
   MarketplaceAuditPort,
+  MarketplaceCataloguePort,
   MarketplaceClockPort,
   MarketplaceDb,
   MarketplaceEngineConfig,
@@ -129,6 +131,44 @@ export {
   type FetchOrderOutcome,
 } from "./core/fetch-order";
 export type { MarketplaceOrderState } from "./core/state";
+export {
+  CatalogueRetryError,
+  catalogueDedupeKey,
+  MARKETPLACE_CATALOGUE_JOB,
+  type CatalogueAction,
+  type CatalogueJobPayload,
+  type CatalogueOutcome,
+} from "./core/catalogue-job";
+export type {
+  CatalogueActionResult,
+  CatalogueDocumentResult,
+  CataloguePublishInput,
+  CatalogueRefusalCode,
+  CatalogueTarget,
+} from "./core/catalogue";
+export type {
+  CatalogueCallContext,
+  CatalogueFailure,
+  CatalogueImage,
+  CatalogueItem,
+  CatalogueItemOut,
+  CatalogueItemRef,
+  CatalogueMenuEntry,
+  CatalogueMenuOptions,
+  CatalogueStoredImage,
+  CatalogueWarningCode,
+  CataloguePublishResult,
+  MarketplaceCatalogue,
+  PullCatalogue,
+  PushCatalogue,
+} from "./core/catalogue-port";
+export type {
+  CatalogueFailedAction,
+  CatalogueFailureCode,
+  CataloguePublicationView,
+  CatalogueStatus,
+} from "./core/catalogue-store";
+export { CATALOGUE_GIVE_UP_MS, CATALOGUE_STALE_MS } from "./core/catalogue-sweep";
 export type {
   MarketplaceAvailability,
   StorePauseRef,

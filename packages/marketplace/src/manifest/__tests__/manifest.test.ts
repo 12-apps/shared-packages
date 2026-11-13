@@ -213,6 +213,7 @@ describe("the job blueprints", () => {
     expect(wired.jobs.map((job) => job.name).sort()).toEqual([
       "marketplace.availability",
       "marketplace.availability-sweep",
+      "marketplace.catalogue",
       "marketplace.expire-acceptances",
       "marketplace.fetch-order",
       "marketplace.outbound",

@@ -1,3 +1,4 @@
+import type { MarketplaceCatalogue } from "./catalogue-port";
 import type { MarketplaceAvailability } from "./pause-port";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
@@ -42,8 +43,11 @@ export interface MarketplaceCredentials {
 
 /** What the host's HTTP client takes. */
 export interface MarketplaceHttpRequest {
-  /** `DELETE` since FUT-4851: iFood removes an interruption with it. */
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  /**
+   * `PATCH` since FUT-4768: iFood's catalogue sets an item's status with it.
+   * `DELETE` since FUT-4851: iFood removes an interruption with it.
+   */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
   headers: Record<string, string>;
   body?: string;
@@ -173,6 +177,13 @@ export interface MarketplaceAdapter {
    * order (iFood) leaves it out.
    */
   fetchOrder?(ctx: AdapterCallContext, order: { externalOrderId: string }): Promise<FetchOrderResult>;
+  /**
+   * OPTIONAL. Publishing the store's products to this marketplace's catalogue
+   * (FUT-4768): `push` (the adapter writes each item) or `pull` (the
+   * marketplace reads a menu document the host serves). Absent: the
+   * marketplace cannot be published to, and the host says so.
+   */
+  readonly catalogue?: MarketplaceCatalogue;
   /**
    * OPTIONAL. Closing the store on this marketplace for a while, and opening
    * it again (FUT-4851). Absent: the marketplace cannot be paused through an

@@ -55,6 +55,7 @@
     "20261111200000_marketplace_engine",
     "20261111210000_payment_refund_retries",
     "20261112120000_marketplace_cancellation_failure",
+    "20261113120000_marketplace_catalogue",
     "20261113180000_marketplace_store_pause"
   ]
 }

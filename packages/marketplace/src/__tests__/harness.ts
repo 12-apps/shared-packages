@@ -10,6 +10,7 @@ import type {
   MarketplaceAdmissionRequest,
   MarketplaceAdmissionResult,
   MarketplaceAuditEntry,
+  MarketplaceCataloguePort,
   MarketplaceRefusal,
   CancellationFailureReason,
 } from "../core/ports";
@@ -70,6 +71,8 @@ interface HarnessOptions {
   cancellationHooks?: boolean;
   /** The engine's override of every adapter's cancellation answer window. */
   cancellationWindowMs?: number;
+  /** The host's catalogue port, for the catalogue suites (FUT-4768). */
+  catalogue?: MarketplaceCataloguePort;
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -165,6 +168,7 @@ export function createHarness(options: HarnessOptions = {}) {
     reconcileBatchSize: 50,
     maxInboxAttempts: 5,
     ...(options.cancellationWindowMs === undefined ? {} : { cancellationWindowMs: options.cancellationWindowMs }),
+    ...(options.catalogue ? { catalogue: options.catalogue } : {}),
     adapters: options.adapters ?? [createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US })],
   });
 
