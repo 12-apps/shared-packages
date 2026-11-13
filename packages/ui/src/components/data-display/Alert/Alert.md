@@ -187,9 +187,10 @@ black (dark mode) only as far as the ink needs, so the title and the
 description hold 4.5:1 over the whole sweep (judged at 21 points, not only the
 ends), the shimmer included, at rest, hovered and pressed (FUT-4516). The shimmer
 is stacked BEHIND the words (`isolation: isolate`, `::before` at `z-index: -1`),
-so a white wash never lies over dark ink. The sweep crosses the alert's own width, at any width (it
-starts one alert-width to the left and ends one to the right, so there is no
-hard edge), every 3s, and is off under `prefers-reduced-motion` (FUT-4874). Native paints the derived first end
+so a white wash never lies over dark ink. The sweep crosses the alert's own
+width at any width (it starts one alert-width to the left and ends one to the
+right, so it leaves no hard edge) every 3s, and is off under
+`prefers-reduced-motion` (FUT-4874). Native paints the derived first end
 under the same ink (no shimmer, no pointer states, so rest only).
 
 ### `announce` — whether the alert interrupts
