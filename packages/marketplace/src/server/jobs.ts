@@ -140,7 +140,7 @@ const fetchOrder: WireJobBlueprint<FetchOrderJobPayload, MarketplaceJobDeps> = {
 };
 
 /** The catalogue job's attempts: the last one stamps FAILED. */
-export const MARKETPLACE_CATALOGUE_ATTEMPTS = 3;
+const MARKETPLACE_CATALOGUE_ATTEMPTS = 3;
 
 const catalogue: WireJobBlueprint<CatalogueJobPayload, MarketplaceJobDeps> = {
   name: "catalogue",

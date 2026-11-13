@@ -23,7 +23,7 @@ import type { MarketplaceProvider } from "./types";
  * category again). A publish that only waited is left PUBLISHING for the
  * sweep, which re-queues it after 10 minutes, so a long window costs nothing.
  */
-export const CLAIM_STALE_MS = 3 * 60_000;
+const CLAIM_STALE_MS = 3 * 60_000;
 
 /** What one publish learnt about the category claims it met: whether another held one. */
 export interface CategoryRunState {

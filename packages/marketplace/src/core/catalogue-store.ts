@@ -133,7 +133,7 @@ export function truncateReason(reason: string): string {
 }
 
 /** Why a connection cannot carry a catalogue call. */
-export interface ConnectionProblem {
+interface ConnectionProblem {
   problem: "NOT_CONNECTED" | "CREDENTIALS";
 }
 
