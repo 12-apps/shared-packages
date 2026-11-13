@@ -39,4 +39,9 @@ export interface FormMessageProps {
   error?: boolean;
   children: React.ReactNode;
   dataTestId?: string;
+  /**
+   * The message's element id. Point the control's `aria-describedby` at it, so
+   * a screen reader says why the field is invalid, not only that it is.
+   */
+  id?: string;
 }

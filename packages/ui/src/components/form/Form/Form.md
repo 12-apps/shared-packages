@@ -68,6 +68,7 @@ function MyForm() {
 |------|------|---------|-------------|
 | error | `boolean` | `false` | Error state styling |
 | children | `ReactNode` | - | Message content |
+| id | `string` | - | The message's element id, for the control's `aria-describedby` |
 
 ## Layout Variants
 
