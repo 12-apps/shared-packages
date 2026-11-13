@@ -82,7 +82,18 @@ export interface CatalogueCallContext extends AdapterCallContext {
 }
 
 /** A publish's answer: the marketplace's id for the item, or the refusal and retry shapes of every outbound call. */
-export type CataloguePublishResult = { kind: "published"; externalId: string } | CatalogueFailure;
+export type CataloguePublishResult =
+  | {
+      kind: "published";
+      externalId: string;
+      /**
+       * OPTIONAL. The SKU this marketplace's orders will carry for the item,
+       * when it is not the host's product id (the item's external code). The
+       * engine maps it to the product, so its orders arrive mapped.
+       */
+      sku?: string;
+    }
+  | CatalogueFailure;
 
 /** A marketplace the store's software writes to. */
 export interface PushCatalogue {

@@ -128,6 +128,45 @@ describe("catalogue publishing, push", () => {
     expect(JSON.parse(h.http.requests[0]?.body ?? "{}")).toEqual({ name: "Burger", price: 2500, category: "Burgers" });
   });
 
+  it("maps the SKU the marketplace's orders will carry to the product, and keeps the map after a withdraw", async () => {
+    const h = mount();
+    await h.connect(PUSHY);
+    h.memory.tables.marketplaceMenuLink.rows.push({
+      id: "link-old",
+      clientId: TENANT,
+      provider: PUSHY,
+      externalSku: "p-1",
+      externalName: "Burger",
+      menuItemId: null,
+      lastSeenAt: new Date("2026-11-01T00:00:00.000Z"),
+    });
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h);
+    await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h);
+
+    const links = await h.engine.menuLinks({ clientId: TENANT, provider: PUSHY });
+    expect(links.map((link) => [link.externalSku, link.menuItemId])).toEqual([["p-1", "p-1"]]);
+  });
+
+  it("an iFood order for a published product arrives mapped", async () => {
+    const http = scriptedHttp((request) =>
+      request.url.endsWith("/oauth/token")
+        ? { status: 200, body: JSON.stringify({ accessToken: "tok" }) }
+        : { status: 200, body: JSON.stringify([{ id: "cat-1", name: "Burgers" }]) },
+    );
+    const h = createHarness({ http, catalogue: hostCatalogue({ "SKU-1": BURGER }) });
+    await h.connect("IFOOD");
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "SKU-1" });
+    await runLatest(h);
+
+    const unmapped = await h.engine.menuLinks({ clientId: TENANT, provider: "IFOOD", unmappedOnly: true });
+    expect(unmapped).toEqual([]);
+    expect(await h.engine.menuLinks({ clientId: TENANT, provider: "IFOOD" })).toMatchObject([
+      { externalSku: "SKU-1", externalName: "Burger", menuItemId: "SKU-1" },
+    ]);
+  });
+
   it("sends the marketplace's own price when the store set one, and keeps it on the row", async () => {
     const h = mount();
     await h.connect(PUSHY);

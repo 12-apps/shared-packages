@@ -81,7 +81,7 @@ export async function enqueueCatalogue(ctx: EngineContext, payload: CatalogueJob
 type RunResult = CataloguePublishResult | OutboundResult;
 
 /** What a run did instead of a call: an engine-side reason it cannot be made. */
-type Run = { result: RunResult; sentPriceCents: number | null } | { code: CatalogueFailureCode };
+type Run = { result: RunResult; sentPriceCents: number | null; name?: string } | { code: CatalogueFailureCode };
 
 /** The call this run makes, or the code that stands in for it. */
 async function callFor(
@@ -99,9 +99,11 @@ async function callFor(
   const item = (await ctx.ports.catalogue?.items(row.clientId, [row.productId]))?.get(row.productId);
   if (!item) return { code: "PRODUCT_GONE" };
   const priceCents = row.priceCents ?? item.priceCents;
-  if (catalogue.mode === "pull") return { result: await catalogue.notifyMenuChanged(call), sentPriceCents: priceCents };
+  if (catalogue.mode === "pull") {
+    return { result: await catalogue.notifyMenuChanged(call), sentPriceCents: priceCents, name: item.name };
+  }
   const out = { ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId };
-  return { result: await catalogue.publishItem(call, out), sentPriceCents: priceCents };
+  return { result: await catalogue.publishItem(call, out), sentPriceCents: priceCents, name: item.name };
 }
 
 /** The predicate a stamp holds to: the row still asks for this action, at the instant this run read. */
@@ -143,6 +145,28 @@ async function publishLateLanding(ctx: EngineContext, table: CatalogueTable, row
   if (moved.count === 0) return;
   const payload: CatalogueJobPayload = { clientId: row.clientId, publicationId: row.id, action: "publish" };
   await enqueueCatalogue(ctx, payload, catalogueDedupeKey(payload, now));
+}
+
+/**
+ * Map the SKU the marketplace's orders will carry for a published item to the
+ * host's product, so those orders arrive mapped instead of on the attention
+ * list. Kept on a withdraw: an order placed before it still maps.
+ */
+async function mapPublishedSku(ctx: EngineContext, row: CatalogueRow, result: RunResult, name: string | undefined): Promise<void> {
+  const sku = (result.kind === "published" ? result.sku : undefined) ?? row.productId;
+  const db = await ctx.ports.db();
+  await db.marketplaceMenuLink.upsert({
+    where: { clientId_provider_externalSku: { clientId: row.clientId, provider: row.provider, externalSku: sku } },
+    create: {
+      clientId: row.clientId,
+      provider: row.provider,
+      externalSku: sku,
+      externalName: name ?? null,
+      menuItemId: row.productId,
+      lastSeenAt: ctx.ports.clock.now(),
+    },
+    update: { menuItemId: row.productId },
+  });
 }
 
 async function stampSuccess(
@@ -223,6 +247,7 @@ async function runOnce(
   const { result } = run;
   if (result.kind === "accepted" || result.kind === "published") {
     await stampSuccess(ctx, table, row, action, result, run.sentPriceCents);
+    if (action === "publish") await mapPublishedSku(ctx, row, result, run.name);
     ctx.ports.publishChanged(row.clientId);
     return { kind: "done", action };
   }

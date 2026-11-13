@@ -187,7 +187,8 @@ async function publish(ctx: CatalogueCallContext, item: CatalogueItemOut): Promi
   if ("kind" in image) return image;
   const put = await call(ctx, "PUT", "items", ifoodItemBody(item, category.id, image.path));
   if ("kind" in put) return put;
-  return ok(put) ? { kind: "published", externalId: ifoodItemId(item.ref) } : failureOf(put);
+  // iFood's orders carry the item's `externalCode` as the line's SKU (the order normalizer reads it).
+  return ok(put) ? { kind: "published", externalId: ifoodItemId(item.ref), sku: item.productId } : failureOf(put);
 }
 
 async function withdraw(ctx: CatalogueCallContext, item: CatalogueItemRef): Promise<OutboundResult> {

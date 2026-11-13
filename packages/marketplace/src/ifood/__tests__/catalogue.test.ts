@@ -64,7 +64,7 @@ describe("iFood catalogue, publish", () => {
 
     const result = await IFOOD_CATALOGUE.publishItem(ctx, ITEM);
 
-    expect(result).toEqual({ kind: "published", externalId: ifoodItemId("pub-1") });
+    expect(result).toEqual({ kind: "published", externalId: ifoodItemId("pub-1"), sku: "p-1" });
     expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
       "POST https://merchant-api.ifood.com.br/authentication/v1.0/oauth/token",
       `GET ${BASE}/categories`,
