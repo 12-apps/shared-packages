@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fiscal\Sidecar\Tests\Unit;
 
+use Fiscal\Sidecar\Nfe\Credentials;
+use Fiscal\Sidecar\ServiceError;
 use Fiscal\Sidecar\Tests\Support\Fixtures;
 use Fiscal\Sidecar\Tests\Support\RecordedTransport;
 use Fiscal\Sidecar\Tests\Support\ServiceProcess;
@@ -68,14 +70,20 @@ final class SecretsNeverLoggedTest extends TestCase
 
     public function testAnExpiredCertificateIsAuth(): void
     {
-        $expired = ThrowawayCertificate::create(validDays: -1);
-        [$kernel] = Fixtures::kernel(new RecordedTransport());
+        // PHP cannot backdate a certificate (and 8.3.36 refuses negative days),
+        // so a one-day certificate is judged two days from now.
+        $oneDay = ThrowawayCertificate::create(validDays: 1);
+        $opened = ['pfx' => $oneDay->pfx, 'password' => $oneDay->password];
+        Credentials::open($opened);
 
-        $response = Fixtures::call($kernel, 'POST', '/nfce/issue', Fixtures::issueBody('nfce-simples', $expired, true));
-
-        self::assertSame(401, $response->status);
-        self::assertSame('AUTH', $response->body['error']['class']);
-        self::assertStringContainsString('expired', $response->body['error']['message']);
+        try {
+            Credentials::open($opened, new \DateTimeImmutable('+2 days'));
+            self::fail('an expired certificate was accepted');
+        } catch (ServiceError $error) {
+            self::assertSame('AUTH', $error->class->value);
+            self::assertStringContainsString('expired', $error->getMessage());
+            self::assertSame(401, $error->class->httpStatus());
+        }
     }
 
     public function testBytesThatAreNotAPfxAreAuth(): void

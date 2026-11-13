@@ -16,8 +16,13 @@ use Throwable;
  */
 final class Credentials
 {
-    /** @param array{pfx: string, password: string} $certificate */
-    public static function open(array $certificate): Certificate
+    /**
+     * @param array{pfx: string, password: string} $certificate
+     * @param \DateTimeImmutable|null $now the moment the validity is judged at;
+     *   the current time unless a test asks for another (PHP cannot backdate a
+     *   certificate, so an expired one is judged at a later moment instead)
+     */
+    public static function open(array $certificate, ?\DateTimeImmutable $now = null): Certificate
     {
         try {
             $opened = Certificate::readPfx($certificate['pfx'], $certificate['password']);
@@ -28,7 +33,7 @@ final class Credentials
                 'The certificate could not be opened: the password is wrong or the file is not a PKCS#12 (.pfx).',
             );
         }
-        if ($opened->isExpired()) {
+        if ($opened->getValidTo() < ($now ?? new \DateTimeImmutable())) {
             throw new ServiceError(
                 ErrorClass::AUTH,
                 'The certificate expired on ' . $opened->getValidTo()->format('Y-m-d') . '.',

@@ -43,11 +43,7 @@ final class ThrowawayCertificate
             $options = ['config' => $config, 'digest_alg' => 'sha256', 'x509_extensions' => 'a1'];
             $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA] + $options);
             $csr = openssl_csr_new(['commonName' => "TEST COMPANY:$cnpj", 'countryName' => 'BR'], $key, $options);
-            $days = $validDays;
-            $x509 = openssl_csr_sign($csr, null, $key, $days, $options, random_int(1, PHP_INT_MAX));
-            if ($validDays < 0) {
-                $x509 = self::expired($key, $csr, $options);
-            }
+            $x509 = openssl_csr_sign($csr, null, $key, $validDays, $options, random_int(1, PHP_INT_MAX));
             $password = bin2hex(random_bytes(12));
             $pfx = '';
             if ($x509 === false || !openssl_pkcs12_export($x509, $pfx, $key, $password)) {
@@ -63,16 +59,5 @@ final class ThrowawayCertificate
     public function base64(): string
     {
         return base64_encode($this->pfx);
-    }
-
-    /**
-     * PHP cannot backdate `openssl_csr_sign`, so an expired certificate is one
-     * whose validity ended before it began being checked: zero days, checked later.
-     *
-     * @param array<string, mixed> $options
-     */
-    private static function expired(\OpenSSLAsymmetricKey $key, \OpenSSLCertificateSigningRequest $csr, array $options): \OpenSSLCertificate|false
-    {
-        return openssl_csr_sign($csr, null, $key, 0, $options, random_int(1, PHP_INT_MAX));
     }
 }
