@@ -204,12 +204,18 @@ function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown
     `[payments] pending-charge sweep could not reconcile ${charge.provider} ` +
     `${charge.providerChargeId} (${charge.merchant.kind}:${charge.merchant.id}): ` +
     `${error instanceof Error ? error.message : String(error)}`;
-  if ((isTransportError(error) || isRequestTimeout(error)) && !last) return deps.logInfo?.(line);
+  const transient = (isTransportError(error) || isRequestTimeout(error)) && !last;
+  if (transient || !firstWarningFor(deps, charge)) deps.logInfo?.(line);
+  else deps.logWarn?.(line);
+}
+
+/** True the first time this binding sees the charge fail for good; it is remembered from then on. */
+function firstWarningFor(deps: PendingSweepDeps, charge: StoredCharge): boolean {
   const key = `${charge.provider}:${charge.providerChargeId}`;
   let warned = warnedByDeps.get(deps);
   if (!warned) warnedByDeps.set(deps, (warned = new Set()));
-  if (warned.has(key)) return deps.logInfo?.(line);
+  if (warned.has(key)) return false;
   if (warned.size >= WARNED_CHARGES_CAP) warned.clear();
   warned.add(key);
-  deps.logWarn?.(line);
+  return true;
 }
