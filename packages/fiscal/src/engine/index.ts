@@ -7,7 +7,8 @@
  * supply, and gets the per-line and per-order breakdown back.
  */
 
-export { computeTax, ratesAt } from "./compute";
+export { computeTax } from "./compute";
+export { ratesAt } from "./plan";
 export { computeTaxWithOracle } from "./oracle";
 export type { OfficialCalculator, OfficialCalculatorItemAnswer, OfficialCalculatorItemRequest } from "./oracle";
 export { compareBreakdowns } from "./compare";

@@ -15,7 +15,7 @@ export interface BreakdownDisagreement {
 }
 
 const LINE_FIELDS = [
-  "baseCents",
+  "valueCents",
   "taxBaseCents",
   "reductionBp",
   "cbsRateBp",
@@ -24,6 +24,7 @@ const LINE_FIELDS = [
   "ibsUfCents",
   "ibsMunRateBp",
   "ibsMunCents",
+  "netValueCents",
 ] as const satisfies readonly (keyof LineTax)[];
 
 const ORDER_FIELDS = [
@@ -32,6 +33,7 @@ const ORDER_FIELDS = [
   "ibsUfCents",
   "ibsMunCents",
   "totalTaxCents",
+  "netValueCents",
   "gorjetaExcludedCents",
   "intermediationExcludedCents",
   "treatment",

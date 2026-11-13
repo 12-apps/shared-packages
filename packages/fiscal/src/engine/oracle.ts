@@ -1,16 +1,22 @@
 /**
  * The ORACLE mode: the same interface as `computeTax`, with the per-item
  * figures asked of an injected `OfficialCalculator` — the port a host points
- * at the RFB's Calculadora de Tributos (open source, with an API and a local
- * component; `docs/tax/04` §3 in the origin host). Everything else — the
- * regime's treatment, the exclusions, each line's base — is the engine's own
- * plan, so running both modes over one fixture set checks exactly the rates,
- * the reductions and the rounding against the official figures.
+ * at the official IBS/CBS calculator (the Receita Federal's Calculadora de
+ * Tributos, open source, with an HTTP API and an embeddable component).
+ * Everything else — the regime's treatment, the segregated exclusions, each
+ * item's base — is the engine's own plan, so running both modes over one
+ * fixture set checks exactly the rates, the reductions and the rounding
+ * against the official figures.
+ *
+ * In a tax-inside-price period the base is taken out of the price with the
+ * TABLE's rates (the calculator takes a base, not a price), and the
+ * calculator's taxes on that base give the net value.
  */
 
 import { FiscalEngineError } from "./errors";
 import { assembleBreakdown, planTax, zeroFigures } from "./plan";
 import type { LineFigures, TaxBreakdown, TaxClass, TaxInput } from "./types";
+
 
 /** One item, as the calculator is asked about it. */
 export interface OfficialCalculatorItemRequest {
@@ -64,7 +70,7 @@ export async function computeTaxWithOracle(input: TaxInput, calculator: Official
   const plan = planTax(input);
   const figures: LineFigures[] = [];
   for (const line of plan.lines) {
-    if (!plan.ratesApply) {
+    if (!line.taxed) {
       figures.push(zeroFigures(line));
       continue;
     }

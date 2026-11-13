@@ -19,27 +19,48 @@ const breakdown = computeTax({
   lines: [
     {
       id: "item-1",
-      baseCents: 3990, // the line's value after its allocated discount
-      quantity: 1,
+      valueCents: 3990, // what the buyer pays for the line, after its allocated discount
+      quantity: 1, // qCom, at most four decimals
       foodAndDrink: true,
-      taxClass: { cClassTrib: "…", cstIbsCbs: "…", regimeEspecifico: "BARES_RESTAURANTES", reductionBp: 0 },
+      taxClass: { cClassTrib: "200047", cstIbsCbs: "200", regimeEspecifico: "BARES_RESTAURANTES", reductionBp: 0 },
     },
   ],
   seller: { regime: "REGIME_REGULAR", regimeEffectiveFrom: "2026-01-01", restaurantRegime: true },
   destinationIbge: "3550308", // the establishment, or for a delivered good the place of delivery
-  exclusions: { serviceCharge: null, retainedIntermediationCents: 0 },
+  exclusions: { serviceCharge: null, retainedIntermediation: null },
   tables,
   supplyDate: "2026-11-20", // the local day of the supply, in the seller's clock
 });
-// breakdown.lines[i]: taxBaseCents, cbsRateBp/cbsCents, ibsUfRateBp/ibsUfCents,
-//   ibsMunRateBp/ibsMunCents, reductionBp, the class snapshot
-// breakdown: the sums, gorjetaExcludedCents, intermediationExcludedCents,
-//   treatment, informative, provisional, tablesVersion
+// breakdown.lines[i]: one NF-e item each — valueCents (vProd), taxBaseCents (vBC),
+//   cbsRateBp/cbsCents, ibsUfRateBp/ibsUfCents, ibsMunRateBp/ibsMunCents, reductionBp,
+//   taxCents, netValueCents (vProdLiq) and netUnitValue (vUnComLiq), the class snapshot
+// breakdown: the sums, netValueCents (vProdLiqTot), gorjetaExcludedCents,
+//   intermediationExcludedCents, treatment, informative, provisional, taxInsidePrice,
+//   tablesVersion
 ```
 
 Money is integer cents, rates integer basis points, dates `YYYY-MM-DD`. Any
-value the engine cannot read is refused with a `FiscalEngineError` carrying a
+value the engine cannot read — a missing object, an `undefined` where `null` is
+required, a malformed table — is refused with a `FiscalEngineError` carrying a
 `code`; nothing is defaulted.
+
+### What a host passes as a line's value
+
+Always **the price the buyer pays for the line** (all units, after the line's
+share of an unconditional discount). The engine decides from the rate table
+whether the tax is inside it:
+
+- **A period with `taxInsidePrice: false` (2026).** The value is the base:
+  `vBC = value`, each tax is `vBC × rate`, and `netValueCents` /
+  `netUnitValue` are `null` — the tax is not part of `vProd` yet.
+- **A period with `taxInsidePrice: true` (2027 on, where the IBS/CBS compose
+  `vProd`).** The value is tax-inclusive. The engine takes the taxes out: `vBC`
+  is the largest whole-cent base whose rounded taxes, added back, fit inside
+  the value; each tax is rounded on that `vBC`; `netValueCents` (`vProdLiq`) is
+  the value less the taxes, so `vProdLiq + Σ tax = vProd` to the cent; and
+  `netUnitValue` (`vUnComLiq`, reais with ten decimals) times the quantity is
+  within the layout's ±0,01 of `vProdLiq` (rule I11c-20). The price never
+  changes; the tax is a share of it.
 
 ### The rules it applies (LC 214/2025)
 
@@ -52,34 +73,48 @@ value the engine cannot read is refused with a `FiscalEngineError` carrying a
   table lists one (`byUf`, `byMunicipality`), the reference rate elsewhere.
 - **Regimes** (art. 41): regime regular and the Simples híbrido → `FULL`;
   Simples inside the DAS → `INFORMATIVE`, carrying the figures a regime store
-  would show and no amount "por fora"; MEI and não contribuinte → `NONE`, zero.
-  In 2026 the test rates are not applied to Simples optants (art. 348 III "c"),
-  read from the period's `appliesToSimplesNacional`.
+  would show and no amount "por fora"; MEI and não contribuinte → `NONE`, zero
+  and not informative. In 2026 the test rates are not applied to Simples
+  optants (art. 348 III "c"), read from the period's `appliesToSimplesNacional`.
 - **Bares e restaurantes**: in a store with `restaurantRegime`, a line whose
   class is `BARES_RESTAURANTES` (prepared food, non-alcoholic drinks prepared
-  on the premises — art. 273) takes the table's 40% reduction (art. 275);
-  alcohol and resale carry `regimeEspecifico: null` and the full rate
-  (art. 273 §2). Outside the special regime a class's own `reductionBp`
-  applies (a cesta-básica zero rate is a 100% reduction).
-- **Exclusions**, restaurant regime only (art. 274 par. único): a service
-  charge passed in full to the staff leaves the base up to 15% of the food
-  and drink (I) — the part above the ceiling, or a charge the store keeps, is
-  taxed as a line of its own; what a platform retained for delivery and
-  intermediation leaves the base (II), spread over the lines by value in exact
-  cents.
-- **Rounding**: per item, per tax, to whole cents, half up — the NF-e layout's
-  rounding, never a floor; the reduction applies to the rate before the
-  product is rounded, and every order figure is the sum of its rounded lines.
+  on the premises — art. 273; official class 200047) takes the table's 40%
+  reduction (art. 275); alcohol and resale carry `regimeEspecifico: null` and
+  the full rate (art. 273 §2). Outside the special regime a class's own
+  `reductionBp` applies (a cesta-básica zero rate is a 100% reduction).
+- **Exclusions**, restaurant regime only (art. 274 par. único), each
+  **segregated as its own item** with no tax (RCBS art. 399 §2; without the
+  segregation the base is the full value, §4), under the table's
+  `exclusionClasses`:
+  - the service charge, when passed in full to the staff AND at most 15% of
+    the food and drink (I): one item, class 410019. Above 15%, or kept by the
+    store, nothing is excluded — the WHOLE charge is a taxed item under the
+    class the host passes. There is no partial exclusion.
+  - what a platform retained for delivery and intermediation (II): one item,
+    class 410020, passed as `retainedIntermediation` and NOT inside any line's
+    value. No goods line's base moves for it. Outside the restaurant regime it
+    is refused: there the amount belongs in the lines.
+- **Rounding**: per item, per tax, to whole cents, **half-even** — what the
+  official calculator does (R$ 5,00 × 0,9% = 0,045 → 0,04), never a floor; the
+  reduction applies to the rate before the product is rounded, and every order
+  figure is the sum of its rounded items. The effective rate (`pAliqEfet`) is
+  not output: the product is computed exactly from the nominal rate and the
+  reduction, which equals `vBC × pAliqEfet` for any whole-percent reduction —
+  every reduction in the official table (V0066) is one: 30, 40, 50, 60, 70, 80
+  or 100%.
 
 ### The oracle mode
 
 `computeTaxWithOracle(input, calculator)` takes the same input and asks an
-`OfficialCalculator` port for each item's rates, reduction and taxes; the
-regime, the exclusions and the bases stay the engine's. A host points the port
-at the official Calculadora de Tributos. The package's own suite runs both
-modes over one fixture set and asserts `compareBreakdowns` finds nothing
-(`src/engine/__tests__/oracle.test.ts`); its recorded answers are hand-computed
-until a recording against the live calculator replaces them.
+`OfficialCalculator` port for each taxed item's rates, reduction and taxes; the
+regime, the exclusions and the bases stay the engine's (in a tax-inside-price
+period the base is taken out with the table's rates, since the calculator
+takes a base). A host points the port at the official calculator's HTTP API.
+The package's suite replays REAL recorded calculator answers for 2026
+(`src/engine/__tests__/fixtures/calculator/`, version and date in
+`recording.json`) and asserts `compareBreakdowns` finds nothing. The
+calculator has no rates for 2027 and later yet, so those years' goldens are
+the engine's own estimates, marked `provisional`.
 
 ## The manifest
 

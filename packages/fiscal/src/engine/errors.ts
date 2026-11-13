@@ -14,8 +14,6 @@ export type FiscalEngineErrorCode =
   | "NO_RATE_PERIOD"
   /** The supply precedes the seller's `regimeEffectiveFrom`. */
   | "REGIME_NOT_IN_EFFECT"
-  /** The retained intermediation is larger than the lines it comes out of. */
-  | "INTERMEDIATION_EXCEEDS_BASE"
   /** The official calculator answered something that is not integer cents and basis points. */
   | "INVALID_ORACLE_ANSWER";
 

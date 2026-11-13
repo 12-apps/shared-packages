@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { computeTax } from "../compute";
-import type { TaxClass, TaxInput, TaxLineInput, TaxRegime } from "../types";
+import { roundTaxCents } from "../rounding";
+import type { LineTax, TaxBreakdown, TaxClass, TaxInput, TaxLineInput, TaxRegime } from "../types";
 import { CLASSES, RESTAURANT_SELLER, SAO_PAULO, TABLES } from "./fixtures/baskets";
 
 /**
@@ -27,38 +28,78 @@ function basket(seed: number, regime: TaxRegime): TaxInput {
   const pick = <T>(items: readonly T[], index: number): T => items[Math.floor(random(index) * items.length)]!;
   const lines: TaxLineInput[] = Array.from({ length: 1 + Math.floor(random(0) * 12) }, (_, i) => ({
     id: `line-${i}`,
-    baseCents: Math.floor(random(100 + i * 4) * 50_000),
-    quantity: 1 + Math.floor(random(101 + i * 4) * 5),
+    valueCents: Math.floor(random(100 + i * 4) * 50_000),
+    quantity: 1 + Math.floor(random(101 + i * 4) * 5000) / 1000,
     foodAndDrink: random(102 + i * 4) < 0.8,
     taxClass: pick(CLASS_POOL, 103 + i * 4),
   }));
-  const total = lines.reduce((sum, line) => sum + line.baseCents, 0);
+  const total = lines.reduce((sum, line) => sum + line.valueCents, 0);
+  const restaurantRegime = random(1) < 0.7;
   return {
     lines,
-    seller: { ...RESTAURANT_SELLER, regime, restaurantRegime: random(1) < 0.7 },
+    seller: { ...RESTAURANT_SELLER, regime, restaurantRegime },
     destinationIbge: SAO_PAULO,
     exclusions: {
       serviceCharge:
         random(2) < 0.6
           ? { id: "service", amountCents: Math.round(total * random(3) * 0.25), passedToStaff: random(4) < 0.7, taxClass: CLASSES.deliveryFee }
           : null,
-      retainedIntermediationCents: random(5) < 0.4 ? Math.floor(random(6) * total) : 0,
+      retainedIntermediation: restaurantRegime && random(5) < 0.4 ? { id: "platform", amountCents: Math.floor(random(6) * 5000) } : null,
     },
     tables: TABLES,
     supplyDate: pick(DATES, 7),
   };
 }
 
+const TAXES = [
+  ["cbsCents", "cbsRateBp"],
+  ["ibsUfCents", "ibsUfRateBp"],
+  ["ibsMunCents", "ibsMunRateBp"],
+] as const;
+
+/** Exact: |tax − base × rate × (1 − reduction)| ≤ ½ cent, and an exact half lands on the even cent. */
+function isNearestEven(line: LineTax, tax: (typeof TAXES)[number]): boolean {
+  const scale = 100_000_000n;
+  const exact = BigInt(line.taxBaseCents) * BigInt(line[tax[1]]) * BigInt(10_000 - line.reductionBp);
+  const twiceGap = 2n * (BigInt(line[tax[0]]) * scale - exact);
+  const gap = twiceGap < 0n ? -twiceGap : twiceGap;
+  if (gap < scale) return true;
+  return gap === scale && line[tax[0]] % 2 === 0;
+}
+
+function sumOf(result: TaxBreakdown, pick: (line: LineTax) => number): number {
+  return result.lines.reduce((sum, line) => sum + pick(line), 0);
+}
+
+function insideTaxes(line: LineTax, base: number): number {
+  return TAXES.reduce((sum, [, rate]) => sum + roundTaxCents(base, line[rate], line.reductionBp), 0);
+}
+
 describe("properties over 200 seeded baskets", () => {
-  it.each(SEEDS)("seed %i: Σ line tax equals the order tax, per tax and in total", (seed) => {
+  it.each(SEEDS)("seed %i: every item's tax is its base × rate to the nearest cent, ties to even; the order adds them up", (seed) => {
     const result = computeTax(basket(seed, "REGIME_REGULAR"));
-    const sum = (pick: (line: (typeof result.lines)[number]) => number) => result.lines.reduce((s, l) => s + pick(l), 0);
-    expect(sum((l) => l.cbsCents)).toBe(result.cbsCents);
-    expect(sum((l) => l.ibsUfCents)).toBe(result.ibsUfCents);
-    expect(sum((l) => l.ibsMunCents)).toBe(result.ibsMunCents);
-    expect(sum((l) => l.taxBaseCents)).toBe(result.taxBaseCents);
-    expect(sum((l) => l.cbsCents + l.ibsUfCents + l.ibsMunCents)).toBe(result.totalTaxCents);
-    expect(result.ibsCents).toBe(result.ibsUfCents + result.ibsMunCents);
+    for (const line of result.lines) {
+      for (const tax of TAXES) expect(isNearestEven(line, tax), `${line.lineId} ${tax[0]}`).toBe(true);
+    }
+    expect(sumOf(result, (l) => l.taxCents)).toBe(result.totalTaxCents);
+    expect(result.cbsCents + result.ibsCents).toBe(result.totalTaxCents);
+  });
+
+  it.each(SEEDS)("seed %i: a tax-inclusive price splits exactly — vProdLiq + tax = vProd, vBC the largest base that fits, vUnComLiq × qCom within ±0,01", (seed) => {
+    const result = computeTax(basket(seed, "REGIME_REGULAR"));
+    if (!result.taxInsidePrice) {
+      expect(result.lines.every((l) => l.netValueCents === null && l.netUnitValue === null)).toBe(true);
+      return;
+    }
+    for (const line of result.lines) {
+      expect(line.netValueCents! + line.taxCents).toBe(line.valueCents);
+      if (line.taxCents > 0) {
+        expect(line.taxBaseCents + insideTaxes(line, line.taxBaseCents)).toBeLessThanOrEqual(line.valueCents);
+        expect(line.taxBaseCents + 1 + insideTaxes(line, line.taxBaseCents + 1)).toBeGreaterThan(line.valueCents);
+      }
+      const unitTimesQuantity = Math.round(Number(line.netUnitValue) * line.quantity * 100);
+      expect(Math.abs(unitTimesQuantity - line.netValueCents!)).toBeLessThanOrEqual(1);
+    }
   });
 
   it.each(SEEDS)("seed %i: a Simples store is informative and shows the figures a regime store would", (seed) => {
@@ -75,22 +116,30 @@ describe("properties over 200 seeded baskets", () => {
     }
   });
 
-  it.each(SEEDS)("seed %i: the gorjeta exclusion never passes 15% of food and drink, nor the charge itself", (seed) => {
+  it.each(SEEDS)("seed %i: the gorjeta is excluded whole or not at all — only within 15% of food and drink, passed to staff, in the regime", (seed) => {
     const input = basket(seed, "REGIME_REGULAR");
     const result = computeTax(input);
-    const foodAndDrink = input.lines.filter((l) => l.foodAndDrink).reduce((s, l) => s + l.baseCents, 0);
-    expect(result.gorjetaExcludedCents * 10_000).toBeLessThanOrEqual(foodAndDrink * 1500);
-    expect(result.gorjetaExcludedCents).toBeLessThanOrEqual(input.exclusions.serviceCharge?.amountCents ?? 0);
-    const exclusionsApply = input.seller.restaurantRegime && input.exclusions.serviceCharge?.passedToStaff === true;
-    if (!exclusionsApply) expect(result.gorjetaExcludedCents).toBe(0);
+    const charge = input.exclusions.serviceCharge;
+    const line = result.lines.find((l) => l.lineId === "service");
+    if (!charge) return expect(line).toBeUndefined();
+    const foodAndDrink = input.lines.filter((l) => l.foodAndDrink).reduce((s, l) => s + l.valueCents, 0);
+    const excluded = input.seller.restaurantRegime && charge.passedToStaff && charge.amountCents * 10_000 <= foodAndDrink * 1500;
+    expect(result.gorjetaExcludedCents).toBe(excluded ? charge.amountCents : 0);
+    expect(line!.source).toBe(excluded ? "GORJETA_EXCLUDED" : "SERVICE_CHARGE");
+    if (excluded) expect(line).toMatchObject({ taxBaseCents: 0, taxCents: 0, taxClass: { cClassTrib: "410019" } });
+    else expect(line!.taxClass).toBe(charge.taxClass);
   });
 
-  it.each(SEEDS)("seed %i: the base loses exactly the exclusions, and no line goes negative", (seed) => {
+  it.each(SEEDS)("seed %i: the retained intermediation is its own 410020 item and no line's base moves for it", (seed) => {
     const input = basket(seed, "REGIME_REGULAR");
     const result = computeTax(input);
-    const gross = input.lines.reduce((s, l) => s + l.baseCents, 0) + (input.exclusions.serviceCharge?.amountCents ?? 0);
-    expect(result.taxBaseCents).toBe(gross - result.gorjetaExcludedCents - result.intermediationExcludedCents);
-    expect(result.lines.every((l) => l.taxBaseCents >= 0 && l.taxBaseCents <= l.baseCents)).toBe(true);
+    const without = computeTax({ ...input, exclusions: { ...input.exclusions, retainedIntermediation: null } });
+    expect(result.lines.filter((l) => l.source !== "INTERMEDIATION_EXCLUDED")).toEqual(without.lines);
+    const retained = input.exclusions.retainedIntermediation;
+    expect(result.intermediationExcludedCents).toBe(retained?.amountCents ?? 0);
+    if (retained) {
+      expect(result.lines.at(-1)).toMatchObject({ lineId: "platform", taxBaseCents: 0, taxCents: 0, taxClass: { cClassTrib: "410020" } });
+    }
   });
 
   it.each(SEEDS)("seed %i: MEI pays nothing, whatever the basket", (seed) => {

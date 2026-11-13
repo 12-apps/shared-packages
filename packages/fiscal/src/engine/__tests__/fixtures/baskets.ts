@@ -1,14 +1,14 @@
 /**
  * The fixture set every engine suite and the oracle harness share: the tax
- * classes a store of each kind sells (`docs/tax/04` §3 lists them: prepared
- * food, alcoholic drink, resold packaged goods, cesta básica, a listed food,
- * plus the delivery fee and the household goods of a market), one restaurant
- * basket and one market basket.
+ * classes a store of each kind sells (prepared food, alcoholic drink, resold
+ * packaged goods, cesta básica, a listed food, the delivery fee, household
+ * goods), one restaurant basket and one market basket.
  *
- * The `cClassTrib`/`cstIbsCbs` values are SHAPED like Informe Técnico
- * 2025.002 codes, but they are fixture labels: the engine carries them opaque
- * and computes from `regimeEspecifico` and `reductionBp`. The host's own
- * classified table is the authority on the codes.
+ * The codes are the official ones (Informe Técnico 2025.002, as the official
+ * calculator V0066 serves them): 200047 bares e restaurantes (−40%), 200003
+ * Anexo I (zero), 200034 Anexo VII (−60%), 000001 full rate. The engine
+ * carries them opaque and computes from `regimeEspecifico` and `reductionBp`;
+ * the oracle harness checks the pairing against the calculator.
  */
 
 import tables from "../../../../tables/ibs-cbs-2026-11-13.json";
@@ -16,6 +16,7 @@ import type {
   RateTables,
   SellerProfile,
   TaxClass,
+  TaxExclusions,
   TaxInput,
   TaxLineInput,
 } from "../../types";
@@ -28,7 +29,7 @@ const RIO = "3304557";
 
 export const CLASSES = {
   /** Prepared on the premises: in the restaurant regime (art. 273 caput, §1). */
-  preparedFood: { cClassTrib: "200030", cstIbsCbs: "200", regimeEspecifico: "BARES_RESTAURANTES", reductionBp: 0 },
+  preparedFood: { cClassTrib: "200047", cstIbsCbs: "200", regimeEspecifico: "BARES_RESTAURANTES", reductionBp: 0 },
   /** Alcohol, even prepared on the premises: OUT, full rate (art. 273 §2). */
   alcoholicDrink: { cClassTrib: "000001", cstIbsCbs: "000", regimeEspecifico: null, reductionBp: 0 },
   /** Bought from a third party and sold as-is: OUT, full rate (art. 273 §2). */
@@ -55,24 +56,23 @@ export const MARKET_SELLER: SellerProfile = {
   restaurantRegime: false,
 };
 
-/** Burger, two juices, a beer, a canned soda, the delivery fee: R$ 81,30. */
+/** Burger, two juices, a bag of chips resold, the delivery fee: R$ 66,40. */
 const RESTAURANT_LINES: readonly TaxLineInput[] = [
-  { id: "burger", baseCents: 3990, quantity: 1, foodAndDrink: true, taxClass: CLASSES.preparedFood },
-  { id: "juice", baseCents: 1200, quantity: 2, foodAndDrink: true, taxClass: CLASSES.preparedFood },
-  { id: "beer", baseCents: 1490, quantity: 1, foodAndDrink: true, taxClass: CLASSES.alcoholicDrink },
-  { id: "soda-can", baseCents: 650, quantity: 1, foodAndDrink: true, taxClass: CLASSES.resoldPackaged },
-  { id: "delivery", baseCents: 800, quantity: 1, foodAndDrink: false, taxClass: CLASSES.deliveryFee },
+  { id: "burger", valueCents: 3990, quantity: 1, foodAndDrink: true, taxClass: CLASSES.preparedFood },
+  { id: "juice", valueCents: 1200, quantity: 2, foodAndDrink: true, taxClass: CLASSES.preparedFood },
+  { id: "chips", valueCents: 650, quantity: 1, foodAndDrink: true, taxClass: CLASSES.resoldPackaged },
+  { id: "delivery", valueCents: 800, quantity: 1, foodAndDrink: false, taxClass: CLASSES.deliveryFee },
 ];
 
-/** Rice (cesta), weighed cheese (Anexo VII), three detergents, a wine: R$ 106,07. */
+/** Rice (cesta), weighed honey (Anexo VII), three detergents, a notebook: R$ 106,07. */
 const MARKET_LINES: readonly TaxLineInput[] = [
-  { id: "rice-5kg", baseCents: 2790, quantity: 1, foodAndDrink: true, taxClass: CLASSES.cestaBasica },
-  { id: "cheese", baseCents: 1850, quantity: 0.512, foodAndDrink: true, taxClass: CLASSES.listedFood },
-  { id: "detergent", baseCents: 1377, quantity: 3, foodAndDrink: false, taxClass: CLASSES.household },
-  { id: "wine", baseCents: 4590, quantity: 1, foodAndDrink: true, taxClass: CLASSES.alcoholicDrink },
+  { id: "rice-5kg", valueCents: 2790, quantity: 1, foodAndDrink: true, taxClass: CLASSES.cestaBasica },
+  { id: "honey", valueCents: 1850, quantity: 0.512, foodAndDrink: true, taxClass: CLASSES.listedFood },
+  { id: "detergent", valueCents: 1377, quantity: 3, foodAndDrink: false, taxClass: CLASSES.household },
+  { id: "notebook", valueCents: 4590, quantity: 1, foodAndDrink: false, taxClass: CLASSES.household },
 ];
 
-export const NO_EXCLUSIONS = { serviceCharge: null, retainedIntermediationCents: 0 } as const;
+export const NO_EXCLUSIONS: TaxExclusions = { serviceCharge: null, retainedIntermediation: null };
 
 export function restaurantInput(supplyDate: string, overrides: Partial<TaxInput> = {}): TaxInput {
   return {
@@ -98,7 +98,7 @@ export function marketInput(supplyDate: string, overrides: Partial<TaxInput> = {
   };
 }
 
-/** One day in each golden year. */
+/** One day in each golden year. 2026 is recorded; the others are ESTIMATE periods. */
 export const GOLDEN_DATES = {
   2026: "2026-11-20",
   2027: "2027-06-15",

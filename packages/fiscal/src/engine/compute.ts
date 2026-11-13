@@ -8,33 +8,24 @@
 import { assembleBreakdown, planTax, zeroFigures } from "./plan";
 import type { PlannedLine, TaxPlan } from "./plan";
 import { roundTaxCents } from "./rounding";
-import type { LineFigures, RatePeriod, TaxBreakdown, TaxInput } from "./types";
+import type { LineFigures, TaxBreakdown, TaxInput } from "./types";
 
-/** The destination's own rate where the table lists one, the reference rate everywhere else. */
-function ownOrReference(rates: Readonly<Record<string, number>>, key: string, referenceBp: number): number {
-  return Object.hasOwn(rates, key) ? rates[key]! : referenceBp;
-}
-
-/** The three nominal rates of the period at the destination (art. 11 I). */
-export function ratesAt(period: RatePeriod, destinationIbge: string): { cbsBp: number; ibsUfBp: number; ibsMunBp: number } {
-  return {
-    cbsBp: period.cbsBp,
-    ibsUfBp: ownOrReference(period.ibsUf.byUf, destinationIbge.slice(0, 2), period.ibsUf.referenceBp),
-    ibsMunBp: ownOrReference(period.ibsMun.byMunicipality, destinationIbge, period.ibsMun.referenceBp),
-  };
-}
-
+/**
+ * Each tax rounded on the item's base. In a tax-inside-price period the base
+ * is the one the plan took out of the price, and these are the very taxes it
+ * was taken out with.
+ */
 function tableFigures(plan: TaxPlan, line: PlannedLine): LineFigures {
-  if (!plan.ratesApply) return zeroFigures(line);
-  const rates = ratesAt(plan.period, plan.input.destinationIbge);
+  if (!line.taxed) return zeroFigures(line);
+  const { cbsBp, ibsUfBp, ibsMunBp } = plan.rates;
   return {
     reductionBp: line.reductionBp,
-    cbsRateBp: rates.cbsBp,
-    cbsCents: roundTaxCents(line.taxBaseCents, rates.cbsBp, line.reductionBp),
-    ibsUfRateBp: rates.ibsUfBp,
-    ibsUfCents: roundTaxCents(line.taxBaseCents, rates.ibsUfBp, line.reductionBp),
-    ibsMunRateBp: rates.ibsMunBp,
-    ibsMunCents: roundTaxCents(line.taxBaseCents, rates.ibsMunBp, line.reductionBp),
+    cbsRateBp: cbsBp,
+    cbsCents: roundTaxCents(line.taxBaseCents, cbsBp, line.reductionBp),
+    ibsUfRateBp: ibsUfBp,
+    ibsUfCents: roundTaxCents(line.taxBaseCents, ibsUfBp, line.reductionBp),
+    ibsMunRateBp: ibsMunBp,
+    ibsMunCents: roundTaxCents(line.taxBaseCents, ibsMunBp, line.reductionBp),
   };
 }
 
