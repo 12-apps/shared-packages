@@ -47,13 +47,18 @@ const CANCELLATION_REQUEST_DENIED = "CANCELLATION_REQUEST_DENIED";
  * hexadecimal HMAC signature of the webhook HTTP request body, using the
  * client secret as a key and SHA256 as the hash function". The key is the
  * merchant app's CLIENT SECRET, so a store's connection keeps that same value
- * as its webhook secret. An unset secret accepts, as for every adapter.
+ * as its webhook secret.
+ *
+ * Unlike iFood (whose secret is issued after certification), the key exists
+ * from the moment the store connects, so an unset secret REFUSES: an unsigned
+ * CANCELLED for a known order id would otherwise cancel it.
  */
 export function verifyOpenDeliverySignature(
   rawBody: string,
   signature: string | null,
   webhookSecret: string | null,
 ): boolean {
+  if (!webhookSecret) return false;
   return verifyHmacSha256Hex(rawBody, signature, webhookSecret);
 }
 
@@ -116,16 +121,21 @@ function lineNote(item: unknown, fraction: string | null): string | null {
 }
 
 /**
- * The per-unit price the buyer paid. The spec defines `totalPrice` as
- * `quantity * (unitPrice + optionsPrice)`, but its own example does not add up
- * (unit 43, options 50, total 50, while `itemsPrice` is 50): the TOTAL is the
- * figure the order's totals are built from, so it wins when it divides evenly,
- * and `unitPrice + optionsPrice` is the fallback.
+ * What the buyer paid for the whole line, in cents. The spec's `totalPrice`
+ * ("quantity * (unitPrice + optionsPrice)") is the figure the order's
+ * `itemsPrice` is built from, and it wins whenever it is stated — its own
+ * example does not add up otherwise (unit 43, options 50, total 50).
+ *
+ * Without it: `unitPrice × quantity + optionsPrice`. ESTIMATED: the spec calls
+ * `optionsPrice` "the sum of the total prices of all options of the item", a
+ * LINE figure, so it is added once, never multiplied by the quantity or by a
+ * weight.
  */
-function unitCents(item: unknown, quantity: number): number {
+function lineTotalCents(item: unknown, quantity: number): number {
   const total = priceCents(item, "totalPrice");
-  if (total !== null && total % quantity === 0) return total / quantity;
-  return (priceCents(item, "unitPrice") ?? 0) + (priceCents(item, "optionsPrice") ?? 0);
+  if (total !== null) return total;
+  const unit = priceCents(item, "unitPrice") ?? 0;
+  return Math.round(unit * quantity) + (priceCents(item, "optionsPrice") ?? 0);
 }
 
 /** The stated quantity (decimal for weighed units), 1 when absent or nonsense. */
@@ -134,32 +144,42 @@ function quantityOf(item: unknown): number {
   return Number.isFinite(stated) && stated > 0 ? stated : 1;
 }
 
-/** A weighed line's price: its total, else the unit price times the weight. */
-function fractionCents(item: unknown, quantity: number): number {
-  return priceCents(item, "totalPrice") ?? Math.round(unitCents(item, 1) * quantity);
+/**
+ * Split a line total over a whole quantity so the lines add up to it EXACTLY:
+ * one row at `total / quantity` when it divides; otherwise `quantity - 1`
+ * units at the floor and one unit carrying the remainder, under the same SKU
+ * (R$ 10.00 over 3 is 3.33 × 2 + 3.34).
+ */
+function splitWhole(total: number, quantity: number): { quantity: number; unitPriceCents: number }[] {
+  const floor = Math.floor(total / quantity);
+  const remainder = total - floor * quantity;
+  if (remainder === 0) return [{ quantity, unitPriceCents: floor }];
+  const rest = quantity === 1 ? [] : [{ quantity: quantity - 1, unitPriceCents: floor }];
+  return [...rest, { quantity: 1, unitPriceCents: floor + remainder }];
 }
 
 /**
- * One `Order.items[]` entry → one line, priced per unit as the buyer paid it
- * ({@link unitCents}). A fractional quantity (500 g as `0.5 KG`) becomes one
- * line at its total price, the quantity in the note.
+ * One `Order.items[]` entry → its lines, which always add up to the line's
+ * total ({@link lineTotalCents}). A whole quantity is split by
+ * {@link splitWhole}; a fractional one (500 g as `0.5 KG`) is one line at its
+ * total, the weight in the note.
+ *
  * A line with no `externalCode` keys on the item id, then the name: an
- * unmapped line is recoverable, a dropped one is not.
+ * unmapped line is recoverable, a dropped one is not. ESTIMATED: whether the
+ * item id is stable across orders is not pinned by the spec; if it is per
+ * order, each such order adds an unmapped SKU row.
  */
-function readLine(item: unknown): NormalizedOrderLine | null {
+function readLines(item: unknown): NormalizedOrderLine[] {
   const name = firstString(item, [["name"]]);
   const sku = firstString(item, [["externalCode"], ["id"]]) ?? name;
-  if (!sku) return null;
+  if (!sku) return [];
   const quantity = quantityOf(item);
   const whole = Number.isInteger(quantity);
   const fraction = whole ? null : `${quantity} ${firstString(item, [["unit"]]) ?? ""}`.trim();
-  return {
-    externalSku: sku,
-    name: name ?? sku,
-    quantity: whole ? quantity : 1,
-    unitPriceCents: whole ? unitCents(item, quantity) : fractionCents(item, quantity),
-    note: lineNote(item, fraction),
-  };
+  const total = lineTotalCents(item, quantity);
+  const parts = whole ? splitWhole(total, quantity) : [{ quantity: 1, unitPriceCents: total }];
+  const note = lineNote(item, fraction);
+  return parts.map((part) => ({ externalSku: sku, name: name ?? sku, ...part, note }));
 }
 
 /** `DELIVERY` or `TAKEOUT`; `INDOOR` (eaten at the store) is neither, so unstated. */
@@ -211,13 +231,13 @@ export function normalizeOpenDeliveryOrder(
   const externalOrderId = firstString(order, [["id"]]);
   const rawItems = pick(order, "items");
   const lines = (Array.isArray(rawItems) ? rawItems : [])
-    .map(readLine)
-    .filter((line): line is NormalizedOrderLine => line !== null);
+    .flatMap(readLines);
   if (!externalOrderId || lines.length === 0) return null;
   return {
     provider: NINETY_NINE_FOOD_PROVIDER,
     externalOrderId,
     externalDisplayId: firstString(order, [["displayId"]]),
+    externalMerchantId: firstString(order, [["merchant", "id"]]),
     buyer: {
       externalId: firstString(order, [["customer", "id"]]),
       name: firstString(order, [["customer", "name"]]),

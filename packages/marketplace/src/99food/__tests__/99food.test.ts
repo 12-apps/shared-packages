@@ -7,7 +7,7 @@ import { createNinetyNineFoodAdapter, NINETY_NINE_FOOD_PROVIDER } from "..";
 import { NINETY_NINE_FOOD_ADAPTER_COPY_EN_US } from "../en-US";
 import { NINETY_NINE_FOOD_ADAPTER_COPY_PT_BR } from "../pt-BR";
 import { normalizeOpenDeliveryEvent, normalizeOpenDeliveryOrder, verifyOpenDeliverySignature } from "../normalize";
-import { API_BASE, PORTAL, SPEC_ORDER_ID, specDeliveryAddress, specEvent, specOrder } from "./fixtures";
+import { API_BASE, PORTAL, SPEC_MERCHANT_ID, SPEC_ORDER_ID, specDeliveryAddress, specEvent, specOrder } from "./fixtures";
 
 /**
  * The 99Food adapter on Open Delivery v1.7.1, read against the spec's own
@@ -39,8 +39,9 @@ describe("verifyOpenDeliverySignature (X-App-Signature: lowercase hex HMAC-SHA25
     expect(verifyOpenDeliverySignature(body, signed, "another-secret")).toBe(false);
   });
 
-  it("accepts an unsigned delivery only while no secret is configured", () => {
-    expect(verifyOpenDeliverySignature(body, null, null)).toBe(true);
+  it("[N4] refuses every delivery while no secret is configured: the key is the client secret, there from the start", () => {
+    expect(verifyOpenDeliverySignature(body, null, null)).toBe(false);
+    expect(verifyOpenDeliverySignature(body, signed, null)).toBe(false);
   });
 
   it("is read from the X-App-Signature header", () => {
@@ -102,6 +103,7 @@ describe("normalizeOpenDeliveryOrder (the GET /v1/orders/{orderId} answer)", () 
       provider: NINETY_NINE_FOOD_PROVIDER,
       externalOrderId: SPEC_ORDER_ID,
       externalDisplayId: "12345",
+      externalMerchantId: SPEC_MERCHANT_ID,
       buyer: { externalId: "d9730653-a8ba-4e85-8dbb-b5697e6ae8d5", name: "John", phone: "11999999999" },
       lines: [
         {
@@ -157,6 +159,46 @@ describe("normalizeOpenDeliveryOrder (the GET /v1/orders/{orderId} answer)", () 
   it("keeps a line whose externalCode is missing, keyed on the item id: an unmapped line, never a dropped one", () => {
     const [item] = specOrder().items;
     expect(normalizeOrder({ ...specOrder(), items: [without(item!, "externalCode")] })?.lines[0]?.externalSku).toBe(item!.id);
+  });
+
+  /** The sum the lines of one order add up to, in cents. */
+  const lineSum = (order: ReturnType<typeof normalizeOrder>) =>
+    (order?.lines ?? []).reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
+
+  it("[B2] splits a total that does not divide so the lines add up to it exactly: 10.00 over 3", () => {
+    const order = normalizeOrder({
+      ...specOrder(),
+      items: [{ id: "a", name: "Soda", externalCode: "S", unit: "UN", quantity: 3, unitPrice: { value: 3.33 }, totalPrice: { value: 10 } }],
+    });
+    expect(order?.lines).toEqual([
+      { externalSku: "S", name: "Soda", quantity: 2, unitPriceCents: 333, note: null },
+      { externalSku: "S", name: "Soda", quantity: 1, unitPriceCents: 334, note: null },
+    ]);
+    expect(lineSum(order)).toBe(1000);
+  });
+
+  it("[B2] keeps the item's total for the spec example's shape at qty 2 and 50.01, never unit + options per unit", () => {
+    const [item] = specOrder().items;
+    const order = normalizeOrder({ ...specOrder(), items: [{ ...item!, quantity: 2, totalPrice: { value: 50.01, currency: "BRL" } }] });
+    expect(order?.lines.map((line) => [line.quantity, line.unitPriceCents])).toEqual([
+      [1, 2500],
+      [1, 2501],
+    ]);
+    expect(lineSum(order)).toBe(5001);
+  });
+
+  it("[B2][N8] with no totalPrice, adds the line's optionsPrice ONCE, for a count and for a weight (ESTIMATED)", () => {
+    const order = normalizeOrder({
+      ...specOrder(),
+      items: [
+        { id: "a", name: "Pizza", externalCode: "P", unit: "UN", quantity: 2, unitPrice: { value: 43 }, optionsPrice: { value: 50 } },
+        { id: "b", name: "Cheese", externalCode: "C", unit: "KG", quantity: 0.5, unitPrice: { value: 40 }, optionsPrice: { value: 2 } },
+      ],
+    });
+    expect(order?.lines.map((line) => [line.externalSku, line.quantity, line.unitPriceCents])).toEqual([
+      ["P", 2, 6800],
+      ["C", 1, 2200],
+    ]);
   });
 
   it("prices a whole quantity per unit and a fraction as one line at its total, the weight in the note", () => {
@@ -291,7 +333,21 @@ describe("the 99Food adapter", () => {
     });
   });
 
-  it("confirms with the spec's OrderConfirmed body, the preparation time when stated, a 422 as already done", async () => {
+  it("[B3] refuses a confirm's 422, unless its problem says the instruction was already received", async () => {
+    const answers: [string, string][] = [
+      ["{}", "refused"],
+      [JSON.stringify({ title: "Order cannot be confirmed: it was cancelled", status: 422 }), "refused"],
+      ["not json", "refused"],
+      [JSON.stringify({ title: "Order already confirmed", status: 422 }), "accepted"],
+      [JSON.stringify({ title: "x", status: 422, detail: "Pedido já foi confirmado" }), "accepted"],
+    ];
+    for (const [body, kind] of answers) {
+      const { ctx } = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 422, body }));
+      expect((await adapter().confirm(ctx, ref, { preparationMinutes: null })).kind).toBe(kind);
+    }
+  });
+
+  it("confirms with the spec's OrderConfirmed body, the preparation time only when stated", async () => {
     const { ctx, requests } = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 202, body: "" }));
     expect(await adapter().confirm(ctx, ref, { preparationMinutes: 25 })).toEqual({ kind: "accepted" });
     expect(requests[1]?.url).toBe(orderUrl("confirm"));
@@ -301,9 +357,9 @@ describe("the 99Food adapter", () => {
       preparationTime: 25,
     });
 
-    const duplicate = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 422, body: "{}" }));
-    expect(await adapter().confirm(duplicate.ctx, ref, { preparationMinutes: null })).toEqual({ kind: "accepted" });
-    expect(JSON.parse(duplicate.requests[1]?.body ?? "{}")).not.toHaveProperty("preparationTime");
+    const unstated = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 202, body: "" }));
+    expect(await adapter().confirm(unstated.ctx, ref, { preparationMinutes: null })).toEqual({ kind: "accepted" });
+    expect(JSON.parse(unstated.requests[1]?.body ?? "{}")).not.toHaveProperty("preparationTime");
   });
 
   it("requests a cancellation with the spec's RequestCancelled body {reason, code, mode}", async () => {

@@ -13,6 +13,8 @@
  */
 
 export const SPEC_ORDER_ID = "4818e72f-2304-466f-9fe7-af08f34ac4ed";
+/** The order example's `merchant.id`. */
+export const SPEC_MERCHANT_ID = "7fb59cb8-5808-40c8-b967-1b3f20ee39cd";
 
 export function specOrder(id: string = SPEC_ORDER_ID) {
   return {
@@ -22,7 +24,7 @@ export function specOrder(id: string = SPEC_ORDER_ID) {
     createdAt: "2021-05-27T19:38:10.332Z",
     orderTiming: "INSTANT",
     preparationStartDateTime: "2021-05-27T19:45:10.332Z",
-    merchant: { id: "7fb59cb8-5808-40c8-b967-1b3f20ee39cd", name: "Plaza Pizza" },
+    merchant: { id: SPEC_MERCHANT_ID, name: "Plaza Pizza" },
     items: [
       {
         id: "732bd31e-77fc-47ee-88ee-a0437f97b198",

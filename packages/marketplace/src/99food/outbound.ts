@@ -104,6 +104,20 @@ async function callOrder(
   return { kind: "retry", reason: "99Food refused the token" };
 }
 
+/** Words a problem body uses for "this instruction was already received". ESTIMATED. */
+const ALREADY_RECEIVED = /already|duplicat|j[aá] (foi )?(recebid|confirmad|processad)/iu;
+
+/** Whether a 422 answer's problem (`Error.title`, or a `detail`) says the instruction was already received. */
+function alreadyReceived(response: MarketplaceHttpResponse): boolean {
+  if (response.status !== 422) return false;
+  try {
+    const problem = JSON.parse(response.body) as { title?: unknown; detail?: unknown };
+    return [problem.title, problem.detail].some((text) => typeof text === "string" && ALREADY_RECEIVED.test(text));
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a 422 answer's `CancellationError.cancellationStatus` says the order is already cancelled. */
 function alreadyCancelled(response: MarketplaceHttpResponse): boolean {
   if (response.status !== 422) return false;
@@ -155,9 +169,12 @@ export function openDeliveryFetchOrder(
  * `createdAt` with the ORDER's creation text (a copy of another schema's), so
  * it is sent as the moment of the confirmation: ESTIMATED.
  *
- * A 422 is answered as done: the spec says a synchronous Ordering Application
- * answers 422 to an instruction it has already received, which is what a
- * retried confirm whose first attempt landed meets.
+ * A 422 is the spec's generic `UnprocessableEntity` ("unable to process the
+ * contained instructions. (Check if the instruction has not been sent
+ * before.)"): a refusal, so the store is shown "não confirmou" and the app
+ * link, UNLESS its problem body says the instruction was already received —
+ * the retried confirm whose first attempt landed. ESTIMATED: the spec pins no
+ * code for that, so {@link alreadyReceived} reads the problem's words.
  */
 export function openDeliveryConfirm(
   ctx: AdapterCallContext,
@@ -177,7 +194,7 @@ export function openDeliveryConfirm(
       },
     });
     if ("kind" in response) return response;
-    return response.status === 422 ? { kind: "accepted" } : outboundResultOf(response);
+    return alreadyReceived(response) ? { kind: "accepted" } : outboundResultOf(response);
   });
 }
 

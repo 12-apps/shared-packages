@@ -60,6 +60,8 @@ interface HarnessOptions {
   failHostHalf?: boolean;
   /** The queue refuses every job. */
   queueDown?: boolean;
+  /** The queue keeps every job id it took, as a queue that keeps finished jobs does: a reused dedupe key is refused. */
+  dedupeQueue?: boolean;
   /** The host's audit write throws. */
   failAudit?: boolean;
   /** The host's own write inside `create`, through the ingest's transaction client. */
@@ -80,6 +82,9 @@ export function createHarness(options: HarnessOptions = {}) {
   const accepted: string[] = [];
   const refused: { orderId: string; reason: MarketplaceRefusal }[] = [];
   const enqueued: { name: string; payload: OutboundJobPayload; dedupeKey?: string }[] = [];
+  /** What the fake queue actually took (with `dedupeQueue`, a reused key is not here). */
+  const queued: { name: string; payload: unknown; dedupeKey?: string }[] = [];
+  const queueKeys = new Set<string>();
   const published: string[] = [];
   const logged: { level: string; message: string }[] = [];
   const catalog = new Set<string>(["menu-1", "menu-2"]);
@@ -132,7 +137,14 @@ export function createHarness(options: HarnessOptions = {}) {
     enqueue: {
       enqueue: async (name, payload, opts) => {
         enqueued.push({ name, payload: payload as OutboundJobPayload, dedupeKey: opts?.dedupeKey });
-        return options.queueDown ? { enqueued: false, reason: "queue down" } : { enqueued: true };
+        if (options.queueDown) return { enqueued: false, reason: "queue down" };
+        const key = opts?.dedupeKey;
+        if (options.dedupeQueue && key !== undefined) {
+          if (queueKeys.has(key)) return { enqueued: false, reason: "duplicate job id" };
+          queueKeys.add(key);
+        }
+        queued.push({ name, payload, dedupeKey: key });
+        return { enqueued: true };
       },
     },
     audit: {
@@ -196,6 +208,7 @@ export function createHarness(options: HarnessOptions = {}) {
     accepted,
     refused,
     enqueued,
+    queued,
     published,
     logged,
     catalog,

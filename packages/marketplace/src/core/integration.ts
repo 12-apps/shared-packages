@@ -168,6 +168,8 @@ export interface IngestionTarget {
   autoAccept: boolean;
   ackSlaSeconds: number;
   webhookSecret: string | null;
+  /** The merchant the store connected; a fetched order naming another is refused. */
+  externalMerchantId: string | null;
 }
 
 /**
@@ -188,8 +190,16 @@ export async function resolveIngestionTarget(
   const db = await ctx.ports.db();
   const row = (await db.marketplaceIntegration.findUnique({
     where: { clientId_provider: { clientId, provider } },
-    select: { enabled: true, autoAccept: true, ackSlaSeconds: true, credentials: true, archivedAt: true },
+    select: {
+      enabled: true,
+      autoAccept: true,
+      ackSlaSeconds: true,
+      credentials: true,
+      archivedAt: true,
+      externalMerchantId: true,
+    },
   })) as {
+    externalMerchantId: string | null;
     enabled: boolean;
     autoAccept: boolean;
     ackSlaSeconds: number;
@@ -202,6 +212,7 @@ export async function resolveIngestionTarget(
     enabled: row.enabled,
     autoAccept: row.autoAccept,
     ackSlaSeconds: row.ackSlaSeconds,
+    externalMerchantId: row.externalMerchantId ?? null,
     // An unopenable blob must not read as "no secret configured" — that would
     // turn a key-rotation problem into an endpoint that accepts unsigned
     // deliveries. The secrets port throws instead, and the caller answers 401.

@@ -96,6 +96,12 @@ export interface NormalizedMarketplaceOrder {
   deliveredBy?: MarketplaceDeliveredBy | null;
   /** Null on a take-out and when unstated. */
   deliveryAddress?: NormalizedAddress | null;
+  /**
+   * OPTIONAL. The merchant the order names, when its body says (Open
+   * Delivery's `merchant.id`). A fetched order naming another merchant than
+   * the connection's is refused.
+   */
+  externalMerchantId?: string | null;
 }
 
 /**

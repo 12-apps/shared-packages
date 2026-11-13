@@ -1,9 +1,10 @@
 import { cancelAcceptance } from "./acceptance";
 import { failCancellationRequest } from "./cancellation";
-import { awaitOrderBody } from "./fetch-order";
+import { awaitOrderBody, requeueOwedFetch } from "./fetch-order";
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { resolveIngestionTarget } from "./integration";
+import { markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent } from "./types";
 
@@ -126,12 +127,10 @@ async function applyEvent(
   }
 
   if (event.cancelled && event.externalOrderId) {
-    await cancelAcceptance(ctx, {
-      clientId,
-      provider: event.provider,
-      externalOrderId: event.externalOrderId,
-      now,
-    });
+    const order = { clientId, provider: event.provider, externalOrderId: event.externalOrderId };
+    // A cancellation that outran a fetched order's body leaves its marker, so
+    // the fetch that follows ingests nothing.
+    if (!(await cancelAcceptance(ctx, { ...order, now }))) await markCancelledBeforeIngest(ctx, order);
     await settleInboxEvent(ctx, inboxId, "PROCESSED");
     return { kind: "cancelled" };
   }
@@ -174,7 +173,7 @@ async function applyEvent(
  */
 export async function reprocessStoredDelivery(
   ctx: EngineContext,
-  input: { id: string; clientId: string; provider: MarketplaceProvider; payload: unknown },
+  input: { id: string; clientId: string; provider: MarketplaceProvider; payload: unknown; receivedAt?: Date | null },
 ): Promise<DeliveryOutcome> {
   const event = normalizeEvent(ctx, input.provider, input.payload);
   if (!event) {
@@ -192,6 +191,8 @@ export async function reprocessStoredDelivery(
     await deferInboxEvent(ctx, input.id, reason);
     return { kind: "ignored", reason };
   }
+  // A row waiting for its order body is the fetch job's: re-queued, never fetched here.
+  if (announcesOrderToFetch(event)) return requeueOwedFetch(ctx, input);
   try {
     return await applyEvent(
       ctx,

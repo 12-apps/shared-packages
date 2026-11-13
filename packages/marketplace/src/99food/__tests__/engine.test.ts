@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { MarketplaceHttpRequest, MarketplaceHttpResponse } from "../../core/adapter";
-import { MARKETPLACE_FETCH_ORDER_JOB, type FetchOrderJobPayload } from "../../core/fetch-order";
+import { FETCH_REQUEUE_AGE_MS, MARKETPLACE_FETCH_ORDER_JOB, type FetchOrderJobPayload } from "../../core/fetch-order";
 import { createIfoodAdapter } from "../../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../../ifood/en-US";
 import { TENANT, createHarness, scriptedHttp, type Harness } from "../../__tests__/harness";
 import { createNinetyNineFoodAdapter, NINETY_NINE_FOOD_PROVIDER } from "..";
 import { NINETY_NINE_FOOD_ADAPTER_COPY_EN_US } from "../en-US";
-import { API_BASE, PORTAL, SPEC_ORDER_ID, specEvent, specOrder } from "./fixtures";
+import { API_BASE, PORTAL, SPEC_MERCHANT_ID, SPEC_ORDER_ID, specEvent, specOrder } from "./fixtures";
 
 /**
  * The engine, unchanged, driven through the 99Food adapter end to end:
@@ -44,6 +44,8 @@ function harness(options: { http?: ReturnType<typeof scriptedHttp>; queueDown?: 
   const mounted = createHarness({
     http,
     queueDown: options.queueDown,
+    // Like a real queue: a job id it already took is refused.
+    dedupeQueue: true,
     cancellationHooks: true,
     adapters: [
       createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US }),
@@ -66,9 +68,15 @@ async function deliver(subject: Harness, payload: unknown) {
   });
 }
 
-/** The fetch jobs queued so far. */
+/** Connect 99Food for the tenant, under the spec order's merchant. */
+async function connect(subject: Harness, settings: { autoAccept?: boolean } = {}) {
+  await subject.connect(P, settings);
+  subject.patchIntegration({ externalMerchantId: SPEC_MERCHANT_ID });
+}
+
+/** The fetch jobs the queue took so far. */
 function fetchJobs(subject: Harness): FetchOrderJobPayload[] {
-  return subject.enqueued
+  return subject.queued
     .filter((job) => job.name === MARKETPLACE_FETCH_ORDER_JOB)
     .map((job) => job.payload as unknown as FetchOrderJobPayload);
 }
@@ -95,7 +103,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("[P1] records CREATED without calling out, then the fetch job ingests the spec's order", async () => {
     const { h, http } = harness();
-    await h.connect(P);
+    await connect(h);
 
     const outcome = await deliver(h, specEvent("CREATED"));
 
@@ -126,7 +134,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("dedups a redelivered CREATED, and a second fetch of a settled row does nothing", async () => {
     const { h, http } = harness();
-    await h.connect(P);
+    await connect(h);
     await arrive(h, SPEC_ORDER_ID);
     const calls = http.requests.length;
 
@@ -141,7 +149,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("[P1] the aceite builds the confirm request: POST /confirm with the host's order code", async () => {
     const { h, http } = harness();
-    await h.connect(P);
+    await connect(h);
     const orderId = await arrive(h, SPEC_ORDER_ID);
 
     await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
@@ -161,7 +169,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("[P1] a refusal builds the cancellation request; the CANCELLED event confirms it", async () => {
     const { h, http } = harness();
-    await h.connect(P);
+    await connect(h);
     const orderId = await arrive(h, SPEC_ORDER_ID);
 
     await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "UNAVAILABLE_ITEM", offendingSkus: ["22"] });
@@ -181,7 +189,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("CANCELLATION_REQUEST_DENIED fails the store's request, so a person finishes it on 99Food", async () => {
     const { h } = harness();
-    await h.connect(P);
+    await connect(h);
     const orderId = await arrive(h, SECOND_ORDER_ID);
     await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "OUTSIDE_DELIVERY_HOURS" });
     await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
@@ -194,7 +202,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
   it("retries a fetch 99Food did not answer, fails it on the last attempt, and the reconciliation re-queues it", async () => {
     const http = openDelivery({ order: () => ({ status: 503, body: "busy" }) });
     const { h } = harness({ http });
-    await h.connect(P);
+    await connect(h);
     await deliver(h, specEvent("CREATED"));
     const [job] = fetchJobs(h);
 
@@ -203,14 +211,79 @@ describe("the engine through the 99Food adapter, end to end", () => {
     expect(h.memory.tables.marketplaceInboxEvent.rows[0]?.status).toBe("FAILED");
     expect(h.created).toEqual([]);
 
+    // Past the job's own retry span, the sweep re-queues under a FRESH key,
+    // which a queue that keeps finished job ids still takes.
+    h.clock.at = new Date(h.clock.at.getTime() + FETCH_REQUEUE_AGE_MS + 1);
     const [stored] = await h.engine.retryable();
     expect(await h.engine.reprocess(stored!)).toEqual({ kind: "awaitingOrder" });
     expect(fetchJobs(h)).toHaveLength(2);
+    expect(new Set(h.queued.map((job) => job.dedupeKey)).size).toBe(2);
+    // The re-queued job fetches again (99Food still answers 503).
+    await expect(h.engine.runFetchOrder(fetchJobs(h)[1]!, ATTEMPT)).rejects.toThrow(/busy/);
+  });
+
+  it("[N2] the sweep leaves a row still inside the fetch's retry span alone: no attempt spent, nothing queued", async () => {
+    const { h } = harness({ queueDown: true });
+    await connect(h);
+    await deliver(h, specEvent("CREATED"));
+    const attempts = h.memory.tables.marketplaceInboxEvent.rows[0]?.attempts;
+
+    const [stored] = await h.engine.retryable();
+    expect(await h.engine.reprocess(stored!)).toEqual({ kind: "awaitingOrder" });
+
+    expect(h.memory.tables.marketplaceInboxEvent.rows[0]?.attempts).toBe(attempts);
+    expect(h.enqueued.filter((job) => job.name === MARKETPLACE_FETCH_ORDER_JOB)).toHaveLength(1);
+  });
+
+  it("[B1] a CANCELLED that outruns the fetch wins: no pedido, no confirm, the CREATED row IGNORED", async () => {
+    const { h, http } = harness({ queueDown: true });
+    await connect(h, { autoAccept: true });
+    await deliver(h, specEvent("CREATED"));
+    const created = h.memory.tables.marketplaceInboxEvent.rows[0]!;
+
+    // The fetch is held; 99Food cancels meanwhile.
+    expect(await deliver(h, specEvent("CANCELLED"))).toEqual({ kind: "cancelled" });
+    expect(await deliver(h, { ...specEvent("CANCELLED"), eventId: "redelivered" })).toEqual({ kind: "cancelled" });
+    const outcome = await h.engine.runFetchOrder({ clientId: TENANT, inboxId: String(created.id) }, ATTEMPT);
+
+    expect(outcome).toEqual({ kind: "skipped", reason: "cancelled before its order body arrived" });
+    expect(http.requests.some((request) => request.method === "GET")).toBe(true);
+    expect(h.created).toEqual([]);
+    expect(h.accepted).toEqual([]);
+    expect(h.enqueued.filter((job) => job.name === "marketplace.outbound")).toEqual([]);
+    expect(created.status).toBe("IGNORED");
+  });
+
+  it("[N3] the acceptance window counts from the event's arrival, not from a delayed fetch", async () => {
+    const { h } = harness();
+    await connect(h);
+    const arrived = h.clock.at;
+    await deliver(h, specEvent("CREATED"));
+    h.clock.at = new Date(arrived.getTime() + 3 * 60_000);
+
+    const outcome = await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT);
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    expect(h.acceptance(outcome.orderId)?.acknowledgeBy).toEqual(new Date(arrived.getTime() + 300_000));
+  });
+
+  it("[N5] refuses, and records, an order naming another merchant than the connection's", async () => {
+    const { h } = harness();
+    await connect(h);
+    h.patchIntegration({ externalMerchantId: "another-merchant" });
+    await deliver(h, specEvent("CREATED"));
+
+    const outcome = await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT);
+
+    expect(outcome).toMatchObject({ kind: "failed", reason: /names merchant/ });
+    expect(h.created).toEqual([]);
+    expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "IGNORED", error: /names merchant/ });
+    expect(h.logged.some((line) => line.level === "error" && /names merchant/.test(line.message))).toBe(true);
   });
 
   it("a held fetch (the host's queue answers no) leaves the row PENDING and says so", async () => {
     const { h, http } = harness({ queueDown: true });
-    await h.connect(P);
+    await connect(h);
 
     expect(await deliver(h, specEvent("CREATED"))).toEqual({ kind: "awaitingOrder" });
     expect(http.requests).toEqual([]);
@@ -220,7 +293,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
   it("refuses the fetch with no credentials on file, and skips it while the connection is off", async () => {
     const { h, http } = harness();
-    await h.connect(P);
+    await connect(h);
     await deliver(h, specEvent("CREATED"));
     const [job] = fetchJobs(h);
 
