@@ -114,6 +114,7 @@ final class CurlTransport implements Transport
             (int) curl_getinfo($curl, CURLINFO_HTTP_CODE),
             (int) curl_getinfo($curl, CURLINFO_HTTP_CONNECTCODE),
             $this->verify,
+            is_string($body) ? $body : '',
         );
         curl_close($curl);
         if ($failure !== null) {
@@ -125,7 +126,9 @@ final class CurlTransport implements Transport
     /**
      * What went wrong, from what cURL reports: whether the body went out
      * (`$uploaded` bytes), the error, the HTTP status, the proxy's CONNECT status.
-     * `null` is a 200.
+     * `null` is a 200. `$body` is what the SERVER answered (never request data):
+     * an HTTP failure quotes its IIS substatus or a short snippet of it, so a
+     * 403.6 (an IP block) reads differently from a 403.7 (no client certificate).
      */
     public static function classify(
         int $errno,
@@ -134,14 +137,18 @@ final class CurlTransport implements Transport
         int $status,
         int $proxyConnect,
         bool $verified,
+        string $body = '',
     ): ?TransportFailure {
         $sent = $uploaded > 0;
         if ($errno === 0) {
+            $said = 'HTTP ' . self::httpDetail($status, $body);
             return match (true) {
                 $status === 200 => null,
-                $status === 403 && $verified => new TransportFailure(TransportFailure::TLS_REFUSED, 403, 'HTTP 403 from SEFAZ'),
-                $status >= 500 => new TransportFailure(TransportFailure::NO_ANSWER, $status, "HTTP $status"),
-                default => new TransportFailure(TransportFailure::REFUSED, $status, "HTTP $status"),
+                $status === 403 && $verified => new TransportFailure(TransportFailure::TLS_REFUSED, 403, "$said from SEFAZ"),
+                $status >= 500 => new TransportFailure(TransportFailure::NO_ANSWER, $status, $said),
+                $verified && $status >= 400 && !in_array($status, [408, 429], true)
+                    => new TransportFailure(TransportFailure::SEFAZ_HTTP, $status, "$said from SEFAZ"),
+                default => new TransportFailure(TransportFailure::REFUSED, $status, $said),
             };
         }
         $refusedCertificate = preg_match('/alert|certificate (required|unknown|revoked|expired)|bad certificate|unknown ca/i', $error) === 1;
@@ -156,6 +163,16 @@ final class CurlTransport implements Transport
                 => new TransportFailure(TransportFailure::NO_ANSWER, null, "cURL error $errno after the request went out"),
             default => new TransportFailure(TransportFailure::NOT_SENT, null, "cURL error $errno before the request went out"),
         };
+    }
+
+    /** `403.6`, as IIS names its substatus, or the status and the first words of the page. */
+    private static function httpDetail(int $status, string $body): string
+    {
+        if (preg_match('/\b' . $status . '\.(\d{1,2})\b/', $body, $sub) === 1) {
+            return "$status.{$sub[1]}";
+        }
+        $text = trim((string) preg_replace('/\s+/', ' ', strip_tags($body)));
+        return $text === '' ? (string) $status : $status . ' "' . mb_substr($text, 0, 80) . '"';
     }
 
     /** @return array<int, string> */

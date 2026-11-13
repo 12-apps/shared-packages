@@ -10,7 +10,8 @@ declare(strict_types=1);
  *   drop-after-upload  reads the whole request, then closes without a word
  *   hang-after-upload  reads the whole request, then says nothing
  *   refuse-client-cert demands a client certificate signed by ca.pem
- *   answer-403         answers HTTP 403 with an HTML page
+ *   answer-403         answers HTTP 403 with an IIS-like page naming substatus 403.6
+ *   answer-404         answers HTTP 404
  *   answer-200         answers HTTP 200 with a SOAP body
  */
 
@@ -53,7 +54,8 @@ while (true) {
     match ($mode) {
         'drop-after-upload' => null,
         'hang-after-upload' => sleep(30),
-        'answer-403' => fwrite($client, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: 13\r\nConnection: close\r\n\r\n<h1>403</h1>\n"),
+        'answer-403' => fwrite($client, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: 97\r\nConnection: close\r\n\r\n<html><body><h2>HTTP Error 403.6 - Forbidden</h2><p>The IP address is rejected.</p></body></html>"),
+        'answer-404' => fwrite($client, "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: 9\r\nConnection: close\r\n\r\nNot Found"),
         default => fwrite($client, "HTTP/1.1 200 OK\r\nContent-Type: application/soap+xml\r\nContent-Length: 19\r\nConnection: close\r\n\r\n<ok><cStat/></ok>\n\n"),
     };
     fclose($client);

@@ -42,6 +42,7 @@ final class ClassificationTest extends TestCase
         yield 'receipt only, no protocol yet' => [['authorization-103-receipt-only'], 'RETRYABLE', '103', 503, false];
         yield 'nothing reached SEFAZ: offline' => [[new TransportFailure(TransportFailure::NOT_SENT)], 'CONTINGENCY', null, 503, false];
         yield 'a 403 from an unverified host' => [[new TransportFailure(TransportFailure::REFUSED, 403)], 'RETRYABLE', null, 503, false];
+        yield 'a 404 from verified SEFAZ: a defect' => [[new TransportFailure(TransportFailure::SEFAZ_HTTP, 404)], 'INTERNAL', null, 500, false];
         yield 'client certificate refused at TLS' => [[new TransportFailure(TransportFailure::TLS_REFUSED)], 'AUTH', null, 401, false];
         yield 'sent, no answer, and the lookup cannot reach SEFAZ: offline' => [
             [new TransportFailure(TransportFailure::NO_ANSWER), new TransportFailure(TransportFailure::NOT_SENT)],

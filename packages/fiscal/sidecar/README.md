@@ -64,9 +64,9 @@ Every failure is `{ error: { class, code, message, details, accessKey, signedXml
 | `REJECTED` | 422 | SEFAZ said no; `code` is its `cStat`. The number is not spent (a denial answers `DENIED`, not an error). |
 | `RETRYABLE` | 503 | try again: nothing reached SEFAZ outside NFC-e issuing, a receipt with no protocol yet (103, 105), SEFAZ unable to reach a revocation list (286, 296), rate limiting (656), 999, SEFAZ stopped (108, 109) outside issuing, a reply with no status, a 4xx that is not SEFAZ's. With `outcomeUnknown: true`, look the key up before sending again. |
 | `CONTINGENCY` | 503 | issuing an NFC-e: nothing reached SEFAZ, or SEFAZ is stopped (108, 109), or a request with no answer could not be settled by a lookup. Go offline through `/nfce/sign-contingency`. **On an NF-e (model 55)** there is no offline path in this service (no SVC, no EPEC): only 108/109 answer `CONTINGENCY` there, and the host treats it as "retry later". |
-| `AUTH` | 401 | the `.pfx` does not open (wrong password, not PKCS#12), the certificate expired, the client certificate was refused at the TLS handshake or by an HTTP 403 from a verified SEFAZ host, or by code (213, 280–285, 290–295). Codes from sped-nfe's `storage/cstat.json`. |
+| `AUTH` | 401 | the `.pfx` does not open (wrong password, not PKCS#12), the certificate expired, the client certificate was refused at the TLS handshake or by an HTTP 403 from a verified SEFAZ host, or by code (213, 280–285, 290–295). Codes from sped-nfe's `storage/cstat.json`. An HTTP refusal's message names the IIS substatus (403.6 is an IP block, 403.7 a missing client certificate) or quotes the start of SEFAZ's page. |
 | `INVALID` | 400 | the request is malformed: the schema, a missing CSC, an XML the layout's XSD refuses, a quantity with more than four decimals, a document past the layout limit. Never retry it as is. |
-| `INTERNAL` | 500 | a defect of the service; a retry would repeat it. |
+| `INTERNAL` | 500 | a defect of the service, or a 4xx other than 403/408/429 from the verified SEFAZ host (a wrong web-service address); a retry would repeat it. |
 
 When the call got as far as signing, `accessKey` and `signedXml` come back
 with the error: the key is spoken for, and an NFC-e can be signed offline.
@@ -99,6 +99,11 @@ service needs at most about 512M; a compose memory limit of 640M leaves Apache
 its parent process.
 OpenSSL's legacy provider is on, because most A1 files issued before 2023 are
 encrypted with RC2-40.
+
+**Follow-up: ICP-Brasil root v13.** ITI has published a v13 root that is not
+in `docker/icp-brasil.pem`: its fingerprint could not yet be checked against a
+source independent of the download. Add it, with the new sha256 in the
+Dockerfile, once it is.
 
 ## A second library
 

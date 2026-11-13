@@ -184,7 +184,8 @@ export interface InutilizedRange extends SefazAnswer {
  * - `INVALID`: the request itself is malformed (the schema, a missing CSC, an
  *   XML the layout refuses, a document the layout version cannot express).
  *   Fix the input; never retry it as is.
- * - `INTERNAL`: a defect of the service. A retry would only repeat it.
+ * - `INTERNAL`: a defect of the service, or a 4xx other than 403/408/429 from
+ *   the verified SEFAZ host (a wrong web-service address). A retry would only repeat it.
  */
 export type SidecarErrorClass = "REJECTED" | "RETRYABLE" | "CONTINGENCY" | "AUTH" | "INVALID" | "INTERNAL";
 

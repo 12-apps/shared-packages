@@ -73,6 +73,13 @@ final class Classifier
                 . '); the outcome is unknown, so look the key up before sending it again.',
                 outcomeUnknown: true,
             ),
+            // INTERNAL rather than a new class: the issuer port's four classes plus
+            // INVALID (the caller's input) and INTERNAL (this side's defect) cover it,
+            // and a wrong web-service address is this side's defect.
+            TransportFailure::SEFAZ_HTTP => new ServiceError(
+                ErrorClass::INTERNAL,
+                'SEFAZ refused the request itself (' . $failure->getMessage() . '); sending it again gets the same answer.',
+            ),
             default => new ServiceError(
                 ErrorClass::RETRYABLE,
                 'An answer that is not SEFAZ\'s (' . $failure->getMessage() . '); nothing was processed.',

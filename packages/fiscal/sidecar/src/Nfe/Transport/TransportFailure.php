@@ -20,6 +20,9 @@ use RuntimeException;
  *   cURL cannot use, or an HTTP 403 from a VERIFIED SEFAZ host).
  * - REFUSED: an HTTP answer that is not SEFAZ's (a 4xx, or a 403 from a host
  *   whose certificate was not verified): nothing was processed; try again.
+ * - SEFAZ_HTTP: a 4xx other than 403, 408 and 429 from the VERIFIED SEFAZ host
+ *   (a 404 or 405: the web-service address or the request is wrong). The same
+ *   request gets the same answer, so it is a defect, never a retry.
  */
 final class TransportFailure extends RuntimeException
 {
@@ -27,6 +30,7 @@ final class TransportFailure extends RuntimeException
     public const NO_ANSWER = 'NO_ANSWER';
     public const TLS_REFUSED = 'TLS_REFUSED';
     public const REFUSED = 'REFUSED';
+    public const SEFAZ_HTTP = 'SEFAZ_HTTP';
 
     public function __construct(
         public readonly string $kind,

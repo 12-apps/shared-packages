@@ -79,6 +79,7 @@ final class CurlTransportTest extends TestCase
         yield 'silent after the upload: the outcome is unknown' => ['hang-after-upload', true, TransportFailure::NO_ANSWER];
         yield 'the client certificate refused at the handshake' => ['refuse-client-cert', true, TransportFailure::TLS_REFUSED];
         yield 'a 403 from the verified host' => ['answer-403', true, TransportFailure::TLS_REFUSED];
+        yield 'a 404 from the verified host: a defect, not a retry' => ['answer-404', true, TransportFailure::SEFAZ_HTTP];
     }
 
     /** @param bool $trustServer whether the transport is given the test CA */
@@ -108,6 +109,39 @@ final class CurlTransportTest extends TestCase
         } finally {
             $server->stop();
         }
+    }
+
+    public function testTheRefusalNamesTheIisSubstatus(): void
+    {
+        $server = TlsTestServer::start('answer-403');
+        try {
+            (new CurlTransport(1, true, $server->caFile(), 3))->post($server->url(), 'x', '<e/>', self::$client);
+            self::fail('the request succeeded');
+        } catch (TransportFailure $failure) {
+            self::assertStringContainsString('403.6', $failure->getMessage(), 'an IP block reads apart from a certificate refusal');
+        } finally {
+            $server->stop();
+        }
+    }
+
+    public function testA404FromAnUnverifiedHostIsOnlyRefused(): void
+    {
+        $server = TlsTestServer::start('answer-404');
+        try {
+            (new CurlTransport(1, false, null, 3))->post($server->url(), 'x', '<e/>', self::$client);
+            self::fail('the request succeeded');
+        } catch (TransportFailure $failure) {
+            self::assertSame(TransportFailure::REFUSED, $failure->kind);
+            self::assertStringContainsString('"Not Found"', $failure->getMessage(), 'a snippet of the page, when there is no substatus');
+        } finally {
+            $server->stop();
+        }
+    }
+
+    public function testRateLimitingFromTheVerifiedHostStaysRetryable(): void
+    {
+        self::assertSame(TransportFailure::REFUSED, CurlTransport::classify(0, '', 10, 429, 0, true, '')?->kind);
+        self::assertSame(TransportFailure::REFUSED, CurlTransport::classify(0, '', 10, 408, 0, true, '')?->kind);
     }
 
     public function testAVerifiedServerAnswers(): void
