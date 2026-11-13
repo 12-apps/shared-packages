@@ -136,7 +136,7 @@ function exclusionDrafts(input: TaxInput, gorjetaExcluded: boolean): LineDraft[]
     if (!input.seller.restaurantRegime) {
       throw new FiscalEngineError(
         "INVALID_INPUT",
-        "a retained intermediation is excluded only in the restaurant regime (art. 274 par. único II); outside it the amount belongs in the lines",
+        "a retained intermediation is excluded only when seller.restaurantRegime is set (art. 274 sole paragraph, II); otherwise the amount belongs in the lines",
       );
     }
     drafts.push({
