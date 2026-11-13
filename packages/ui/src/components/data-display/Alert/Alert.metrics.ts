@@ -63,7 +63,9 @@ export const GLASS = { backgroundAlpha: 0.85, borderAlpha: 0.4, blur: 20, satura
  * `gradient`: on the web the hue's light and dark ends, each moved toward white
  * (light mode) or black (dark mode) only as far as the mode's ink needs
  * (`Alert.gradient.ts`; native paints the first derived end only, see
- * `gradientSurface`; FUT-4516), at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
+ * `gradientSurface`; FUT-4516), at 0.9 along 135°, a 0.2 white shimmer that crosses the alert's own
+ * width every 3s (from one alert-width to its left to one to its right, at any
+ * width; FUT-4874) and is off under `prefers-reduced-motion`.
  *
  * It carries no hover of its own, and that is load-bearing rather than an
  * omission. `alertVariantStyles` is spread AFTER the root's `'&:hover'` in the
@@ -77,7 +79,6 @@ export const GRADIENT = {
   stopAlpha: 0.9,
   shimmerAlpha: 0.2,
   shimmerMs: 3000,
-  shimmerTravel: 1000,
 } as const;
 
 /** Emphasis: the glow's shadow and brightness, the pulse's wash. */

@@ -83,12 +83,20 @@ export const pulseAnimation = (theme: Theme) => keyframes`
 
 // Removed unused slideInAnimation - can be re-added if needed for future features
 
-export const shimmerAnimation = (theme: Theme) => keyframes`
+/**
+ * The shimmer's sweep, in the alert's OWN width (FUT-4874): the band starts one
+ * alert-width to the left of the alert and ends one to the right, so it crosses
+ * the whole surface at any width. It was a fixed 1000px of `background-position`
+ * travel, which never reached an alert narrower than about 1000px and left a
+ * hard vertical edge across a 1280px one. The band is transparent at both ends,
+ * so a frame has no seam wherever it lands.
+ */
+export const shimmerAnimation = () => keyframes`
   0% {
-    background-position: ${rem(theme, -GRADIENT.shimmerTravel)} 0;
+    transform: translateX(-100%);
   }
   100% {
-    background-position: ${rem(theme, GRADIENT.shimmerTravel)} 0;
+    transform: translateX(100%);
   }
 `;
 
@@ -296,11 +304,13 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
       zIndex: -1,
       position: 'absolute',
       top: 0,
-      left: rem(theme, -GRADIENT.shimmerTravel),
+      left: 0,
       width: '100%',
       height: '100%',
       background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
-      animation: `${shimmerAnimation(theme)} ${seconds(GRADIENT.shimmerMs)} infinite`,
+      animation: `${shimmerAnimation()} ${seconds(GRADIENT.shimmerMs)} infinite`,
+      // Decoration only: off for a person who asked for less motion.
+      '@media (prefers-reduced-motion: reduce)': { display: 'none' },
     },
   };
 };
