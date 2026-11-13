@@ -101,12 +101,14 @@ describe("random transition sequences", () => {
     }
   });
 
-  it("keep DENIED, REPLACED and CANCELLED final; REJECTED leaves only a contingency number, back to CONTINGENCY", () => {
+  it("keep DENIED, REPLACED and CANCELLED final; REJECTED leaves only for CONTINGENCY (resend) or SUBMITTED (found SEFAZ's)", () => {
     for (const { seed, accepted, contingency } of WALKS) {
       for (const step of accepted) {
         if (["DENIED", "REPLACED", "CANCELLED"].includes(step.from)) expect(step.to, `seed ${seed}`).toBe(step.from);
         if (step.from === "REJECTED" && step.to !== "REJECTED") {
-          expect([contingency, step.kind, step.to], `seed ${seed}`).toEqual([true, "RESIGN", "CONTINGENCY"]);
+          // A contingency NFC-e resent after correction, or an online number a lookup found SEFAZ's (back to SUBMITTED).
+          const expected = contingency ? [true, "RESIGN", "CONTINGENCY"] : [false, "LOOKUP", "SUBMITTED"];
+          expect([contingency, step.kind, step.to], `seed ${seed}`).toEqual(expected);
         }
       }
     }

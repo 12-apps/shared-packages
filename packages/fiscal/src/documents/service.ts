@@ -17,10 +17,9 @@ import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertReason,
 import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
-import { settleNumber } from "./settle";
+import { settleNumber, settleWithXml, storeNfeProc } from "./settle";
 import { signPending, submit, transmit } from "./steps";
 import { type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
-import { assembleNfeProc, protocolDigestOf } from "./nfe-proc";
 
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
 
@@ -174,26 +173,6 @@ async function cancel(
   return { document: cancelled, failure: null };
 }
 
-/**
- * A SUBMITTED document a lookup finds authorised or denied: its `nfeProc`,
- * from the signed XML a failed call returned and the protocol the lookup
- * carries, stored. `undefined` when either is missing — the document then
- * stays SUBMITTED, and the sweep sends the same call again for the XML.
- */
-async function storeNfeProc(deps: Deps, document: FiscalDocument, answer: LookedUpDocument): Promise<string | undefined> {
-  if ((answer.status !== "AUTHORIZED" && answer.status !== "DENIED") || document.accessKey === null) return undefined;
-  // The XML the protocol certifies, by its digest; never simply the last one stored.
-  const digest = protocolDigestOf(answer.sefazReply);
-  if (digest === null) return undefined;
-  const signedXml = await deps.config.storage.get(xmlKeys.signedByDigest(document.accessKey, digest));
-  if (signedXml === null) return undefined;
-  const nfeProc = assembleNfeProc({ signedXml, sefazReply: answer.sefazReply, accessKey: document.accessKey });
-  if (nfeProc === null) return undefined;
-  const xmlKey = xmlKeys.authorized(document.accessKey);
-  await deps.config.storage.put(xmlKey, nfeProc, "application/xml");
-  return xmlKey;
-}
-
 /** Whether a lookup's answer moves this document (a settled number moves only while it is owed one). */
 function lookupMoves(document: FiscalDocument): boolean {
   if (!canTransition(document.status, "LOOKUP")) return false;
@@ -216,8 +195,10 @@ async function lookup(
   });
   if (!outcome.ok) return { document, answer: null, failure: outcome.error };
   if (!lookupMoves(document)) return { document, answer: outcome.answer, failure: null };
-  const xmlKey = document.status === "SUBMITTED" ? await storeNfeProc(deps, document, outcome.answer) : undefined;
-  const after = await deps.ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer, ...(xmlKey === undefined ? {} : { xmlKey }) });
+  const xmlKey = document.status === "SUBMITTED" ? await storeNfeProc(deps.ctx, document, outcome.answer) : undefined;
+  const looked = await deps.ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer, ...(xmlKey === undefined ? {} : { xmlKey }) });
+  // A live REJECTED number found SEFAZ's is back to SUBMITTED: settle it now if its XML is held.
+  const after = document.status === "REJECTED" ? await settleWithXml(deps.ctx, looked, outcome.answer) : looked;
   return { document: after, answer: outcome.answer, failure: null };
 }
 

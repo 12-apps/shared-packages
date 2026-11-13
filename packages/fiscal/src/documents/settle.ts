@@ -11,8 +11,9 @@
  */
 
 import type { IssuerFailure, IssuerOutcome, SigningMaterial } from "../issuer/port";
-import type { CancelledDocument } from "../sidecar/types";
+import type { CancelledDocument, LookedUpDocument } from "../sidecar/types";
 import { type FiscalContext, xmlKeys } from "./context";
+import { assembleNfeProc, protocolDigestOf } from "./nfe-proc";
 import type { EmitterProfile } from "./profile";
 import type { FiscalDocument, NumberVoid } from "./types";
 
@@ -25,10 +26,44 @@ function defer(ctx: FiscalContext, document: FiscalDocument, what: string, error
   return ctx.advance(document, { kind: "DEFER", reason: `${what} failed`, error, attention: REFUSALS.has(error.class) });
 }
 
+/**
+ * A SUBMITTED document a lookup finds authorised or denied: its `nfeProc`,
+ * from the signed XML whose digest the protocol's `digVal` names and the
+ * protocol itself, stored. `undefined` when either is missing — the document
+ * then stays SUBMITTED, owing work, and the sweep sends the same call again
+ * for the XML.
+ */
+export async function storeNfeProc(ctx: FiscalContext, document: FiscalDocument, answer: LookedUpDocument): Promise<string | undefined> {
+  if ((answer.status !== "AUTHORIZED" && answer.status !== "DENIED") || document.accessKey === null) return undefined;
+  // The XML the protocol certifies, by its digest; never simply the last one stored.
+  const digest = protocolDigestOf(answer.sefazReply);
+  if (digest === null) return undefined;
+  const signedXml = await ctx.config.storage.get(xmlKeys.signedByDigest(document.accessKey, digest));
+  if (signedXml === null) return undefined;
+  const nfeProc = assembleNfeProc({ signedXml, sefazReply: answer.sefazReply, accessKey: document.accessKey });
+  if (nfeProc === null) return undefined;
+  const xmlKey = xmlKeys.authorized(document.accessKey);
+  await ctx.config.storage.put(xmlKey, nfeProc, "application/xml");
+  return xmlKey;
+}
+
+/**
+ * A document a lookup just returned to SUBMITTED (a live REJECTED number
+ * found SEFAZ's): settled as AUTHORIZED or DENIED with the same answer when
+ * the XML the protocol certifies is held. Two steps, never REJECTED →
+ * AUTHORIZED in one.
+ */
+export async function settleWithXml(ctx: FiscalContext, document: FiscalDocument, answer: LookedUpDocument): Promise<FiscalDocument> {
+  if (document.status !== "SUBMITTED") return document;
+  const xmlKey = await storeNfeProc(ctx, document, answer);
+  return xmlKey === undefined ? document : ctx.advance(document, { kind: "LOOKUP", answer, xmlKey });
+}
+
 const lookupFirst: Settle = async (ctx, document, _profile, signing) => {
   if (document.accessKey === null) return ctx.advance(document, { kind: "DEFER", reason: "no access key to look up", error: null, attention: true });
   const outcome = await ctx.config.issuer.lookup({ model: document.model, environment: document.environment, signing, accessKey: document.accessKey });
-  return outcome.ok ? ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer }) : defer(ctx, document, "the lookup", outcome.error);
+  if (!outcome.ok) return defer(ctx, document, "the lookup", outcome.error);
+  return settleWithXml(ctx, await ctx.advance(document, { kind: "LOOKUP", answer: outcome.answer }), outcome.answer);
 };
 
 /** The cancel owed: by substitution when a contingency document replaced it, an ordinary one otherwise. */

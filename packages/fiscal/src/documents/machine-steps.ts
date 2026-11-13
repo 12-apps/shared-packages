@@ -123,11 +123,15 @@ function voidAfterLookup(answer: LookedUpDocument): NumberVoid {
 function lookupOfSettledNumber(document: FiscalDocument, answer: LookedUpDocument): Partial<FiscalDocument> {
   if (document.numberVoid !== "LOOKUP_FIRST") refuse(document, "LOOKUP", "its number is already settled");
   if (isLive(document) && (answer.status === "AUTHORIZED" || answer.status === "DENIED")) {
-    // The sale's own document, SEFAZ's, whose XML could not be fetched: never
-    // cancelled, never voided — a person settles it (`attention`).
+    // The sale's own document, still SEFAZ's: never cancelled, never voided,
+    // never left REJECTED. It goes back to SUBMITTED, owing work, with the
+    // protocol kept — the next step settles it with its XML (the service does
+    // at once when it holds the XML the protocol certifies; otherwise the
+    // sweep sends the same call again, which the fiscal service settles).
+    // Its failures keep counting, so a loop of refusals reaches a person.
     return {
+      status: "SUBMITTED",
       numberVoid: null,
-      attention: true,
       outcomeUnknown: false,
       protocol: answer.protocol ?? document.protocol,
       statusCode: answer.statusCode,
@@ -192,8 +196,9 @@ function cancelFields(document: FiscalDocument, input: InputOf<"CANCEL">): Parti
 function rejectFields(document: FiscalDocument, error: SidecarError): Partial<FiscalDocument> {
   const failed = failedFields(document, error);
   if (document.seriesKind === "CONTINGENCY") return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: null };
-  const mayBeSefazs = failed.outcomeUnknown === true || document.protocol !== null;
-  return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: mayBeSefazs ? "LOOKUP_FIRST" : "INUTILIZE" };
+  // Known to be SEFAZ's: a refused re-send is one more failure of the same document, not a settlement.
+  if (document.protocol !== null) return { status: "REJECTED", ...failed, ...failure(document, false), numberVoid: "LOOKUP_FIRST" };
+  return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: failed.outcomeUnknown === true ? "LOOKUP_FIRST" : "INUTILIZE" };
 }
 
 export const STEPS: Step = {

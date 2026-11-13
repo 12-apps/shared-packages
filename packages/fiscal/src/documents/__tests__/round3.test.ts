@@ -142,9 +142,10 @@ describe.each(STORES)("R3-2 (%s store)", (_name, makeStore) => {
     expect((await service.issue(ISSUE)).id).toBe(document.id);
 
     clock += 30 * 60_000;
-    await service.sweep(10); // the lookup: still SEFAZ's — a person settles it; nothing voided, nothing cancelled
+    await service.sweep(10); // the lookup: still SEFAZ's — back to SUBMITTED, owing work; nothing voided, nothing cancelled (review R4-1)
     const settled = (await store.getDocument("o", document.id))!;
-    expect(settled).toMatchObject({ status: "REJECTED", numberVoid: null, attention: true, protocol: "135260000000042" });
+    expect(settled).toMatchObject({ status: "SUBMITTED", numberVoid: null, protocol: "135260000000042" });
+    expect(settled.nextAttemptAt).not.toBeNull();
     expect(calls.filter((m) => m === "inutilize" || m === "cancel" || m === "cancelBySubstitution" || m === "signContingency")).toEqual([]);
   });
 });
