@@ -60,6 +60,7 @@ describe("the fiscal manifest", () => {
   it("ships the modules, the partial and the tables", () => {
     expect(Object.keys(packageJson.exports)).toEqual([
       "./danfe",
+      "./danfe/en-US",
       "./danfe/pt-BR",
       "./documents",
       "./engine",

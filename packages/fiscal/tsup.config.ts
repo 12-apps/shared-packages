@@ -8,6 +8,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     "danfe/index": "src/danfe/index.ts",
+    "danfe/en-US": "src/danfe/en-US.ts",
     "danfe/pt-BR": "src/danfe/pt-BR.ts",
     "documents/index": "src/documents/index.ts",
     "engine/index": "src/engine/index.ts",

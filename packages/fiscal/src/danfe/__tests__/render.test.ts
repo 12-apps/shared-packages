@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { DANFE_NFCE_EN_US } from "../en-US";
 import { DANFE_NFCE_PT_BR } from "../pt-BR";
 import { DANFE_COLUMNS, type DanfeLine, money, renderDanfeNfce, wrap } from "../render";
 
@@ -57,6 +58,12 @@ describe("the DANFE NFC-e", () => {
     const all = texts(renderDanfeNfce({ xml: AUTHORIZED, paperWidth: 80, labels: english as never })).join("\n");
     expect(all).toContain("EN title");
     expect(all).not.toContain("Documento Auxiliar");
+  });
+
+  it("ships both packs with every label, the same payment codes in each", () => {
+    expect(Object.keys(DANFE_NFCE_EN_US).sort()).toEqual(Object.keys(DANFE_NFCE_PT_BR).sort());
+    expect(Object.keys(DANFE_NFCE_EN_US.paymentMethods)).toEqual(Object.keys(DANFE_NFCE_PT_BR.paymentMethods));
+    expect(texts(renderDanfeNfce({ xml: AUTHORIZED, paperWidth: 80, labels: DANFE_NFCE_EN_US })).join(" ")).toContain("UNIDENTIFIED CONSUMER");
   });
 
   it("refuses an XML that is not an NFC-e", () => {

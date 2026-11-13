@@ -9,6 +9,10 @@
       "types": "./dist/danfe/index.d.ts",
       "default": "./dist/danfe/index.js"
     },
+    "./danfe/en-US": {
+      "types": "./dist/danfe/en-US.d.ts",
+      "default": "./dist/danfe/en-US.js"
+    },
     "./danfe/pt-BR": {
       "types": "./dist/danfe/pt-BR.d.ts",
       "default": "./dist/danfe/pt-BR.js"
