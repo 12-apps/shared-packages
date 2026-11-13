@@ -47,7 +47,7 @@ export class FetchOrderRetryError extends Error {
 }
 
 /** The reason a recorded row waits for its fetch. */
-export const AWAITING_ORDER_REASON = "order details to fetch";
+const AWAITING_ORDER_REASON = "order details to fetch";
 
 /**
  * Leave the row PENDING for its fetch and queue the job. The queue port never

@@ -65,7 +65,7 @@ export function firstCents(source: unknown, paths: string[][]): number | null {
 }
 
 /** An ISO timestamp → a Date, or null when absent or unparseable. */
-export function toDate(value: unknown): Date | null {
+function toDate(value: unknown): Date | null {
   const raw = asString(value);
   if (!raw) return null;
   const parsed = new Date(raw);

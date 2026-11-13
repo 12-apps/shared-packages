@@ -22,6 +22,8 @@ import { API_BASE, PORTAL, SPEC_ORDER_ID, specEvent, specOrder } from "./fixture
 const P = NINETY_NINE_FOOD_PROVIDER;
 const SECOND_ORDER_ID = "0f7a1d7e-9b7c-4c38-a0b1-2f1e1c6f8d11";
 const ATTEMPT = { attempt: 1, maxAttempts: 3 };
+/** The sandbox URL of the spec order's resource. */
+const orderUrl = (action: string): string => `${API_BASE.SANDBOX}/v1/orders/${SPEC_ORDER_ID}/${action}`;
 const TOKEN = { status: 200, body: JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 3600 }) };
 
 /** 99Food's API as the spec describes it: token, order details, 202 for confirm and cancel. */
@@ -39,7 +41,7 @@ function openDelivery(overrides: { order?: (request: MarketplaceHttpRequest) => 
 
 function harness(options: { http?: ReturnType<typeof scriptedHttp>; queueDown?: boolean } = {}) {
   const http = options.http ?? openDelivery();
-  const h = createHarness({
+  const mounted = createHarness({
     http,
     queueDown: options.queueDown,
     cancellationHooks: true,
@@ -48,15 +50,15 @@ function harness(options: { http?: ReturnType<typeof scriptedHttp>; queueDown?: 
       createNinetyNineFoodAdapter({ copy: NINETY_NINE_FOOD_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, portalUrl: PORTAL }),
     ],
   });
-  return { h, http };
+  return { h: mounted, http };
 }
 
 /** Deliver one Open Delivery event for the tenant, as the webhook route does. */
-async function deliver(h: Harness, payload: unknown) {
-  const event = h.engine.normalize(P, payload);
+async function deliver(subject: Harness, payload: unknown) {
+  const event = subject.engine.normalize(P, payload);
   if (!event) throw new Error("did not normalize");
-  const target = await h.engine.target(TENANT, P);
-  return h.engine.deliver({
+  const target = await subject.engine.target(TENANT, P);
+  return subject.engine.deliver({
     clientId: TENANT,
     event,
     payload,
@@ -65,18 +67,18 @@ async function deliver(h: Harness, payload: unknown) {
 }
 
 /** The fetch jobs queued so far. */
-function fetchJobs(h: Harness): FetchOrderJobPayload[] {
-  return h.enqueued
+function fetchJobs(subject: Harness): FetchOrderJobPayload[] {
+  return subject.enqueued
     .filter((job) => job.name === MARKETPLACE_FETCH_ORDER_JOB)
     .map((job) => job.payload as unknown as FetchOrderJobPayload);
 }
 
 /** CREATED → the fetch job → an ingested order's host id. */
-async function arrive(h: Harness, orderId: string): Promise<string> {
-  await deliver(h, specEvent("CREATED", orderId));
-  const job = fetchJobs(h).at(-1);
+async function arrive(subject: Harness, orderId: string): Promise<string> {
+  await deliver(subject, specEvent("CREATED", orderId));
+  const job = fetchJobs(subject).at(-1);
   if (!job) throw new Error("no fetch queued");
-  const outcome = await h.engine.runFetchOrder(job, ATTEMPT);
+  const outcome = await subject.engine.runFetchOrder(job, ATTEMPT);
   if (outcome.kind !== "ingested") throw new Error(outcome.kind);
   return outcome.orderId;
 }
@@ -148,7 +150,8 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
     expect(run).toEqual({ kind: "done", action: "confirm" });
     const confirm = http.requests.at(-1);
-    expect(`${confirm?.method} ${confirm?.url}`).toBe(`POST https://sandbox.od.example.test/v1/orders/${SPEC_ORDER_ID}/confirm`);
+    expect(confirm?.method).toBe("POST");
+    expect(confirm?.url).toBe(orderUrl("confirm"));
     expect(confirm?.headers.Authorization).toBe("Bearer tok");
     expect(JSON.parse(confirm?.body ?? "{}")).toEqual({ orderExternalCode: orderId, createdAt: h.clock.at.toISOString() });
     // One token for the fetch and the confirm.
@@ -165,7 +168,7 @@ describe("the engine through the 99Food adapter, end to end", () => {
     await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
 
     const request = http.requests.at(-1);
-    expect(request?.url).toBe(`https://sandbox.od.example.test/v1/orders/${SPEC_ORDER_ID}/requestCancellation`);
+    expect(request?.url).toBe(orderUrl("requestCancellation"));
     expect(JSON.parse(request?.body ?? "{}")).toEqual({ reason: "Item unavailable", code: "UNAVAILABLE_ITEM", mode: "MANUAL" });
     // 202 is "taken": the answer is an event.
     expect(h.acceptance(orderId)?.cancellationStatus).toBe("REQUESTED");

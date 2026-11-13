@@ -194,10 +194,10 @@ describe("normalizeOpenDeliveryOrder (the GET /v1/orders/{orderId} answer)", () 
 
 /** A context answering each request through `answer`, recording them. */
 function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpResponse) {
-  const requests: MarketplaceHttpRequest[] = [];
+  const recorded: MarketplaceHttpRequest[] = [];
   const ctx: AdapterCallContext = {
     http: async (request) => {
-      requests.push(request);
+      recorded.push(request);
       return answer(request);
     },
     credentials: { clientId: "app-id", clientSecret: "app-secret", webhookSecret: null },
@@ -205,11 +205,13 @@ function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpRes
     tokens: new Map(),
     now: new Date("2026-11-13T12:00:00.000Z"),
   };
-  return { ctx, requests };
+  return { ctx, requests: recorded };
 }
 
+/** The sandbox URL of the spec order's resource. */
+const orderUrl = (action: string): string => `${API_BASE.SANDBOX}/v1/orders/${SPEC_ORDER_ID}/${action}`;
 const TOKEN = { status: 200, body: JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 3600 }) };
-const ref = { externalOrderId: SPEC_ORDER_ID, externalDisplayId: "12345", hostOrderCode: "order-1", placedAt: new Date() };
+const ref = { externalOrderId: SPEC_ORDER_ID, externalDisplayId: "12345", hostOrderCode: "order-1", placedAt: new Date("2026-11-13T11:00:00.000Z") };
 
 describe("the 99Food adapter", () => {
   it("[P1] states its capabilities and serves Open Delivery's eleven merchant reasons, offline", () => {
@@ -292,7 +294,7 @@ describe("the 99Food adapter", () => {
   it("confirms with the spec's OrderConfirmed body, the preparation time when stated, a 422 as already done", async () => {
     const { ctx, requests } = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 202, body: "" }));
     expect(await adapter().confirm(ctx, ref, { preparationMinutes: 25 })).toEqual({ kind: "accepted" });
-    expect(requests[1]?.url).toBe(`https://sandbox.od.example.test/v1/orders/${SPEC_ORDER_ID}/confirm`);
+    expect(requests[1]?.url).toBe(orderUrl("confirm"));
     expect(JSON.parse(requests[1]?.body ?? "{}")).toEqual({
       orderExternalCode: "order-1",
       createdAt: "2026-11-13T12:00:00.000Z",
@@ -315,7 +317,7 @@ describe("the 99Food adapter", () => {
     });
 
     expect(result).toEqual({ kind: "accepted" });
-    expect(requests[1]?.url).toBe(`https://sandbox.od.example.test/v1/orders/${SPEC_ORDER_ID}/requestCancellation`);
+    expect(requests[1]?.url).toBe(orderUrl("requestCancellation"));
     expect(JSON.parse(requests[1]?.body ?? "{}")).toEqual({
       reason: "Item unavailable",
       code: "UNAVAILABLE_ITEM",
