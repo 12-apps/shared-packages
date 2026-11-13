@@ -295,7 +295,9 @@ model MarketplaceCataloguePublication {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([clientId, provider, productId])
+  // Named: Prisma's default (68 characters) is past Postgres's 63, which
+  // truncates it, and the database and the schema would then disagree.
+  @@unique([clientId, provider, productId], map: "marketplace_catalogue_publications_client_provider_product_key")
   @@index([clientId, productId])
   @@index([status, requestedAt])
   @@map("marketplace_catalogue_publications")

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS "marketplace_catalogue_publications" (
     CONSTRAINT "marketplace_catalogue_publications_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_catalogue_publications_client_id_provider_product_id_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_catalogue_publications_client_provider_product_key"
     ON "marketplace_catalogue_publications"("client_id", "provider", "product_id");
 CREATE INDEX IF NOT EXISTS "marketplace_catalogue_publications_client_id_product_id_idx"
     ON "marketplace_catalogue_publications"("client_id", "product_id");

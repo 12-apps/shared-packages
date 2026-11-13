@@ -291,3 +291,47 @@ describe("the catalogue migration", () => {
     await db.close();
   });
 });
+
+/**
+ * Every index the partial declares exists in the migrations under the name
+ * Prisma gives it, and that name fits Postgres's 63 characters. Prisma names
+ * an unmapped `@@unique` `<table>_<columns>_key` and an `@@index`
+ * `<table>_<columns>_idx`; past 63 characters Postgres truncates what the
+ * migration creates and Prisma expects another name, which is drift.
+ */
+describe("the partial's index names", () => {
+  const PARTIAL = new URL("../../prisma/marketplace.prisma", import.meta.url);
+
+  function expectedIndexNames(): string[] {
+    const names: string[] = [];
+    for (const block of readFileSync(PARTIAL, "utf8").split(/\nmodel /u).slice(1)) {
+      const table = /@@map\("([^"]+)"\)/u.exec(block)?.[1];
+      if (!table) continue;
+      const columnOf = (field: string): string =>
+        new RegExp(`\\n\\s+${field}\\s[^\\n]*@map\\("([^"]+)"\\)`, "u").exec(block)?.[1] ?? field;
+      for (const match of block.matchAll(/@@(unique|index)\(\[([^\]]+)\](?:,\s*map:\s*"([^"]+)")?\)/gu)) {
+        const [, kind, fields = "", map] = match;
+        const columns = fields.split(",").map((field) => columnOf(field.trim()));
+        names.push(map ?? `${table}_${columns.join("_")}_${kind === "unique" ? "key" : "idx"}`);
+      }
+    }
+    return names;
+  }
+
+  it("fit in 63 characters", () => {
+    const tooLong = expectedIndexNames().filter((name) => name.length > 63);
+    expect(tooLong).toEqual([]);
+  });
+
+  it("are the names the migrations create", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    const created = new Set(
+      (await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename LIKE 'marketplace_%'")).rows.map(
+        (row) => row.indexname,
+      ),
+    );
+    expect(expectedIndexNames().filter((name) => !created.has(name))).toEqual([]);
+    await db.close();
+  });
+});
