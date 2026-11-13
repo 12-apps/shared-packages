@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @12-apps/marketplace — CANONICAL Prisma model partial.
 //
-// The five tables the marketplace engine owns. A host does NOT copy these
+// The six tables the marketplace engine owns. A host does NOT copy these
 // models by hand: it composes this file into its multi-file schema folder from
 // the `db` capability (`package.json` "wiring.db"), and discovers the
 // migrations beside it.
@@ -301,4 +301,30 @@ model MarketplaceCataloguePublication {
   @@index([clientId, productId])
   @@index([status, requestedAt])
   @@map("marketplace_catalogue_publications")
+}
+
+/// The marketplace's id for one host category on one connection (FUT-4768).
+///
+/// A marketplace that is written to (push) groups items in categories it
+/// issues ids for, found or created by name. Stored so every publish into
+/// the same category reuses one id, and CLAIMED while it is being created
+/// (`claimedAt` set, `externalId` still NULL), so two products switched on at
+/// once into a new category create it once, not twice.
+model MarketplaceCatalogueCategory {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  provider String
+  /// The host category's name, as the item carried it.
+  name     String
+
+  /// The marketplace's id for it; NULL while it is being found or created.
+  externalId String?   @map("external_id")
+  /// When a publish claimed the creation; a claim past its staleness is taken over.
+  claimedAt  DateTime? @map("claimed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider, name])
+  @@map("marketplace_catalogue_categories")
 }

@@ -106,19 +106,36 @@ function categoryIdIn(body: string, name: string): string | null {
   return typeof found?.id === "string" ? found.id : null;
 }
 
-/** The category's id, found by name or created. */
-async function categoryId(ctx: CatalogueCallContext, name: string): Promise<{ id: string } | Failure> {
+/** The category named `name` on iFood, or null; the failure that ended the read otherwise. */
+async function findCategory(ctx: CatalogueCallContext, name: string): Promise<{ id: string | null } | Failure> {
   const listed = await call(ctx, "GET", "categories");
   if ("kind" in listed) return listed;
   if (!ok(listed)) return failureOf(listed);
-  const existing = categoryIdIn(listed.body, name);
-  if (existing) return { id: existing };
+  return { id: categoryIdIn(listed.body, name) };
+}
+
+/**
+ * Find the category by name, else create it, then read the list again and
+ * adopt the first of that name: a POST whose answer was lost and was retried
+ * is found rather than created twice. The engine runs this once per
+ * (connection, name) at a time and stores the id (`ctx.category`).
+ */
+async function findOrCreateCategory(ctx: CatalogueCallContext, name: string): Promise<{ id: string } | Failure> {
+  const found = await findCategory(ctx, name);
+  if ("kind" in found) return found;
+  if (found.id) return { id: found.id };
   const created = await call(ctx, "POST", "categories", { name, status: "AVAILABLE", template: "DEFAULT" });
   if ("kind" in created) return created;
   if (!ok(created)) return failureOf(created);
   const id = (parse(created.body) as { id?: unknown } | null)?.id;
-  return typeof id === "string" ? { id } : { kind: "retry", reason: "iFood created the category without an id" };
+  if (typeof id !== "string") return { kind: "retry", reason: "iFood created the category without an id" };
+  // ESTIMATED: the list answers categories in creation order, so the first match is the oldest.
+  const again = await findCategory(ctx, name);
+  return "id" in again && again.id ? { id: again.id } : { id };
 }
+
+const categoryId = (ctx: CatalogueCallContext, name: string): Promise<{ id: string } | Failure> =>
+  ctx.category(name, () => findOrCreateCategory(ctx, name));
 
 /** The uploaded photo's path, null when there is no photo to send. */
 async function imagePath(ctx: CatalogueCallContext, imageUrl: string | null): Promise<{ path: string | null } | Failure> {

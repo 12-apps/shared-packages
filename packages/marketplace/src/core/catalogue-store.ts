@@ -1,3 +1,4 @@
+import { resolveCategory } from "./catalogue-category";
 import type { CatalogueCallContext } from "./catalogue-port";
 import { connectionMerchantId, readOutboundConnection } from "./integration";
 import type { EngineContext, MarketplaceDb } from "./ports";
@@ -112,6 +113,7 @@ export async function catalogueConnection(
       tokens: ctx.tokens,
       externalMerchantId: merchantId,
       loadImage: (url) => (catalogue ? catalogue.image(url) : Promise.resolve(null)),
+      category: (name, resolve) => resolveCategory(ctx, { clientId, provider }, name, resolve),
     };
   } catch (error) {
     return `credentials do not open: ${error instanceof Error ? error.message : String(error)}`;

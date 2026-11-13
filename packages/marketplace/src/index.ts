@@ -148,6 +148,7 @@ export type {
 } from "./core/catalogue";
 export type {
   CatalogueCallContext,
+  CatalogueFailure,
   CatalogueImage,
   CatalogueItem,
   CatalogueItemOut,

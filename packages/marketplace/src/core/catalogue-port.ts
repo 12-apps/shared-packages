@@ -63,18 +63,26 @@ export interface CatalogueImage {
   base64: string;
 }
 
+/** An outbound call's answer when it is not a success: refused (final) or retry. */
+export type CatalogueFailure = Exclude<OutboundResult, { kind: "accepted" }>;
+
 /** What one catalogue call is handed: the outbound context plus the store's merchant id and the image loader. */
 export interface CatalogueCallContext extends AdapterCallContext {
   /** The connection's merchant id on the marketplace. */
   externalMerchantId: string;
   /** The host's image loader: the bytes behind an item's `imageUrl`, or null when it cannot load them. */
   loadImage(url: string): Promise<CatalogueImage | null>;
+  /**
+   * The marketplace's id for the host category `name`: the one the engine
+   * stored for this connection, else `resolve()` (the adapter's find-or-create)
+   * run by ONE publish at a time and stored. A second publish into a category
+   * being created is answered `retry`, so a new category is created once.
+   */
+  category(name: string, resolve: () => Promise<{ id: string } | CatalogueFailure>): Promise<{ id: string } | CatalogueFailure>;
 }
 
 /** A publish's answer: the marketplace's id for the item, or the refusal and retry shapes of every outbound call. */
-export type CataloguePublishResult =
-  | { kind: "published"; externalId: string }
-  | Exclude<OutboundResult, { kind: "accepted" }>;
+export type CataloguePublishResult = { kind: "published"; externalId: string } | CatalogueFailure;
 
 /** A marketplace the store's software writes to. */
 export interface PushCatalogue {

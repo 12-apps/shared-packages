@@ -398,6 +398,40 @@ describe("the sweep, for the catalogue", () => {
   });
 });
 
+describe("a category created once", () => {
+  it("two products switched on at once into a new iFood category create it once, and both land in it", async () => {
+    const categories: { id: string; name: string }[] = [];
+    const http = scriptedHttp((request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok" }) };
+      if (request.method === "GET") return { status: 200, body: JSON.stringify(categories) };
+      if (request.url.endsWith("/categories")) {
+        categories.push({ id: `cat-${categories.length + 1}`, name: "Drinks" });
+        return { status: 201, body: JSON.stringify(categories.at(-1)) };
+      }
+      return { status: 200, body: "{}" };
+    });
+    const drink: CatalogueItem = { ...BURGER, categoryName: "Drinks", imageUrl: null };
+    const h = createHarness({ http, catalogue: hostCatalogue({ "p-1": drink, "p-2": drink }) });
+    await h.connect("IFOOD");
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-2" });
+    const [first, second] = jobs(h);
+
+    const runs = await Promise.allSettled([h.engine.runCatalogue(first!, FIRST), h.engine.runCatalogue(second!, FIRST)]);
+    // The one that found the category being created is retried by the queue, and then reuses it.
+    const retried = runs.flatMap((run, index) => (run.status === "rejected" ? [[first, second][index]!] : []));
+    expect(retried).toHaveLength(1);
+    expect(runs.find((run) => run.status === "rejected")).toMatchObject({ reason: expect.any(CatalogueRetryError) });
+    await h.engine.runCatalogue(retried[0]!, FIRST);
+
+    expect(http.requests.filter((request) => request.method === "POST" && request.url.endsWith("/categories"))).toHaveLength(1);
+    const puts = http.requests.filter((request) => request.method === "PUT");
+    expect(puts.map((request) => JSON.parse(request.body ?? "{}").item.categoryId)).toEqual(["cat-1", "cat-1"]);
+    const rows = await h.engine.catalogueState({ clientId: TENANT, productIds: ["p-1", "p-2"] });
+    expect(rows.map((row) => row.status)).toEqual(["PUBLISHED", "PUBLISHED"]);
+  });
+});
+
 describe("a host with no catalogue port", () => {
   it("answers UNSUPPORTED, and iFood states its catalogue as push", async () => {
     const h = createHarness({ http: scriptedHttp([{ status: 200, body: "{}" }]) });

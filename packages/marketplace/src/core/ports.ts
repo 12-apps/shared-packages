@@ -64,6 +64,12 @@ export interface MarketplaceDb {
     upsert(args: unknown): Promise<unknown>;
     updateMany(args: unknown): Promise<{ count: number }>;
   };
+  /** OPTIONAL, as above: the marketplace's category ids, found or created once per name. */
+  marketplaceCatalogueCategory?: {
+    findFirst(args: unknown): Promise<unknown>;
+    create(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<{ count: number }>;
+  };
 }
 
 /**

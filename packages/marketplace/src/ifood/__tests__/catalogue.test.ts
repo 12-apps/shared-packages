@@ -39,6 +39,7 @@ function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpRes
     now: new Date("2026-11-13T12:00:00.000Z"),
     externalMerchantId: "m-1",
     loadImage: async () => image,
+    category: (_name, resolve) => resolve(),
   };
   return { ctx, requests: recorded };
 }
@@ -98,6 +99,25 @@ describe("iFood catalogue, publish", () => {
     const put = json(requests.at(-1)) as { item: { categoryId: string }; products: { imagePath?: string }[] };
     expect(put.item.categoryId).toBe("cat-new");
     expect(put.products[0]?.imagePath).toBe("m-1/x.png");
+  });
+
+  it("reads the list again after creating a category and adopts the first of that name", async () => {
+    let lists = 0;
+    const { ctx, requests } = context((request) => {
+      if (request.url.endsWith("/oauth/token")) return TOKEN;
+      if (request.method === "GET") {
+        lists += 1;
+        // A first POST whose answer was lost made "cat-old"; this run's POST made "cat-new".
+        const after = [{ id: "cat-old", name: "Burgers" }, { id: "cat-new", name: "Burgers" }];
+        return { status: 200, body: JSON.stringify(lists === 1 ? [] : after) };
+      }
+      if (request.url.endsWith("/categories")) return { status: 201, body: JSON.stringify({ id: "cat-new", name: "Burgers" }) };
+      return { status: 200, body: "{}" };
+    });
+
+    await IFOOD_CATALOGUE.publishItem(ctx, { ...ITEM, imageUrl: null });
+
+    expect((json(requests.at(-1)) as { item: { categoryId: string } }).item.categoryId).toBe("cat-old");
   });
 
   it("names the same item on every retry: the ids are derived from the publication", () => {

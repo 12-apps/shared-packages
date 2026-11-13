@@ -1,7 +1,7 @@
 -- @domains: marketplace
 -- @12-apps/marketplace: the catalogue publication (FUT-4768). Additive and
--- replay-safe, like the engine's other migrations: one new table, its indexes
--- and its CHECKs. No column of an existing table changes.
+-- replay-safe, like the engine's other migrations: two new tables, their
+-- indexes and their CHECKs. No column of an existing table changes.
 --
 -- One row per (store, marketplace, host product): whether the store wants the
 -- product in that marketplace's catalogue, the price it set for that
@@ -56,4 +56,27 @@ DO $$ BEGIN
     ALTER TABLE "marketplace_catalogue_publications" ADD CONSTRAINT "marketplace_catalogue_publications_price_check"
         CHECK (("price_cents" IS NULL OR "price_cents" > 0)
                AND ("sent_price_cents" IS NULL OR "sent_price_cents" > 0));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- The marketplace's id for one host category on one connection, found or
+-- created by name once and reused; claimed while it is being created.
+CREATE TABLE IF NOT EXISTS "marketplace_catalogue_categories" (
+    "id" TEXT NOT NULL,
+    "client_id" TEXT NOT NULL,
+    "provider" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "external_id" TEXT,
+    "claimed_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "marketplace_catalogue_categories_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_catalogue_categories_client_id_provider_name_key"
+    ON "marketplace_catalogue_categories"("client_id", "provider", "name");
+
+DO $$ BEGIN
+    ALTER TABLE "marketplace_catalogue_categories" ADD CONSTRAINT "marketplace_catalogue_categories_provider_shape"
+        CHECK ("provider" ~ '^[A-Z][A-Z0-9_]*$');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

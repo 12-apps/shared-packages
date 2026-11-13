@@ -180,7 +180,7 @@ country); see the README's Rappi section for what is still ESTIMATED.
     changes for a host that does not. To offer the product page's marketplace switches:
     - run migration `20261113120000_marketplace_catalogue` (one new table, additive) and
       re-sync the partial (`prisma:sync-marketplace`), so `db` has the
-      `marketplaceCataloguePublication` delegate;
+      `marketplaceCataloguePublication` and `marketplaceCatalogueCategory` delegates;
     - bind `catalogue.items` (the product → item mapping) and `catalogue.image`;
     - let the `http` port send `PATCH`;
     - run the `marketplace.catalogue` job (it arrives with the jobs capability);
@@ -201,7 +201,8 @@ migration:
 
 `20261113120000_marketplace_catalogue` (1.2) adds `marketplace_catalogue_publications`:
 one row per (store, marketplace, product), its five states, its failed action and its
-prices CHECKed, `product_id` by value. A host that wants it adds
+prices CHECKed, `product_id` by value; and `marketplace_catalogue_categories`, a push
+marketplace's category id per (store, marketplace, category name), created once. A host that wants it adds
 `marketplace_catalogue_publications.product_id → <catalog>(id) ON DELETE CASCADE`.
 
 The migrations are replay-safe. `20261112120000_marketplace_cancellation_failure`

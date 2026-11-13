@@ -88,6 +88,7 @@ describe("99Food catalogue, telling it the menu changed", () => {
       now: new Date("2026-11-13T12:00:00.000Z"),
       externalMerchantId: "m-1",
       loadImage: async () => null,
+      category: (_name, resolve) => resolve(),
     };
     return { ctx, requests: recorded };
   }
