@@ -553,6 +553,39 @@ describe("failure codes", () => {
   });
 });
 
+describe("the photo, on the row", () => {
+  it("uploads a photo once, reuses it on the next publish, and keeps a warning on the row", async () => {
+    let uploadStatus = 200;
+    const http = scriptedHttp((request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok" }) };
+      if (request.url.endsWith("/image/upload")) return { status: uploadStatus, body: JSON.stringify({ imagePath: "m/x.png" }) };
+      if (request.method === "GET") return { status: 200, body: JSON.stringify([{ id: "cat-1", name: "Burgers" }]) };
+      return { status: 200, body: "{}" };
+    });
+    const products: Record<string, CatalogueItem> = { "p-1": BURGER };
+    const h = createHarness({
+      http,
+      catalogue: { ...hostCatalogue(products), image: async () => ({ contentType: "image/png", base64: "AAAA" }) },
+    });
+    await h.connect("IFOOD");
+    const uploads = () => http.requests.filter((request) => request.url.endsWith("/image/upload")).length;
+
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+    await runLatest(h);
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1", priceCents: 2700 });
+    await runLatest(h);
+    expect(uploads()).toBe(1);
+
+    products["p-1"] = { ...BURGER, imageUrl: "https://img.test/huge.png" };
+    uploadStatus = 413;
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1", priceCents: 2800 });
+    await runLatest(h);
+
+    expect(uploads()).toBe(2);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED", warningCode: "IMAGE_TOO_LARGE", sentPriceCents: 2800 });
+  });
+});
+
 describe("a category created once", () => {
   it("two products switched on at once into a new iFood category create it once, and both land in it", async () => {
     const categories: { id: string; name: string }[] = [];

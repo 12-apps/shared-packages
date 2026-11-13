@@ -155,6 +155,8 @@ export type {
   CatalogueItemRef,
   CatalogueMenuEntry,
   CatalogueMenuOptions,
+  CatalogueStoredImage,
+  CatalogueWarningCode,
   CataloguePublishResult,
   MarketplaceCatalogue,
   PullCatalogue,

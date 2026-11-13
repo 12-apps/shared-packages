@@ -51,7 +51,26 @@ export interface CatalogueItemOut extends CatalogueItem {
   productId: string;
   /** The marketplace's id from the last publish, or null before the first. */
   externalId: string | null;
+  /**
+   * The photo this marketplace already holds for the item, from an earlier
+   * publish: the adapter's own reference (iFood's `imagePath`) and the
+   * `imageUrl` it was made from. Reuse it while `sourceUrl` is still the
+   * item's `imageUrl` rather than uploading again; null when none is held.
+   */
+  storedImage: CatalogueStoredImage | null;
 }
+
+/** A photo a marketplace holds: the adapter's reference to it, and the URL it was made from. */
+export interface CatalogueStoredImage {
+  ref: string;
+  sourceUrl: string;
+}
+
+/**
+ * Something a publish that SUCCEEDED could not do, for the host to say:
+ * the photo was too large for the marketplace, or it refused the photo.
+ */
+export type CatalogueWarningCode = "IMAGE_TOO_LARGE" | "IMAGE_REFUSED";
 
 /** What the adapter is handed to withdraw. */
 export type CatalogueItemRef = Pick<CatalogueItemOut, "ref" | "productId" | "externalId">;
@@ -92,6 +111,13 @@ export type CataloguePublishResult =
        * engine maps it to the product, so its orders arrive mapped.
        */
       sku?: string;
+      /**
+       * OPTIONAL. The photo the marketplace now holds (stored for the next
+       * publish to reuse), null when it holds none; absent leaves the stored one.
+       */
+      image?: CatalogueStoredImage | null;
+      /** OPTIONAL. What the publish could not do although it succeeded. */
+      warning?: CatalogueWarningCode;
     }
   | CatalogueFailure;
 

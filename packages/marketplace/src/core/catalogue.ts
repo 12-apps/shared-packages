@@ -216,7 +216,7 @@ export async function readCatalogueDocument(
     const item = items.get(row.productId);
     const priceCents = item ? menuPrice(row, item.priceCents) : null;
     if (!item || priceCents === null) return [];
-    return [{ ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId }];
+    return [{ ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId, storedImage: null }];
   });
   const document = catalogue.menuDocument({ externalMerchantId: connection.externalMerchantId, entries, options: input.options });
   return { kind: "document", document };

@@ -10,6 +10,8 @@ import type {
   CatalogueItemOut,
   CatalogueItemRef,
   CataloguePublishResult,
+  CatalogueStoredImage,
+  CatalogueWarningCode,
   PushCatalogue,
 } from "../core/catalogue-port";
 import { IFOOD_API, bearer, ifoodTokenKey } from "./outbound";
@@ -26,8 +28,9 @@ import { IFOOD_API, bearer, ifoodTokenKey } from "./outbound";
  * One publish is, in order:
  * 1. the category, by name: `GET /categories`, else `POST /categories`
  *    (`template: "DEFAULT"`);
- * 2. the photo, when the item has one and the host's loader reads it:
- *    `POST /image/upload` with a base64 data URL, which answers `imagePath`;
+ * 2. the photo, when the item has one: the `imagePath` iFood already holds
+ *    for the same photo URL, else `POST /image/upload` with a base64 data URL
+ *    of the bytes the host's loader reads, which answers `imagePath`;
  * 3. the item: `PUT /items` with `item`, `products`, `optionGroups`,
  *    `options` — idempotent, it replaces the whole item, and the item appears
  *    at once (synchronous).
@@ -137,16 +140,38 @@ async function findOrCreateCategory(ctx: CatalogueCallContext, name: string): Pr
 const categoryId = (ctx: CatalogueCallContext, name: string): Promise<{ id: string } | Failure> =>
   ctx.category(name, () => findOrCreateCategory(ctx, name));
 
-/** The uploaded photo's path, null when there is no photo to send. */
-async function imagePath(ctx: CatalogueCallContext, imageUrl: string | null): Promise<{ path: string | null } | Failure> {
-  if (imageUrl === null) return { path: null };
-  const image = await ctx.loadImage(imageUrl);
-  if (!image) return { path: null };
-  const uploaded = await call(ctx, "POST", "image/upload", { image: `data:${image.contentType};base64,${image.base64}` });
+/** The photo the item goes out with, and what the publish could not do about it. */
+interface PhotoOutcome {
+  image: CatalogueStoredImage | null;
+  warning?: CatalogueWarningCode;
+}
+
+/**
+ * The photo for this publish, uploading only when it must:
+ * - no `imageUrl`: no photo;
+ * - the photo iFood already holds was made from this same URL: reuse it;
+ * - else upload the bytes the host's loader reads; when it reads nothing,
+ *   keep the photo iFood holds, if any (PUT replaces the whole item, so
+ *   sending none would drop it);
+ * - an upload iFood refuses (413 over 5 MB, another final 4xx) publishes
+ *   without a photo and says why as a warning, rather than failing the item.
+ */
+async function photoFor(ctx: CatalogueCallContext, item: CatalogueItemOut): Promise<PhotoOutcome | Failure> {
+  const stored = item.storedImage;
+  if (item.imageUrl === null) return { image: null };
+  if (stored && stored.sourceUrl === item.imageUrl) return { image: stored };
+  const bytes = await ctx.loadImage(item.imageUrl);
+  if (!bytes) return { image: stored };
+  const uploaded = await call(ctx, "POST", "image/upload", { image: `data:${bytes.contentType};base64,${bytes.base64}` });
   if ("kind" in uploaded) return uploaded;
-  if (!ok(uploaded)) return failureOf(uploaded);
+  if (!ok(uploaded)) {
+    const failure = failureOf(uploaded);
+    if (failure.kind === "retry") return failure;
+    return { image: null, warning: uploaded.status === 413 ? "IMAGE_TOO_LARGE" : "IMAGE_REFUSED" };
+  }
   const path = (parse(uploaded.body) as { imagePath?: unknown } | null)?.imagePath;
-  return typeof path === "string" ? { path } : { kind: "retry", reason: "iFood answered the upload without an imagePath" };
+  if (typeof path !== "string") return { kind: "retry", reason: "iFood answered the upload without an imagePath" };
+  return { image: { ref: path, sourceUrl: item.imageUrl } };
 }
 
 /** The `PUT /items` body for one simple item with no add-ons. */
@@ -183,12 +208,14 @@ export function ifoodItemBody(item: CatalogueItemOut, category: string, image: s
 async function publish(ctx: CatalogueCallContext, item: CatalogueItemOut): Promise<CataloguePublishResult> {
   const category = await categoryId(ctx, item.categoryName);
   if ("kind" in category) return category;
-  const image = await imagePath(ctx, item.imageUrl);
-  if ("kind" in image) return image;
-  const put = await call(ctx, "PUT", "items", ifoodItemBody(item, category.id, image.path));
+  const photo = await photoFor(ctx, item);
+  if ("kind" in photo) return photo;
+  const put = await call(ctx, "PUT", "items", ifoodItemBody(item, category.id, photo.image?.ref ?? null));
   if ("kind" in put) return put;
+  if (!ok(put)) return failureOf(put);
   // iFood's orders carry the item's `externalCode` as the line's SKU (the order normalizer reads it).
-  return ok(put) ? { kind: "published", externalId: ifoodItemId(item.ref), sku: item.productId } : failureOf(put);
+  const published = { kind: "published" as const, externalId: ifoodItemId(item.ref), sku: item.productId, image: photo.image };
+  return photo.warning ? { ...published, warning: photo.warning } : published;
 }
 
 async function withdraw(ctx: CatalogueCallContext, item: CatalogueItemRef): Promise<OutboundResult> {

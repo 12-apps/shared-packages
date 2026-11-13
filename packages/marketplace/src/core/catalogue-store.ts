@@ -1,5 +1,5 @@
 import { resolveCategory } from "./catalogue-category";
-import type { CatalogueCallContext } from "./catalogue-port";
+import type { CatalogueCallContext, CatalogueWarningCode } from "./catalogue-port";
 import { connectionMerchantId, readOutboundConnection } from "./integration";
 import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
@@ -50,6 +50,8 @@ export interface CataloguePublicationView {
   sentPriceCents: number | null;
   /** The marketplace's id for the item, from the last successful publish. */
   externalId: string | null;
+  /** What the last successful publish could not do (the photo); null when it did everything. */
+  warningCode: CatalogueWarningCode | null;
   failedAction: CatalogueFailedAction | null;
   /** Why it FAILED; null unless FAILED. The host's copy is keyed by it. */
   failureCode: CatalogueFailureCode | null;
@@ -64,10 +66,12 @@ export interface CataloguePublicationView {
   failedAt: Date | null;
 }
 
-/** A publication row, with the engine's own id. */
+/** A publication row, with the engine's own columns. */
 export interface CatalogueRow extends CataloguePublicationView {
   id: string;
   clientId: string;
+  imageRef: string | null;
+  imageSourceUrl: string | null;
 }
 
 export const CATALOGUE_ROW_SELECT = {
@@ -79,6 +83,9 @@ export const CATALOGUE_ROW_SELECT = {
   priceCents: true,
   sentPriceCents: true,
   externalId: true,
+  imageRef: true,
+  imageSourceUrl: true,
+  warningCode: true,
   failedAction: true,
   failureCode: true,
   failureReason: true,
@@ -104,6 +111,7 @@ export function viewOf(row: CatalogueRow): CataloguePublicationView {
     priceCents: row.priceCents,
     sentPriceCents: row.sentPriceCents,
     externalId: row.externalId,
+    warningCode: row.warningCode,
     failedAction: row.failedAction,
     failureCode: row.failureCode,
     failureReason: row.failureReason,

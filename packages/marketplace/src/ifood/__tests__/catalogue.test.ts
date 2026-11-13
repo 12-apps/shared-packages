@@ -24,6 +24,7 @@ const ITEM: CatalogueItemOut = {
   imageUrl: "https://img.test/x.png",
   categoryName: "Burgers",
   priceCents: 2550,
+  storedImage: null,
 };
 
 function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpResponse, image: CatalogueImage | null = null) {
@@ -64,7 +65,7 @@ describe("iFood catalogue, publish", () => {
 
     const result = await IFOOD_CATALOGUE.publishItem(ctx, ITEM);
 
-    expect(result).toEqual({ kind: "published", externalId: ifoodItemId("pub-1"), sku: "p-1" });
+    expect(result).toEqual({ kind: "published", externalId: ifoodItemId("pub-1"), sku: "p-1", image: null });
     expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
       "POST https://merchant-api.ifood.com.br/authentication/v1.0/oauth/token",
       `GET ${BASE}/categories`,
@@ -102,14 +103,14 @@ describe("iFood catalogue, publish", () => {
   });
 
   it("reads the list again after creating a category and adopts the first of that name", async () => {
-    let lists = 0;
+    const lists: string[] = [];
     const { ctx, requests } = context((request) => {
       if (request.url.endsWith("/oauth/token")) return TOKEN;
       if (request.method === "GET") {
-        lists += 1;
+        lists.push(request.url);
         // A first POST whose answer was lost made "cat-old"; this run's POST made "cat-new".
         const after = [{ id: "cat-old", name: "Burgers" }, { id: "cat-new", name: "Burgers" }];
-        return { status: 200, body: JSON.stringify(lists === 1 ? [] : after) };
+        return { status: 200, body: JSON.stringify(lists.length === 1 ? [] : after) };
       }
       if (request.url.endsWith("/categories")) return { status: 201, body: JSON.stringify({ id: "cat-new", name: "Burgers" }) };
       return { status: 200, body: "{}" };
@@ -148,6 +149,52 @@ describe("iFood catalogue, publish", () => {
       throw new Error("socket hang up");
     });
     expect(await IFOOD_CATALOGUE.publishItem(ctx, ITEM)).toEqual({ kind: "retry", reason: "socket hang up" });
+  });
+});
+
+describe("iFood catalogue, the photo", () => {
+  const PNG = { contentType: "image/png", base64: "AAAA" };
+  const uploads = (requests: MarketplaceHttpRequest[]) => requests.filter((request) => request.url.endsWith("/image/upload"));
+  const putImage = (requests: MarketplaceHttpRequest[]) =>
+    (json(requests.at(-1)) as { products: { imagePath?: string }[] }).products[0]?.imagePath;
+
+  it("reuses the photo iFood holds for the same URL instead of uploading it again", async () => {
+    const { ctx, requests } = context(ifood(), PNG);
+    const stored = { ref: "m-1/old.png", sourceUrl: ITEM.imageUrl! };
+
+    const result = await IFOOD_CATALOGUE.publishItem(ctx, { ...ITEM, storedImage: stored });
+
+    expect(uploads(requests)).toEqual([]);
+    expect(putImage(requests)).toBe("m-1/old.png");
+    expect(result).toMatchObject({ kind: "published", image: stored });
+  });
+
+  it("uploads again when the photo URL changed, and answers the new reference", async () => {
+    const { ctx, requests } = context(ifood(), PNG);
+
+    const result = await IFOOD_CATALOGUE.publishItem(ctx, { ...ITEM, storedImage: { ref: "m-1/old.png", sourceUrl: "https://img.test/old.png" } });
+
+    expect(uploads(requests)).toHaveLength(1);
+    expect(result).toMatchObject({ image: { ref: "m-1/x.png", sourceUrl: ITEM.imageUrl } });
+  });
+
+  it("keeps the photo iFood holds when the loader reads nothing, since the PUT replaces the whole item", async () => {
+    const { ctx, requests } = context(ifood(), null);
+
+    await IFOOD_CATALOGUE.publishItem(ctx, { ...ITEM, storedImage: { ref: "m-1/old.png", sourceUrl: "https://img.test/old.png" } });
+
+    expect(putImage(requests)).toBe("m-1/old.png");
+  });
+
+  it("publishes without the photo when iFood refuses it as too large, and says so as a warning", async () => {
+    const tooLarge = (request: MarketplaceHttpRequest) =>
+      request.url.endsWith("/image/upload") ? { status: 413, body: "too large" } : ifood()(request);
+    const { ctx, requests } = context(tooLarge, PNG);
+
+    const result = await IFOOD_CATALOGUE.publishItem(ctx, ITEM);
+
+    expect(result).toMatchObject({ kind: "published", image: null, warning: "IMAGE_TOO_LARGE" });
+    expect(putImage(requests)).toBeUndefined();
   });
 });
 

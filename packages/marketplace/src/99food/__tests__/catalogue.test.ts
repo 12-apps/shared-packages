@@ -24,6 +24,7 @@ const entry = (productId: string, categoryName: string, priceCents: number): Cat
   imageUrl: productId === "p-1" ? "https://img.test/p1.png" : null,
   categoryName,
   priceCents,
+  storedImage: null,
 });
 
 const adapter = createNinetyNineFoodAdapter({ copy: NINETY_NINE_FOOD_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, portalUrl: PORTAL });

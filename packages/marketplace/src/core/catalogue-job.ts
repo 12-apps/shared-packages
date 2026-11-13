@@ -102,7 +102,8 @@ async function callFor(
   if (catalogue.mode === "pull") {
     return { result: await catalogue.notifyMenuChanged(call), sentPriceCents: priceCents, name: item.name };
   }
-  const out = { ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId };
+  const storedImage = row.imageRef && row.imageSourceUrl ? { ref: row.imageRef, sourceUrl: row.imageSourceUrl } : null;
+  const out = { ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId, storedImage };
   return { result: await catalogue.publishItem(call, out), sentPriceCents: priceCents, name: item.name };
 }
 
@@ -169,6 +170,16 @@ async function mapPublishedSku(ctx: EngineContext, row: CatalogueRow, result: Ru
   });
 }
 
+/** What a successful publish leaves on the row beyond its state: the item's id, the photo held, the warning. */
+function publishedExtras(result: RunResult): Record<string, unknown> {
+  if (result.kind !== "published") return { warningCode: null };
+  const image =
+    result.image === undefined
+      ? {}
+      : { imageRef: result.image?.ref ?? null, imageSourceUrl: result.image?.sourceUrl ?? null };
+  return { externalId: result.externalId, warningCode: result.warning ?? null, ...image };
+}
+
 async function stampSuccess(
   ctx: EngineContext,
   table: CatalogueTable,
@@ -181,7 +192,7 @@ async function stampSuccess(
   const externalId = result.kind === "published" ? result.externalId : null;
   const data =
     action === "publish"
-      ? { status: "PUBLISHED", publishedAt: now, sentPriceCents, ...(externalId === null ? {} : { externalId }), ...NO_FAILURE }
+      ? { status: "PUBLISHED", publishedAt: now, sentPriceCents, ...publishedExtras(result), ...NO_FAILURE }
       : { status: "WITHDRAWN", withdrawnAt: now, ...NO_FAILURE };
   const moved = await table.updateMany({ where: stillAsked(row, action), data });
   if (moved.count > 0) return;

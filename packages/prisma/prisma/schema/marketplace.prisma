@@ -280,6 +280,15 @@ model MarketplaceCataloguePublication {
   /// The marketplace's id for the item, from the last successful publish.
   externalId String? @map("external_id")
 
+  /// The photo the marketplace holds for the item: the adapter's reference to
+  /// it (iFood's uploaded `imagePath`) and the photo URL it was made from, so a
+  /// re-publish of the same photo does not upload it again.
+  imageRef       String? @map("image_ref")
+  imageSourceUrl String? @map("image_source_url")
+  /// What the last successful publish could not do: IMAGE_TOO_LARGE |
+  /// IMAGE_REFUSED (CHECK); NULL when it did everything.
+  warningCode    String? @map("warning_code")
+
   /// Which action FAILED: PUBLISH | WITHDRAW (CHECK); NULL unless FAILED.
   failedAction  String? @map("failed_action")
   /// Why it FAILED, a code the host words (CHECK): REFUSED, UNAVAILABLE,

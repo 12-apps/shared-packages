@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS "marketplace_catalogue_publications" (
     "price_cents" INTEGER,
     "sent_price_cents" INTEGER,
     "external_id" TEXT,
+    "image_ref" TEXT,
+    "image_source_url" TEXT,
+    "warning_code" TEXT,
     "failed_action" TEXT,
     "failure_code" TEXT,
     "failure_reason" TEXT,
@@ -57,6 +60,11 @@ DO $$ BEGIN
     ALTER TABLE "marketplace_catalogue_publications" ADD CONSTRAINT "marketplace_catalogue_publications_failure_code_check"
         CHECK ("failure_code" IS NULL OR "failure_code" IN ('REFUSED', 'UNAVAILABLE', 'TIMEOUT', 'NOT_CONNECTED',
                                                             'CREDENTIALS', 'PRODUCT_GONE', 'UNSUPPORTED', 'INTERNAL'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TABLE "marketplace_catalogue_publications" ADD CONSTRAINT "marketplace_catalogue_publications_warning_code_check"
+        CHECK ("warning_code" IS NULL OR "warning_code" IN ('IMAGE_TOO_LARGE', 'IMAGE_REFUSED'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
