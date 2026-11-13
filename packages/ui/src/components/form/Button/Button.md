@@ -116,15 +116,20 @@ API: it is never renamed or dropped without a major.
 
 The press ripple and the focus pulsate (an outline or text button's only
 keyboard focus indicator) paint ABOVE the button's own surface and BELOW its
-label, icons and spinner, in every variant, colour and mode. The button is its
-own stacking context (`isolation: isolate`) and MUI's `.MuiTouchRipple-root`
-sits at `z-index: -1`, so a held contained button keeps its label contrast and a
-focused one keeps its pulsate. Opacity and timing are MUI's. The press ripple
-is painted in the absolute OPPOSITE the label's ink (black under a light label,
-white under a dark one), read from the colour the variant actually paints, so it
-never moves the surface toward the ink. The focus pulsate keeps the label's own
-colour, so keyboard focus stays as visible as before. A host that restyles
-the ripple keeps it under the label by leaving that `z-index` alone.
+label, icons and spinner, in every variant, colour and mode. MUI's
+`.MuiTouchRipple-root` keeps its own layer; the CONTENT is lifted above it (the
+label is wrapped in a `span`, and the label, the icon slots and the spinner take
+`position: relative; z-index: 1`). The button is NOT a stacking context, so a
+`pulse` button's ring still paints behind its fill and every state but the press
+looks as it always did.
+
+A button that paints its own fill (`solid`, `gradient`) also tints its PRESS
+ripple against the label: in the absolute on the fill's side of the ink (black
+under a light label, white under a dark one), so holding it down never moves the
+fill toward the ink. `outline`, `text`, `ghost` and `glass` sit on whatever the
+host paints, which the button cannot read, so they keep MUI's `currentColor`
+ripple (a host-coloured pane is not read for any variant). The focus pulsate
+keeps `currentColor` everywhere, and opacity and timing are MUI's.
 
 ## Rendering as something else
 

@@ -19,8 +19,8 @@ import {
   iconAlignmentStyles,
   buttonInk,
   buttonSize,
-  buttonSurface,
-  rippleUnderLabelStyles,
+  BUTTON_CONTENT_LAYER,
+  contentAboveRippleStyles,
 } from './Button.styles';
 import type { ButtonComponent, ButtonProps } from './Button.types';
 
@@ -47,12 +47,8 @@ const StyledButton = styled(MuiButton, {
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
-    ...rippleUnderLabelStyles(),
-    ...pressRippleStyles(
-      theme,
-      buttonInk(theme, customVariant, colorPalette, customColor),
-      buttonSurface(theme, customVariant, colorPalette),
-    ),
+    ...contentAboveRippleStyles(),
+    ...pressRippleStyles(theme, customVariant, buttonInk(theme, customVariant, colorPalette, customColor), colorPalette.main),
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
@@ -134,6 +130,15 @@ const LOADING_SPINNER_STYLE: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  zIndex: BUTTON_CONTENT_LAYER.zIndex,
+};
+
+/** The label, above the ripple (`BUTTON_CONTENT_LAYER`): a text node cannot take a layer, so it gets a box. */
+const LABEL_STYLE: React.CSSProperties = {
+  ...BUTTON_CONTENT_LAYER,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 /**
@@ -156,7 +161,7 @@ function ButtonLabel({
   testId: (suffix: string) => string | undefined;
   children: React.ReactNode;
 }): React.ReactElement {
-  if (!loading) return <>{children}</>;
+  if (!loading) return <span style={LABEL_STYLE}>{children}</span>;
   return (
     <>
       <span style={LOADING_LABEL_STYLE} data-testid={testId('busy-label')}>

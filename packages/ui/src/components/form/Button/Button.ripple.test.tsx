@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -47,6 +47,8 @@ const BLACK = ['#000', '#000000', 'rgb(0, 0, 0)'];
 const WHITE = ['#fff', '#ffffff', 'rgb(255, 255, 255)'];
 
 /** The fill a variant paints its label on, read from the theme and not from the component. */
+const FILLED = new Set<string>(['solid', 'gradient']);
+
 const surfaceOf = (theme: ReturnType<typeof createTheme>, variant: string, color: string): string => {
   const fill: Record<string, string> = {
     primary: theme.palette.primary.main,
@@ -54,20 +56,23 @@ const surfaceOf = (theme: ReturnType<typeof createTheme>, variant: string, color
     danger: theme.palette.error.main,
     neutral: controlNeutral(theme).main,
   };
-  return variant === 'solid' || variant === 'gradient' ? String(fill[color]) : theme.palette.background.paper;
+  return String(fill[color]);
 };
 
 describe('Button press ripple colour (FUT-4861)', () => {
   describe.each(['light', 'dark'] as const)('in %s mode', (mode) => {
     it.each(VARIANTS.flatMap((variant) => COLORS.map((color) => ({ variant, color }))))(
-      'paints the $variant $color press ripple on the surface side of the label, away from the ink',
+      '$variant $color: a filled button\'s press ripple sits on the fill side of the label, any other keeps currentColor',
       ({ variant, color }) => {
         const { cls } = renderButton(mode, { variant, color });
+        const press = colorOf((s) => s === `.${cls} ${PRESS}`);
+        if (!FILLED.has(variant)) {
+          expect(press).toBeUndefined();
+          return;
+        }
         const label = String(colorOf((s) => s === `.${cls}`));
-        const press = String(colorOf((s) => s === `.${cls} ${PRESS}`));
         const surface = surfaceOf(createTheme({ palette: { mode } }), variant, color);
-        const expected = getLuminance(surface) >= getLuminance(label) ? WHITE : BLACK;
-        expect(expected).toContain(press);
+        expect(getLuminance(surface) >= getLuminance(label) ? WHITE : BLACK).toContain(String(press));
       },
     );
   });
@@ -77,13 +82,16 @@ describe('Button press ripple colour (FUT-4861)', () => {
     expect(BLACK).toContain(String(colorOf((s) => s === `.${solid.cls} ${PRESS}`)));
   });
 
-  it('paints white under the dark ink of a text button on a light surface', () => {
-    const text = renderButton('light', { variant: 'text', color: 'primary' });
-    expect(WHITE).toContain(String(colorOf((s) => s === `.${text.cls} ${PRESS}`)));
+  it('leaves outline, text, ghost and glass with MUI\'s own ripple colour, so a press stays visible', () => {
+    for (const variant of ['outline', 'text', 'ghost', 'glass'] as const) {
+      const { cls } = renderButton('light', { variant, color: 'primary' });
+      expect(colorOf((s) => s.startsWith(`.${cls} `) && s.includes('MuiTouchRipple'))).toBeUndefined();
+      cleanup();
+    }
   });
 
   it('does not repaint the focus pulsate or the ripple child', () => {
-    const { cls } = renderButton('light', { variant: 'outline', color: 'primary' });
+    const { cls } = renderButton('light', { variant: 'solid', color: 'primary' });
     const own = rules().filter((r) => r.selectorText.startsWith(`.${cls} `) && r.selectorText.includes('MuiTouchRipple'));
     const repainted = own.filter((r) => r.style.getPropertyValue('color'));
     expect(repainted.map((r) => r.selectorText)).toEqual([`.${cls} ${PRESS}`]);

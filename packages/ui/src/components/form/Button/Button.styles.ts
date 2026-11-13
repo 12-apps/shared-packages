@@ -127,25 +127,28 @@ export const buttonSize =
   };
 
 /**
- * THE PRESS RIPPLE AND THE FOCUS PULSATE PAINT UNDER THE LABEL (FUT-4861).
+ * THE BUTTON'S CONTENT PAINTS ABOVE THE PRESS RIPPLE AND THE FOCUS PULSATE (FUT-4861).
  *
  * MUI appends `.MuiTouchRipple-root` as the last child, absolutely positioned
  * at `z-index: 0`, so it painted OVER the label: a contained button held down
  * dropped its label to 2.9 to 3.5:1, and the focus pulsate (the only keyboard
  * focus indicator an outline or text button has) read 2.95 to 4.17:1 over it.
  *
- * `isolation: isolate` makes the button its own stacking context, so a
- * `z-index: -1` ripple stays ABOVE the button's own surface (fill, gradient,
- * border) and BELOW everything in flow: the label, the icons. The ripple and
- * the pulsate keep their colour and their timing; only the layer moves. The
- * loading spinner and the progress fill are positioned and paint above it too.
+ * The ripple stays where MUI puts it, above the button's own surface; the
+ * CONTENT is what moves: the start and end icon slots here, the label wrapper
+ * and the spinner in `Button.tsx`, each `position: relative; z-index: 1`. The
+ * button is NOT made a stacking context (an `isolation: isolate` did that and
+ * pulled a `pulse` button's `::after`, which sits at `z-index: -1` behind the
+ * fill, over the fill), so every state but the press paints as it always did.
+ * The ripple and the pulsate keep their timing; only the label's side moves.
  *
  * A host that corrects the ink of a control from outside (inside an Alert, say)
- * moves the ripple the same way, so the two rules agree.
+ * moves the ripple under the label too, so the two rules agree.
  */
-export const rippleUnderLabelStyles = (): CSSObject => ({
-  isolation: 'isolate',
-  '& .MuiTouchRipple-root': { zIndex: -1 },
+export const BUTTON_CONTENT_LAYER = { position: 'relative', zIndex: 1 } as const;
+
+export const contentAboveRippleStyles = (): CSSObject => ({
+  '& > .MuiButton-startIcon, & > .MuiButton-endIcon': BUTTON_CONTENT_LAYER,
 });
 
 /**
@@ -308,10 +311,6 @@ export const buttonInk = (
   palette: ColorPalette,
   color: string,
 ): string | undefined => VARIANT_STYLES[variant ?? '']?.(theme, palette, color).color as string | undefined;
-
-/** The colour a variant paints its label on: its fill, or the theme's paper for one with no fill of its own. */
-export const buttonSurface = (theme: Theme, variant: string | undefined, palette: ColorPalette): string =>
-  variant === undefined || variant === 'solid' || variant === 'gradient' ? palette.main : theme.palette.background.paper;
 
 export const buttonVariantStyles = (
   theme: Theme,
