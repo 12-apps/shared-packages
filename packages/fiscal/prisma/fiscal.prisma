@@ -1,0 +1,158 @@
+// @12-apps/fiscal — canonical host-agnostic Prisma partial (FUT-2237).
+//
+// The emitter profile, its issuing points, one number counter per issuing
+// point and series, the fiscal documents and their events. Every host id (the
+// profile's owner, a document's subject) is stored BY VALUE: what an owner or
+// a subject is stays the host's to map, and the links to its orders live in
+// the host. The package migration adds the CHECKs Prisma cannot express.
+//
+// Secrets are never stored in clear: the certificate, its password and the
+// CSC token are ciphertext from the host's cipher.
+
+model FiscalEmitterProfile {
+  ownerId                       String    @id @map("owner_id")
+  cnpj                          String
+  stateRegistration             String    @map("state_registration")
+  municipalRegistration         String?   @map("municipal_registration")
+  cnae                          String?
+  legalName                     String    @map("legal_name")
+  tradeName                     String?   @map("trade_name")
+  // CRT on the document: SIMPLES | SIMPLES_EXCESS | NORMAL | MEI.
+  taxRegime                     String    @map("tax_regime")
+  // The IBS/CBS engine's regime, and the day it took effect.
+  regime                        String
+  regimeEffectiveFrom           DateTime  @map("regime_effective_from") @db.Date
+  restaurantRegime              Boolean   @map("restaurant_regime")
+  // { street, number, complement, district, municipalityIbge, municipalityName, uf, postalCode, phone }
+  address                       Json
+  // homologacao | producao
+  environment                   String
+  // ISSUED_HERE | ISSUED_ELSEWHERE | NONE — the host sets the default.
+  documentPolicy                String    @map("document_policy")
+  // STORE_CERTIFICATE | PLATFORM (declared, NOT_SUPPORTED until FUT-2229 q4).
+  signingIdentity               String    @map("signing_identity")
+  certificateCiphertext         String?   @map("certificate_ciphertext")
+  certificatePasswordCiphertext String?   @map("certificate_password_ciphertext")
+  certificateExpiresAt          DateTime? @map("certificate_expires_at")
+  cscId                         String?   @map("csc_id")
+  cscCiphertext                 String?   @map("csc_ciphertext")
+  consentRecordedAt             DateTime? @map("consent_recorded_at")
+  updatedAt                     DateTime  @updatedAt @map("updated_at")
+
+  @@index([certificateExpiresAt])
+  @@map("fiscal_emitter_profiles")
+}
+
+// Where documents are issued from: an opaque id the host maps (a register, the
+// online store). A register has an online and a contingency series.
+model FiscalIssuingPoint {
+  id                String   @id
+  ownerId           String   @map("owner_id")
+  // NFE | NFCE
+  model             String
+  onlineSeries      Int      @map("online_series")
+  contingencySeries Int?     @map("contingency_series")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  counters FiscalNumberCounter[]
+
+  @@index([ownerId])
+  @@map("fiscal_issuing_points")
+}
+
+// The ONE counter of a series. SEFAZ numbers by CNPJ, model and series, and
+// one CNPJ can serve several owners, so the primary key is the CNPJ's: a
+// series belongs to one issuing point. `nextNumber` is drawn with
+// FISCAL_NEXT_NUMBER_SQL in the same transaction as the document's insert.
+model FiscalNumberCounter {
+  issuerCnpj     String             @map("issuer_cnpj")
+  environment    String
+  model          String
+  series         Int
+  issuingPointId String             @map("issuing_point_id")
+  // ONLINE | CONTINGENCY
+  seriesKind     String             @map("series_kind")
+  nextNumber     Int                @map("next_number")
+  updatedAt      DateTime           @default(now()) @map("updated_at")
+  issuingPoint   FiscalIssuingPoint @relation(fields: [issuingPointId], references: [id], onDelete: Restrict)
+
+  @@id([issuerCnpj, environment, model, series])
+  @@index([issuingPointId])
+  @@map("fiscal_number_counters")
+}
+
+model FiscalDocument {
+  id             String    @id
+  ownerId        String    @map("owner_id")
+  issuerCnpj     String    @map("issuer_cnpj")
+  // What the document is for, opaque: the host links it to its orders.
+  subjectId      String    @map("subject_id")
+  issuingPointId String    @map("issuing_point_id")
+  model          String
+  environment    String
+  seriesKind     String    @map("series_kind")
+  series         Int
+  number         Int
+  keyCode        String    @map("key_code")
+  // PENDING | SUBMITTED | AUTHORIZED | REJECTED | DENIED | CONTINGENCY | CANCELLED | REPLACED
+  status         String
+  // The SaleForDocument as sent. Never a secret.
+  sale           Json
+  // { totalCents, discountCents, cbsCents, ibsUfCents, ibsMunCents }
+  totals         Json
+  buyerTaxId     String?   @map("buyer_tax_id")
+  accessKey      String?   @unique @map("access_key")
+  protocol       String?
+  statusCode     String?   @map("status_code")
+  statusReason   String?   @map("status_reason")
+  lastErrorClass String?   @map("last_error_class")
+  outcomeUnknown Boolean   @default(false) @map("outcome_unknown")
+  issuedAt       String    @map("issued_at")
+  authorizedAt   String?   @map("authorized_at")
+  // { since, reason } of a document signed offline.
+  contingency    Json?
+  cancelledAt    String?   @map("cancelled_at")
+  cancelReason   String?   @map("cancel_reason")
+  cancelProtocol String?   @map("cancel_protocol")
+  replacedById   String?   @map("replaced_by_id")
+  // LOOKUP_FIRST | INUTILIZE | CANCEL | INUTILIZED | CANCELLED | DENIED
+  numberVoid     String?   @map("number_void")
+  xmlKey         String?   @map("xml_key")
+  eventXmlKey    String?   @map("event_xml_key")
+  attempts       Int       @default(0)
+  // Failed steps in a row; the backoff and the person's flag follow from it.
+  failures       Int       @default(0)
+  nextAttemptAt  DateTime? @map("next_attempt_at")
+  attention      Boolean   @default(false)
+  deadlineWarnedAt DateTime? @map("deadline_warned_at")
+  createdAt      DateTime  @map("created_at")
+  updatedAt      DateTime  @map("updated_at")
+
+  events FiscalDocumentEvent[]
+
+  // The per-subject guard (one live document) and the sweep's queue index are
+  // partial indexes, in the migration: Prisma cannot express them.
+  @@unique([issuerCnpj, environment, model, series, number], map: "fiscal_documents_number_key")
+  @@index([ownerId, subjectId, model])
+  @@map("fiscal_documents")
+}
+
+// One transition, with the fiscal service's raw answer (secret-named keys
+// scrubbed). Append-only.
+model FiscalDocumentEvent {
+  id         String         @id
+  // Insertion order: two events of one millisecond keep theirs.
+  seq        BigInt         @unique @default(autoincrement())
+  documentId String         @map("document_id")
+  kind       String
+  fromStatus String         @map("from_status")
+  toStatus   String         @map("to_status")
+  at         DateTime
+  errorClass String?        @map("error_class")
+  code       String?
+  answer     Json?
+  document   FiscalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([documentId, at])
+  @@map("fiscal_document_events")
+}

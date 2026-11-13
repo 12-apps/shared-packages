@@ -800,7 +800,7 @@ describe("a host without the pause model", () => {
     const store = { db: tables as MarketplaceDb, transaction: memory.transaction };
     const h = createHarness({ adapters: [adapter(ACME, interruptionMarketplace().availability)], store });
     await h.connect(ACME);
-    await expect(pause(h, minutes(20))).rejects.toThrow(/20261113180000_marketplace_store_pause/u);
+    await expect(pause(h, minutes(20))).rejects.toThrow(/20261113230000_marketplace_store_pause/u);
     expect(await h.engine.availabilityState(TENANT)).toMatchObject([{ provider: ACME, state: "OPEN", supported: true }]);
     expect(await h.engine.sweepAvailability()).toEqual({ expired: 0, requeued: 0, givenUp: 0 });
   });

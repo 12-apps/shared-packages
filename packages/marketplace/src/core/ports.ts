@@ -73,7 +73,7 @@ export interface MarketplaceDb {
   /**
    * OPTIONAL in the type, so a host on 1.x that has not yet composed the
    * pause model still compiles; `pauseStore` refuses without it (FUT-4851,
-   * migration `20261113180000_marketplace_store_pause`).
+   * migration `20261113230000_marketplace_store_pause`).
    */
   marketplaceStorePause?: {
     findFirst(args: unknown): Promise<unknown>;

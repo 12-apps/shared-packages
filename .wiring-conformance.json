@@ -257,47 +257,31 @@
   },
   "@12-apps/fiscal :: areas": {
     "kind": "exempt",
-    "why": "suggests no nav rows yet: the engine has no screen to place, and the fiscal settings screen and documents list that would carry areas arrive with FUT-2237's web surface"
-  },
-  "@12-apps/fiscal :: db": {
-    "kind": "exempt",
-    "why": "owns no table yet: the engine is a pure function over its inputs; the emitter profile, the fiscal document, its events and the per-series number counters arrive as the FUT-2237 partial"
+    "why": "suggests no nav rows: there is no package screen to place yet — the settings screen and the documents list arrive with FUT-2231 and FUT-2238"
   },
   "@12-apps/fiscal :: e2e": {
     "kind": "exempt",
-    "why": "ships no packaged journeys: the engine is asserted by its own golden, property and oracle suites, and no screen exists yet for a journey to drive"
+    "why": "ships no packaged journeys: the documents are asserted by the state-machine property suite, the service suite and the issuer's contract suite over the fiscal service's recorded answers, and no screen exists yet for a journey to drive"
   },
   "@12-apps/fiscal :: email": {
     "kind": "exempt",
-    "why": "sends no mail: certificate expiry and a rejected document are notifications in FUT-2237's scope, delivered through the host's notifier, never a package mailer"
+    "why": "sends no mail: certificate expiry and a rejected document are notifications delivered through the host's notifier, never a package mailer"
   },
   "@12-apps/fiscal :: env": {
     "kind": "exempt",
-    "why": "reads no process.env: the rate tables, the seller's regime and the date of the supply all arrive as arguments to a pure function"
-  },
-  "@12-apps/fiscal :: http": {
-    "kind": "exempt",
-    "why": "mounts no routes yet: the engine is called in-process by the host's pricing code; profile, certificate upload, issue, cancel and look-up routes arrive with FUT-2237"
-  },
-  "@12-apps/fiscal :: jobs": {
-    "kind": "exempt",
-    "why": "schedules no work yet: computing a breakdown is synchronous and pure; retry, contingency transmission and the certificate-expiry warning are FUT-2237's blueprints"
+    "why": "reads no process.env in shipped source: the fiscal service's address, the timeout, the clock and every secret arrive as arguments and ports; only the live contract suite reads FISCAL_TEST_*, and tests do not ship"
   },
   "@12-apps/fiscal :: mcp": {
     "kind": "exempt",
-    "why": "declares no package-owned tool set: a tax breakdown is computed inside the host's own order flows, and exposing fiscal operations to an agent is host vocabulary over its routes"
+    "why": "declares no package-owned tool set: issuing or cancelling a fiscal document is a legal act a host gates by its own permissions and flows, and exposing it to an agent is host vocabulary over its routes"
   },
   "@12-apps/fiscal :: notifications": {
     "kind": "exempt",
-    "why": "raises no alerts yet: the engine has no event to announce; certificate-expiring and document-rejected blueprints arrive with FUT-2237's document module"
-  },
-  "@12-apps/fiscal :: observability": {
-    "kind": "exempt",
-    "why": "runs no code that logs: the engine refuses bad input by throwing a typed FiscalEngineError, and a namespace would oblige every host to bind a logger for a pure function"
+    "why": "the four alerts (certificate expiring, document rejected, document needs a person, NFC-e 20 hours into contingency) are host copy: createFiscalNotificationBlueprints(copy) in ./notifications — the host feeds its own notifications mount, the estate's sanctioned shape for package alerts; the document service and the jobs emit them through the host's notifier"
   },
   "@12-apps/fiscal :: surface": {
     "kind": "exempt",
-    "why": "ships no web surface yet: the fiscal settings screen and the documents list, which each host mounts where it wants, arrive with FUT-2237"
+    "why": "ships no web surface in FUT-2237: the fiscal settings screen and the documents list are built with their screen tickets (FUT-2231, FUT-2238) from the owner's approved prototypes, over this package's http routes; the offline register's contingency blocks are FUT-4717's, over the declared ContingencyBlockSource port"
   },
   "@12-apps/forms-core": {
     "kind": "exempt",

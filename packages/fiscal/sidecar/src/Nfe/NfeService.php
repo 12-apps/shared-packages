@@ -86,8 +86,41 @@ final class NfeService
         $protocol = $in->pattern('protocol', '/^[0-9]{15}$/', 'the 15-digit authorisation protocol');
         $reason = $in->text('reason', 15, 255);
         $tools = $this->toolsForKey($in, $model, $environment, $key);
+        return $this->sendCancel($tools, $key, fn (): string => $tools->sefazCancela($key, $reason, $protocol));
+    }
+
+    /**
+     * `POST /nfce/cancel-substitution`: the NFC-e "cancelamento por
+     * substituição" (event 110112). Cancels an online NFC-e found authorised
+     * after its sale was issued again in contingency, naming the substitute's
+     * key (`chNFeRef`). Settled like an ordinary cancel when retried.
+     */
+    public function cancelBySubstitution(Input $in): Response
+    {
+        $environment = $in->environment();
+        $key = self::keyOf(Model::NFCE, $in);
+        $substitute = $in->accessKey('substituteAccessKey');
+        if ((int) substr($substitute, 20, 2) !== Model::NFCE->code()) {
+            throw ServiceError::invalid('substituteAccessKey is not of a model 65 document.');
+        }
+        if ($substitute === $key) {
+            throw ServiceError::invalid('substituteAccessKey must be another document\'s key.');
+        }
+        $protocol = $in->pattern('protocol', '/^[0-9]{15}$/', 'the 15-digit authorisation protocol');
+        $reason = $in->text('reason', 15, 255);
+        $tools = $this->toolsForKey($in, Model::NFCE, $environment, $key);
+        return $this->sendCancel(
+            $tools,
+            $key,
+            fn (): string => $tools->sefazCancelaPorSubstituicao($key, $reason, $protocol, $substitute, DocumentMapper::PROCESS_VERSION),
+        );
+    }
+
+    /** One cancel event, sent and settled: 218/573 and a request with no answer are looked up. */
+    private function sendCancel(Tools $tools, string $key, callable $send): Response
+    {
         try {
-            $reply = $this->exchange(fn (): string => $tools->sefazCancela($key, $reason, $protocol));
+            $reply = $this->exchange($send);
         } catch (TransportFailure $failure) {
             if ($failure->kind !== TransportFailure::NO_ANSWER) {
                 throw Classifier::fromTransport($failure, false);

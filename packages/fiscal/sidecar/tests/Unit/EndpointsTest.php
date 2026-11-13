@@ -28,6 +28,7 @@ final class EndpointsTest extends TestCase
             'GET /health',
             'POST /inutilize',
             'POST /nfce/cancel',
+            'POST /nfce/cancel-substitution',
             'POST /nfce/issue',
             'POST /nfce/lookup',
             'POST /nfce/sign-contingency',
@@ -170,6 +171,58 @@ final class EndpointsTest extends TestCase
         ]));
 
         self::assertSame(422, $response->status);
+        self::assertSame(['REJECTED', '501'], [$response->body['error']['class'], $response->body['error']['code']]);
+    }
+
+    public function testCancelBySubstitutionSendsEvent110112NamingTheSubstitute(): void
+    {
+        $transport = new RecordedTransport('cancel-substitution-135-registered');
+        [$kernel] = Fixtures::kernel($transport);
+        $substitute = '35261111222333000181650020000000019482139071';
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/cancel-substitution', $this->keyed([
+            'protocol' => '135260000123456',
+            'reason' => 'Replaced by the document issued in contingency',
+            'substituteAccessKey' => $substitute,
+        ]));
+
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame('CANCELLED', $response->body['status']);
+        self::assertSame('135260000200002', $response->body['protocol']);
+        $envelope = $transport->sent[0]['envelope'];
+        self::assertStringContainsString('<tpEvento>110112</tpEvento>', $envelope);
+        self::assertStringContainsString("<chNFeRef>$substitute</chNFeRef>", $envelope);
+        self::assertStringContainsString('<verAplic>fiscal-sidecar-1</verAplic>', $envelope);
+    }
+
+    public function testCancelBySubstitutionRefusesAMissingOrSelfSubstitute(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport());
+        $base = ['protocol' => '135260000123456', 'reason' => 'Replaced by the document issued in contingency'];
+
+        $missing = Fixtures::call($kernel, 'POST', '/nfce/cancel-substitution', $this->keyed($base));
+        $self = Fixtures::call($kernel, 'POST', '/nfce/cancel-substitution', $this->keyed(
+            $base + ['substituteAccessKey' => '35261111222333000181650010000012011482139076'],
+        ));
+        $nfe = Fixtures::call($kernel, 'POST', '/nfce/cancel-substitution', $this->keyed(
+            $base + ['substituteAccessKey' => '35261111222333000181550010000012011482139076'],
+        ));
+
+        self::assertSame(['INVALID', 400], [$missing->body['error']['class'], $missing->status]);
+        self::assertSame(['INVALID', 400], [$self->body['error']['class'], $self->status]);
+        self::assertSame(['INVALID', 400], [$nfe->body['error']['class'], $nfe->status]);
+    }
+
+    public function testCancelBySubstitutionALateOneIsRejectedWithItsCode(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport('cancel-501-late'));
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/cancel-substitution', $this->keyed([
+            'protocol' => '135260000123456',
+            'reason' => 'Replaced by the document issued in contingency',
+            'substituteAccessKey' => '35261111222333000181650020000000019482139071',
+        ]));
+
         self::assertSame(['REJECTED', '501'], [$response->body['error']['class'], $response->body['error']['code']]);
     }
 

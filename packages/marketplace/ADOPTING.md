@@ -267,7 +267,7 @@ owner ALSO made by hand on the marketplace during the kitchen's pause (that
 one would be reopened with it). Their adapters offer the capability only with
 `pauseByStoreSwitch: true`; leave it off to keep them `unsupported`.
 
-**The database.** Migration `20261113180000_marketplace_store_pause` adds
+**The database.** Migration `20261113230000_marketplace_store_pause` adds
 `marketplace_store_pauses` (one row per store and marketplace, CHECKed
 vocabularies, no foreign key; add `client_id → <tenants>(id) ON DELETE CASCADE`
 if you want one). The `MarketplaceDb.marketplaceStorePause` delegate is

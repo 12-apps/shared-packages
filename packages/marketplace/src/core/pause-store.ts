@@ -96,7 +96,7 @@ export function pauseTable(db: MarketplaceDb): NonNullable<MarketplaceDb["market
   if (!table) {
     throw new Error(
       "@12-apps/marketplace: the store pause needs the MarketplaceStorePause model " +
-        "(migration 20261113180000_marketplace_store_pause); compose the partial and migrate.",
+        "(migration 20261113230000_marketplace_store_pause); compose the partial and migrate.",
     );
   }
   return table;

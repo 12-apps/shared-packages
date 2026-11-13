@@ -34,6 +34,7 @@ final class NfeModule implements Module
             $router->add('POST', "$prefix/cancel", fn (Request $r): Response => $this->service()->cancel($model, self::in($r)));
             $router->add('POST', "$prefix/lookup", fn (Request $r): Response => $this->service()->lookup($model, self::in($r)));
         }
+        $router->add('POST', '/nfce/cancel-substitution', fn (Request $r): Response => $this->service()->cancelBySubstitution(self::in($r)));
         $router->add('POST', '/nfce/sign-contingency', fn (Request $r): Response => $this->service()->signContingency(self::in($r)));
         $router->add('POST', '/inutilize', fn (Request $r): Response => $this->service()->inutilize(self::in($r)));
     }

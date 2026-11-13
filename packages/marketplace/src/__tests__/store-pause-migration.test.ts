@@ -71,7 +71,7 @@ describe("the store pause migration", () => {
     expect(expected).toHaveLength(3);
     expect(await indexNames(pg)).toEqual(expected);
     for (const name of expected) expect(name.length).toBeLessThanOrEqual(63);
-    const sql = readFileSync(new URL("20261113180000_marketplace_store_pause/migration.sql", MIGRATIONS), "utf8");
+    const sql = readFileSync(new URL("20261113230000_marketplace_store_pause/migration.sql", MIGRATIONS), "utf8");
     await pg.exec(sql);
     expect(await indexNames(pg)).toEqual(expected);
   });
