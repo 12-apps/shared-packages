@@ -106,7 +106,9 @@ refund lands after all, its REFUNDED word adopts it while the payment is still
 pending, or — when the payment was returned again meanwhile — is recorded once
 as a double return (`doubleReturned`) for a person to recover. A charge read
 that adopts money back records it as that refund only while no second refund
-was sent (`sendingAgain` tells the host before every send); after one, which
+was sent (`sendingAgain` tells the host before every send, `sentNothing` takes
+it back when the answer proves nothing moved: FAILED, an answered refusal, or a
+refusal before dispatch); after one that may have moved money, which
 refund landed is unknown and the late word counts as a double return; and
 `settleByHand` on such a payment reads the charge first, refusing with
 `MONEY_BACK` or `CHARGE_UNREADABLE`. WHEN a payment is refundable, what a cancel

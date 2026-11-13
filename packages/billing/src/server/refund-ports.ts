@@ -127,11 +127,19 @@ export interface RefundablePaymentStore {
   /**
    * Called BEFORE every refund this binding sends: on a payment reopened
    * NOT_RETURNED (it carries a `notReturnedRefundId`) the host records that a
-   * second refund was asked for, so `find` answers `sentAgain: true` from then
-   * on. A no-op for any other payment. Keyed by the charge, the one handle the
-   * provider call carries.
+   * second refund was asked for, at `at`, ONLY when none is recorded yet, so
+   * `find` answers `sentAgain: true`. A no-op for any other payment. Keyed by
+   * the charge, the one handle the provider call carries. Recorded before the
+   * call so a process that dies mid-send still leaves it.
    */
   sendingAgain(provider: string, providerChargeId: string, at: Date): Promise<void>;
+  /**
+   * The send recorded at `at` provably moved no money (a FAILED answer, an
+   * answered refusal, or refused before dispatch): clear the record ONLY if it
+   * is still that one (`at`), so an earlier send that may have moved money
+   * keeps it.
+   */
+  sentNothing(provider: string, providerChargeId: string, at: Date): Promise<void>;
 }
 
 /** A refund recorded unconfirmed (`confirmed: false`), waiting for the provider to finish it. */
@@ -214,9 +222,6 @@ export interface NotReturnedRefund {
    */
   settledRefundId: string | null;
 }
-
-/** How a charge read back answered: money back, not back (yet), or not readable at all. */
-export type ChargeRead = "BACK" | "NOT_BACK" | "UNREADABLE";
 
 /**
  * Who said a refund was never returned, and why — handed to `reopen` so the

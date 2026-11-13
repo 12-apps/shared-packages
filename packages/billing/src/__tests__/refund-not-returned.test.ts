@@ -9,6 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { ProviderRequestError, UnsupportedOperationError } from "@12-apps/payments-backend";
+
 import { harness, HOUR, T0_MS, WITHIN } from "./refund-world";
 
 const BY = { by: "fin@paladira.com", reason: "Provedor não devolveu em 3 dias" };
@@ -224,6 +226,42 @@ describe("the refund said never returned lands after all", () => {
     await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
   });
 
+  it.each([
+    ["answered FAILED", "FAILED"],
+    ["answered with a refusal", "REFUSED"],
+    ["refused before dispatch", "UNSUPPORTED"],
+  ])("a second send %s moved no money: after the adoption, the late word counts once", async (_label, how) => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    if (how === "FAILED") h.refund.mockResolvedValueOnce({ providerRefundId: "rf-x", status: "FAILED", amount: { amountCents: 0, currency: "BRL" } });
+    if (how === "REFUSED") h.refund.mockRejectedValueOnce(new ProviderRequestError("acquirer-a", "refused", { httpStatus: 422 }));
+    if (how === "UNSUPPORTED") h.refund.mockRejectedValueOnce(new UnsupportedOperationError("acquirer-a", "refund"));
+    await h.flow.retry("pay-1");
+    expect(h.held.row.sentAgain).toBe(false);
+    // rf-1 lands; a charge read (the hand settlement's check) adopts it.
+    const { refreshCharge, later, flow, held, payments } = h;
+    refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    later(HOUR);
+    await expect(flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ why: "MONEY_BACK" });
+    expect(held.row.state).toBe("REFUNDED");
+    expect(payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED", providerRefundId: "rf-1" });
+
+    await expect(flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+  });
+
+  it("a send that may have moved money keeps its record when a later one is refused", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    const { flow, held, refund, later } = h;
+    refund.mockRejectedValueOnce(new Error("socket hang up"));
+    await flow.retry("pay-1");
+    later(HOUR);
+    refund.mockResolvedValueOnce({ providerRefundId: "rf-x", status: "FAILED", amount: { amountCents: 0, currency: "BRL" } });
+    await flow.runDue();
+    expect(refund).toHaveBeenCalledTimes(3);
+    expect(held.row.sentAgain).toBe(true);
+  });
+
   it("a redelivery of the word that adopted it is ignored", async () => {
     const h = await overdueRefund();
     await h.flow.markNotReturned("pay-1", BY);
@@ -260,6 +298,21 @@ describe("settling by hand a refund said never returned", () => {
     h.payments.markRefunded.mockResolvedValueOnce(false);
 
     await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "ALREADY_REFUNDED" });
+  });
+
+  it("still reads the charge after a retry rewrote the pending reason", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    const { flow, held, refund, refreshCharge, later } = h;
+    refund.mockRejectedValue(new Error("provider down"));
+    await flow.retry("pay-1");
+    expect(held.row.pendingReason).not.toBe("NOT_RETURNED");
+    later(2 * HOUR);
+    refreshCharge.mockClear();
+    refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+
+    await expect(flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "MONEY_BACK" });
+    expect(refreshCharge).toHaveBeenCalled();
   });
 
   it("an unreadable charge refuses it: nothing settled", async () => {

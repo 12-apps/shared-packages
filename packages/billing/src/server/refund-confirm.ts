@@ -6,7 +6,6 @@ import { BillingConfigError } from "../errors";
 import type { MerchantRef, NormalizedWebhookEvent } from "@12-apps/payments-backend";
 
 import type {
-  ChargeRead,
   ConfirmationPass,
   NotReturnedBy,
   NotReturnedResult,
@@ -45,6 +44,9 @@ import type {
  */
 
 const BATCH = 20;
+
+/** How a charge read back answered: money back, not back (yet), or not readable at all. */
+export type ChargeRead = "BACK" | "NOT_BACK" | "UNREADABLE";
 
 /**
  * A charge that reads this has its money back. CANCELED counts only because

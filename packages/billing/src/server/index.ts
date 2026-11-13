@@ -18,6 +18,7 @@ export {
   type SubscriptionCollectionDeps,
 } from "./collect";
 export { createSubscriptionRefund } from "./refund";
+export type { ChargeRead } from "./refund-confirm";
 export {
   SUBSCRIPTION_REFUND_SUBJECT,
   type ConfirmationPass,
@@ -27,7 +28,6 @@ export {
   type NotReturnedResult,
   type NotReturnedRefund,
   type ReopenRecord,
-  type ChargeRead,
   type RefundUpdateOutcome,
   type RefundUpdate,
   type UnconfirmedRefund,

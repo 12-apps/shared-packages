@@ -25,6 +25,7 @@ import {
   type SubscriptionRefundResult,
 } from "./refund-ports";
 import { confirmDue, markNotReturned, readCharge, refundUpdated, refundWebhookHandler } from "./refund-confirm";
+import { adoptedRefundId, recordingSends } from "./refund-sends";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -85,8 +86,6 @@ import { confirmDue, markNotReturned, readCharge, refundUpdated, refundWebhookHa
  * Server-only.
  */
 
-type SendingGateway = Awaited<ReturnType<SubscriptionRefundDeps["payments"]>>["gateway"];
-
 /** One call's context: the deps, the clock and this request's stores. */
 interface Ctx {
   deps: SubscriptionRefundDeps;
@@ -131,27 +130,6 @@ function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSer
     // field existed) keeps the payment id, the binding its live series has.
     boundTo: payment.requestId ? `${payment.id}:${payment.requestId}` : payment.id,
     cause: reason ?? null,
-  };
-}
-
-/**
- * The money a charge read sees back on a payment reopened NOT_RETURNED is the
- * refund said never returned — unless a second refund was sent since, when it
- * may be either: then no id is recorded, and that refund's late word is a
- * double return.
- */
-function adoptedRefundId(payment: RefundablePayment | null): string | null {
-  return payment?.notReturnedRefundId && !payment.sentAgain ? payment.notReturnedRefundId : null;
-}
-
-/** The gateway, telling the host before every refund it sends (`sendingAgain`). */
-function recordingSends(gateway: SendingGateway, store: RefundablePaymentStore, now: () => Date): SendingGateway {
-  return {
-    refreshCharge: (...args) => gateway.refreshCharge(...args),
-    refund: async (merchant, provider, input) => {
-      await store.sendingAgain(provider, input.providerChargeId, now());
-      return gateway.refund(merchant, provider, input);
-    },
   };
 }
 
@@ -342,7 +320,9 @@ async function settleByHand(
 ): Promise<SettleByHandResult> {
   const payment = await pendingPayment(ctx, paymentId);
   if (refused(payment)) return payment;
-  if (payment.pendingReason === "NOT_RETURNED") {
+  // Keyed on the kept refund id, not the pending reason: a retry after the
+  // reopen rewrites the reason, and the refund said never returned may still land.
+  if (payment.notReturnedRefundId !== null) {
     const notYet = await notReturnedYet(ctx, payment);
     if (notYet) return notYet;
   }

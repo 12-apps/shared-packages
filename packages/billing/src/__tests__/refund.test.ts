@@ -75,6 +75,7 @@ function paymentRows(initial: RefundablePayment | null) {
       return true;
     }),
     sendingAgain: vi.fn(async () => undefined),
+    sentNothing: vi.fn(async () => undefined),
   } satisfies RefundablePaymentStore;
   return { store, refundedWith, pendingWith, current: () => held.row };
 }
