@@ -434,6 +434,31 @@ describe("catalogue publishing, pull", () => {
     expect(after).toMatchObject({ document: { items: [{ code: "p-2" }] } });
   });
 
+  it("keeps a published item in the menu, at the price last sent, when a re-publish fails; a failed first publish is not listed", async () => {
+    const h = mount(
+      [
+        { status: 204, body: "" },
+        { status: 404, body: "no merchant" },
+      ],
+      { "p-1": BURGER, "p-2": { ...BURGER, name: "Fries", priceCents: 900 } },
+    );
+    await h.connect(PULLY);
+    const options = { menuName: "Menu", currency: "XTS" };
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-1" });
+    await runLatest(h);
+
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-1", priceCents: 2800 });
+    await runLatest(h);
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-2" });
+    await runLatest(h);
+
+    expect((await stateOf(h, PULLY, "p-1"))?.status).toBe("FAILED");
+    expect((await stateOf(h, PULLY, "p-2"))?.status).toBe("FAILED");
+    expect(await h.engine.catalogueDocument({ clientId: TENANT, provider: PULLY, options })).toMatchObject({
+      document: { items: [{ code: "p-1", price: 2500 }] },
+    });
+  });
+
   it("serves no document for a push marketplace or one not connected", async () => {
     const h = mount();
     const options = { menuName: "Menu", currency: "XTS" };

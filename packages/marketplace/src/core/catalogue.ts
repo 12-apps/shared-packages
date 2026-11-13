@@ -177,8 +177,19 @@ export async function readCatalogueState(
   return rows.map(viewOf);
 }
 
-/** Every product a pull marketplace's menu lists: switched on, or on its way. */
-const IN_MENU = ["PUBLISHING", "PUBLISHED"];
+/**
+ * Every product a pull marketplace's menu lists: switched on, on its way, or
+ * already published once and since FAILED to be published again (it stays,
+ * at the price last sent, until it is withdrawn).
+ */
+const IN_MENU = ["PUBLISHING", "PUBLISHED", "FAILED"];
+
+/** Whether a row belongs in the served menu, and at which price. */
+function menuPrice(row: CatalogueRow, storePrice: number): number | null {
+  if (row.status !== "FAILED") return row.priceCents ?? storePrice;
+  const republishFailed = row.failedAction === "PUBLISH" && row.publishedAt !== null;
+  return republishFailed ? (row.sentPriceCents ?? row.priceCents ?? storePrice) : null;
+}
 
 /**
  * The menu part of the document a pull marketplace reads, for the host to
@@ -203,8 +214,9 @@ export async function readCatalogueDocument(
   const items = (await ctx.ports.catalogue?.items(input.clientId, rows.map((row) => row.productId))) ?? new Map();
   const entries: CatalogueMenuEntry[] = rows.flatMap((row) => {
     const item = items.get(row.productId);
-    if (!item) return [];
-    return [{ ...item, priceCents: row.priceCents ?? item.priceCents, ref: row.id, productId: row.productId, externalId: row.externalId }];
+    const priceCents = item ? menuPrice(row, item.priceCents) : null;
+    if (!item || priceCents === null) return [];
+    return [{ ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId }];
   });
   const document = catalogue.menuDocument({ externalMerchantId: connection.externalMerchantId, entries, options: input.options });
   return { kind: "document", document };
