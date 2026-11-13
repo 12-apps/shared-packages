@@ -26,6 +26,7 @@ export {
 export { buildHomologacaoEvidenceFile, formatEvidenceTime, type EvidenceFile, type EvidenceFileDeps } from './file';
 export { buildHomologacaoEvidenceJson } from './json';
 export { createMemoryHomologacaoEvidenceStore } from './memory';
+export { type EvidenceGooglePayMerchant } from './orders-wallet';
 export {
   createPrismaHomologacaoEvidenceStore,
   type EvidenceChargeDelegate,

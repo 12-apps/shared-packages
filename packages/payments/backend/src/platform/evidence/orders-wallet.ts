@@ -39,17 +39,32 @@ export const WALLET_ORDER_KEYS: readonly EvidenceStepKey[] = (['GOOGLE_PAY', 'AP
   Object.values(keysOf(wallet)),
 );
 
+/** The platform's Google merchant id, as `platformGooglePayMerchant(process.env)` reads it (FUT-4895). */
+export type EvidenceGooglePayMerchant = NonNullable<NonNullable<EvidenceWalletsConfig['googlePay']>['merchantInfo']>;
+
+/**
+ * Google's sheet, against the seller's PagBank account, or null when it cannot
+ * open: no account, or PRODUCTION without the platform's Google merchant id,
+ * which Google requires there (FUT-4895).
+ */
+async function googlePayConfig(deps: EvidenceRunDeps, accountId: string | null): Promise<EvidenceWalletsConfig['googlePay']> {
+  if (!accountId) return null;
+  const production = environmentOf(deps) === 'PRODUCTION';
+  const merchantInfo = (await deps.googlePayMerchant?.()) ?? null;
+  if (production && !merchantInfo) return null;
+  return {
+    gateway: 'pagbank',
+    gatewayMerchantId: accountId,
+    environment: production ? 'PRODUCTION' : 'TEST',
+    ...(merchantInfo ? { merchantInfo } : {}),
+  };
+}
+
 /** What the browser needs to open each sheet — Google's against the seller's PagBank account. */
 export async function walletsConfig(deps: EvidenceRunDeps, accountId: string | null): Promise<EvidenceWalletsConfig> {
   return {
     amountCents: amountsOf(deps).wallet,
-    googlePay: accountId
-      ? {
-          gateway: 'pagbank',
-          gatewayMerchantId: accountId,
-          environment: environmentOf(deps) === 'PRODUCTION' ? 'PRODUCTION' : 'TEST',
-        }
-      : null,
+    googlePay: await googlePayConfig(deps, accountId),
     applePay: { configured: (await deps.applePayConfigured?.()) === true },
   };
 }

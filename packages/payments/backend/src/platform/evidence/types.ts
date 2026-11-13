@@ -262,8 +262,8 @@ export interface BrowserWalletResult {
 export interface EvidenceWalletsConfig {
   /** The amount the sheets show — the amount the wallet orders are raised for. */
   amountCents: number;
-  /** `TEST` for the sandbox evidence, `PRODUCTION` for the production one (FUT-4198). */
-  googlePay: { gateway: string; gatewayMerchantId: string; environment: 'TEST' | 'PRODUCTION' } | null;
+  /** `TEST` in sandbox, `PRODUCTION` in production (FUT-4198); `merchantInfo` is required in PRODUCTION (FUT-4895). */
+  googlePay: { gateway: string; gatewayMerchantId: string; environment: 'TEST' | 'PRODUCTION'; merchantInfo?: { merchantId: string; merchantName?: string } } | null;
   applePay: { configured: boolean };
 }
 

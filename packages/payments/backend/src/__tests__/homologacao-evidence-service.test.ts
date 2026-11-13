@@ -44,7 +44,11 @@ function delegates() {
 
 function service(
   config = createMemoryProviderConfigStore(),
-  extra: { applePayConfigured?: () => boolean; environment?: 'SANDBOX' | 'PRODUCTION' } = {},
+  extra: {
+    applePayConfigured?: () => boolean;
+    googlePayMerchant?: () => { merchantId: string; merchantName?: string } | null;
+    environment?: 'SANDBOX' | 'PRODUCTION';
+  } = {},
   d = delegates(),
 ) {
   const appCredentials = () => ({ environment: 'SANDBOX' as const, fields: { clientId: 'cid', accountToken: 'platform-token' } });
@@ -110,6 +114,13 @@ describe('createHomologacaoEvidence', () => {
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
 
+  it('given a Google merchant id, then the sandbox sheet carries it too, still in TEST (FUT-4895)', async () => {
+    const google = { merchantId: 'BCR2DN4T00000000' };
+    const view = await service(await connectedConfig(), { googlePayMerchant: () => google }).svc.seller();
+
+    expect(view.wallets.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'TEST', merchantInfo: google });
+  });
+
   it('given the host says Apple Pay is configured, then the view says so (FUT-3755)', async () => {
     const view = await service(await connectedConfig(), { applePayConfigured: () => true }).svc.seller();
 
@@ -154,8 +165,15 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
     billingAddress: { street: 'Rua A', number: '1', regionCode: 'MG', city: 'Belo Horizonte', postalCode: '30000000' },
   };
 
-  function productionService(config = createMemoryProviderConfigStore(), d = delegates()) {
-    return service(config, { environment: 'PRODUCTION', applePayConfigured: () => true }, d);
+  const GOOGLE = { merchantId: 'BCR2DN4T00000000', merchantName: 'Paladira' };
+
+  function productionService(
+    config = createMemoryProviderConfigStore(),
+    d = delegates(),
+    googlePayMerchant: (() => typeof GOOGLE | null) | 'absent' = () => GOOGLE,
+  ) {
+    const google = googlePayMerchant === 'absent' ? {} : { googlePayMerchant };
+    return service(config, { environment: 'PRODUCTION', applePayConfigured: () => true, ...google }, d);
   }
 
   it('when connecting, then the authorization asks for PRODUCTION and its record is kept apart from the sandbox one', async () => {
@@ -171,14 +189,24 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
     expect((await prod.svc.file()).content).toContain('aguardando login e consentimento');
   });
 
-  it('given a production seller, then its wallets charge R$ 1,00 and Google Pay runs in PRODUCTION', async () => {
+  it('given a production seller, then its wallets charge R$ 1,00 and Google Pay runs in PRODUCTION with the Google merchant id (FUT-4895)', async () => {
     const view = await productionService(await connectedConfig('PRODUCTION')).svc.seller();
 
     expect(view.wallets).toEqual({
       amountCents: 100,
-      googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'PRODUCTION' },
+      googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'PRODUCTION', merchantInfo: GOOGLE },
       applePay: { configured: true },
     });
+  });
+
+  it('given no Google merchant id, then production offers no Google Pay, since Google would refuse the request (FUT-4895)', async () => {
+    const connected = await connectedConfig('PRODUCTION');
+    const unset = await productionService(connected, delegates(), () => null).svc.seller();
+    const absent = await productionService(connected, delegates(), 'absent').svc.seller();
+
+    expect(unset.wallets.googlePay).toBeNull();
+    expect(absent.wallets.googlePay).toBeNull();
+    expect(unset.wallets.applePay).toEqual({ configured: true });
   });
 
   it('given the cardholder, then phase 1 hands the browser their 3DS data for R$ 1,00', async () => {
