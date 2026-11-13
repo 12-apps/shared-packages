@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "series": 2,
+  "number": 88,
+  "keyCode": "73015529",
+  "issuedAt": "2026-11-20T15:00:00-03:00",
+  "operationNature": "VENDA DE MERCADORIA",
+  "purpose": "NORMAL",
+  "destination": "INTERNAL",
+  "presence": "INTERNET",
+  "finalConsumer": false,
+  "intermediary": { "cnpj": "11444777000161", "userId": "seller-42" },
+  "issuer": {
+    "cnpj": "11222333000181",
+    "stateRegistration": "123456789012",
+    "legalName": "EXAMPLE FOODS LTDA",
+    "tradeName": null,
+    "taxRegime": "NORMAL",
+    "address": {
+      "street": "Rua das Flores",
+      "number": "100",
+      "complement": "Loja 2",
+      "district": "Centro",
+      "municipalityIbge": "3550308",
+      "municipalityName": "Sao Paulo",
+      "uf": "SP",
+      "postalCode": "01001000",
+      "phone": null
+    }
+  },
+  "buyer": {
+    "document": { "kind": "CNPJ", "number": "11444777000161" },
+    "name": "BUYER COMPANY SA",
+    "stateRegistrationStatus": "CONTRIBUTOR",
+    "stateRegistration": "987654321098",
+    "email": "buyer@example.com",
+    "address": {
+      "street": "Avenida Central",
+      "number": "2000",
+      "complement": null,
+      "district": "Bela Vista",
+      "municipalityIbge": "3550308",
+      "municipalityName": "Sao Paulo",
+      "uf": "SP",
+      "postalCode": "01310000",
+      "phone": null
+    }
+  },
+  "lines": [
+    {
+      "id": "line-1",
+      "code": "BOX-12",
+      "gtin": "7891000100103",
+      "description": "Box of twelve bottles",
+      "ncm": "22021000",
+      "cest": "0300700",
+      "cfop": "5102",
+      "unit": "CX",
+      "quantity": 3.5,
+      "valueCents": 35000,
+      "discountCents": 0,
+      "approximateTaxCents": null,
+      "additionalInfo": null,
+      "icms": { "regime": "NORMAL", "origin": 0, "cst": "00", "baseCents": 35000, "rateBp": 1800, "amountCents": 6300 },
+      "pis": { "cst": "01", "baseCents": 35000, "rateBp": 165, "amountCents": 578 },
+      "cofins": { "cst": "01", "baseCents": 35000, "rateBp": 760, "amountCents": 2660 },
+      "ibsCbs": {
+        "cst": "000",
+        "classCode": "000001",
+        "figures": {
+          "baseCents": 35000,
+          "reductionBp": 0,
+          "cbsRateBp": 90,
+          "cbsCents": 315,
+          "ibsUfRateBp": 10,
+          "ibsUfCents": 35,
+          "ibsMunRateBp": 0,
+          "ibsMunCents": 0
+        }
+      }
+    }
+  ],
+  "freight": "BY_ISSUER",
+  "payments": [
+    { "method": "BANK_SLIP", "amountCents": 35000, "card": null, "description": null }
+  ],
+  "changeCents": 0,
+  "additionalInfo": { "forTaxpayer": null, "forTaxAuthority": null },
+  "technicalResponsible": null
+}
