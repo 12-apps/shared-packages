@@ -33,10 +33,10 @@ export interface WebhookArrival {
  * lines, only through its own logger.
  */
 /** How often one refusal reason may reach the error tracker: once per window per provider and reason. */
-export const WEBHOOK_REFUSAL_REPORT_WINDOW_MS = 15 * 60_000;
+const WEBHOOK_REFUSAL_REPORT_WINDOW_MS = 15 * 60_000;
 
 /** Test seams: the window and the clock. */
-export interface WebhookLogOptions {
+interface WebhookLogOptions {
   refusalWindowMs?: number;
   now?: () => number;
 }
