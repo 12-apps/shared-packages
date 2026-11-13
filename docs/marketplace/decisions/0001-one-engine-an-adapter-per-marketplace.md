@@ -99,3 +99,28 @@ ingest path. It is a capability of the event, not a provider check, so iFood
 (whose events carry the order) is unchanged and the next Open Delivery
 marketplace is again an adapter and its registration. No migration: the
 provider column checks a shape.
+
+## Addendum — Rappi, a synchronous answer, and an order the event carries (FUT-4765)
+
+Rappi is the third adapter, `@12-apps/marketplace/rappi` (provider `RAPPI`),
+built from its public developer portal with every shape it does not show
+marked ESTIMATED. It is the first registered adapter whose cancellation is
+SYNCHRONOUS (`asyncCancellationOutcome: false`: the reject's 200 is the
+outcome) and that cannot cancel after an accept (`cancelAfterAccept: false`:
+the store's cancel of a taken order fails at once and opens the portal). Both
+were already capabilities of the port, so the adapter needed no new one.
+
+Two engine rules, neither naming a marketplace:
+
+- **A late synchronous answer finds its request (R3-N2).** An accept that
+  clears a FAILED request keeps its `cancellation_requested_at` as a
+  tombstone, and the outbound job's synchronous "cancelled" matches a
+  status-less row with the same instant. Without it, a reject timed out by
+  the sweep while in flight, followed by the store's accept, left the order
+  ACCEPTED here and cancelled on the marketplace. No migration: the column
+  exists, and nothing reads it without a status.
+- **An order the event carries is held to the connection's merchant id**, as
+  a fetched one already was: a body naming another merchant is settled FAILED
+  for the reconciliation sweep. Only an adapter that names the merchant on the
+  order (Rappi, 99Food) is judged; iFood's orders name none and cost no read.
+
