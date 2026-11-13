@@ -106,7 +106,11 @@ export async function publishToCatalogue(ctx: EngineContext, input: CataloguePub
   const existing = await findRow(table, input);
   const now = ctx.ports.clock.now();
   const price = input.priceCents === undefined ? {} : { priceCents: input.priceCents };
-  const asked = existing?.status === "PUBLISHING" ? {} : { requestedAt: now };
+  // A double tap keeps the ask on its way; a NEW price is a new ask, so the
+  // run already queued (which reads the row's price at its own instant) misses
+  // its stamp and the new run sends the new price.
+  const samePrice = input.priceCents === undefined || input.priceCents === existing?.priceCents;
+  const asked = existing?.status === "PUBLISHING" && samePrice ? {} : { requestedAt: now };
   const row = (await table.upsert({
     where: { clientId_provider_productId: { clientId: input.clientId, provider: input.provider, productId: input.productId } },
     create: { clientId: input.clientId, provider: input.provider, productId: input.productId, status: "PUBLISHING", requestedAt: now, ...price },

@@ -197,6 +197,34 @@ describe("catalogue publishing, push", () => {
     expect(h.http.requests).toHaveLength(1);
   });
 
+  it("a new price set while the publish is in flight is sent by a run of its own", async () => {
+    const mounted: { harness?: Harness } = {};
+    const prices: number[] = [];
+    const http = scriptedHttp(async (request) => {
+      prices.push(JSON.parse(request.body ?? "{}").price);
+      // The store changes the price while the first call is on its way.
+      if (prices.length === 1) {
+        await mounted.harness?.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1", priceCents: 3100 });
+      }
+      return { status: 200, body: "{}" };
+    });
+    const h = createHarness({ http, adapters: [fakeAdapter(PUSHY, pushCatalogue)], catalogue: hostCatalogue() });
+    mounted.harness = h;
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    const firstJob = jobs(h).at(-1)!;
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+
+    await h.engine.runCatalogue(firstJob, LAST);
+
+    expect((await stateOf(h))?.status).toBe("PUBLISHING");
+    const keys = h.enqueued.filter((job) => job.name === "marketplace.catalogue").map((job) => job.dedupeKey);
+    expect(new Set(keys).size).toBe(2);
+    await runLatest(h);
+    expect(prices).toEqual([2500, 3100]);
+    expect(await stateOf(h)).toMatchObject({ status: "PUBLISHED", priceCents: 3100, sentPriceCents: 3100 });
+  });
+
   it("withdraws: WITHDRAWING at once, WITHDRAWN once the marketplace took it, by the id the publish answered", async () => {
     const h = mount();
     await h.connect(PUSHY);
