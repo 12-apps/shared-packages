@@ -128,6 +128,23 @@ async function withdrawLateLanding(ctx: EngineContext, table: CatalogueTable, ro
   await enqueueCatalogue(ctx, payload, catalogueDedupeKey(payload, now));
 }
 
+/**
+ * A withdraw that landed after the store switched the product back on (a
+ * publish while withdrawing): the item is out on the marketplace now, so the
+ * publish is owed again, whether or not its own run already went out. The row
+ * takes a fresh ask and the publish is queued: the store's last tap wins.
+ */
+async function publishLateLanding(ctx: EngineContext, table: CatalogueTable, row: CatalogueRow): Promise<void> {
+  const now = ctx.ports.clock.now();
+  const moved = await table.updateMany({
+    where: { id: row.id, status: { in: ["PUBLISHING", "PUBLISHED"] } },
+    data: { status: "PUBLISHING", requestedAt: now },
+  });
+  if (moved.count === 0) return;
+  const payload: CatalogueJobPayload = { clientId: row.clientId, publicationId: row.id, action: "publish" };
+  await enqueueCatalogue(ctx, payload, catalogueDedupeKey(payload, now));
+}
+
 async function stampSuccess(
   ctx: EngineContext,
   table: CatalogueTable,
@@ -143,7 +160,9 @@ async function stampSuccess(
       ? { status: "PUBLISHED", publishedAt: now, sentPriceCents, ...(externalId === null ? {} : { externalId }), ...NO_FAILURE }
       : { status: "WITHDRAWN", withdrawnAt: now, ...NO_FAILURE };
   const moved = await table.updateMany({ where: stillAsked(row, action), data });
-  if (moved.count === 0 && action === "publish") await withdrawLateLanding(ctx, table, row, externalId);
+  if (moved.count > 0) return;
+  if (action === "publish") await withdrawLateLanding(ctx, table, row, externalId);
+  else await publishLateLanding(ctx, table, row);
 }
 
 /** One failure, as the row keeps it: a code, and the marketplace's own words only for a refusal. */

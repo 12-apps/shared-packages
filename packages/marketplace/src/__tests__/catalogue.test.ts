@@ -282,6 +282,33 @@ describe("catalogue publishing, push", () => {
     expect(await stateOf(h)).toMatchObject({ status: "WITHDRAWN" });
   });
 
+  it("a withdraw that lands after the store switched the product back on is followed by a publish again", async () => {
+    const mounted: { harness?: Harness } = {};
+    const http = scriptedHttp(async (request) => {
+      // The store switches it back on while the withdraw call is in flight.
+      if (request.method === "PATCH") await mounted.harness?.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+      return { status: 200, body: "{}" };
+    });
+    const h = createHarness({ http, adapters: [fakeAdapter(PUSHY, pushCatalogue)], catalogue: hostCatalogue() });
+    mounted.harness = h;
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h);
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+    await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    const withdrawJob = jobs(h).at(-1)!;
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+
+    await h.engine.runCatalogue(withdrawJob, LAST);
+    // The withdraw landed after the store's new ask: it stamps nothing, and the publish is owed again.
+    expect((await stateOf(h))?.status).toBe("PUBLISHING");
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+    await runLatest(h);
+
+    expect(h.http.requests.map((request) => request.method)).toEqual(["PUT", "PATCH", "PUT"]);
+    expect((await stateOf(h))?.status).toBe("PUBLISHED");
+  });
+
   it("a withdraw after a failed publish is still sent: its answer may have been lost after it landed", async () => {
     const h = mount([
       { status: 503, body: "busy" },
