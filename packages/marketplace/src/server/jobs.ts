@@ -24,7 +24,7 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  *   backoff; the reconciliation sweep re-queues a row still owed.
  * - `catalogue`, on demand: one publish or withdraw of one product on one
  *   marketplace's catalogue (FUT-4768). Three attempts with backoff; the
- *   last one stamps FAILED with the marketplace's reason.
+ *   last one stamps FAILED with a failure code.
  * - `outbound-sweep`, every five minutes: re-queues every call a row still
  *   owes (a PENDING request, an accept with no confirm stamp, a catalogue
  *   publish or withdraw on its way) once it is older than the job's own retry
