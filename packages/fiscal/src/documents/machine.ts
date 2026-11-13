@@ -169,7 +169,8 @@ const STEPS: Step = {
   REPLACE: (document, input) => ({
     status: "REPLACED",
     replacedById: input.replacedById,
-    numberVoid: document.status === "SUBMITTED" && document.outcomeUnknown ? "LOOKUP_FIRST" : "INUTILIZE",
+    // A key means the call got as far as signing: SEFAZ may hold it.
+    numberVoid: document.status === "SUBMITTED" && document.outcomeUnknown && document.accessKey !== null ? "LOOKUP_FIRST" : "INUTILIZE",
   }),
   CANCEL: cancelFields,
   LOOKUP: (document, input) => lookupFields(document, input.answer),

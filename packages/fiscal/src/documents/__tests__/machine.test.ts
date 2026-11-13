@@ -99,7 +99,7 @@ describe("the fiscal document state machine", () => {
     const never = transition(aDocument(), { kind: "REPLACE", replacedById: "doc-2" }, AT);
     expect(never.document).toMatchObject({ status: "REPLACED", replacedById: "doc-2", numberVoid: "INUTILIZE" });
 
-    const unknown = transition(aDocument({ status: "SUBMITTED", outcomeUnknown: true }), { kind: "REPLACE", replacedById: "doc-2" }, AT);
+    const unknown = transition(aDocument({ status: "SUBMITTED", outcomeUnknown: true, accessKey: "k" }), { kind: "REPLACE", replacedById: "doc-2" }, AT);
     expect(unknown.document.numberVoid).toBe("LOOKUP_FIRST");
 
     const transmitted = transition(offline.document, { kind: "AUTHORIZE", answer: AUTHORIZED, xmlKey: "y" }, AT);

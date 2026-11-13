@@ -16,7 +16,9 @@ export type FiscalDocumentErrorCode =
   /** The signing identity is declared but not built yet (`PLATFORM`). */
   | "NOT_SUPPORTED"
   /** A series' counter passed 999 999 999. */
-  | "SERIES_EXHAUSTED";
+  | "SERIES_EXHAUSTED"
+  /** Another worker advanced the document first; re-read it. */
+  | "CONFLICT";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;
