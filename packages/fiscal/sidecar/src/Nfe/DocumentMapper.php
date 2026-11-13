@@ -66,9 +66,10 @@ final class DocumentMapper
 
     /**
      * From 2027 the IBS/CBS go INSIDE `vProd`, and the price without tax
-     * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source:
-     * future-pay docs/tax/02-fiscal-document-platforms.md §7, "the tax goes into
-     * `vProd` from 2027"). sped-nfe 5.2.9 cannot write those fields, and document
+     * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source: NT
+     * 2026.008 v1.00 itself: from 2027 the IBS, CBS and IS values "deverão ser
+     * acrescidos ao valor do produto ou serviço, compondo o valor informado no
+     * campo vProd"). sped-nfe 5.2.9 cannot write those fields, and document
      * version 1 does not carry them, so a document issued on or after this day
      * is refused rather than emitted wrong. Lifted by the sped-nfe bump that
      * brings NT 2026.008, with document version 2.
