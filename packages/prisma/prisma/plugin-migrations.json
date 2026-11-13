@@ -54,6 +54,7 @@
     "20261106140000_discount_window_in_zone",
     "20261111200000_marketplace_engine",
     "20261111210000_payment_refund_retries",
-    "20261112120000_marketplace_cancellation_failure"
+    "20261112120000_marketplace_cancellation_failure",
+    "20261113120000_fiscal_documents"
   ]
 }

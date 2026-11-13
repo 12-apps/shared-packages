@@ -102,7 +102,9 @@ export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
   if (typeof config?.baseUrl !== "string" || config.baseUrl === "") throw new TypeError("createSidecarIssuer needs baseUrl.");
   if (typeof config.fetch !== "function") throw new TypeError("createSidecarIssuer needs fetch.");
   if (!Number.isInteger(config.timeoutMs) || config.timeoutMs <= 0) throw new TypeError("createSidecarIssuer needs a positive timeoutMs.");
-  const base = config.baseUrl.replace(/\/+$/, "");
+  let baseEnd = config.baseUrl.length;
+  while (baseEnd > 0 && config.baseUrl[baseEnd - 1] === "/") baseEnd -= 1;
+  const base = config.baseUrl.slice(0, baseEnd);
 
   const call = <T>(path: string, body: unknown) => post<T>(config, base, path, body);
 

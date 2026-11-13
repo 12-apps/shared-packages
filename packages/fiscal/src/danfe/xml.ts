@@ -37,5 +37,9 @@ export function elements(xml: string, tag: string): string[] {
 
 /** The access key from `<infNFe Id="NFe…">`. */
 export function accessKeyOf(xml: string): string | null {
-  return /<infNFe[^>]*\sId="NFe([0-9A-Z]{44})"/.exec(xml)?.[1] ?? null;
+  const start = xml.indexOf("<infNFe");
+  if (start === -1) return null;
+  const end = xml.indexOf(">", start);
+  const openTag = xml.slice(start, end === -1 ? xml.length : end);
+  return /\sId="NFe([0-9A-Z]{44})"/.exec(openTag)?.[1] ?? null;
 }

@@ -18,12 +18,16 @@ export function localIso(at: Date, offset: string): string {
   return `${new Date(at.getTime() + minutes * 60_000).toISOString().slice(0, 19)}${offset}`;
 }
 
+const UNBIASED_LIMIT = Math.floor(2 ** 32 / 100_000_000) * 100_000_000;
+
 /** `cNF`: eight random digits, never equal to the number's own eight (the layout's rule). */
 export function drawKeyCode(number: number): string {
   const own = String(number % 100_000_000).padStart(8, "0");
   for (;;) {
     const [value] = globalThis.crypto.getRandomValues(new Uint32Array(1));
-    const code = String((value ?? 0) % 100_000_000).padStart(8, "0");
+    // Rejection sampling: values at or above the last whole multiple of 10^8 would bias the low codes.
+    if (value === undefined || value >= UNBIASED_LIMIT) continue;
+    const code = String(value % 100_000_000).padStart(8, "0");
     if (code !== own) return code;
   }
 }
@@ -58,12 +62,19 @@ export function totalsOf(sale: SaleDraft): DocumentTotals {
   };
 }
 
+/** `text` without any trailing run of `char`, in linear time (no regex backtracking). */
+export function trimEnd(text: string, char: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === char) end -= 1;
+  return text.slice(0, end);
+}
+
 /** Storage keys, by access key: one folder per document, whatever its owner. */
 export const xmlKeys = {
   signed: (accessKey: string) => `fiscal/${accessKey}/signed.xml`,
   /** One signed XML per digest: every XML a failed call returned under a key is kept, none overwritten. */
   signedByDigest: (accessKey: string, digest: string) =>
-    `fiscal/${accessKey}/signed-${digest.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}.xml`,
+    `fiscal/${accessKey}/signed-${trimEnd(digest.replace(/\+/g, "-").replace(/\//g, "_"), "=")}.xml`,
   authorized: (accessKey: string) => `fiscal/${accessKey}/authorized.xml`,
   cancel: (accessKey: string) => `fiscal/${accessKey}/cancel.xml`,
   inutilization: (document: FiscalDocument) =>
