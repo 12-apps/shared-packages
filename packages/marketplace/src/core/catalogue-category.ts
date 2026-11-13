@@ -17,13 +17,13 @@ import type { MarketplaceProvider } from "./types";
  */
 
 /**
- * A claim older than this was left by a publish that died (or is stuck on a
- * call that will time out); another takes it over. Shorter than the catalogue
- * job's retry span (attempts at 0 s, 10 s and 30 s), so a waiting publish's
- * last attempt finds a dead holder's claim stale and goes on itself; an
- * adapter finds before it creates, so a category the holder did make is found.
+ * A claim older than this was left by a publish that died; another takes it
+ * over. Well above three slow marketplace calls, so a live holder on a slow
+ * call keeps its claim (a shorter window let a second publish create the
+ * category again). A publish that only waited is left PUBLISHING for the
+ * sweep, which re-queues it after 10 minutes, so a long window costs nothing.
  */
-export const CLAIM_STALE_MS = 15_000;
+export const CLAIM_STALE_MS = 3 * 60_000;
 
 /** What one publish learnt about the category claims it met: whether another held one. */
 export interface CategoryRunState {
@@ -86,9 +86,10 @@ export async function resolveCategory(
   } finally {
     // The claim is released whatever happened, so the next attempt (this
     // publish's or another's) goes on at once instead of waiting it out.
+    // Only this publish's own claim is released: one taken over meanwhile stays its new holder's.
     const id = "id" in result ? result.id : null;
     await table.updateMany({
-      where: { ...key, externalId: null },
+      where: id === null ? { ...key, externalId: null, claimedAt: now } : { ...key, externalId: null },
       data: id === null ? { claimedAt: null } : { externalId: id, claimedAt: null },
     });
   }

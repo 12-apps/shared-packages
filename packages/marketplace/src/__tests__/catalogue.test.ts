@@ -697,7 +697,7 @@ describe("a category creation that did not finish", () => {
     expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
   });
 
-  it("a claim whose holder died is taken over within the waiting publish's retries", async () => {
+  it("a claim whose holder died is taken over once stale, through the sweep", async () => {
     const fake = ifoodCategories();
     const h = createHarness({ http: fake.http, catalogue: hostCatalogue({ "p-1": drink }) });
     await h.connect("IFOOD");
@@ -711,14 +711,38 @@ describe("a category creation that did not finish", () => {
     });
     await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
 
-    await expect(runLatest(h, FIRST)).rejects.toBeInstanceOf(CatalogueRetryError);
-    h.clock.at = new Date(h.clock.at.getTime() + 10_000);
-    await expect(runLatest(h, { attempt: 2, maxAttempts: 3 })).rejects.toBeInstanceOf(CatalogueRetryError);
-    h.clock.at = new Date(h.clock.at.getTime() + 20_000);
-    await runLatest(h, LAST);
+    // Within the job's retries the claim is still fresh: the publish only waits.
+    expect(await runLatest(h, LAST)).toMatchObject({ kind: "skipped" });
+    expect(fake.creates).toHaveLength(0);
+
+    // The sweep re-queues it after 10 minutes, when the dead holder's claim is stale.
+    h.clock.at = new Date(h.clock.at.getTime() + 11 * 60_000);
+    expect((await h.engine.sweepOutbound()).catalogueRequeued).toBe(1);
+    await runLatest(h, FIRST);
 
     expect(fake.creates).toHaveLength(1);
     expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
+  });
+
+  it("a slow but live holder keeps its claim: the category is created once", async () => {
+    const fake = ifoodCategories();
+    const h = createHarness({ http: fake.http, catalogue: hostCatalogue({ "p-1": drink }) });
+    await h.connect("IFOOD");
+    h.memory.tables.marketplaceCatalogueCategory.rows.push({
+      id: "claim-1",
+      clientId: TENANT,
+      provider: "IFOOD",
+      name: "Drinks",
+      externalId: null,
+      claimedAt: h.clock.at,
+    });
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    // Thirty seconds into the holder's slow call the claim is not stale.
+    h.clock.at = new Date(h.clock.at.getTime() + 30_000);
+    expect(await runLatest(h, LAST)).toMatchObject({ kind: "skipped" });
+    expect(fake.creates).toHaveLength(0);
+    expect(h.memory.tables.marketplaceCatalogueCategory.rows[0]!.claimedAt).not.toBeNull();
   });
 
   it("a publish that only waited for another's category is left PUBLISHING for the sweep, never FAILED", async () => {
