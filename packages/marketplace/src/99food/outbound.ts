@@ -31,8 +31,13 @@ const TOKEN_MARGIN_MS = 60_000;
 /** `expires_in` is optional in the spec's `TokenResponse`; an hour when absent. ESTIMATED. */
 const DEFAULT_TOKEN_SECONDS = 3600;
 
-const baseOf = (ctx: AdapterCallContext, bases: NinetyNineFoodApiBaseUrls): string =>
-  bases[ctx.environment].replace(/\/+$/u, "");
+/** The base URL with its trailing slashes cut, by a loop: a `/\/+$/` regex backtracks polynomially on many slashes. */
+function baseOf(ctx: AdapterCallContext, bases: NinetyNineFoodApiBaseUrls): string {
+  const base = bases[ctx.environment];
+  let end = base.length;
+  while (end > 0 && base.charCodeAt(end - 1) === 47) end -= 1;
+  return base.slice(0, end);
+}
 const tokenKey = (ctx: AdapterCallContext): string =>
   `${NINETY_NINE_FOOD_PROVIDER}:${ctx.environment}:${ctx.credentials.clientId}`;
 
