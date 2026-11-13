@@ -1,0 +1,111 @@
+import { describe, expect, it } from "vitest";
+
+import { FiscalDocumentError } from "../errors";
+import { DOCUMENT_TRANSITIONS, type DocumentInput, transition } from "../machine";
+import type { FiscalDocument, FiscalDocumentStatus } from "../types";
+import { AUTHORIZED, CANCELLED, DENIED, INUTILIZED, SIGNED, aDocument, lookedUp, sidecarError } from "./fixtures";
+
+/**
+ * Random transition sequences. Every draw is a pure hash of (seed, draw
+ * number), the engine suite's generator, so a failure names the seed that
+ * reproduces it and CI draws the same sequences every run.
+ */
+function draw(seed: number, index: number): number {
+  let t = (Math.imul(seed, 0x9e3779b1) + Math.imul(index + 1, 0x6d2b79f5)) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+const INPUTS: readonly DocumentInput[] = [
+  { kind: "SUBMIT" },
+  { kind: "AUTHORIZE", answer: AUTHORIZED, xmlKey: "x" },
+  { kind: "DENY", answer: DENIED, xmlKey: "x" },
+  { kind: "REJECT", error: sidecarError("REJECTED") },
+  { kind: "REJECT", error: sidecarError("INVALID") },
+  { kind: "RETRY", error: sidecarError("RETRYABLE", { outcomeUnknown: true }) },
+  { kind: "RETRY", error: sidecarError("CONTINGENCY") },
+  { kind: "SIGN_OFFLINE", answer: SIGNED, contingency: { since: "2026-11-20T12:30:00-03:00", reason: "SEFAZ fora do ar no momento" }, xmlKey: "x" },
+  { kind: "REPLACE", replacedById: "doc-2" },
+  { kind: "CANCEL", answer: CANCELLED, reason: "pedido cancelado pelo cliente", eventXmlKey: null },
+  { kind: "LOOKUP", answer: lookedUp("NOT_FOUND") },
+  { kind: "LOOKUP", answer: lookedUp("AUTHORIZED") },
+  { kind: "LOOKUP", answer: lookedUp("CANCELLED") },
+  { kind: "INUTILIZE", answer: INUTILIZED, eventXmlKey: null },
+];
+
+const AT = "2026-11-20T15:31:00.000Z";
+const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+
+interface Walk {
+  readonly visited: FiscalDocumentStatus[];
+  readonly accepted: Array<{ from: FiscalDocumentStatus; to: FiscalDocumentStatus; kind: DocumentInput["kind"] }>;
+}
+
+function walk(seed: number): Walk {
+  const start = draw(seed, 0) < 0.5 ? aDocument() : aDocument({ seriesKind: "CONTINGENCY" });
+  let document: FiscalDocument = start;
+  const visited: FiscalDocumentStatus[] = [document.status];
+  const accepted: Walk["accepted"] = [];
+  for (let step = 1; step <= 40; step += 1) {
+    const input = INPUTS[Math.floor(draw(seed, step) * INPUTS.length)]!;
+    const before = JSON.stringify(document);
+    try {
+      const result = transition(document, input, AT);
+      expect(result.event.fromStatus).toBe(document.status);
+      expect(result.event.toStatus).toBe(result.document.status);
+      accepted.push({ from: document.status, to: result.document.status, kind: input.kind });
+      document = result.document;
+      visited.push(document.status);
+    } catch (error) {
+      expect(error, `seed ${seed} step ${step}`).toBeInstanceOf(FiscalDocumentError);
+      expect((error as FiscalDocumentError).code).toBe("TRANSITION_REFUSED");
+      expect(JSON.stringify(document), `seed ${seed}: a refusal changed the document`).toBe(before);
+    }
+  }
+  return { visited, accepted };
+}
+
+const WALKS = SEEDS.map((seed) => ({ seed, ...walk(seed) }));
+
+describe("random transition sequences", () => {
+  it("accept an input only from a state its row lists", () => {
+    for (const { seed, accepted } of WALKS) {
+      for (const step of accepted) {
+        expect(DOCUMENT_TRANSITIONS[step.kind], `seed ${seed}`).toContain(step.from);
+      }
+    }
+  });
+
+  it("enter CANCELLED only from AUTHORIZED, and never leave it", () => {
+    for (const { seed, accepted } of WALKS) {
+      for (const step of accepted) {
+        if (step.to === "CANCELLED") expect(["AUTHORIZED", "CANCELLED"], `seed ${seed}`).toContain(step.from);
+        if (step.from === "CANCELLED") expect(step.to, `seed ${seed}`).toBe("CANCELLED");
+      }
+    }
+  });
+
+  it("never reach AUTHORIZED once REJECTED, DENIED, REPLACED or CANCELLED", () => {
+    for (const { seed, visited } of WALKS) {
+      const final = visited.findIndex((status) => ["REJECTED", "DENIED", "REPLACED", "CANCELLED"].includes(status));
+      if (final >= 0) expect(visited.slice(final), `seed ${seed}`).not.toContain("AUTHORIZED");
+    }
+  });
+
+  it("keep a final state final", () => {
+    for (const { seed, visited } of WALKS) {
+      for (const final of ["REJECTED", "DENIED", "REPLACED"] as const) {
+        const at = visited.indexOf(final);
+        if (at >= 0) expect(new Set(visited.slice(at)), `seed ${seed}`).toEqual(new Set([final]));
+      }
+    }
+  });
+
+  it("cover every state across the seeds", () => {
+    const seen = new Set(WALKS.flatMap((w) => w.visited));
+    expect([...seen].sort()).toEqual(
+      ["AUTHORIZED", "CANCELLED", "CONTINGENCY", "DENIED", "PENDING", "REJECTED", "REPLACED", "SUBMITTED"],
+    );
+  });
+});
