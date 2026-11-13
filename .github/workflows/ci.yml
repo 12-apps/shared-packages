@@ -171,6 +171,12 @@ jobs:
           # Self-verifying: narrowing these filters must re-run the lanes they
           # gate, or a filter could be quietly weakened with nothing to catch it.
           - '.github/workflows/ci.yml'
+        # The fiscal service (PHP over sped-nfe) in @12-apps/fiscal: its own
+        # language, its own test runner and its own image, none of which the
+        # pnpm lanes reach. Self-verifying for the same reason as above.
+        fiscal-sidecar:
+          - 'packages/fiscal/sidecar/**'
+          - '.github/workflows/ci.yml'
       force-all: ${{ github.event_name == 'push' }}
 
   lint:
@@ -1325,6 +1331,46 @@ jobs:
           set -o pipefail
           pnpm quality:release 2>&1 | tee release-scripts.log
 
+  # The fiscal service (packages/fiscal/sidecar, FUT-4716): PHPUnit's unit
+  # suite (the mapping against the 010f XSD, the classification, the secrets
+  # never logged, statelessness, the cURL transport against a local TLS
+  # server) and the image the npm tarball ships, built from its Dockerfile so
+  # the Composer stage and both pinned digests are proved on every change.
+  fiscal-sidecar:
+    name: Fiscal Service (PHP)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes)['fiscal-sidecar']
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/fiscal/sidecar
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned by SHA: a third-party action runs with this job's token.
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          extensions: curl, dom, soap, openssl
+          tools: composer:v2
+          coverage: none
+      - name: Composer cache folder
+        id: composer-cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('packages/fiscal/sidecar/composer.lock') }}
+      - name: Install
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: PHPUnit (unit suite)
+        run: vendor/bin/phpunit --testsuite unit
+      - name: Build the image
+        run: docker build --tag fiscal-sidecar:ci .
+
   # What this PR's CI has cost, as one comment that is edited in place on every
   # push rather than a new comment per run.
   #
@@ -1371,7 +1417,7 @@ jobs:
     # red run on the commit, and `release-watchdog.yml`, which compares every
     # package's newest tag against the registry daily and is the only check
     # that still fires when the release workflow cannot run at all.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, native, native-harness, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, native, native-harness, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts, fiscal-sidecar]
     steps:
       # The wiring conformance gate runs HERE, not in a filtered job: it holds
       # a COMPLETENESS property (every package answers every capability kind,
