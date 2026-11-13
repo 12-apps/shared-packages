@@ -83,14 +83,7 @@ export const pulseAnimation = (theme: Theme) => keyframes`
 
 // Removed unused slideInAnimation - can be re-added if needed for future features
 
-/**
- * The shimmer's sweep, in the alert's OWN width (FUT-4874): the band starts one
- * alert-width to the left of the alert and ends one to the right, so it crosses
- * the whole surface at any width. It was a fixed 1000px of `background-position`
- * travel, which never reached an alert narrower than about 1000px and left a
- * hard vertical edge across a 1280px one. The band is transparent at both ends,
- * so a frame has no seam wherever it lands.
- */
+/** The sweep in the alert's OWN width: one width to its left to one to its right (FUT-4874), so no hard edge. */
 export const shimmerAnimation = () => keyframes`
   0% {
     transform: translateX(-100%);
@@ -293,8 +286,7 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
     border: 'none',
     position: 'relative',
     overflow: 'hidden',
-    // The shimmer paints UNDER the ink (FUT-4516): unstacked, the `::before` lay over the
-    // words (3.8:1). Isolated, its -1 stays behind them and above the background and tint.
+    // UNDER the ink (FUT-4516): unstacked the `::before` lay over the words (3.8:1); isolated, its -1 stays behind them.
     isolation: 'isolate',
     '.MuiAlert-icon': {
       color: ink,
@@ -309,7 +301,6 @@ const gradientStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => 
       height: '100%',
       background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
       animation: `${shimmerAnimation()} ${seconds(GRADIENT.shimmerMs)} infinite`,
-      // Decoration only: off for a person who asked for less motion.
       '@media (prefers-reduced-motion: reduce)': { display: 'none' },
     },
   };

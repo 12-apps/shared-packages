@@ -213,8 +213,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
       onBlur,
       ...others
     } = resolveButtonProps(rawProps);
-    // Every spelling of the test id the shared contract allows, mapped to the
-    // one the DOM reads; the native Button does the same in reverse.
+    // Every spelling of the test id the contract allows, mapped to the one the DOM reads.
     const ownTestId = resolveTestId(others, 'button');
     const testId = (suffix: string) => childTestId(others, suffix, 'button');
     const props = withoutTestIdProps(others);
