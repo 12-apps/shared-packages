@@ -132,6 +132,9 @@ async function putOrder(
  * Take the order: `PUT …/orders/{orderId}/take/{cookingTime}`, the store's
  * preparation minutes as the cooking time, or `…/take/` to keep the order's
  * own (the portal: outside the order's range, Rappi uses the nearest bound).
+ * The empty segment is how the portal's guide spells it
+ * (`PUT /orders/{orderId}/take/`); ESTIMATED that Rappi's router serves it
+ * (a 404 there would read as a refusal and show the portal link).
  * Every refused answer (400 "Invalid state transition", 404) is a refusal: the
  * store sees "não confirmou" and the app link.
  */

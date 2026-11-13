@@ -112,15 +112,22 @@ were already capabilities of the port, so the adapter needed no new one.
 
 Two engine rules, neither naming a marketplace:
 
-- **A late synchronous answer finds its request (R3-N2).** An accept that
-  clears a FAILED request keeps its `cancellation_requested_at` as a
-  tombstone, and the outbound job's synchronous "cancelled" matches a
-  status-less row with the same instant. Without it, a reject timed out by
-  the sweep while in flight, followed by the store's accept, left the order
-  ACCEPTED here and cancelled on the marketplace. No migration: the column
-  exists, and nothing reads it without a status.
+- **A late answer to the call in flight finds its request (R3-N2).** An
+  accept that clears a FAILED request keeps its `cancellation_requested_at`
+  as a tombstone, and the outbound job's synchronous "cancelled" matches a
+  status-less row of an order still ACCEPTED with the same instant. Without
+  it, a reject timed out by the sweep while in flight, followed by the
+  store's accept, left the order ACCEPTED here and cancelled on the
+  marketplace. An order the marketplace's own event already rejected is not
+  matched, so the host hears one cancellation once. Not covered: a call the
+  marketplace applied but answered 5xx (or not at all); its retry finds no
+  request after the accept, and the take that follows is refused, which shows
+  the app link. No migration: the column exists, and nothing reads it without
+  a status.
 - **An order the event carries is held to the connection's merchant id**, as
   a fetched one already was: a body naming another merchant is settled FAILED
-  for the reconciliation sweep. Only an adapter that names the merchant on the
-  order (Rappi, 99Food) is judged; iFood's orders name none and cost no read.
+  for the reconciliation sweep. Only an order that names its merchant is
+  judged (Rappi's carried NEW_ORDER; 99Food's orders are fetched and were
+  judged already), by a one-column read that opens no credentials; iFood's
+  orders name none and cost no read.
 

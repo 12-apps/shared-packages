@@ -32,8 +32,8 @@ import { rappiReject, rappiTake, type RappiBaseUrls } from "./outbound";
  * ```
  *
  * Its webhooks (NEW_ORDER and ORDER_EVENT_CANCEL, each registered with Rappi
- * at its own URL) are the engine's one route, `POST
- * /webhooks/marketplace/:tenantSlug/RAPPI`.
+ * as its own subscription, all pointing at the same URL) are the engine's one
+ * route, `POST /webhooks/marketplace/:tenantSlug/RAPPI`.
  *
  * What Rappi CANNOT do through its public API is stated, never inferred: a
  * reject is only accepted while the order is SENT (before it is taken), and
@@ -51,6 +51,11 @@ export { RAPPI_PROVIDER, RAPPI_SIGNATURE_HEADER } from "./normalize";
  * it will transition to TIMEOUT status", so a reject that has not reached Rappi
  * six minutes after it was asked can no longer be one. The request is failed
  * as TIMEOUT and a person finishes it on Rappi.
+ *
+ * ESTIMATED: Rappi counts its 6 minutes from the order's arrival, the engine
+ * counts this window from the request. A reject asked late in Rappi's window
+ * may still be sent after Rappi's TIMEOUT; Rappi then answers 400, which reads
+ * as a refusal (FAILED, the portal link): slower than needed, never wrong.
  */
 export const RAPPI_CANCELLATION_ANSWER_WINDOW_MS = 6 * 60_000;
 

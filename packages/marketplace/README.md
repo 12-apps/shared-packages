@@ -143,14 +143,14 @@ createRappiAdapter({
 
 | part | from the portal |
 |---|---|
-| Webhook | Register `NEW_ORDER` and `ORDER_EVENT_CANCEL` (each at this one URL). `Rappi-Signature: t=<timestamp>,sign=<signature>`, HMAC-SHA256 of `<t>.<raw body>` keyed by the webhook's secret. A connection stores that secret as its `webhookSecret`, and a connection without one REFUSES every delivery. |
+| Webhook | Register `NEW_ORDER` and `ORDER_EVENT_CANCEL` (each its own subscription, both pointing at this one URL). `Rappi-Signature: t=<timestamp>,sign=<signature>`, HMAC-SHA256 of `<t>.<raw body>` keyed by the webhook's secret. A connection stores that secret as its `webhookSecret`, and a connection without one REFUSES every delivery. |
 | Events | Rappi's bodies do not name their event, so the adapter reads the shape. An `order_detail` is `NEW_ORDER` → ingested (with `action: "scheduled"` / `"cancelled"`, the two scheduled notices → IGNORED). `{ event, order_id, store_id }` naming a cancellation (`canceled_with_charge`) → cancelled. `ORDER_OTHER_EVENT` (it carries `event_time`) → IGNORED. PING, menu and store events name no order and are acknowledged 200 and dropped. |
 | Merchant id | A connection's `externalMerchantId` for Rappi is **Rappi's store id**: `store.internal_id` on `NEW_ORDER`, `store_id` on every other event. A `NEW_ORDER` naming another store is settled FAILED (so the reconciliation sweep ingests it once the id is corrected) and the webhook answers 500. |
 | Auth | `POST {tokenUrl}` (the portal's `https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations`), JSON `{ client_id, client_secret }` → `access_token`, valid one week; sent as `x-authorization: Bearer <token>`; cached per process. |
 | Take (the confirm) | `PUT {apiBaseUrl}/orders/{orderId}/take/{cookingTime}` (the portal's base is `https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api`), the store's preparation minutes (`take/` keeps the order's own). 400 "Invalid state transition" and 404 are refusals: "não confirmou" and the app link. |
 | Reject (the cancel) | `PUT …/orders/{orderId}/reject` with `{ reason, cancel_type, items_skus }`: one of the portal's six `cancel_type`s, the three item ones requiring the offending SKUs. Only from SENT. The 200 IS the outcome (`asyncCancellationOutcome: false`): CONFIRMED at once. Every refused answer is a refusal (FAILED, the portal link). |
 | Cancel after take | No public endpoint: `cancelAfterAccept: false`, so the store's cancel of a taken order is FAILED at once and opens the partner portal (`appLink`; Rappi names no per-order link). |
-| Windows | Rappi gives a SENT order 6 minutes to be taken or rejected before its own TIMEOUT, so a reject still waiting 6 minutes after it was asked is failed as TIMEOUT (`cancellationAnswerWindowMs`). A connection's acknowledgement window should be at most 360 s. |
+| Windows | Rappi gives a SENT order 6 minutes to be taken or rejected before its own TIMEOUT, so a reject still waiting 6 minutes after it was asked is failed as TIMEOUT (`cancellationAnswerWindowMs`). Rappi counts from the order's arrival and the engine from the request, so a reject asked late may still be sent after Rappi's TIMEOUT and come back 400 (FAILED, the portal link). A connection's acknowledgement window should be at most 360 s. |
 | Order | `totals.total_order`, "the total amount that the restaurant receives", is the total; Rappi states no commission (`commissionCents` null). A line is an item at `price` plus its subitems, `× quantity`, so its rows add up exactly to it; subitems and comments go into the note; an item with no `sku` keys on Rappi's item id. `delivery` is Rappi's courier, `marketplace` the store's own, `pickup` a take-out. |
 
 The fixtures are the portal's own examples (`src/rappi/__tests__/fixtures.ts`).
@@ -180,7 +180,19 @@ to end: webhook, ingest, aceite, take, reject, Rappi's cancel, and R3-N2.
 - no `PING` answer: the route answers `{ received: true }`, not Rappi's
   `{ "status": "OK" }`, so do not subscribe `PING` until the host answers it;
 - that Rappi sends every order by webhook: `GET orders` / `orders/status/sent`
-  polling is not done by this adapter.
+  polling is not done by this adapter;
+- that Rappi serves `…/take/` with an empty cooking-time segment (the guide's
+  spelling) when the store states no preparation time;
+- the reject window counted from the request, where Rappi counts from the
+  order's arrival (see Windows);
+- that the 500 a merchant mismatch answers is harmless: Rappi redelivers, the
+  redelivery is an inbox duplicate answered 200; whether Rappi throttles or
+  disables a webhook after repeated 500s is not public.
+
+Out of scope: the merchant check applies to the NEW_ORDER body only. An
+`ORDER_EVENT_CANCEL` naming another `store_id` under this connection's secret
+still cancels a matching order id: the signature binds the connection's own
+secret, and judging event merchants in the engine would change iFood's path.
 
 ### A late synchronous answer (R3-N2)
 
@@ -188,8 +200,15 @@ A synchronous marketplace answers a cancellation in the response. When the
 outbound sweep times a request out while the call is still in flight, the
 store may accept the order before the answer lands. The accept clears the
 request but keeps its `cancellation_requested_at` as a TOMBSTONE, and the job
-matches a status-less row carrying the same instant: a late "rejected" still
-moves the order to REJECTED (CONFIRMED) and tells the host
-`onCancellationConfirmed`, so the order is never ACCEPTED here and cancelled
-there. A late refusal matches nothing and leaves the accepted order as it is.
+matches a status-less row of a STILL ACCEPTED order carrying the same
+instant: a late "rejected" to the call in flight still moves the order to
+REJECTED (CONFIRMED) and tells the host `onCancellationConfirmed`. A late
+refusal matches nothing and leaves the accepted order as it is; and once the
+marketplace's own cancel event has rejected the order (telling the host), the
+tombstone answers nothing more, so the host is told once.
 
+What it does NOT cover: a call Rappi APPLIED but answered with a 5xx or not at
+all. Its retry runs after the store's accept, finds no request and sends
+nothing, so the order stays ACCEPTED here while cancelled on Rappi. The take
+the accept queued is then answered 400, so the order shows "não confirmou"
+with the portal link and a person settles it there.
