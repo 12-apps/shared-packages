@@ -104,8 +104,8 @@ async function callOrder(
   return { kind: "retry", reason: "99Food refused the token" };
 }
 
-/** Words a problem body uses for "this instruction was already received". ESTIMATED. */
-const ALREADY_RECEIVED = /already|duplicat|j[aá] (foi )?(recebid|confirmad|processad)/iu;
+/** Words a problem body uses for "this instruction was already received", in English or Portuguese. ESTIMATED. */
+const ALREADY_RECEIVED = /already|duplicat|(recebid|confirmad|processad)[oa]/iu;
 
 /** Whether a 422 answer's problem (`Error.title`, or a `detail`) says the instruction was already received. */
 function alreadyReceived(response: MarketplaceHttpResponse): boolean {

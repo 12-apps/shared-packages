@@ -111,7 +111,7 @@ end to end: event, fetch, ingest, aceite, confirm, cancel, the answer.
 - a token with no `expires_in` lives an hour (the field is optional);
 - `outOfStockItems` is not sent: the spec wants item uuids there, and the
   engine keeps the marketplace's SKUs (`externalCode`);
-- a confirm 422 reads as "already received" when its problem's `title` or `detail` says so (already, duplicate, já recebido/confirmado); the spec pins no code;
+- a confirm 422 reads as "already received" when its problem's `title` or `detail` says so (already, duplicate, recebido, confirmado, processado); the spec pins no code;
 - with no `totalPrice`, a line is `unitPrice × quantity + optionsPrice` (options added once: the spec calls it a line figure);
 - with no `externalCode`, a line keys on the item id, which may be per order (then each such order adds an unmapped SKU row);
 - that 99Food sends every event by webhook (Open Delivery also allows
