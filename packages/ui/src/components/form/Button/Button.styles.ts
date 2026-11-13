@@ -309,6 +309,10 @@ export const buttonInk = (
   color: string,
 ): string | undefined => VARIANT_STYLES[variant ?? '']?.(theme, palette, color).color as string | undefined;
 
+/** The colour a variant paints its label on: its fill, or the theme's paper for one with no fill of its own. */
+export const buttonSurface = (theme: Theme, variant: string | undefined, palette: ColorPalette): string =>
+  variant === undefined || variant === 'solid' || variant === 'gradient' ? palette.main : theme.palette.background.paper;
+
 export const buttonVariantStyles = (
   theme: Theme,
   variant: string | undefined,

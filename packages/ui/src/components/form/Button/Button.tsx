@@ -19,6 +19,7 @@ import {
   iconAlignmentStyles,
   buttonInk,
   buttonSize,
+  buttonSurface,
   rippleUnderLabelStyles,
 } from './Button.styles';
 import type { ButtonComponent, ButtonProps } from './Button.types';
@@ -47,7 +48,11 @@ const StyledButton = styled(MuiButton, {
     position: 'relative',
     overflow: 'hidden',
     ...rippleUnderLabelStyles(),
-    ...pressRippleStyles(theme, buttonInk(theme, customVariant, colorPalette, customColor)),
+    ...pressRippleStyles(
+      theme,
+      buttonInk(theme, customVariant, colorPalette, customColor),
+      buttonSurface(theme, customVariant, colorPalette),
+    ),
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),

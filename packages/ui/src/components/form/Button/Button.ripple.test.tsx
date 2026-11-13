@@ -3,7 +3,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { getContrastRatio } from '../../../tokens/color';
+import { getLuminance } from '../../../tokens/color';
+import { controlNeutral } from '../../../tokens/ink';
 import { Button } from './Button';
 import type { ButtonProps } from './Button.types';
 
@@ -45,21 +46,28 @@ const renderButton = (mode: 'light' | 'dark', props: ButtonProps): { cls: string
 const BLACK = ['#000', '#000000', 'rgb(0, 0, 0)'];
 const WHITE = ['#fff', '#ffffff', 'rgb(255, 255, 255)'];
 
+/** The fill a variant paints its label on, read from the theme and not from the component. */
+const surfaceOf = (theme: ReturnType<typeof createTheme>, variant: string, color: string): string => {
+  const fill: Record<string, string> = {
+    primary: theme.palette.primary.main,
+    success: theme.palette.success.main,
+    danger: theme.palette.error.main,
+    neutral: controlNeutral(theme).main,
+  };
+  return variant === 'solid' || variant === 'gradient' ? String(fill[color]) : theme.palette.background.paper;
+};
+
 describe('Button press ripple colour (FUT-4861)', () => {
   describe.each(['light', 'dark'] as const)('in %s mode', (mode) => {
     it.each(VARIANTS.flatMap((variant) => COLORS.map((color) => ({ variant, color }))))(
-      'paints the $variant $color press ripple in the absolute opposite the label',
+      'paints the $variant $color press ripple on the surface side of the label, away from the ink',
       ({ variant, color }) => {
         const { cls } = renderButton(mode, { variant, color });
-        const label = colorOf((s) => s === `.${cls}`);
-        const press = colorOf((s) => s === `.${cls} ${PRESS}`);
-        expect(label).toBeTruthy();
-        expect([...BLACK, ...WHITE]).toContain(press);
-        const other = BLACK.includes(press ?? '') ? '#ffffff' : '#000000';
-        // The ripple sits on the side that contrasts MORE with the label than the one it left.
-        expect(getContrastRatio(String(label), String(press))).toBeGreaterThanOrEqual(
-          getContrastRatio(String(label), other),
-        );
+        const label = String(colorOf((s) => s === `.${cls}`));
+        const press = String(colorOf((s) => s === `.${cls} ${PRESS}`));
+        const surface = surfaceOf(createTheme({ palette: { mode } }), variant, color);
+        const expected = getLuminance(surface) >= getLuminance(label) ? WHITE : BLACK;
+        expect(expected).toContain(press);
       },
     );
   });
