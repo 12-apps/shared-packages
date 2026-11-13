@@ -38,6 +38,17 @@ export {
 export { DataViewsGrid } from "./DataViewsGrid";
 export { DataViewsTableBase, type DataViewsTableBaseProps } from "./DataViewsTableBase";
 export { toSavedViewSummary, CARD_ASPECT_RATIOS, DATA_VIEWS_LAYOUTS } from "./data-views-types";
+// A saved view's stored shape (FUT-4867): the two open maps as keyed lists, and
+// the converters a host's persistence seam opts in with. The zod schema for it
+// is the `./wire` entry, so a consumer that never validates loads no `zod`.
+export {
+  toDataViewStateWire,
+  fromDataViewStateWire,
+  readStoredViewState,
+  type DataViewStateWire,
+  type DataViewPillWire,
+  type DataViewRangeWire,
+} from "./data-views-wire";
 export { cardScaleForZoom, cardMinWidthForZoom } from "./data-views-layout-context";
 export { DataViewsBoard, type BoardConfig, type BoardGroup } from "./DataViewsBoard";
 export type {

@@ -97,6 +97,14 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/DataGrid`
 **Docs**: `src/components/data-display/DataGrid/DataGrid.md`
 
+### DataViews
+**Purpose**: The admin list machinery — filter bar, saved views, sort, column visibility, selection and bulk actions over the Tabela / Grade / Lista / Quadro layouts
+**Use Cases**: Every admin list a user filters, sorts and saves views of
+**Features**: `DataViewsTableBase` with injected saved-view persistence and router; a saved view's state has a closed STORED shape (FUT-4867) — `toDataViewStateWire` / `fromDataViewStateWire` turn the `pills` / `ranges` maps into keyed lists `{ field, … }[]`, `readStoredViewState` and `toSavedViewSummary` read legacy and wire rows alike, and `dataViewStateWireSchema` (the `/wire` entry, needs `zod`) validates it with no open place. The component still emits the in-memory shape; a host opts in at its persistence seam
+**Types**: `DataViewState`, `DataViewStateWire`, `DataViewPillWire`, `DataViewRangeWire`, `SavedViewSummary`, `DataViewPersistence`
+**Location**: `src/components/data-display/DataViews`
+**Docs**: `src/components/data-display/DataViews/SAVED-VIEWS-WIRE.md`, `src/components/data-display/DataViews/RESPONSIVE-BEHAVIOUR.md`
+
 ### DescriptionItem
 **Purpose**: Display label-value pairs for read-only information
 **Use Cases**: Metadata display, property lists, detail views, incident information, profile data

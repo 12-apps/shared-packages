@@ -192,6 +192,10 @@
       "types": "./dist/types/components/data-display/DataViews/index.d.ts",
       "default": "./dist/data-display/DataViews.js"
     },
+    "./data-display/DataViews/wire": {
+      "types": "./dist/types/components/data-display/DataViews/wire.d.ts",
+      "default": "./dist/data-display/DataViews/wire.js"
+    },
     "./data-display/DayRuler": {
       "types": "./dist/types/components/data-display/DayRuler/index.d.ts",
       "default": "./dist/data-display/DayRuler.js"
@@ -832,7 +836,8 @@
     "react-dom": "^18.0.0 || ^19.0.0",
     "react-native": ">=0.79.0",
     "react-native-svg": ">=15.0.0",
-    "react-native-safe-area-context": ">=5.0.0"
+    "react-native-safe-area-context": ">=5.0.0",
+    "zod": ">=4.0.0"
   },
   "dependencies": {
     "@12-apps/forms-core": "workspace:*",
@@ -888,7 +893,8 @@
     "vite": "^6.4.1",
     "vite-plugin-istanbul": "^7.2.1",
     "vitest": "^3.2.4",
-    "react-native-safe-area-context": "5.7.0"
+    "react-native-safe-area-context": "5.7.0",
+    "zod": "^4.3.5"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
@@ -924,6 +930,9 @@
       "optional": true
     },
     "react-native-safe-area-context": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   }
