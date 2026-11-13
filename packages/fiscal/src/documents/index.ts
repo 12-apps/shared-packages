@@ -23,3 +23,5 @@ export type { CertificateFacts, FiscalDocuments, FiscalDocumentsServiceConfig, I
 export { createMemoryFiscalStore } from "./memory";
 export type { MemoryFiscalStore } from "./memory";
 export { FISCAL_NEXT_NUMBER_SQL } from "./sql";
+export { documentLines } from "./lines";
+export type { LineDetails } from "./lines";
