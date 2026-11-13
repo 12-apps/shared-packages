@@ -127,29 +127,30 @@ export const buttonSize =
   };
 
 /**
- * THE BUTTON'S CONTENT PAINTS ABOVE THE PRESS RIPPLE AND THE FOCUS PULSATE (FUT-4861).
+ * THE PRESS RIPPLE AND THE FOCUS PULSATE PAINT UNDER THE LABEL (FUT-4861).
  *
  * MUI appends `.MuiTouchRipple-root` as the last child, absolutely positioned
  * at `z-index: 0`, so it painted OVER the label: a contained button held down
  * dropped its label to 2.9 to 3.5:1, and the focus pulsate (the only keyboard
  * focus indicator an outline or text button has) read 2.95 to 4.17:1 over it.
  *
- * The ripple stays where MUI puts it, above the button's own surface; the
- * CONTENT is what moves: the start and end icon slots here, the label wrapper
- * and the spinner in `Button.tsx`, each `position: relative; z-index: 1`. The
- * button is NOT made a stacking context (an `isolation: isolate` did that and
- * pulled a `pulse` button's `::after`, which sits at `z-index: -1` behind the
- * fill, over the fill), so every state but the press paints as it always did.
- * The ripple and the pulsate keep their timing; only the label's side moves.
+ * `isolation: isolate` makes the button its own stacking context, so a
+ * `z-index: -1` ripple stays ABOVE the button's own surface (fill, gradient,
+ * border) and BELOW everything in flow: the label, the icons. The DOM is MUI's
+ * own: no wrapper, no z-index on the content. MUI's root is already
+ * `position: relative`, so the context changes nothing among its siblings.
  *
- * A host that corrects the ink of a control from outside (inside an Alert, say)
- * moves the ripple under the label too, so the two rules agree.
+ * Not when `pulse` is set: a pulse button's `::after` sits at `z-index: -1` and
+ * is meant to paint BEHIND the fill, which a context of its own would turn
+ * into a layer over it. A pulse button keeps MUI's ripple layer, exactly as before.
  */
-export const BUTTON_CONTENT_LAYER = { position: 'relative', zIndex: 1 } as const;
-
-export const contentAboveRippleStyles = (): CSSObject => ({
-  '& > .MuiButton-startIcon, & > .MuiButton-endIcon': BUTTON_CONTENT_LAYER,
-});
+export const rippleUnderLabelStyles = (pulse?: boolean): CSSObject =>
+  pulse
+    ? {}
+    : {
+        isolation: 'isolate',
+        '& .MuiTouchRipple-root': { zIndex: -1 },
+      };
 
 /**
  * MUI centres icons with a negative margin that fights our own padding, so the

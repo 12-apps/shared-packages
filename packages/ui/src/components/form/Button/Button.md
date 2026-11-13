@@ -116,12 +116,15 @@ API: it is never renamed or dropped without a major.
 
 The press ripple and the focus pulsate (an outline or text button's only
 keyboard focus indicator) paint ABOVE the button's own surface and BELOW its
-label, icons and spinner, in every variant, colour and mode. MUI's
-`.MuiTouchRipple-root` keeps its own layer; the CONTENT is lifted above it (the
-label is wrapped in a `span`, and the label, the icon slots and the spinner take
-`position: relative; z-index: 1`). The button is NOT a stacking context, so a
-`pulse` button's ring still paints behind its fill and every state but the press
-looks as it always did.
+label, icons and spinner, in every variant, colour and mode. The button is its
+own stacking context (`isolation: isolate`) and MUI's `.MuiTouchRipple-root`
+sits at `z-index: -1`. The DOM is MUI's own: no wrapper around the label and no
+`z-index` on the content, so full-width and `flex: 1` children, ellipsis and
+overlays behave as before. Truncate the label (a child), not the button root.
+
+A `pulse` button is the exception: its ring (`::after`, `z-index: -1`) is meant
+to paint behind the fill, which a stacking context would reverse, so it keeps
+MUI's ripple layer and MUI's ripple colour exactly as before.
 
 A button that paints its own fill (`solid`, `gradient`) also tints its PRESS
 ripple against the label: in the absolute on the fill's side of the ink (black

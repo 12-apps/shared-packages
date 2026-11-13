@@ -82,6 +82,11 @@ describe('Button press ripple colour (FUT-4861)', () => {
     expect(BLACK).toContain(String(colorOf((s) => s === `.${solid.cls} ${PRESS}`)));
   });
 
+  it('leaves a pulse button\'s press ripple in MUI\'s colour, since it keeps MUI\'s layer over the label', () => {
+    const { cls } = renderButton('light', { variant: 'solid', color: 'primary', pulse: true });
+    expect(colorOf((s) => s === `.${cls} ${PRESS}`)).toBeUndefined();
+  });
+
   it('leaves outline, text, ghost and glass with MUI\'s own ripple colour, so a press stays visible', () => {
     for (const variant of ['outline', 'text', 'ghost', 'glass'] as const) {
       const { cls } = renderButton('light', { variant, color: 'primary' });
