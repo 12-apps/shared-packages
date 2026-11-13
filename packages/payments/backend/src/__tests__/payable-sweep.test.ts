@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PaymentsGateway } from '../core/gateway';
-import { reconcilePendingCharges, resetSweepWarnings } from '../core/payable-sweep';
+import { reconcilePendingCharges } from '../core/payable-sweep';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 import { createMemoryChargeStore } from '../memory';
 
@@ -47,12 +47,6 @@ async function storeWith(
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-
-
-// The once-per-charge warning is per process; every test starts with none given.
-afterEach(() => {
-  resetSweepWarnings();
-});
 
 describe('reconcilePendingCharges', () => {
   it('settles a PAID re-read through the host port and leaves a still-waiting one alone', async () => {

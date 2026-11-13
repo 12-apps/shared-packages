@@ -1,12 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { reconcilePendingCharges, resetSweepWarnings } from '../core/payable-sweep';
+import { reconcilePendingCharges, type PendingSweepDeps } from '../core/payable-sweep';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 import { createMemoryChargeStore } from '../memory';
 
 /**
- * A charge the sweep cannot reconcile is warned about ONCE per process; every
- * later pass logs it at info (FUT-3968: one stuck InfinitePay charge warned on
+ * A charge the sweep cannot reconcile is warned about ONCE per host binding
+ * (the deps object a host supplies once); every later pass logs it at info (FUT-3968: one stuck InfinitePay charge warned on
  * every sweep, 376 times in 14 days, and the error tracker's quota ran out).
  */
 
@@ -31,40 +31,36 @@ async function storeWithStuckCharge(id: string) {
   return store;
 }
 
-async function sweepOnce(store: Awaited<ReturnType<typeof storeWithStuckCharge>>) {
+/** One host binding: the deps a host builds once and passes on every pass. */
+function hostBinding(store: Awaited<ReturnType<typeof storeWithStuckCharge>>) {
   const logWarn = vi.fn();
   const logInfo = vi.fn();
   const refreshCharge = vi.fn(async () => {
     throw new Error('charge not found');
   });
-  await reconcilePendingCharges(
-    { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
-    { now: NOW },
-  );
-  return { logWarn, logInfo };
+  const deps = { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo } as PendingSweepDeps;
+  return { deps, logWarn, logInfo };
 }
-
-afterEach(() => {
-  resetSweepWarnings();
-});
 
 describe('pending-charge sweep: one warning per stuck charge', () => {
   it('warns on the first pass and logs the same failure at info on the next', async () => {
-    const store = await storeWithStuckCharge('CHAR_stuck');
+    const { deps, logWarn, logInfo } = hostBinding(await storeWithStuckCharge('CHAR_stuck'));
 
-    const first = await sweepOnce(store);
-    const second = await sweepOnce(store);
+    await reconcilePendingCharges(deps, { now: NOW });
+    await reconcilePendingCharges(deps, { now: NOW });
 
-    expect(first.logWarn).toHaveBeenCalledTimes(1);
-    expect(first.logWarn.mock.calls[0]?.[0]).toContain('CHAR_stuck');
-    expect(second.logWarn).not.toHaveBeenCalled();
-    expect(second.logInfo).toHaveBeenCalledWith(expect.stringContaining('CHAR_stuck'));
+    expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(logWarn.mock.calls[0]?.[0]).toContain('CHAR_stuck');
+    expect(logInfo).toHaveBeenCalledWith(expect.stringContaining('CHAR_stuck'));
   });
 
-  it('still warns about a different charge', async () => {
-    await sweepOnce(await storeWithStuckCharge('CHAR_a'));
-    const other = await sweepOnce(await storeWithStuckCharge('CHAR_b'));
+  it('still warns about a different charge, and a second binding starts with none warned', async () => {
+    const first = hostBinding(await storeWithStuckCharge('CHAR_a'));
+    await reconcilePendingCharges(first.deps, { now: NOW });
+    const second = hostBinding(await storeWithStuckCharge('CHAR_a'));
+    await reconcilePendingCharges(second.deps, { now: NOW });
 
-    expect(other.logWarn).toHaveBeenCalledWith(expect.stringContaining('CHAR_b'));
+    expect(first.logWarn).toHaveBeenCalledTimes(1);
+    expect(second.logWarn).toHaveBeenCalledTimes(1);
   });
 });

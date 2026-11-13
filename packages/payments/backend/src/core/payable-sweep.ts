@@ -181,8 +181,13 @@ async function reconcileOne(
   }
 }
 
-/** Charges already warned about in this process; bounded so a long-lived process cannot grow it forever. */
-const warnedCharges = new Set<string>();
+/**
+ * Charges already warned about, per host binding. Keyed on the deps object the
+ * host supplies once and passes on every pass (the job blueprint does exactly
+ * that), so each binding has its own memory and nothing is shared between
+ * hosts or tests. Bounded so a long-lived process cannot grow it forever.
+ */
+const warnedByDeps = new WeakMap<PendingSweepDeps, Set<string>>();
 const WARNED_CHARGES_CAP = 1_000;
 
 /**
@@ -201,13 +206,10 @@ function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown
     `${error instanceof Error ? error.message : String(error)}`;
   if ((isTransportError(error) || isRequestTimeout(error)) && !last) return deps.logInfo?.(line);
   const key = `${charge.provider}:${charge.providerChargeId}`;
-  if (warnedCharges.has(key)) return deps.logInfo?.(line);
-  if (warnedCharges.size >= WARNED_CHARGES_CAP) warnedCharges.clear();
-  warnedCharges.add(key);
+  let warned = warnedByDeps.get(deps);
+  if (!warned) warnedByDeps.set(deps, (warned = new Set()));
+  if (warned.has(key)) return deps.logInfo?.(line);
+  if (warned.size >= WARNED_CHARGES_CAP) warned.clear();
+  warned.add(key);
   deps.logWarn?.(line);
-}
-
-/** Forget which charges were warned about. Tests only. */
-export function resetSweepWarnings(): void {
-  warnedCharges.clear();
 }
