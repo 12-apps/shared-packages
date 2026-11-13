@@ -90,6 +90,9 @@ export const GLOBAL_IGNORES = [
   // Machine-written and gitignored; linting it holds generated code to a bar
   // its generator, not this repo, decides.
   "**/.features-gen/**",
+  // A PHP service's Composer dependencies (packages/fiscal/sidecar): third-party
+  // code, gitignored, installed by `composer install`; some of it ships JS assets.
+  "packages/*/sidecar/vendor/**",
 ];
 
 // Test-ish globs — excluded from size/complexity, linted for flakiness instead.
