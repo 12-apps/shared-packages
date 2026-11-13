@@ -91,15 +91,17 @@ host.adoptServer({
 | capability | what it is |
 |---|---|
 | `http` | `POST /webhooks/marketplace/:tenantSlug/:provider` (`kind: "webhook"`, needs the raw `request`), and per entity one read and one bulk write under `/admin/:tenantSlug/marketplace`: `GET`/`PUT` (connections), `GET`/`PUT /menu-links`, `GET`/`POST /acceptances` (decisions). `@12-apps/marketplace/hono`'s `marketplaceRouter({ ...config, resolveActor })` mounts them in one line. |
-| `jobs` | `marketplace.expire-acceptances` (every minute, lease 5 min), `marketplace.reconcile-inbox` (every 5 min, lease 5 min), `marketplace.outbound` (3 attempts, exponential backoff 30 s), `marketplace.outbound-sweep` (every 5 min, lease 5 min: re-queues every call still owed after 10 min, gives a PENDING request up as FAILED after 24 h). Bind `{ engine }`. |
+| `jobs` | `marketplace.expire-acceptances` (every minute, lease 5 min), `marketplace.reconcile-inbox` (every 5 min, lease 5 min), `marketplace.outbound` (3 attempts, exponential backoff 30 s), `marketplace.fetch-order` (on demand, 3 attempts, exponential backoff 5 s: the order body an event only announced; a host that holds it through its `enqueue` port holds every fetch), `marketplace.outbound-sweep` (every 5 min, lease 5 min: re-queues every call still owed after 10 min, gives a PENDING request up as FAILED after 24 h). Bind `{ engine }`. |
 | `mcp` | Six tools, the bulk-upsert protocol: `listMarketplaceIntegrations` / `upsertMarketplaceIntegrations` (operations `upsert`, `archive`, `unarchive`), `listMarketplaceMenuLinks` / `upsertMarketplaceMenuLinks`, `listMarketplaceAcceptances` / `decideMarketplaceOrders`. Every write takes a list, is all-or-nothing in one transaction, supports `validateOnly`, answers every problem with its path; reads take `ids`. Descriptions are English. |
 | `permissions` | `marketplace:manage` (connect, map) and `marketplace:decide` (read and answer the queue). The host decides which roles hold them; each route declares its own. |
 | `db` | `prisma/marketplace.prisma` + `prisma/migrations` (composed). |
 | `observability` | namespace `marketplace`. |
 
-The route copy (`MarketplaceServerCopy`) and the iFood adapter's copy
-(`IfoodAdapterCopy`) are required config; pt-BR and en-US packs ship beside
-each.
+The route copy (`MarketplaceServerCopy`) and each adapter's copy
+(`IfoodAdapterCopy`, `NinetyNineFoodAdapterCopy`) are required config; pt-BR
+and en-US packs ship beside each. The 99Food adapter also requires its
+`apiBaseUrl` per environment and its `portalUrl`, which 99Food gives a partner
+at onboarding.
 
 ## 4. What the origin host changes when it adopts this package
 

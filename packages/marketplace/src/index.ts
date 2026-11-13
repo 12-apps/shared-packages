@@ -12,7 +12,8 @@
  * So: the engine (this entry) holds the inbox, the pipeline, ingest, the
  * acceptance clock and its sweep, the SKU map, the integration settings and
  * the outbound engine, and knows no marketplace by name. Each marketplace is
- * an adapter at its own subpath (`@12-apps/marketplace/ifood`), registered at
+ * an adapter at its own subpath (`@12-apps/marketplace/ifood`,
+ * `@12-apps/marketplace/99food`), registered at
  * mount. The wiring manifests are at `./manifest` and `./manifest/server`.
  *
  * Everything the engine needs from its host is a required port with no
@@ -27,6 +28,7 @@ export {
   type AdapterTokenCache,
   type CancellationReason,
   type CancellationRequestInput,
+  type FetchOrderResult,
   type MarketplaceAdapter,
   type MarketplaceCapabilities,
   type MarketplaceCredentials,
@@ -120,4 +122,10 @@ export {
   type OutboundJobPayload,
 } from "./core/outbound-queue";
 export type { DeliveryOutcome } from "./core/pipeline";
+export {
+  FetchOrderRetryError,
+  MARKETPLACE_FETCH_ORDER_JOB,
+  type FetchOrderJobPayload,
+  type FetchOrderOutcome,
+} from "./core/fetch-order";
 export type { MarketplaceOrderState } from "./core/state";

@@ -53,6 +53,9 @@ export async function recordInboxEvent(
         eventType: input.event.eventType,
         externalOrderId: input.event.externalOrderId,
         payload: input.payload,
+        // The engine's clock, not the database's: an announced order's
+        // acceptance window counts from here (`./fetch-order.ts`).
+        receivedAt: ctx.ports.clock.now(),
       },
       select: { id: true },
     })) as { id: string };
@@ -136,6 +139,8 @@ export interface PendingInboxEvent {
   clientId: string;
   provider: MarketplaceProvider;
   payload: unknown;
+  /** When the delivery was recorded. */
+  receivedAt?: Date | null;
 }
 
 /**
@@ -161,12 +166,13 @@ export async function listRetryableInboxEvents(
     },
     orderBy: { receivedAt: "asc" },
     take: ctx.ports.reconcileBatchSize,
-    select: { id: true, clientId: true, provider: true, payload: true },
-  })) as { id: string; clientId: string; provider: string; payload: unknown }[];
+    select: { id: true, clientId: true, provider: true, payload: true, receivedAt: true },
+  })) as { id: string; clientId: string; provider: string; payload: unknown; receivedAt: Date | null }[];
   return rows.map((row) => ({
     id: row.id,
     clientId: row.clientId,
     provider: row.provider as MarketplaceProvider,
     payload: row.payload,
+    receivedAt: row.receivedAt,
   }));
 }

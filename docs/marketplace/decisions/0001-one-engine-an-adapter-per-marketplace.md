@@ -85,3 +85,17 @@ replay-safely.
 - The host keeps the stock draw, the settlement effects, the screens and the
   cancel route; the engine gives it `decide`, `recordStoreCancellation`,
   `suggestReason` and `orderStates` to build them on.
+
+## Addendum — 99Food, and an order the event only announces (FUT-4763, FUT-4764)
+
+99Food is the second adapter, `@12-apps/marketplace/99food` (provider
+`NINETY_NINE_FOOD`), on Open Delivery v1.7.1. It needed one thing the port did
+not have: Open Delivery's `CREATED` event names the order and carries none of
+it. The port gains an OPTIONAL `fetchOrder`, and an event marks itself
+`orderToFetch`. The engine never fetches inside the request that delivered the
+event: the webhook records the row PENDING and queues `marketplace.fetch-order`,
+whose job fetches through the host's HTTP port and ingests through the one
+ingest path. It is a capability of the event, not a provider check, so iFood
+(whose events carry the order) is unchanged and the next Open Delivery
+marketplace is again an adapter and its registration. No migration: the
+provider column checks a shape.

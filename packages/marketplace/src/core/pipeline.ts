@@ -1,8 +1,10 @@
 import { cancelAcceptance } from "./acceptance";
 import { failCancellationRequest } from "./cancellation";
+import { awaitOrderBody, requeueOwedFetch } from "./fetch-order";
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { resolveIngestionTarget } from "./integration";
+import { markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent } from "./types";
 
@@ -34,6 +36,8 @@ export type DeliveryOutcome =
   | { kind: "ingested"; orderId: string; unmappedSkus: string[] }
   | { kind: "cancelled" }
   | { kind: "cancellationFailed" }
+  /** Recorded; the order body is fetched by the `marketplace.fetch-order` job. */
+  | { kind: "awaitingOrder" }
   | { kind: "duplicate" }
   | { kind: "ignored"; reason: string }
   | { kind: "failed"; reason: string };
@@ -88,6 +92,11 @@ export async function processDelivery(
   }
 }
 
+/** The event names an order whose body the marketplace serves apart (`orderToFetch`). */
+function announcesOrderToFetch(event: NormalizedEvent): boolean {
+  return event.order === null && event.orderToFetch === true && event.externalOrderId !== null;
+}
+
 /**
  * Act on one recorded delivery: cancel, ingest, or deliberately nothing.
  *
@@ -118,14 +127,20 @@ async function applyEvent(
   }
 
   if (event.cancelled && event.externalOrderId) {
-    await cancelAcceptance(ctx, {
-      clientId,
-      provider: event.provider,
-      externalOrderId: event.externalOrderId,
-      now,
-    });
+    const order = { clientId, provider: event.provider, externalOrderId: event.externalOrderId };
+    // A cancellation that outran a fetched order's body leaves its marker, so
+    // the fetch that follows ingests nothing.
+    if (!(await cancelAcceptance(ctx, { ...order, now }))) await markCancelledBeforeIngest(ctx, order);
     await settleInboxEvent(ctx, inboxId, "PROCESSED");
     return { kind: "cancelled" };
+  }
+
+  if (announcesOrderToFetch(event)) {
+    // The event announces an order whose body the marketplace serves apart.
+    // Fetching is a call to the marketplace, so it is a job's, never this
+    // request's: the row waits PENDING and the fetch is queued.
+    await awaitOrderBody(ctx, clientId, inboxId);
+    return { kind: "awaitingOrder" };
   }
 
   if (!event.order) {
@@ -158,7 +173,7 @@ async function applyEvent(
  */
 export async function reprocessStoredDelivery(
   ctx: EngineContext,
-  input: { id: string; clientId: string; provider: MarketplaceProvider; payload: unknown },
+  input: { id: string; clientId: string; provider: MarketplaceProvider; payload: unknown; receivedAt?: Date | null },
 ): Promise<DeliveryOutcome> {
   const event = normalizeEvent(ctx, input.provider, input.payload);
   if (!event) {
@@ -176,6 +191,8 @@ export async function reprocessStoredDelivery(
     await deferInboxEvent(ctx, input.id, reason);
     return { kind: "ignored", reason };
   }
+  // A row waiting for its order body is the fetch job's: re-queued, never fetched here.
+  if (announcesOrderToFetch(event)) return requeueOwedFetch(ctx, input);
   try {
     return await applyEvent(
       ctx,
