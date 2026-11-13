@@ -1,0 +1,17 @@
+{
+  "what": "Real request/response pairs of the official IBS/CBS calculator (Calculadora de Tributos da Reforma Tributaria do Consumo), POST /calculadora/regime-geral, replayed by oracle.test.ts. Never edited by hand: re-record by calling the endpoint with each *.request.json and saving the body as the matching *.response.json.",
+  "endpoint": "https://piloto-cbs.tributos.gov.br/servico/calculadora-consumo/api/calculadora/regime-geral",
+  "recordedAt": "2026-11-13",
+  "calculatorVersion": {
+    "versaoApp": "1.6.2-a39944eb",
+    "versaoDb": "V0066",
+    "dataVersaoDb": "2026-10-28",
+    "ambiente": "apr"
+  },
+  "pairs": ["restaurant", "market", "half-cent", "exclusions"],
+  "notes": [
+    "Only 2026 can be recorded: the calculator answers 404 for the rates of 2027 and later.",
+    "Alcohol and sweetened drinks are absent: the calculator demands Imposto Seletivo data for them, which the engine does not take.",
+    "NCM codes are the ones the calculator links to each cClassTrib (it refuses an unlinked NCM with 422)."
+  ]
+}

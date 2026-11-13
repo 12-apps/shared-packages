@@ -1,0 +1,45 @@
+{
+  "id": "fiscal-market-2026",
+  "versao": "1.0.0",
+  "dataHoraEmissao": "2026-11-20T12:00:00-03:00",
+  "municipio": 3304557,
+  "uf": "RJ",
+  "itens": [
+    {
+      "numero": 1,
+      "ncm": "10063021",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "200",
+      "baseCalculo": 27.9,
+      "cClassTrib": "200003"
+    },
+    {
+      "numero": 2,
+      "ncm": "04090000",
+      "quantidade": 0.512,
+      "unidade": "KG",
+      "cst": "200",
+      "baseCalculo": 18.5,
+      "cClassTrib": "200034"
+    },
+    {
+      "numero": 3,
+      "ncm": "34025000",
+      "quantidade": 3,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 13.77,
+      "cClassTrib": "000001"
+    },
+    {
+      "numero": 4,
+      "ncm": "48202000",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 45.9,
+      "cClassTrib": "000001"
+    }
+  ]
+}

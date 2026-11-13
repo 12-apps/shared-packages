@@ -1,0 +1,45 @@
+{
+  "id": "fiscal-restaurant-2026",
+  "versao": "1.0.0",
+  "dataHoraEmissao": "2026-11-20T12:00:00-03:00",
+  "municipio": 3550308,
+  "uf": "SP",
+  "itens": [
+    {
+      "numero": 1,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "200",
+      "baseCalculo": 39.9,
+      "cClassTrib": "200047"
+    },
+    {
+      "numero": 2,
+      "ncm": "21069090",
+      "quantidade": 2,
+      "unidade": "UN",
+      "cst": "200",
+      "baseCalculo": 12.0,
+      "cClassTrib": "200047"
+    },
+    {
+      "numero": 3,
+      "ncm": "20052000",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 6.5,
+      "cClassTrib": "000001"
+    },
+    {
+      "numero": 4,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 8.0,
+      "cClassTrib": "000001"
+    }
+  ]
+}
