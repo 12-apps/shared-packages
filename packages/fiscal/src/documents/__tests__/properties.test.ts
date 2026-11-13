@@ -49,12 +49,15 @@ interface Walk {
   readonly accepted: Array<{ from: FiscalDocumentStatus; to: FiscalDocumentStatus; kind: DocumentInput["kind"] }>;
 }
 
+/** The 40 steps of every walk, numbered from 1. */
+const STEPS = Array.from({ length: 40 }, (_, index) => index + 1);
+
 function walk(seed: number): Walk {
   const start = draw(seed, 0) < 0.5 ? aDocument() : aDocument({ seriesKind: "CONTINGENCY" });
-  let document: FiscalDocument = start;
-  const visited: FiscalDocumentStatus[] = [document.status];
+  const visited: FiscalDocumentStatus[] = [start.status];
   const accepted: Walk["accepted"] = [];
-  for (let step = 1; step <= 40; step += 1) {
+  /** One step of the walk: the document it leaves, the one it was handed when the input is refused. */
+  const stepFrom = (document: FiscalDocument, step: number): FiscalDocument => {
     const input = INPUTS[Math.floor(draw(seed, step) * INPUTS.length)]!;
     const before = JSON.stringify(document);
     try {
@@ -62,18 +65,21 @@ function walk(seed: number): Walk {
       expect(result.event.fromStatus).toBe(document.status);
       expect(result.event.toStatus).toBe(result.document.status);
       accepted.push({ from: document.status, to: result.document.status, kind: input.kind });
-      document = result.document;
-      visited.push(document.status);
+      visited.push(result.document.status);
+      return result.document;
     } catch (error) {
       expect(error, `seed ${seed} step ${step}`).toBeInstanceOf(FiscalDocumentError);
       expect((error as FiscalDocumentError).code).toBe("TRANSITION_REFUSED");
       expect(JSON.stringify(document), `seed ${seed}: a refusal changed the document`).toBe(before);
+      return document;
     }
-  }
+  };
+  STEPS.reduce(stepFrom, start);
   return { contingency: start.seriesKind === "CONTINGENCY", visited, accepted };
 }
 
 const WALKS = SEEDS.map((seed) => ({ seed, ...walk(seed) }));
+const statesVisited = (walks: readonly Walk[]) => walks.flatMap((w) => w.visited);
 
 describe("random transition sequences", () => {
   it("accept an input only from a state its row lists", () => {
@@ -115,7 +121,7 @@ describe("random transition sequences", () => {
   });
 
   it("cover every state across the seeds", () => {
-    const seen = new Set(WALKS.flatMap((w) => w.visited));
+    const seen = new Set(statesVisited(WALKS));
     expect([...seen].sort()).toEqual(
       ["AUTHORIZED", "CANCELLED", "CONTINGENCY", "DENIED", "PENDING", "REJECTED", "REPLACED", "SUBMITTED"],
     );

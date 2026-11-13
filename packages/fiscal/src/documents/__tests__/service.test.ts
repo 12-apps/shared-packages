@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import type { Issuer, IssuerOutcome } from "../../issuer/port";
@@ -10,6 +7,7 @@ import { draftOf } from "../context";
 import { createMemoryFiscalStore } from "../memory";
 import { createFiscalDocuments } from "../service";
 import { createSigningIdentities } from "../signing";
+import { RECORDED_ANSWERS } from "../../issuer/__tests__/fixtures/recorded";
 import { SALE } from "./fixtures";
 
 /**
@@ -17,18 +15,17 @@ import { SALE } from "./fixtures";
  * with the fiscal service's OWN recorded answers (`../../issuer/__tests__/fixtures/sidecar`).
  */
 
-const RECORDED = join(import.meta.dirname, "../../issuer/__tests__/fixtures/sidecar");
 function recorded<T>(name: string): IssuerOutcome<T> {
-  const { status, body } = JSON.parse(readFileSync(join(RECORDED, `${name}.json`), "utf8")) as { status: number; body: unknown };
+  const { status, body } = RECORDED_ANSWERS[name]!;
   return status === 200 ? { ok: true, answer: body as T } : { ok: false, error: (body as { error: never }).error };
 }
 
 type Method = Exclude<keyof Issuer, "health">;
 
 function scriptedIssuer(script: Partial<Record<Method, string[]>>) {
-  const calls: Array<{ method: Method; call: unknown }> = [];
+  const received: Array<{ method: Method; call: unknown }> = [];
   const answer = (method: Method) => async (call: unknown) => {
-    calls.push({ method, call });
+    received.push({ method, call });
     const next = script[method]?.shift();
     if (next === undefined) throw new Error(`no scripted answer for ${method}`);
     return recorded(next);
@@ -42,7 +39,7 @@ function scriptedIssuer(script: Partial<Record<Method, string[]>>) {
     inutilize: answer("inutilize"),
     health: async () => ({ status: "ok" as const, libraries: {}, nfeSchemas: "", sefazTlsVerify: true }),
   } as unknown as Issuer;
-  return { issuer, calls };
+  return { issuer, calls: received };
 }
 
 /** A reversible stand-in for the host's cipher, so a test can see ciphertext is not plaintext. */
@@ -78,15 +75,18 @@ const PROFILE: EmitterProfileInput = {
 const DRAFT = draftOf(SALE);
 
 async function setup(script: Partial<Record<Method, string[]>>, profile: Partial<EmitterProfileInput> = {}) {
-  const store = createMemoryFiscalStore();
-  const { issuer, calls } = scriptedIssuer(script);
-  const stored = new Map<string, string>();
-  const notified: unknown[] = [];
-  let clock = Date.parse("2026-11-20T15:30:00.000Z");
-  let ids = 0;
-  const service = createFiscalDocuments({
-    store,
-    issuer,
+  const memoryStore = createMemoryFiscalStore();
+  const scripted = scriptedIssuer(script);
+  const objects = new Map<string, string>();
+  const emitted: unknown[] = [];
+  /** The service's clock, moved forward by `later`. */
+  const clock = { at: Date.parse("2026-11-20T15:30:00.000Z") };
+  const ids = (function* () {
+    for (let n = 1; ; n += 1) yield `doc-${n}`;
+  })();
+  const documents = createFiscalDocuments({
+    store: memoryStore,
+    issuer: scripted.issuer,
     signing: createSigningIdentities({ cipher }),
     cipher,
     readCertificate: async ({ password }) => {
@@ -94,12 +94,12 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
       return { expiresAt: "2027-03-01T00:00:00.000Z" };
     },
     storage: {
-      put: async (key, body) => void stored.set(key, body),
-      get: async (key) => stored.get(key) ?? null,
+      put: async (key, body) => void objects.set(key, body),
+      get: async (key) => objects.get(key) ?? null,
     },
     sales: { saleFor: async (): Promise<SaleDraft> => DRAFT },
-    notify: { emit: async (event) => void notified.push(event) },
-    now: () => new Date(clock),
+    notify: { emit: async (event) => void emitted.push(event) },
+    now: () => new Date(clock.at),
     utcOffset: () => "-03:00",
     reasons: {
       contingency: "SEFAZ indisponivel no momento da venda",
@@ -108,11 +108,11 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     },
     staleAfterMs: 5 * 60_000,
     nfceOnlineToleranceMs: 15 * 60_000,
-    newId: () => `doc-${(ids += 1)}`,
+    newId: () => ids.next().value as string,
   });
-  await service.saveProfile("owner-1", { ...PROFILE, ...profile });
-  await service.uploadCertificate("owner-1", { pfxBase64: PFX, password: PASSWORD });
-  await service.createIssuingPoint("owner-1", {
+  await documents.saveProfile("owner-1", { ...PROFILE, ...profile });
+  await documents.uploadCertificate("owner-1", { pfxBase64: PFX, password: PASSWORD });
+  await documents.createIssuingPoint("owner-1", {
     id: "register-1",
     model: "NFCE",
     onlineSeries: 1,
@@ -120,8 +120,8 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     firstOnlineNumber: 1201,
     firstContingencyNumber: 1,
   });
-  const later = (ms: number) => void (clock += ms);
-  return { service, store, calls, stored, notified, later };
+  const later = (ms: number) => void (clock.at += ms);
+  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later };
 }
 
 const ISSUE = { ownerId: "owner-1", subjectId: "order-77", issuingPointId: "register-1", model: "NFCE" } as const;

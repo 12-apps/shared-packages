@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { DANFE_NFCE_PT_BR } from "../danfe/pt-BR";
@@ -12,12 +9,12 @@ import { createSigningIdentities } from "../documents/signing";
 import { createApiFiscal, type FiscalRoute } from "../http";
 import type { Issuer } from "../issuer/port";
 import nfceSimples from "../../sidecar/tests/fixtures/documents/nfce-simples.json";
+import { RECORDED_ANSWERS } from "../issuer/__tests__/fixtures/recorded";
 
 /** The routes over the real service, the memory store and the fiscal service's recorded answers. */
 
-const RECORDED = join(import.meta.dirname, "../issuer/__tests__/fixtures/sidecar");
 const recorded = (name: string) => {
-  const { status, body } = JSON.parse(readFileSync(join(RECORDED, `${name}.json`), "utf8")) as { status: number; body: { error?: unknown } };
+  const { status, body } = RECORDED_ANSWERS[name] as { status: number; body: { error?: unknown } };
   return status === 200 ? { ok: true, answer: body } : { ok: false, error: body.error };
 };
 
@@ -48,8 +45,10 @@ function api(cancelAnswer = "nfce-cancel") {
     staleAfterMs: 300_000,
     nfceOnlineToleranceMs: 15 * 60_000,
     newId: (() => {
-      let n = 0;
-      return () => `doc-${(n += 1)}`;
+      const ids = (function* () {
+        for (let n = 1; ; n += 1) yield `doc-${n}`;
+      })();
+      return () => ids.next().value as string;
     })(),
   });
   const { routes } = createApiFiscal({ documents, storage, danfeLabels: DANFE_NFCE_PT_BR });
@@ -80,13 +79,13 @@ const PROFILE = {
 };
 
 async function ready(cancelAnswer?: string) {
-  const fiscal = api(cancelAnswer);
-  await fiscal.call("PUT", "/fiscal/profile", { body: PROFILE });
-  await fiscal.call("PUT", "/fiscal/profile/certificate", { body: { pfxBase64: PFX, password: PASSWORD } });
-  await fiscal.call("POST", "/fiscal/issuing-points", {
+  const prepared = api(cancelAnswer);
+  await prepared.call("PUT", "/fiscal/profile", { body: PROFILE });
+  await prepared.call("PUT", "/fiscal/profile/certificate", { body: { pfxBase64: PFX, password: PASSWORD } });
+  await prepared.call("POST", "/fiscal/issuing-points", {
     body: { id: "register-1", model: "NFCE", onlineSeries: 1, contingencySeries: 2, firstOnlineNumber: 1201, firstContingencyNumber: 1 },
   });
-  return fiscal;
+  return prepared;
 }
 
 describe("the fiscal routes", () => {

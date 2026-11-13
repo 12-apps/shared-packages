@@ -1,28 +1,28 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { DANFE_NFCE_EN_US } from "../en-US";
 import { DANFE_NFCE_PT_BR } from "../pt-BR";
 import { DANFE_COLUMNS, type DanfeLine, money, renderDanfeNfce, wrap } from "../render";
+import nfceIssueAuthorized from "../../issuer/__tests__/fixtures/sidecar/nfce-issue-authorized.json";
+import nfceSignContingency from "../../issuer/__tests__/fixtures/sidecar/nfce-sign-contingency.json";
 
 /** The fiscal service's own recorded answers: an authorised NFC-e, and one signed offline. */
-const RECORDED = join(import.meta.dirname, "../../issuer/__tests__/fixtures/sidecar");
-const body = (name: string) => (JSON.parse(readFileSync(join(RECORDED, `${name}.json`), "utf8")) as { body: Record<string, string> }).body;
-const AUTHORIZED = body("nfce-issue-authorized")["authorizedXml"]!;
-const OFFLINE = body("nfce-sign-contingency")["signedXml"]!;
+const body = (recorded: unknown) => (recorded as { body: Record<string, string> }).body;
+const AUTHORIZED = body(nfceIssueAuthorized)["authorizedXml"]!;
+const OFFLINE = body(nfceSignContingency)["signedXml"]!;
+/** The authorised XML re-labelled as an NF-e (model 55). */
+const asModel55 = (xml: string) => xml.replace("<mod>65</mod>", "<mod>55</mod>");
 
 const texts = (lines: readonly DanfeLine[]) => lines.map((line) => line.text);
 const DIVISIONS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
 describe("the DANFE NFC-e", () => {
   it.each([58, 80] as const)("lays the full DANFE out on %i mm in the Manual's divisions, in order", (paperWidth) => {
-    const lines = renderDanfeNfce({ xml: AUTHORIZED, paperWidth, labels: DANFE_NFCE_PT_BR });
-    const order = lines.map((line) => DIVISIONS.indexOf(line.division));
+    const rendered = renderDanfeNfce({ xml: AUTHORIZED, paperWidth, labels: DANFE_NFCE_PT_BR });
+    const order = rendered.map((line) => DIVISIONS.indexOf(line.division));
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(new Set(lines.map((line) => line.division))).toEqual(new Set(DIVISIONS));
-    for (const line of lines) expect(line.text.length, line.text).toBeLessThanOrEqual(DANFE_COLUMNS[paperWidth]);
+    expect(new Set(rendered.map((line) => line.division))).toEqual(new Set(DIVISIONS));
+    for (const line of rendered) expect(line.text.length, line.text).toBeLessThanOrEqual(DANFE_COLUMNS[paperWidth]);
   });
 
   it("prints the issuer, every item, the totals, the key, the protocol and the QR code", () => {
@@ -68,7 +68,7 @@ describe("the DANFE NFC-e", () => {
 
   it("refuses an XML that is not an NFC-e", () => {
     expect(() => renderDanfeNfce({ xml: "<nfeProc/>", paperWidth: 58, labels: DANFE_NFCE_PT_BR })).toThrow(/not an NF-e/);
-    expect(() => renderDanfeNfce({ xml: AUTHORIZED.replace("<mod>65</mod>", "<mod>55</mod>"), paperWidth: 58, labels: DANFE_NFCE_PT_BR })).toThrow(/model 65/);
+    expect(() => renderDanfeNfce({ xml: asModel55(AUTHORIZED), paperWidth: 58, labels: DANFE_NFCE_PT_BR })).toThrow(/model 65/);
   });
 
   it("formats money in reais and wraps on spaces", () => {

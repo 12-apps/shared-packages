@@ -26,6 +26,9 @@ import { fiscalServerManifest } from "../server";
 const stubApi = () =>
   createApiFiscal({ documents: {} as never, storage: {} as never, danfeLabels: DANFE_NFCE_PT_BR });
 
+/** The jobs' clock where the case does not read it. */
+const NOW = "2026-11-20T15:30:00.000Z";
+
 describe("the fiscal manifest", () => {
   it("passes the producer assertions", () => {
     expect(defineManifest(fiscalManifest)).toBe(fiscalManifest);
@@ -112,7 +115,7 @@ describe("the fiscal manifest", () => {
       server: fiscalServerManifest,
       bindings: {
         http: { mountPath: "/api/admin/:tenant", config: { documents: {} as never, storage: {} as never, danfeLabels: DANFE_NFCE_PT_BR } },
-        jobs: { deps: { documents: {} as never, store: {} as never, notify: { emit: async () => ({}) }, now: () => new Date() } },
+        jobs: { deps: { documents: {} as never, store: {} as never, notify: { emit: async () => ({}) }, now: () => new Date(NOW) } },
       },
     });
     const wired = host.assemble();
@@ -134,7 +137,7 @@ describe("the fiscal jobs", () => {
     const ctx = context();
     const sweep = vi.fn().mockResolvedValue({ advanced: [{ documentId: "d1", status: "AUTHORIZED" }], failures: [{ documentId: "d2", message: "boom" }] });
     const transmitContingency = vi.fn().mockResolvedValue(idle);
-    const deps = { documents: { sweep, transmitContingency }, store: {} as never, notify: { emit: vi.fn() }, now: () => new Date() };
+    const deps = { documents: { sweep, transmitContingency }, store: {} as never, notify: { emit: vi.fn() }, now: () => new Date(NOW) };
     await FISCAL_JOBS.blueprints.sweep.handle(undefined as never, deps, ctx);
     await FISCAL_JOBS.blueprints.transmitContingency.handle(undefined as never, deps, ctx);
     expect(sweep).toHaveBeenCalledWith(10);

@@ -53,12 +53,8 @@ describe.skipIf(!live)("the sidecar issuer, live against SEFAZ homologação", (
 
 /** The access key's modulo-11 check digit. */
 function checkDigit(body: string): number {
-  let sum = 0;
-  let weight = 2;
-  for (let i = body.length - 1; i >= 0; i -= 1) {
-    sum += Number(body[i]) * weight;
-    weight = weight === 9 ? 2 : weight + 1;
-  }
+  // Weights 2 to 9 from the rightmost digit, starting over at 2 after 9.
+  const sum = [...body].reverse().reduce((total, digit, index) => total + Number(digit) * (2 + (index % 8)), 0);
   const rest = sum % 11;
   return rest < 2 ? 0 : 11 - rest;
 }

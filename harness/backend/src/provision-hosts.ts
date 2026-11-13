@@ -31,6 +31,7 @@ import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './d
 import { createEntitlementsHost } from './entitlements-host';
 import { impersonationHost } from './impersonation-host';
 import { applyLifecycleMigrations } from './lifecycle-db';
+import { applyFiscalMigrations, fiscalHost } from './fiscal-host';
 import { applyMarketplaceMigrations, marketplaceHost } from './marketplace-host';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyMcpMigrations, mcpOauthHost } from './mcp-oauth-host';
@@ -132,11 +133,15 @@ async function provisionStored(pg: PGlite) {
   // writes through the Prisma delegates and its interactive `$transaction`,
   // and its own migration (replay-safe) arrives out of its tarball.
   await applyMarketplaceMigrations(pg);
+  // @12-apps/fiscal (FUT-2237) is the fourth: its own store runs raw SQL
+  // through the same client's `$transaction`, over its own migration.
+  await applyFiscalMigrations(pg);
   const prisma = await createPrismaClient(pg);
   const payments = paymentsHost(prisma);
   const chat = chatHost(prisma);
   const marketplace = marketplaceHost(prisma);
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace };
+  const fiscal = fiscalHost(prisma);
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace, fiscal };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {
@@ -215,5 +220,6 @@ export interface Hosts {
   payments: ReturnType<typeof paymentsHost>;
   chat: ReturnType<typeof chatHost>;
   marketplace: ReturnType<typeof marketplaceHost>;
+  fiscal: ReturnType<typeof fiscalHost>;
 }
 

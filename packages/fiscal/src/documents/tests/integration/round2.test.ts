@@ -9,25 +9,28 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { PGlite } from "@electric-sql/pglite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { DANFE_NFCE_PT_BR } from "../../danfe/pt-BR";
-import { createApiFiscal } from "../../http";
-import type { Issuer } from "../../issuer/port";
-import type { SaleForDocument } from "../../sale/types";
-import { computeAccessKey, draftOf } from "../context";
-import { createMemoryFiscalStore } from "../memory";
-import { digestOf } from "../nfe-proc";
-import type { FiscalStore, SaleDraft } from "../ports";
-import { createFiscalDocuments } from "../service";
-import { createSigningIdentities } from "../signing";
-import { createPrismaFiscalStore } from "../sql-store";
-import { SALE } from "./fixtures";
-import { migratedDatabase, prismaOver } from "./pglite";
+import { DANFE_NFCE_PT_BR } from "../../../danfe/pt-BR";
+import { createApiFiscal } from "../../../http";
+import type { Issuer } from "../../../issuer/port";
+import type { SaleForDocument } from "../../../sale/types";
+import { computeAccessKey, draftOf } from "../../context";
+import { createMemoryFiscalStore } from "../../memory";
+import { digestOf } from "../../nfe-proc";
+import type { FiscalStore, SaleDraft } from "../../ports";
+import { createFiscalDocuments } from "../../service";
+import { createSigningIdentities } from "../../signing";
+import { createPrismaFiscalStore } from "../../sql-store";
+import { SALE } from "../../__tests__/fixtures";
+import { migratedDatabase, prismaOver, warmDatabase } from "./pglite";
+
+/** The migration is paid here, under the hook's own timeout, never inside the first case's. */
+beforeAll(warmDatabase, 60_000);
 
 const K2 = "35261111222333000181650020000000019482139071";
 const RECORDED_KEY = "35261111222333000181650010000012011482139076";
-const RECORDED = join(import.meta.dirname, "../../issuer/__tests__/fixtures/sidecar");
+const RECORDED = join(import.meta.dirname, "../../../issuer/__tests__/fixtures/sidecar");
 const RECORDED_SIGNED = (JSON.parse(readFileSync(join(RECORDED, "nfce-issue-authorized.json"), "utf8")) as { body: { signedXml: string } }).body.signedXml;
 
 const err = (cls: string, o: Record<string, unknown> = {}) => ({

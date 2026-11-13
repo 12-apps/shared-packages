@@ -1,12 +1,10 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import type { SaleForDocument } from "../../sale/types";
 import type { SidecarErrorBody } from "../../sidecar/types";
 import type { IssuerOutcome, SigningMaterial } from "../port";
 import { createSidecarIssuer, type SidecarFetch } from "../sidecar";
+import { RECORDED_ANSWERS } from "./fixtures/recorded";
 
 /**
  * The adapter against the fiscal service's OWN recorded answers. Each file in
@@ -24,12 +22,7 @@ interface Recording {
   readonly body: unknown;
 }
 
-const DIR = join(import.meta.dirname, "fixtures", "sidecar");
-const RECORDINGS: Record<string, Recording> = Object.fromEntries(
-  readdirSync(DIR)
-    .filter((file) => file.endsWith(".json"))
-    .map((file) => [file.replace(/\.json$/, ""), JSON.parse(readFileSync(join(DIR, file), "utf8")) as Recording]),
-);
+const RECORDINGS = RECORDED_ANSWERS as Readonly<Record<string, Recording>>;
 
 const SIGNING: SigningMaterial = {
   certificate: { pfxBase64: "UEZYLUJZVEVT", password: "pfx-password-not-a-real-one" },

@@ -45,13 +45,13 @@ describe("a person's attention", () => {
     }, AT);
     expect(refused.document).toMatchObject({ attention: true, statusCode: "241", failures: 1 });
 
-    let document = aDocument({ status: "SUBMITTED" });
-    for (let i = 0; i < MAX_FAILURES; i += 1) {
-      expect(document.attention).toBe(false);
-      document = transition(document, { kind: "RETRY", error: sidecarError("RETRYABLE") }, AT).document;
-    }
-    expect(document).toMatchObject({ attention: true, failures: MAX_FAILURES });
-    const released = transition(document, { kind: "RELEASE" }, AT).document;
+    const retries = Array.from({ length: MAX_FAILURES }, () => sidecarError("RETRYABLE"));
+    const exhausted = retries.reduce((current, error) => {
+      expect(current.attention).toBe(false);
+      return transition(current, { kind: "RETRY", error }, AT).document;
+    }, aDocument({ status: "SUBMITTED" }));
+    expect(exhausted).toMatchObject({ attention: true, failures: MAX_FAILURES });
+    const released = transition(exhausted, { kind: "RELEASE" }, AT).document;
     expect(released).toMatchObject({ attention: false, failures: 0 });
     expect(() => transition(released, { kind: "RELEASE" }, AT)).toThrow(/not waiting for a person/);
   });

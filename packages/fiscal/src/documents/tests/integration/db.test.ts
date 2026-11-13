@@ -3,16 +3,19 @@
  * to: every (status, numberVoid) pair the state machine can reach is a row the
  * migration's CHECKs accept, written through the package's own store.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { PGlite } from "@electric-sql/pglite";
 
-import { computeAccessKey } from "../helpers";
-import { type DocumentInput, transition } from "../machine";
-import { createPrismaFiscalStore } from "../sql-store";
-import type { FiscalDocument } from "../types";
-import { AUTHORIZED, CANCELLED, DENIED, INUTILIZED, SALE, SIGNED, aDocument, lookedUp, sidecarError } from "./fixtures";
-import { migratedDatabase, prismaOver } from "./pglite";
+import { computeAccessKey } from "../../helpers";
+import { type DocumentInput, transition } from "../../machine";
+import { createPrismaFiscalStore } from "../../sql-store";
+import type { FiscalDocument } from "../../types";
+import { AUTHORIZED, CANCELLED, DENIED, INUTILIZED, SALE, SIGNED, aDocument, lookedUp, sidecarError } from "../../__tests__/fixtures";
+import { migratedDatabase, prismaOver, warmDatabase } from "./pglite";
+
+/** The migration is paid here, under the hook's own timeout, never inside the first case's. */
+beforeAll(warmDatabase, 60_000);
 
 let db: PGlite | undefined;
 afterEach(async () => {

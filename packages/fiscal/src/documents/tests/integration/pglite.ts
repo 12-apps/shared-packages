@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
 
-import type { FiscalPrismaClient, FiscalSqlClient } from "../sql-store";
+import type { FiscalPrismaClient, FiscalSqlClient } from "../../sql-store";
 
 /**
  * A real (WASM) Postgres with the package's migrations applied, and the two
@@ -11,7 +11,7 @@ import type { FiscalPrismaClient, FiscalSqlClient } from "../sql-store";
  * package's own store runs here exactly as it runs on a host's client.
  */
 
-const MIGRATIONS = join(import.meta.dirname, "../../../prisma/migrations");
+const MIGRATIONS = join(import.meta.dirname, "../../../../prisma/migrations");
 
 async function migrate(): Promise<PGlite> {
   const db = new PGlite();
@@ -23,6 +23,16 @@ async function migrate(): Promise<PGlite> {
 
 /** One migrated database per test file: starting and migrating a PGlite costs about a second each time. */
 let shared: Promise<PGlite> | undefined;
+
+/**
+ * Starts and migrates the file's database once. Call it from a `beforeAll` so
+ * the migration is paid under the hook's own timeout, never inside the first
+ * case's.
+ */
+export async function warmDatabase(): Promise<void> {
+  shared ??= migrate();
+  await shared;
+}
 
 /**
  * The file's migrated database, emptied: every table truncated and every

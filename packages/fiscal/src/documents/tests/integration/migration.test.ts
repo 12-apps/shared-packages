@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { FISCAL_NEXT_NUMBER_SQL } from "../sql";
+import { FISCAL_NEXT_NUMBER_SQL } from "../../sql";
 
 /**
  * The package's migrations on a real (WASM) Postgres: the number draw is the
@@ -13,7 +13,7 @@ import { FISCAL_NEXT_NUMBER_SQL } from "../sql";
  * state machine never writes.
  */
 
-const MIGRATIONS = join(import.meta.dirname, "../../../prisma/migrations");
+const MIGRATIONS = join(import.meta.dirname, "../../../../prisma/migrations");
 
 let db: PGlite;
 

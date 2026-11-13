@@ -8,21 +8,24 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { PGlite } from "@electric-sql/pglite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type { Issuer } from "../../issuer/port";
-import { draftOf } from "../context";
-import { createMemoryFiscalStore } from "../memory";
-import { assembleNfeProc, digestOf } from "../nfe-proc";
-import type { FiscalStore } from "../ports";
-import { createFiscalDocuments } from "../service";
-import { createSigningIdentities } from "../signing";
-import { createPrismaFiscalStore } from "../sql-store";
-import { isLive } from "../types";
-import { SALE } from "./fixtures";
-import { migratedDatabase, prismaOver } from "./pglite";
+import type { Issuer } from "../../../issuer/port";
+import { draftOf } from "../../context";
+import { createMemoryFiscalStore } from "../../memory";
+import { assembleNfeProc, digestOf } from "../../nfe-proc";
+import type { FiscalStore } from "../../ports";
+import { createFiscalDocuments } from "../../service";
+import { createSigningIdentities } from "../../signing";
+import { createPrismaFiscalStore } from "../../sql-store";
+import { isLive } from "../../types";
+import { SALE } from "../../__tests__/fixtures";
+import { migratedDatabase, prismaOver, warmDatabase } from "./pglite";
 
-const RECORDED = join(import.meta.dirname, "../../issuer/__tests__/fixtures/sidecar");
+/** The migration is paid here, under the hook's own timeout, never inside the first case's. */
+beforeAll(warmDatabase, 60_000);
+
+const RECORDED = join(import.meta.dirname, "../../../issuer/__tests__/fixtures/sidecar");
 const FIX = (JSON.parse(readFileSync(join(RECORDED, "nfce-issue-authorized.json"), "utf8")) as { body: { authorizedXml: string; accessKey: string } }).body;
 const err = (cls: string, o: Record<string, unknown> = {}) => ({
   ok: false,

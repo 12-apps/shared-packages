@@ -115,6 +115,7 @@ import { provisionResearch, researchHost, reseedResearch } from './research-host
 import { observability } from './observability-host';
 import { reseedBilling } from './billing-host';
 import { reseedChat } from './chat-host';
+import { reseedFiscal } from './fiscal-host';
 import { setOsrmDown } from './routing-host';
 import { provisionHosts, type Hosts } from './provision-hosts';
 
@@ -190,6 +191,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedResearch(pg);
     await reseedBilling(pg);
     await reseedChat(pg, hosts.chat);
+    await reseedFiscal(pg, hosts.fiscal);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();

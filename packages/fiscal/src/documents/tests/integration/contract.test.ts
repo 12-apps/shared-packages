@@ -4,28 +4,31 @@
  * Prisma store on a real Postgres (PGlite, the package's migration). Each case
  * is an invariant of the numbering contract; the review found each broken.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { PGlite } from "@electric-sql/pglite";
 
-import { DANFE_NFCE_PT_BR } from "../../danfe/pt-BR";
-import { renderDanfeNfce } from "../../danfe/render";
-import type { Issuer, IssuerOutcome } from "../../issuer/port";
-import { draftOf } from "../context";
-import { createMemoryFiscalStore } from "../memory";
-import type { FiscalStore } from "../ports";
-import { createFiscalDocuments } from "../service";
-import { createSigningIdentities } from "../signing";
-import { createPrismaFiscalStore } from "../sql-store";
-import type { FiscalDocument } from "../types";
-import { SALE } from "./fixtures";
-import { migratedDatabase, prismaOver } from "./pglite";
+import { DANFE_NFCE_PT_BR } from "../../../danfe/pt-BR";
+import { renderDanfeNfce } from "../../../danfe/render";
+import type { Issuer, IssuerOutcome } from "../../../issuer/port";
+import { draftOf } from "../../context";
+import { createMemoryFiscalStore } from "../../memory";
+import type { FiscalStore } from "../../ports";
+import { createFiscalDocuments } from "../../service";
+import { createSigningIdentities } from "../../signing";
+import { createPrismaFiscalStore } from "../../sql-store";
+import type { FiscalDocument } from "../../types";
+import { SALE } from "../../__tests__/fixtures";
+import { migratedDatabase, prismaOver, warmDatabase } from "./pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+/** The migration is paid here, under the hook's own timeout, never inside the first case's. */
+beforeAll(warmDatabase, 60_000);
+
 const K1 = "35261111222333000181650010000012011482139076";
 const K2 = "35261111222333000181650020000000019482139071";
-const RECORDED = join(import.meta.dirname, "../../issuer/__tests__/fixtures/sidecar");
+const RECORDED = join(import.meta.dirname, "../../../issuer/__tests__/fixtures/sidecar");
 const recorded = (name: string) => JSON.parse(readFileSync(join(RECORDED, `${name}.json`), "utf8")) as { body: Record<string, string> };
 
 const err = (cls: string, o: Record<string, unknown> = {}) => ({
