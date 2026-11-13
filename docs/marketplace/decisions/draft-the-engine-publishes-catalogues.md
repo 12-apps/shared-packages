@@ -38,8 +38,14 @@ So:
    host says so (`catalogueMode` null).
 2. **One row per (store, marketplace, product)** in the engine's own table,
    with the mechanism's states: PUBLISHING → PUBLISHED, WITHDRAWING →
-   WITHDRAWN, FAILED with the action and the marketplace's own reason. The
-   price for the marketplace lives on the row (NULL: the store's).
+   WITHDRAWN, FAILED with the action and a failure CODE the host words (the
+   marketplace's own words kept beside a refusal only; the engine writes no
+   sentence a person reads). The price for the marketplace lives on the row
+   (NULL: the store's), and so does the photo the marketplace holds.
+   A push marketplace's category id is stored per (connection, name) and its
+   creation claimed by one publish at a time, so a new category is created
+   once. A publish that succeeds maps the SKU the marketplace's orders will
+   carry to the product.
 3. **Nothing calls a marketplace inline.** `publish` and `withdraw` stamp and
    queue `marketplace.catalogue`; the job makes the call with the outbound
    rules every other call follows (2xx done, a final 4xx FAILED, anything else
@@ -67,9 +73,11 @@ invents, and a lost answer must not make a second item, so the engine hands
 the adapter the row's id and the adapter derives the marketplace's ids from it
 (`stableUuid`).
 
-**A withdraw while publishing wins.** The store's last tap is what it means.
-The publish run calls nobody once the row asks for a withdraw, and a publish
-that lands after it is withdrawn again.
+**The store's last tap wins.** The publish run calls nobody once the row asks
+for a withdraw, a publish that lands after a withdraw is withdrawn again, a
+withdraw that lands after the product was switched back on is followed by a
+publish, and a new price is a new ask. A withdraw is always sent (a publish
+whose answer was lost may have landed), unless the connection is gone.
 
 ## Limits
 
