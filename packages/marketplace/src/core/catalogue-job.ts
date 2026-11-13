@@ -230,6 +230,10 @@ async function runFor(ctx: EngineContext, row: CatalogueRow, action: CatalogueAc
   const catalogue = ctx.registry.get(row.provider)?.catalogue;
   if (!catalogue) return { code: "UNSUPPORTED" };
   const connection = await catalogueConnection(ctx, row.clientId, row.provider);
+  // A withdraw for a connection that is gone (archived, removed) has nobody to tell: it is out.
+  if ("problem" in connection && connection.problem === "NOT_CONNECTED" && action === "withdraw") {
+    return { result: { kind: "accepted" }, sentPriceCents: null };
+  }
   if ("problem" in connection) return { code: connection.problem };
   return callFor(ctx, row, action, catalogue, { ...connection, now: ctx.ports.clock.now() });
 }
@@ -251,9 +255,7 @@ async function runOnce(
   if (!row) return { kind: "skipped", reason: "no such publication for this tenant" };
   const { action } = payload;
   if (row.status !== WANTED[action]) return { kind: "skipped", reason: `the publication is ${row.status}, not ${WANTED[action]}` };
-  let run = await runFor(ctx, row, action);
-  // A withdraw for a connection that is gone (archived, removed) has nobody to tell: it is out.
-  if ("code" in run && run.code === "NOT_CONNECTED" && action === "withdraw") run = { result: { kind: "accepted" }, sentPriceCents: null };
+  const run = await runFor(ctx, row, action);
   if ("code" in run) return fail(ctx, table, row, action, { code: run.code, reason: null }, run.code);
   const { result } = run;
   if (result.kind === "accepted" || result.kind === "published") {

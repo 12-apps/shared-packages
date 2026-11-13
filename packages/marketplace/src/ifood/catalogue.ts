@@ -7,6 +7,7 @@ import {
 import { stableUuid } from "../core/catalogue-ids";
 import type {
   CatalogueCallContext,
+  CatalogueImage,
   CatalogueItemOut,
   CatalogueItemRef,
   CataloguePublishResult,
@@ -161,7 +162,11 @@ async function photoFor(ctx: CatalogueCallContext, item: CatalogueItemOut): Prom
   if (item.imageUrl === null) return { image: null };
   if (stored && stored.sourceUrl === item.imageUrl) return { image: stored };
   const bytes = await ctx.loadImage(item.imageUrl);
-  if (!bytes) return { image: stored };
+  return bytes ? upload(ctx, bytes, item.imageUrl) : { image: stored };
+}
+
+/** `POST /image/upload`: the new photo, a warning for a refused one, or the failure to retry. */
+async function upload(ctx: CatalogueCallContext, bytes: CatalogueImage, sourceUrl: string): Promise<PhotoOutcome | Failure> {
   const uploaded = await call(ctx, "POST", "image/upload", { image: `data:${bytes.contentType};base64,${bytes.base64}` });
   if ("kind" in uploaded) return uploaded;
   if (!ok(uploaded)) {
@@ -171,7 +176,7 @@ async function photoFor(ctx: CatalogueCallContext, item: CatalogueItemOut): Prom
   }
   const path = (parse(uploaded.body) as { imagePath?: unknown } | null)?.imagePath;
   if (typeof path !== "string") return { kind: "retry", reason: "iFood answered the upload without an imagePath" };
-  return { image: { ref: path, sourceUrl: item.imageUrl } };
+  return { image: { ref: path, sourceUrl } };
 }
 
 /** The `PUT /items` body for one simple item with no add-ons. */
