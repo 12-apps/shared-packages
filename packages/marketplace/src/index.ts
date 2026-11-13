@@ -129,3 +129,27 @@ export {
   type FetchOrderOutcome,
 } from "./core/fetch-order";
 export type { MarketplaceOrderState } from "./core/state";
+export type {
+  MarketplaceAvailability,
+  StorePauseRef,
+  StorePauseRequest,
+  StorePauseResult,
+} from "./core/pause-port";
+export type {
+  PauseOutcome,
+  PauseStoreInput,
+  PauseStoreResult,
+  ResumeOutcome,
+  StoreAvailabilityView,
+} from "./core/pause";
+export { AvailabilityRetryError, type AvailabilityOutcome } from "./core/pause-job";
+export {
+  MARKETPLACE_AVAILABILITY_JOB,
+  STORE_PAUSE_LEASE_MS,
+  availabilityDedupeKey,
+  type AvailabilityJobPayload,
+  type StorePauseFailureCode,
+  type StorePauseState,
+  type StorePauseWanted,
+} from "./core/pause-store";
+export type { AvailabilitySweepResult } from "./core/pause-sweep";

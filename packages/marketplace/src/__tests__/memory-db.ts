@@ -225,6 +225,29 @@ export function createMemoryDb() {
       }),
       unique: [["orderId"], ["provider", "externalOrderId"]],
     }),
+    marketplaceStorePause: new MemoryTable("pause", {
+      defaults: () => ({
+        state: "OPEN",
+        wanted: "OPEN",
+        until: null,
+        reason: null,
+        timeZone: null,
+        externalId: null,
+        sentUntil: null,
+        attemptKey: null,
+        retiredExternalId: null,
+        failureCode: null,
+        failureDetail: null,
+        requestedAt: EPOCH,
+        leaseUntil: null,
+        pausedAt: null,
+        resumedAt: null,
+        failedAt: null,
+        createdAt: EPOCH,
+        updatedAt: EPOCH,
+      }),
+      unique: [["clientId", "provider"]],
+    }),
   };
   const db: MarketplaceDb = tables;
 

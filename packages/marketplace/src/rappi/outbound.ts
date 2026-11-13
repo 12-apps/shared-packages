@@ -57,7 +57,7 @@ const TOKEN_MARGIN_MS = 60_000;
 const DEFAULT_TOKEN_SECONDS = 7 * 24 * 60 * 60;
 
 /** A base URL with its trailing slashes cut, by a loop: a `/\/+$/` regex backtracks polynomially on many slashes. */
-function trimmed(base: string): string {
+export function trimmed(base: string): string {
   let end = base.length;
   while (end > 0 && base.charCodeAt(end - 1) === 47) end -= 1;
   return base.slice(0, end);
@@ -83,7 +83,7 @@ function tokenOf(body: string): { token: string; expiresInSeconds: number } | nu
  * (the M2M client credentials). Keyed by environment and client id; memory
  * only, written to no row or log.
  */
-async function bearer(
+export async function bearer(
   ctx: AdapterCallContext,
   hosts: RappiHosts,
 ): Promise<{ token: string } | Exclude<OutboundResult, { kind: "accepted" }>> {

@@ -21,10 +21,10 @@ import {
  */
 
 /** iFood's merchant API. Sandbox and production share the host; the credentials differ. */
-const API = "https://merchant-api.ifood.com.br";
-const TOKEN_URL = `${API}/authentication/v1.0/oauth/token`;
+export const IFOOD_API = "https://merchant-api.ifood.com.br";
+const TOKEN_URL = `${IFOOD_API}/authentication/v1.0/oauth/token`;
 const orderUrl = (externalOrderId: string, action: string): string =>
-  `${API}/order/v1.0/orders/${encodeURIComponent(externalOrderId)}/${action}`;
+  `${IFOOD_API}/order/v1.0/orders/${encodeURIComponent(externalOrderId)}/${action}`;
 
 /**
  * iFood's order-manager portal. No per-order deep link was found in the
@@ -35,6 +35,9 @@ export const IFOOD_PORTAL_URL = "https://portal.ifood.com.br/";
 
 /** A token is renewed this long before iFood says it expires. */
 const TOKEN_MARGIN_MS = 60_000;
+
+/** The token cache key: per environment and merchant app. */
+export const ifoodTokenKey = (ctx: AdapterCallContext): string => `IFOOD:${ctx.environment}:${ctx.credentials.clientId}`;
 
 /** iFood's OAuth answer, read defensively: a missing field is "no token". */
 function tokenOf(body: string): { token: string; expiresInSeconds: number } | null {
@@ -53,8 +56,8 @@ function tokenOf(body: string): { token: string; expiresInSeconds: number } | nu
  * client-credentials grant. Keyed by the app's client id, so two stores with
  * two apps never share one. The token lives in memory only.
  */
-async function bearer(ctx: AdapterCallContext): Promise<{ token: string } | OutboundResult> {
-  const key = `IFOOD:${ctx.environment}:${ctx.credentials.clientId}`;
+export async function bearer(ctx: AdapterCallContext): Promise<{ token: string } | OutboundResult> {
+  const key = ifoodTokenKey(ctx);
   const cached = ctx.tokens.get(key);
   if (cached && cached.expiresAt > ctx.now.getTime() + TOKEN_MARGIN_MS) return { token: cached.token };
   const response = await ctx.http({
@@ -89,7 +92,7 @@ function postOrder(ctx: AdapterCallContext, externalOrderId: string, action: str
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     // A 401 is a token that went stale under us: forget it, and the retry fetches another.
-    if (response.status === 401) ctx.tokens.delete(`IFOOD:${ctx.environment}:${ctx.credentials.clientId}`);
+    if (response.status === 401) ctx.tokens.delete(ifoodTokenKey(ctx));
     return response.status === 401 ? { kind: "retry", reason: "iFood refused the token" } : outboundResultOf(response);
   });
 }

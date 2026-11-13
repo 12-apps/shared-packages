@@ -212,3 +212,72 @@ all. Its retry runs after the store's accept, finds no request and sends
 nothing, so the order stays ACCEPTED here while cancelled on Rappi. The take
 the accept queued is then answered 400, so the order shows "não confirmou"
 with the portal link and a person settles it there.
+
+## Pausing a store (FUT-4851)
+
+When the store's kitchen passes its cap, the host closes the store on every
+connected marketplace until the kitchen's ESTIMATED reopening time, renews the
+closure while the kitchen stays paused, and opens the store the moment the
+pause is over. The host owns the debounce (a store setting, 3 minutes by
+default); the engine only receives `pauseStore({ clientId, until, reason,
+timeZone })` and `resumeStore({ clientId })`, and the screen reads
+`availabilityState(clientId)`. The owner's rules and why each part is shaped
+this way: [the decision draft](../../docs/marketplace/decisions/draft-a-store-pause-closes-every-marketplace.md).
+What the host wires: [ADOPTING.md](./ADOPTING.md#7-pausing-a-store).
+
+A marketplace is paused through an OPTIONAL adapter capability,
+`availability`, in one of two shapes:
+
+- **`interruption`**: the marketplace keeps a closure with its own id and an
+  end. The engine stores the id and deletes that id and nothing else, so a
+  closure the owner made by hand is never touched; and if every call after
+  the pause is lost, the marketplace still opens the store at the end it was
+  given.
+- **`switch`**: a store-wide on/off with no id and no end. The engine turns a
+  store on only if its own record says it turned it off, and turns it on by
+  itself once `until` has passed unrenewed. It cannot tell its own closure
+  from one the owner ALSO made by hand meanwhile, so a switch adapter offers
+  the capability only when the host opts in (`pauseByStoreSwitch: true`).
+
+### What each marketplace offers, from public documentation only
+
+CONFIRMED = read in the cited public document. ESTIMATED = not shown there;
+assumed in code, confined to the adapter's `pause.ts`, to be checked in the
+marketplace's sandbox.
+
+| marketplace | fact | status | source |
+|---|---|---|---|
+| iFood | Interruptions: `GET`/`POST /merchant/v1.0/merchants/{merchantId}/interruptions`, `DELETE …/interruptions/{interruptionId}` on `https://merchant-api.ifood.com.br`; a temporary closure that does not change the opening hours | ESTIMATED (two independent public clients agree; iFood's portal, developer.ifood.com.br, answers our reader 403) | npm `@theyahia/ifood-mcp` (`dist/tools/*-interruption.js`), npm `n8n-nodes-ifood-completo`, npm `n8n-nodes-ifood` |
+| iFood | Create body `{ description, start, end }`, 201 with the interruption; delete answers 204 | ESTIMATED (same clients) | as above |
+| iFood | The client may send its own `id` in the create body (sent, as the idempotency key) | ESTIMATED; covered anyway: every create is preceded by a list, and an interruption under the key is reused | none public |
+| iFood | Times are read as the store's local clock, the payload's offset discarded | ESTIMATED (one client says so); the adapter sends the store's wall clock WITH its offset, which reads the same either way | `@theyahia/ifood-mcp` |
+| iFood | No call moves an interruption's end | ESTIMATED; the engine creates the later one first, then deletes the earlier, so the store is never open between them | none found |
+| iFood | Auth: the merchant app's client-credentials token (`POST /authentication/v1.0/oauth/token`), as every other call of the adapter | ESTIMATED (as the rest of the iFood adapter, "iFood is unverified" above); no public scope list for the merchant module was readable | the adapter's existing outbound |
+| iFood | Limits (rate, interruptions per merchant, maximum length, description length) | ESTIMATED: none published that we could read; a refusal is FAILED with iFood's own words | none |
+| Rappi | `PUT https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api/availability/stores/enable`, synchronous, `{ stores: [{ store_id, is_enabled }] }`; 200 with `results[]` (`store_id`, `is_enabled`, `operation_result`, `operation_result_type`, `operation_result_message`, `suspended_reason`, `suspended_at`, `suspended_time`), 400, 403, 422 (over 300 stores), 502 | CONFIRMED | [dev-portal.rappi.com/en/api-reference/availability](https://dev-portal.rappi.com/en/api-reference/availability/) |
+| Rappi | No end time or duration on the request: a switch; a store turned off stays off until turned on | CONFIRMED (no such parameter; the portal's FAQ: it stays off until enabled again) | same page; [dev-portal.rappi.com/en/frequently-asked-questions](https://dev-portal.rappi.com/en/frequently-asked-questions/) |
+| Rappi | `store_id` is the connection's merchant id (Rappi's store id) | ESTIMATED (the page says "the one from your system" for this call and "the one in the rappi system" for the massive one) | same page |
+| Rappi | A per-store failure reads as `operation_result: false` or an error-named `operation_result_type` | ESTIMATED (types not shown) | same page |
+| 99Food | Open Delivery v1.7.1: the software PUSHES `POST /v1/merchantUpdate` with only `merchantStatus` (`AVAILABLE`/`UNAVAILABLE`) to open or close the merchant, OAuth2 `od.all`; 204 (200 for compatibility), 400, 401, 403, 404, 503 | CONFIRMED for the standard | [openapi.yaml v1.7.1](https://abrasel-nacional.github.io/opendelivery/openapi.yaml), "New Merchant Update Notification" |
+| 99Food | `merchantStatus` has no end ("you don't know when the service will be re-established"): a switch | CONFIRMED for the standard | same |
+| 99Food | The path is `/v1/merchantUpdate` (the spec files the webhook under the key `/v1/menuUpdated`, while its description and route table say `POST /v1/merchantUpdate`) | ESTIMATED | same |
+| 99Food | 99Food implements `merchantUpdate`, and the token names the merchant (the body names none) | ESTIMATED | none public for 99Food |
+| 99Food | The marketplace PULLING the status (`GET /v1/merchant/{id}/status`, host: the software) | Not used: the engine pushes, and serving the status is a host route this package does not ship | same spec |
+
+### Failure codes
+
+No sentence a host shows is the engine's. A FAILED record carries a
+`failureCode` (`UNSUPPORTED`, `NOT_CONNECTED`, `PAUSE_REFUSED`,
+`PAUSE_UNANSWERED`, `RESUME_REFUSED`, `RESUME_UNANSWERED`) for the host's copy,
+and the marketplace's own words, verbatim and cut to 300 characters, in
+`failureDetail`.
+
+### Tests
+
+- `src/__tests__/store-pause.test.ts`: the engine through fake marketplaces
+  (an interruption and a switch): fan-out, idempotency and renewal, the state
+  machine, deleting only what it created, the races (resume before and during
+  a pause, pause during a resume, a lost answer, two runs at once), the sweep.
+- `src/ifood/__tests__/pause.test.ts`: the request shapes each adapter sends.
+- `src/__tests__/store-pause-migration.test.ts`: the migration on PGlite,
+  index names against Prisma's, and a pause and resume on real Postgres.

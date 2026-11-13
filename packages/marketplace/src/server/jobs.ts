@@ -4,6 +4,8 @@ import type { MarketplaceEngine } from "../core/engine";
 import { FetchOrderRetryError, type FetchOrderJobPayload } from "../core/fetch-order";
 import { OutboundRetryError } from "../core/outbound";
 import type { OutboundJobPayload } from "../core/outbound-queue";
+import { AvailabilityRetryError } from "../core/pause-job";
+import type { AvailabilityJobPayload } from "../core/pause-store";
 
 /**
  * The engine's three jobs, declared here because every number in them is the
@@ -25,6 +27,12 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  *   owes (a PENDING request, an accept with no confirm stamp) once it is older
  *   than the job's own retry span, so a refused enqueue or a dead process
  *   loses nothing.
+ * - `availability`, on demand: brings one marketplace in line with the host's
+ *   last pause or resume ask for one store (FUT-4851). Three attempts with
+ *   backoff; the last one stamps FAILED with a failure code.
+ * - `availability-sweep`, every five minutes: resumes a pause past its
+ *   `until` (the host stopped renewing it), re-queues an ask still owed, and
+ *   gives up on one older than a day.
  *
  * What stays the host's: whether to run them at all, on which runtime, and the
  * lease implementation. A host with no worker declines `jobs` in writing.
@@ -39,7 +47,14 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
 export interface MarketplaceJobDeps {
   engine: Pick<
     MarketplaceEngine,
-    "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "runFetchOrder" | "sweepOutbound"
+    | "expireLapsed"
+    | "retryable"
+    | "reprocess"
+    | "runOutbound"
+    | "runFetchOrder"
+    | "sweepOutbound"
+    | "runAvailability"
+    | "sweepAvailability"
   >;
 }
 
@@ -152,6 +167,47 @@ const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
   },
 };
 
+/** The availability job's attempts: the last one stamps FAILED. */
+export const MARKETPLACE_AVAILABILITY_ATTEMPTS = 3;
+
+const availability: WireJobBlueprint<AvailabilityJobPayload, MarketplaceJobDeps> = {
+  name: "availability",
+  attempts: MARKETPLACE_AVAILABILITY_ATTEMPTS,
+  // Short: a store is open on the marketplace while the kitchen is paused.
+  backoff: { type: "exponential", delayMs: 10_000 },
+  handle: async (payload, deps, context) => {
+    try {
+      const outcome = await deps.engine.runAvailability(payload, {
+        attempt: context.attempt,
+        maxAttempts: context.maxAttempts,
+      });
+      if (outcome.kind === "skipped") {
+        context.logger.info(`marketplace.availability: ${payload.provider} ${payload.clientId} skipped: ${outcome.reason}`);
+      }
+    } catch (error) {
+      if (error instanceof AvailabilityRetryError) context.logger.warn(`marketplace.availability: ${error.message}`);
+      throw error;
+    }
+  },
+};
+
+const availabilitySweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
+  name: "availability-sweep",
+  queue: MARKETPLACE_SWEEP_QUEUE,
+  concurrency: 1,
+  schedule: { pattern: "*/5 * * * *", timezone: "UTC" },
+  attempts: 1,
+  lease: { ttlMs: SWEEP_LEASE_MS },
+  handle: async (_payload, deps, context) => {
+    const result = await deps.engine.sweepAvailability();
+    if (result.expired + result.requeued + result.givenUp === 0) return;
+    context.logger.info(
+      `marketplace.availability-sweep: resumed ${result.expired} expired pause(s), re-queued ${result.requeued}, ` +
+        `gave up on ${result.givenUp}.`,
+    );
+  },
+};
+
 /** The jobs contribution. */
 export const MARKETPLACE_JOBS = {
   namespace: "marketplace",
@@ -161,5 +217,7 @@ export const MARKETPLACE_JOBS = {
     outbound,
     "fetch-order": fetchOrder,
     "outbound-sweep": outboundSweep,
+    availability,
+    "availability-sweep": availabilitySweep,
   },
 } as const satisfies JobsContribution<MarketplaceJobDeps>;

@@ -26,6 +26,7 @@ const TABLES = {
   marketplaceMenuLink: "marketplace_menu_links",
   marketplaceInboxEvent: "marketplace_inbox_events",
   marketplaceAcceptance: "marketplace_acceptances",
+  marketplaceStorePause: "marketplace_store_pauses",
 } as const;
 
 const COMPOUND_KEYS: Record<string, readonly string[]> = {
@@ -164,6 +165,7 @@ export function pgliteDb(pg: PGlite) {
     marketplaceMenuLink: delegate(conn, TABLES.marketplaceMenuLink, true),
     marketplaceInboxEvent: delegate(conn, TABLES.marketplaceInboxEvent, false),
     marketplaceAcceptance: delegate(conn, TABLES.marketplaceAcceptance, true),
+    marketplaceStorePause: delegate(conn, TABLES.marketplaceStorePause, true),
   } as unknown as MarketplaceDb;
   async function transaction<T>(fn: (tx: MarketplaceDb) => Promise<T>): Promise<T> {
     return pg.transaction(async (tx) => {

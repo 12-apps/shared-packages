@@ -45,6 +45,18 @@ import {
 } from "./integration";
 import { listMarketplaceMenuLinks, type MarketplaceMenuLinkView } from "./menu-links";
 import { runOutbound, type OutboundAttempt, type OutboundOutcome } from "./outbound";
+import {
+  availabilityState,
+  pauseStore,
+  resumeStore,
+  type PauseStoreInput,
+  type PauseStoreResult,
+  type ResumeOutcome,
+  type StoreAvailabilityView,
+} from "./pause";
+import { runAvailability, type AvailabilityOutcome } from "./pause-job";
+import type { AvailabilityJobPayload } from "./pause-store";
+import { sweepAvailability, type AvailabilitySweepResult } from "./pause-sweep";
 import type { OutboundJobPayload } from "./outbound-queue";
 import {
   normalizeEvent,
@@ -170,6 +182,24 @@ export interface MarketplaceEngine {
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
   /** Fetch and ingest one announced order (the `marketplace.fetch-order` job's body). */
   runFetchOrder(payload: FetchOrderJobPayload, attempt: OutboundAttempt): Promise<FetchOrderOutcome>;
+
+  /**
+   * The kitchen paused (or renewed its pause): close the store until `until`
+   * on every live connection whose marketplace can be paused (FUT-4851).
+   * Idempotent: an equal or earlier `until` than one standing does nothing.
+   */
+  pauseStore(input: PauseStoreInput): Promise<PauseStoreResult>;
+  /** The kitchen's pause is over: delete every closure the engine created, and nothing else. */
+  resumeStore(input: {
+    clientId: string;
+    now?: Date;
+  }): Promise<{ marketplaces: { provider: MarketplaceProvider; outcome: ResumeOutcome }[] }>;
+  /** Where the store's pause stands on each marketplace, for the screen. */
+  availabilityState(clientId: string): Promise<StoreAvailabilityView[]>;
+  /** Bring one marketplace in line with the last ask (the `marketplace.availability` job's body). */
+  runAvailability(payload: AvailabilityJobPayload, attempt: OutboundAttempt): Promise<AvailabilityOutcome>;
+  /** Expire, re-queue and give up on store pauses (the `marketplace.availability-sweep` job's body). */
+  sweepAvailability(now?: Date): Promise<AvailabilitySweepResult>;
 }
 
 /**
@@ -233,5 +263,11 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     sweepOutbound: (now) => sweepOutbound(ctx, now ?? ports.clock.now()),
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
     runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
+
+    pauseStore: (input) => pauseStore(ctx, input),
+    resumeStore: (input) => resumeStore(ctx, input),
+    availabilityState: (clientId) => availabilityState(ctx, clientId),
+    runAvailability: (payload, attempt) => runAvailability(ctx, payload, attempt),
+    sweepAvailability: (now) => sweepAvailability(ctx, now ?? ports.clock.now()),
   };
 }
