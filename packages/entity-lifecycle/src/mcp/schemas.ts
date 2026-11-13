@@ -177,6 +177,41 @@ export const saveDraftBody = z.strictObject({
   data: z.record(z.string(), z.unknown()),
 });
 
+/**
+ * What a host may hand in as ONE collection's draft `data` schema (FUT-4867):
+ * any zod schema whose output is an object. Typically a `z.strictObject` of the
+ * collection's editable fields, `.partial()` — a draft is a working copy, so a
+ * field the admin has not filled in yet must still save.
+ */
+export type DraftDataSchema = z.ZodType<Record<string, unknown>>;
+
+/**
+ * The draft-write body with the collection's OWN `data` schema in place of the
+ * open record {@link saveDraftBody} carries (FUT-4867).
+ *
+ * `saveDraftBody` is open at `data` on purpose — the package cannot know a
+ * collection's fields — and that open place is exactly what a host rule
+ * demanding a closed input at every depth refuses. A host that knows the
+ * fields passes them here and gets a body with no open place left, provided
+ * the schema it passes has none (a `z.strictObject` all the way down, no
+ * `z.unknown()`, no record keyed by any string).
+ *
+ * Opt-in: a host that passes nothing keeps `saveDraftBody`, byte for byte.
+ * Hand the same schema to `lifecycleMcpEndpoints({ draftData })` and to the
+ * registration's `draftData`, so the tool surface, the host's route and the
+ * package's own handler all refuse the same unknown key.
+ *
+ * ```ts
+ * const lossReasonDraftData = z
+ *   .strictObject({ name: z.string(), category: z.enum([...]), kind: z.enum([...]) })
+ *   .partial();
+ * export const lossReasonDraftBody = saveDraftBodyOf(lossReasonDraftData);
+ * ```
+ */
+export function saveDraftBodyOf<D extends DraftDataSchema>(data: D) {
+  return z.strictObject({ data });
+}
+
 export const draftItemParams = z.strictObject({
   tenantSlug: z.string().min(1),
   draftId: z.string().min(1),

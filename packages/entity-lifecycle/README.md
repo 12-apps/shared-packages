@@ -34,7 +34,10 @@ instead of wiring it:
   one call per collection. The routes above were already generated from one
   declaration each; their MCP descriptors were the part a host still wrote out
   once per collection. The shape is the package's, the summaries stay the
-  host's (`@12-apps/mcp` and `zod` are optional peers).
+  host's (`@12-apps/mcp` and `zod` are optional peers). A host that needs
+  every input closed passes the collection's own draft schema as `draftData`
+  and validates its routes with `saveDraftBodyOf(schema)` — see
+  [Closed draft data](./ADOPTING.md#closed-draft-data-opt-in).
 - `prisma/entity-lifecycle.prisma` + `prisma/migrations/*` — the model
   partial and its migrations, COPIED into the host by `prisma:sync` and the
   host's plugin-migration sync.

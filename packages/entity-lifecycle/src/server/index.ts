@@ -25,6 +25,7 @@ export {
   type LifecycleActor,
   type LifecycleAuthorization,
   type LifecycleAuthorizeGate,
+  type LifecycleDraftDataValidator,
   type LifecycleMessages,
   type LifecycleCopyResolver,
   type LifecycleCopySource,

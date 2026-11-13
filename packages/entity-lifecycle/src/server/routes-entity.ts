@@ -271,7 +271,7 @@ function itemDraftRoutes(config: EntityRouteConfig): LifecycleRoute[] {
     }),
     route(config, 'PUT', `/${registration.slug}/:id/draft`, async ({ actor, params, body }, deps) => {
       const id = requireParam(params, 'id', deps.messages);
-      const data = parseSnapshotBody(body, deps.messages);
+      const data = parseSnapshotBody(body, deps.messages, registration.draftData);
       const ctx = await ctxOf(deps, actor);
       const draft = await foldLifecycle(deps.messages, () => lifecycle.saveDraft(ctx, id, data));
       return ok(draftJson(draft));
@@ -293,7 +293,7 @@ function draftCollectionRoutes(config: EntityRouteConfig): LifecycleRoute[] {
       return ok({ drafts: drafts.map((draft) => draftJson(draft).draft) });
     }),
     route(config, 'POST', `/${registration.slug}/drafts`, async ({ actor, body }, deps) => {
-      const data = parseSnapshotBody(body, deps.messages);
+      const data = parseSnapshotBody(body, deps.messages, registration.draftData);
       const ctx = await ctxOf(deps, actor);
       const draft = await foldLifecycle(deps.messages, () => lifecycle.saveDraft(ctx, null, data));
       return ok(draftJson(draft));
@@ -323,7 +323,7 @@ function newItemDraftRoutes(config: EntityRouteConfig): LifecycleRoute[] {
     }),
     route(config, 'PUT', `/${registration.slug}/drafts/:draftId`, async ({ actor, params, body }, deps) => {
       const draftId = requireParam(params, 'draftId', deps.messages);
-      const data = parseSnapshotBody(body, deps.messages);
+      const data = parseSnapshotBody(body, deps.messages, registration.draftData);
       const ctx = await ctxOf(deps, actor);
       const draft = await foldLifecycle(deps.messages, () =>
         lifecycle.updateNewDraft(ctx, draftId, data),
