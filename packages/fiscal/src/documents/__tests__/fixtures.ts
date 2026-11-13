@@ -19,6 +19,7 @@ export function aDocument(overrides: Partial<FiscalDocument> = {}): FiscalDocume
   return {
     id: "doc-1",
     ownerId: "owner-1",
+    issuerCnpj: "11222333000181",
     subjectId: "subject-1",
     issuingPointId: "point-1",
     model: "NFCE",
@@ -48,6 +49,10 @@ export function aDocument(overrides: Partial<FiscalDocument> = {}): FiscalDocume
     xmlKey: null,
     eventXmlKey: null,
     attempts: 0,
+    failures: 0,
+    nextAttemptAt: null,
+    attention: false,
+    deadlineWarnedAt: null,
     createdAt: "2026-11-20T15:30:00.000Z",
     updatedAt: "2026-11-20T15:30:00.000Z",
     ...overrides,

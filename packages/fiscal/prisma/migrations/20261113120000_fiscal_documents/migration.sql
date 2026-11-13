@@ -75,7 +75,7 @@ CREATE TABLE "fiscal_issuing_points" (
 CREATE INDEX "fiscal_issuing_points_owner_id_idx" ON "fiscal_issuing_points"("owner_id");
 
 CREATE TABLE "fiscal_number_counters" (
-    "owner_id"         TEXT NOT NULL,
+    "issuer_cnpj"      TEXT NOT NULL,
     "environment"      TEXT NOT NULL,
     "model"            TEXT NOT NULL,
     "series"           INTEGER NOT NULL,
@@ -84,8 +84,9 @@ CREATE TABLE "fiscal_number_counters" (
     "next_number"      INTEGER NOT NULL,
     "updated_at"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- One counter per series: a series belongs to ONE issuing point.
-    CONSTRAINT "fiscal_number_counters_pkey" PRIMARY KEY ("owner_id", "environment", "model", "series"),
+    -- One counter per series of a CNPJ, as SEFAZ numbers: a series belongs to
+    -- ONE issuing point, whichever owner (one CNPJ can serve several) holds it.
+    CONSTRAINT "fiscal_number_counters_pkey" PRIMARY KEY ("issuer_cnpj", "environment", "model", "series"),
     CONSTRAINT "fiscal_number_counters_issuing_point_id_fkey"
       FOREIGN KEY ("issuing_point_id") REFERENCES "fiscal_issuing_points"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "fiscal_number_counters_environment_check" CHECK ("environment" IN ('homologacao', 'producao')),
@@ -100,6 +101,7 @@ CREATE INDEX "fiscal_number_counters_issuing_point_id_idx" ON "fiscal_number_cou
 CREATE TABLE "fiscal_documents" (
     "id"               TEXT NOT NULL,
     "owner_id"         TEXT NOT NULL,
+    "issuer_cnpj"      TEXT NOT NULL,
     "subject_id"       TEXT NOT NULL,
     "issuing_point_id" TEXT NOT NULL,
     "model"            TEXT NOT NULL,
@@ -129,6 +131,10 @@ CREATE TABLE "fiscal_documents" (
     "xml_key"          TEXT,
     "event_xml_key"    TEXT,
     "attempts"         INTEGER NOT NULL DEFAULT 0,
+    "failures"         INTEGER NOT NULL DEFAULT 0,
+    "next_attempt_at"  TIMESTAMP(3),
+    "attention"        BOOLEAN NOT NULL DEFAULT false,
+    "deadline_warned_at" TIMESTAMP(3),
     "created_at"       TIMESTAMP(3) NOT NULL,
     "updated_at"       TIMESTAMP(3) NOT NULL,
 
@@ -137,11 +143,12 @@ CREATE TABLE "fiscal_documents" (
     CONSTRAINT "fiscal_documents_environment_check" CHECK ("environment" IN ('homologacao', 'producao')),
     CONSTRAINT "fiscal_documents_series_kind_check" CHECK ("series_kind" IN ('ONLINE', 'CONTINGENCY')),
     CONSTRAINT "fiscal_documents_number_check" CHECK ("number" BETWEEN 1 AND 999999999),
+    CONSTRAINT "fiscal_documents_failures_check" CHECK ("failures" >= 0),
     CONSTRAINT "fiscal_documents_key_code_check" CHECK ("key_code" ~ '^[0-9]{8}$'),
     CONSTRAINT "fiscal_documents_status_check"
       CHECK ("status" IN ('PENDING', 'SUBMITTED', 'AUTHORIZED', 'REJECTED', 'DENIED', 'CONTINGENCY', 'CANCELLED', 'REPLACED')),
     CONSTRAINT "fiscal_documents_number_void_check"
-      CHECK ("number_void" IS NULL OR "number_void" IN ('LOOKUP_FIRST', 'INUTILIZE', 'CANCEL', 'INUTILIZED', 'CANCELLED')),
+      CHECK ("number_void" IS NULL OR "number_void" IN ('LOOKUP_FIRST', 'INUTILIZE', 'CANCEL', 'INUTILIZED', 'CANCELLED', 'DENIED')),
     CONSTRAINT "fiscal_documents_last_error_class_check"
       CHECK ("last_error_class" IS NULL OR "last_error_class" IN ('REJECTED', 'RETRYABLE', 'CONTINGENCY', 'AUTH', 'INVALID', 'INTERNAL')),
     -- An authorised, denied or cancelled document carries its key and protocol.
@@ -154,14 +161,23 @@ CREATE TABLE "fiscal_documents" (
 );
 
 CREATE UNIQUE INDEX "fiscal_documents_access_key_key" ON "fiscal_documents"("access_key");
-CREATE UNIQUE INDEX "fiscal_documents_owner_id_environment_model_series_number_key"
-  ON "fiscal_documents"("owner_id", "environment", "model", "series", "number");
+CREATE UNIQUE INDEX "fiscal_documents_number_key"
+  ON "fiscal_documents"("issuer_cnpj", "environment", "model", "series", "number");
 CREATE INDEX "fiscal_documents_owner_id_subject_id_model_idx" ON "fiscal_documents"("owner_id", "subject_id", "model");
-CREATE INDEX "fiscal_documents_status_updated_at_idx" ON "fiscal_documents"("status", "updated_at");
-CREATE INDEX "fiscal_documents_number_void_updated_at_idx" ON "fiscal_documents"("number_void", "updated_at");
+-- Prisma cannot express a partial unique index. This is the per-subject guard:
+-- at most ONE live document per (owner, subject, model) — not a replaced one,
+-- nor an online one SEFAZ rejected (its number is voided and the sale issued
+-- again); a rejected contingency NFC-e stays live, for the store to resend.
+CREATE UNIQUE INDEX "fiscal_documents_live_subject_key"
+  ON "fiscal_documents"("owner_id", "subject_id", "model")
+  WHERE "status" <> 'REPLACED' AND NOT ("status" = 'REJECTED' AND "series_kind" = 'ONLINE');
+-- The sweep's and the transmission's queue: by next attempt, never a row waiting for a person.
+CREATE INDEX "fiscal_documents_next_attempt_at_idx"
+  ON "fiscal_documents"("next_attempt_at") WHERE "attention" = false;
 
 CREATE TABLE "fiscal_document_events" (
     "id"          TEXT NOT NULL,
+    "seq"         BIGSERIAL NOT NULL,
     "document_id" TEXT NOT NULL,
     "kind"        TEXT NOT NULL,
     "from_status" TEXT NOT NULL,
@@ -175,7 +191,9 @@ CREATE TABLE "fiscal_document_events" (
     CONSTRAINT "fiscal_document_events_document_id_fkey"
       FOREIGN KEY ("document_id") REFERENCES "fiscal_documents"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "fiscal_document_events_kind_check"
-      CHECK ("kind" IN ('SUBMIT', 'AUTHORIZE', 'DENY', 'REJECT', 'RETRY', 'SIGN_OFFLINE', 'REPLACE', 'CANCEL', 'LOOKUP', 'INUTILIZE'))
+      CHECK ("kind" IN ('SUBMIT', 'AUTHORIZE', 'DENY', 'REJECT', 'RETRY', 'SIGN_OFFLINE', 'REPLACE', 'CANCEL', 'LOOKUP', 'INUTILIZE',
+                        'DEFER', 'RESIGN', 'RELEASE', 'WARN'))
 );
 
+CREATE UNIQUE INDEX "fiscal_document_events_seq_key" ON "fiscal_document_events"("seq");
 CREATE INDEX "fiscal_document_events_document_id_at_idx" ON "fiscal_document_events"("document_id", "at");

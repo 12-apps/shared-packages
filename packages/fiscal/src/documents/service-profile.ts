@@ -32,16 +32,34 @@ export interface Deps {
   readonly config: FiscalDocumentsServiceConfig;
 }
 
+/**
+ * The CSC's ciphertext a save leaves: the CSC id and token are one secret, so
+ * a new id needs its token, a token needs an id, and no id clears both.
+ */
+async function cscCiphertextFor(
+  config: FiscalDocumentsServiceConfig,
+  stored: EmitterProfile | null,
+  input: Pick<EmitterProfileInput, "cscId" | "cscToken">,
+): Promise<string | null> {
+  if (input.cscToken !== null) {
+    if (input.cscId === null) throw new FiscalDocumentError("INVALID_INPUT", "cscId is required with cscToken.");
+    return config.cipher.encrypt(input.cscToken);
+  }
+  if (input.cscId === null) return null;
+  if (input.cscId !== stored?.cscId) throw new FiscalDocumentError("INVALID_INPUT", "cscToken is required with a new cscId.");
+  return stored.cscCiphertext;
+}
+
 export async function saveProfile({ ctx, config }: Deps, ownerId: string, input: EmitterProfileInput): Promise<EmitterProfile> {
   const stored = await config.store.getProfile(ownerId);
-  const { cscToken, ...fields } = input;
+  const fields = Object.fromEntries(Object.entries(input).filter(([key]) => key !== "cscToken")) as Omit<EmitterProfileInput, "cscToken">;
   const profile: EmitterProfile = {
     ...fields,
     ownerId,
     certificateCiphertext: stored?.certificateCiphertext ?? null,
     certificatePasswordCiphertext: stored?.certificatePasswordCiphertext ?? null,
     certificateExpiresAt: stored?.certificateExpiresAt ?? null,
-    cscCiphertext: cscToken === null ? (stored?.cscCiphertext ?? null) : await config.cipher.encrypt(cscToken),
+    cscCiphertext: await cscCiphertextFor(config, stored, input),
     updatedAt: ctx.nowIso(),
   };
   await config.store.saveProfile(profile);
@@ -69,7 +87,7 @@ export async function uploadCertificate({ ctx, config }: Deps, ownerId: string, 
 }
 
 export async function createIssuingPoint({ ctx, config }: Deps, ownerId: string, input: IssuingPointInput): Promise<IssuingPoint> {
-  await ctx.requireProfile(ownerId);
+  const profile = await ctx.requireProfile(ownerId);
   if (input.model === "NFE" && input.contingencySeries !== null) {
     throw new FiscalDocumentError("INVALID_INPUT", "an NF-e issuing point has no contingency series: the service has no offline NF-e path.");
   }
@@ -81,6 +99,6 @@ export async function createIssuingPoint({ ctx, config }: Deps, ownerId: string,
     contingencySeries: input.contingencySeries,
     createdAt: ctx.nowIso(),
   };
-  await config.store.createIssuingPoint(point, { online: input.firstOnlineNumber, contingency: input.firstContingencyNumber });
+  await config.store.createIssuingPoint(point, profile.cnpj, { online: input.firstOnlineNumber, contingency: input.firstContingencyNumber });
   return point;
 }

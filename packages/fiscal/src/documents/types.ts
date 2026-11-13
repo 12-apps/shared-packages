@@ -65,8 +65,12 @@ export type SeriesKind = "ONLINE" | "CONTINGENCY";
  * - `INUTILIZE`: never used at SEFAZ; inutilize it.
  * - `CANCEL`: the lookup found it authorised after all; cancel it.
  * - `INUTILIZED` / `CANCELLED`: settled.
+ * - `DENIED`: settled — the lookup found the number denied, which spends it.
  */
-export type NumberVoid = "LOOKUP_FIRST" | "INUTILIZE" | "CANCEL" | "INUTILIZED" | "CANCELLED";
+export type NumberVoid = "LOOKUP_FIRST" | "INUTILIZE" | "CANCEL" | "INUTILIZED" | "CANCELLED" | "DENIED";
+
+/** The `numberVoid` values that still owe the sweep a call. */
+export const OWED_VOIDS: readonly NumberVoid[] = ["LOOKUP_FIRST", "INUTILIZE", "CANCEL"];
 
 /** The order figures a document carries, in integer cents. */
 export interface DocumentTotals {
@@ -78,11 +82,25 @@ export interface DocumentTotals {
   readonly ibsMunCents: number;
 }
 
+/**
+ * Whether the document is the one its subject stands on. At most one live
+ * document per (owner, subject, model): a REPLACED one is not, nor an online
+ * one SEFAZ rejected (its number is voided and the sale is issued again). A
+ * REJECTED contingency NFC-e stays live: the buyer holds its DANFE, and the
+ * store corrects and resends it under the same number.
+ */
+export function isLive(document: Pick<FiscalDocument, "status" | "seriesKind">): boolean {
+  if (document.status === "REPLACED") return false;
+  return !(document.status === "REJECTED" && document.seriesKind === "ONLINE");
+}
+
 /** One fiscal document. */
 export interface FiscalDocument {
   readonly id: string;
   /** The emitter profile's owner: an opaque id the host maps (a store, a company). */
   readonly ownerId: string;
+  /** The issuer's CNPJ: SEFAZ numbers by CNPJ, model and series, so the counters do too. */
+  readonly issuerCnpj: string;
   /** What the document is FOR, opaque: the host links it to its orders. */
   readonly subjectId: string;
   readonly issuingPointId: string;
@@ -124,6 +142,17 @@ export interface FiscalDocument {
   readonly eventXmlKey: string | null;
   /** Calls made to the issuer for this document. */
   readonly attempts: number;
+  /** Failed steps in a row (a retry, a deferred settlement); any progress resets it. */
+  readonly failures: number;
+  /** When the sweep (or the contingency transmission) may take it again; `null` when nothing is owed. */
+  readonly nextAttemptAt: string | null;
+  /**
+   * A person must look: a settlement SEFAZ refused, or too many failures in a
+   * row. The sweep leaves it alone until someone releases it.
+   */
+  readonly attention: boolean;
+  /** When the 24-hour contingency deadline warning went out. */
+  readonly deadlineWarnedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -139,7 +168,11 @@ export type DocumentEventKind =
   | "REPLACE"
   | "CANCEL"
   | "LOOKUP"
-  | "INUTILIZE";
+  | "INUTILIZE"
+  | "DEFER"
+  | "RESIGN"
+  | "RELEASE"
+  | "WARN";
 
 /**
  * One transition, as stored. `answer` is what the fiscal service answered,

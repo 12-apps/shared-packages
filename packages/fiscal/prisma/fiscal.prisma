@@ -60,11 +60,12 @@ model FiscalIssuingPoint {
   @@map("fiscal_issuing_points")
 }
 
-// The ONE counter of a series. The primary key makes a series belong to one
-// issuing point per owner, environment and model; `nextNumber` is drawn with
+// The ONE counter of a series. SEFAZ numbers by CNPJ, model and series, and
+// one CNPJ can serve several owners, so the primary key is the CNPJ's: a
+// series belongs to one issuing point. `nextNumber` is drawn with
 // FISCAL_NEXT_NUMBER_SQL in the same transaction as the document's insert.
 model FiscalNumberCounter {
-  ownerId        String             @map("owner_id")
+  issuerCnpj     String             @map("issuer_cnpj")
   environment    String
   model          String
   series         Int
@@ -75,7 +76,7 @@ model FiscalNumberCounter {
   updatedAt      DateTime           @default(now()) @map("updated_at")
   issuingPoint   FiscalIssuingPoint @relation(fields: [issuingPointId], references: [id], onDelete: Restrict)
 
-  @@id([ownerId, environment, model, series])
+  @@id([issuerCnpj, environment, model, series])
   @@index([issuingPointId])
   @@map("fiscal_number_counters")
 }
@@ -83,6 +84,7 @@ model FiscalNumberCounter {
 model FiscalDocument {
   id             String    @id
   ownerId        String    @map("owner_id")
+  issuerCnpj     String    @map("issuer_cnpj")
   // What the document is for, opaque: the host links it to its orders.
   subjectId      String    @map("subject_id")
   issuingPointId String    @map("issuing_point_id")
@@ -113,27 +115,34 @@ model FiscalDocument {
   cancelReason   String?   @map("cancel_reason")
   cancelProtocol String?   @map("cancel_protocol")
   replacedById   String?   @map("replaced_by_id")
-  // LOOKUP_FIRST | INUTILIZE | CANCEL | INUTILIZED | CANCELLED
+  // LOOKUP_FIRST | INUTILIZE | CANCEL | INUTILIZED | CANCELLED | DENIED
   numberVoid     String?   @map("number_void")
   xmlKey         String?   @map("xml_key")
   eventXmlKey    String?   @map("event_xml_key")
   attempts       Int       @default(0)
+  // Failed steps in a row; the backoff and the person's flag follow from it.
+  failures       Int       @default(0)
+  nextAttemptAt  DateTime? @map("next_attempt_at")
+  attention      Boolean   @default(false)
+  deadlineWarnedAt DateTime? @map("deadline_warned_at")
   createdAt      DateTime  @map("created_at")
   updatedAt      DateTime  @map("updated_at")
 
   events FiscalDocumentEvent[]
 
-  @@unique([ownerId, environment, model, series, number])
+  // The per-subject guard (one live document) and the sweep's queue index are
+  // partial indexes, in the migration: Prisma cannot express them.
+  @@unique([issuerCnpj, environment, model, series, number], map: "fiscal_documents_number_key")
   @@index([ownerId, subjectId, model])
-  @@index([status, updatedAt])
-  @@index([numberVoid, updatedAt])
   @@map("fiscal_documents")
 }
 
 // One transition, with the fiscal service's raw answer (secret-named keys
 // scrubbed). Append-only.
 model FiscalDocumentEvent {
-  id         String         @id @default(uuid())
+  id         String         @id
+  // Insertion order: two events of one millisecond keep theirs.
+  seq        BigInt         @unique @default(autoincrement())
   documentId String         @map("document_id")
   kind       String
   fromStatus String         @map("from_status")

@@ -18,7 +18,11 @@ export type FiscalDocumentErrorCode =
   /** A series' counter passed 999 999 999. */
   | "SERIES_EXHAUSTED"
   /** Another worker advanced the document first; re-read it. */
-  | "CONFLICT";
+  | "CONFLICT"
+  /** The subject already has a live document of that model (the per-subject guard). */
+  | "SUBJECT_HAS_DOCUMENT"
+  /** The document's state has no paper to print (only AUTHORIZED, or CONTINGENCY awaiting transmission). */
+  | "NOT_PRINTABLE";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;

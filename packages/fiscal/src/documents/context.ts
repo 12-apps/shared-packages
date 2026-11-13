@@ -1,17 +1,21 @@
 /**
  * What every step of the document service shares: the ports, the clock, the
- * host's words written into a document, and the helpers that number a new
- * document and persist one transition.
+ * host's words written into a document, and the two writes everything goes
+ * through — numbering a new document, and persisting one transition with the
+ * schedule and the person's flag it implies.
  */
 
 import type { Issuer, SigningMaterial } from "../issuer/port";
-import type { DocumentIssuer, SaleForDocument } from "../sale/types";
+import { FISCAL_ISSUE } from "../manifest/permissions";
 import { FiscalDocumentError } from "./errors";
-import { type DocumentInput, transition } from "./machine";
+import { computeAccessKey, drawKeyCode, issuerOf, localIso, totalsOf } from "./helpers";
+import { type DocumentInput, type Transition, transition } from "./machine";
 import type { DocumentStorage, FiscalStore, SaleDraft, SaleSource } from "./ports";
 import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { SigningIdentities } from "./signing";
-import type { DocumentTotals, FiscalDocument, FiscalDocumentModel, SeriesKind } from "./types";
+import { type FiscalDocument, type FiscalDocumentModel, OWED_VOIDS, type SeriesKind } from "./types";
+
+export { computeAccessKey, draftOf, drawKeyCode, issuerOf, keyCheckDigit, localIso, totalsOf, xmlKeys } from "./helpers";
 
 /** Twin of `@12-apps/wiring/ports`' `NotifyPort`: never throws. */
 export interface FiscalNotifyPort {
@@ -47,27 +51,40 @@ export interface FiscalDocumentsConfig {
   /** The owner's UTC offset at an instant (`-03:00`): `dhEmi` and `dhCont` are local times. */
   readonly utcOffset: (ownerId: string, at: Date) => string | Promise<string>;
   readonly reasons: FiscalReasons;
-  /** How long a PENDING or SUBMITTED document waits before the sweep takes it again. */
+  /**
+   * How long a document owing a step waits before the sweep takes it again,
+   * the base of the backoff: each failure in a row doubles it, up to 64×.
+   */
   readonly staleAfterMs: number;
+  /**
+   * How late an online NFC-e may still be sent with its `dhEmi`. SEFAZ refuses
+   * a late one (704, "data-hora de emissão atrasada"; five minutes in most
+   * states — the host's, per state). Past it, a stale online NFC-e at a point
+   * with a contingency series goes offline instead of being sent again.
+   */
+  readonly nfceOnlineToleranceMs: number;
   /** Ids for new documents. */
   readonly newId: () => string;
 }
 
 export const FISCAL_DOCUMENT_REJECTED = "fiscal.document-rejected";
 export const FISCAL_CERTIFICATE_EXPIRING = "fiscal.certificate-expiring";
+export const FISCAL_DOCUMENT_NEEDS_ATTENTION = "fiscal.document-needs-attention";
+export const FISCAL_CONTINGENCY_DEADLINE = "fiscal.contingency-deadline";
 
 const REQUIRED_PORTS = ["store", "issuer", "signing", "storage", "sales", "notify"] as const;
 const REQUIRED_FUNCTIONS = ["now", "utcOffset", "newId"] as const;
 const REASONS = ["contingency", "inutilization", "substitution"] as const;
+const DURATIONS = ["staleAfterMs", "nfceOnlineToleranceMs"] as const;
 
 export function assertConfig(config: FiscalDocumentsConfig): void {
   const missing = [
     ...REQUIRED_PORTS.filter((port) => config?.[port] === undefined || config[port] === null),
     ...REQUIRED_FUNCTIONS.filter((fn) => typeof config?.[fn] !== "function"),
+    ...DURATIONS.filter((name) => !Number.isInteger(config?.[name]) || config[name] <= 0),
   ];
   if (missing.length > 0) throw new TypeError(`createFiscalDocuments needs ${missing.join(", ")}.`);
   for (const name of REASONS) assertReason(config.reasons?.[name], `reasons.${name}`);
-  if (!Number.isInteger(config.staleAfterMs) || config.staleAfterMs <= 0) throw new TypeError("createFiscalDocuments needs a positive staleAfterMs.");
 }
 
 export function assertReason(text: unknown, name: string): asserts text is string {
@@ -76,62 +93,14 @@ export function assertReason(text: unknown, name: string): asserts text is strin
   }
 }
 
-/** `2026-11-20T12:30:00-03:00`: the instant as the owner's wall clock. */
-export function localIso(at: Date, offset: string): string {
-  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
-  if (match === null) throw new FiscalDocumentError("INVALID_INPUT", `utcOffset answered "${offset}", not ±HH:MM.`);
-  const minutes = (match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3]));
-  return `${new Date(at.getTime() + minutes * 60_000).toISOString().slice(0, 19)}${offset}`;
+/** The backoff never grows past 64 × `staleAfterMs`. */
+const MAX_BACKOFF_DOUBLINGS = 6;
+
+/** Whether a document still owes the sweep (or the transmission) a call. */
+export function owesWork(document: FiscalDocument): boolean {
+  if (document.status === "PENDING" || document.status === "SUBMITTED" || document.status === "CONTINGENCY") return true;
+  return document.numberVoid !== null && OWED_VOIDS.includes(document.numberVoid);
 }
-
-/** `cNF`: eight random digits, never equal to the number's own eight (the layout's rule). */
-export function drawKeyCode(number: number): string {
-  const own = String(number % 100_000_000).padStart(8, "0");
-  for (;;) {
-    const [value] = globalThis.crypto.getRandomValues(new Uint32Array(1));
-    const code = String((value ?? 0) % 100_000_000).padStart(8, "0");
-    if (code !== own) return code;
-  }
-}
-
-const FILLED_BY_THE_PACKAGE = new Set(["series", "number", "keyCode", "issuer", "issuedAt"]);
-
-/** A stored sale back to the draft it was built from (for a second document of the same sale). */
-export function draftOf(sale: SaleForDocument): SaleDraft {
-  return Object.fromEntries(Object.entries(sale).filter(([key]) => !FILLED_BY_THE_PACKAGE.has(key))) as unknown as SaleDraft;
-}
-
-export function issuerOf(profile: EmitterProfile): DocumentIssuer {
-  return {
-    cnpj: profile.cnpj,
-    stateRegistration: profile.stateRegistration,
-    legalName: profile.legalName,
-    tradeName: profile.tradeName,
-    taxRegime: profile.taxRegime,
-    address: profile.address,
-  };
-}
-
-export function totalsOf(sale: SaleDraft): DocumentTotals {
-  const sum = (pick: (line: SaleDraft["lines"][number]) => number) => sale.lines.reduce((total, line) => total + pick(line), 0);
-  const discountCents = sum((line) => line.discountCents);
-  return {
-    totalCents: sum((line) => line.valueCents) - discountCents,
-    discountCents,
-    cbsCents: sum((line) => line.ibsCbs?.figures?.cbsCents ?? 0),
-    ibsUfCents: sum((line) => line.ibsCbs?.figures?.ibsUfCents ?? 0),
-    ibsMunCents: sum((line) => line.ibsCbs?.figures?.ibsMunCents ?? 0),
-  };
-}
-
-/** Storage keys, by access key: one folder per document, whatever its owner. */
-export const xmlKeys = {
-  signed: (accessKey: string) => `fiscal/${accessKey}/signed.xml`,
-  authorized: (accessKey: string) => `fiscal/${accessKey}/authorized.xml`,
-  cancel: (accessKey: string) => `fiscal/${accessKey}/cancel.xml`,
-  inutilization: (document: FiscalDocument) =>
-    `fiscal/inutilization/${document.environment}/${document.model}/${document.ownerId}/${document.series}-${document.number}.xml`,
-};
 
 export class FiscalContext {
   constructor(readonly config: FiscalDocumentsConfig) {}
@@ -145,13 +114,49 @@ export class FiscalContext {
     return localIso(at, await this.config.utcOffset(ownerId, at));
   }
 
-  /** Persist one transition; a lost race is a `CONFLICT`, never a silent overwrite. */
-  async advance(document: FiscalDocument, input: DocumentInput): Promise<FiscalDocument> {
+  /** When a document may be taken again: never, when nothing is owed or a person must look. */
+  nextAttemptAt(document: FiscalDocument): string | null {
+    if (document.attention || !owesWork(document)) return null;
+    const wait = this.config.staleAfterMs * 2 ** Math.min(document.failures, MAX_BACKOFF_DOUBLINGS);
+    return new Date(this.config.now().getTime() + wait).toISOString();
+  }
+
+  /** The machine's step, scheduled. */
+  scheduled(document: FiscalDocument, input: DocumentInput): Transition {
     const step = transition(document, input, this.nowIso());
+    return { ...step, document: { ...step.document, nextAttemptAt: this.nextAttemptAt(step.document) } };
+  }
+
+  /**
+   * Persist one transition; a lost race is a `CONFLICT`, never a silent
+   * overwrite. A document that has just come to need a person is announced.
+   */
+  async advance(document: FiscalDocument, input: DocumentInput): Promise<FiscalDocument> {
+    const step = this.scheduled(document, input);
     if (!(await this.config.store.saveTransition(document, step))) {
       throw new FiscalDocumentError("CONFLICT", `document ${document.id} moved while ${input.kind} was applied.`);
     }
+    if (step.document.attention && !document.attention) await this.announceAttention(step.document);
     return step.document;
+  }
+
+  async announceAttention(document: FiscalDocument): Promise<void> {
+    await this.config.notify.emit({
+      type: FISCAL_DOCUMENT_NEEDS_ATTENTION,
+      recipient: { tenantId: document.ownerId, permission: FISCAL_ISSUE },
+      payload: {
+        documentId: document.id,
+        subjectId: document.subjectId,
+        model: document.model,
+        status: document.status,
+        numberVoid: document.numberVoid,
+        series: document.series,
+        number: document.number,
+        code: document.statusCode,
+        reason: document.statusReason ?? "",
+        failures: document.failures,
+      },
+    });
   }
 
   material(profile: EmitterProfile): Promise<SigningMaterial> {
@@ -170,7 +175,11 @@ export class FiscalContext {
     return point;
   }
 
-  /** Draw the next number of a series and store the PENDING document built on it, together. */
+  /**
+   * Draw the next number of a series and store the PENDING document built on
+   * it, together. With `replacing`, that document is REPLACED by this one in
+   * the same transaction (going offline), so a crash leaves exactly one live.
+   */
   async createNumbered(input: {
     readonly profile: EmitterProfile;
     readonly point: IssuingPoint;
@@ -178,6 +187,7 @@ export class FiscalContext {
     readonly model: FiscalDocumentModel;
     readonly seriesKind: SeriesKind;
     readonly draft: SaleDraft;
+    readonly replacing?: FiscalDocument;
   }): Promise<FiscalDocument> {
     const { profile, point, draft } = input;
     const series = input.seriesKind === "ONLINE" ? point.onlineSeries : point.contingencySeries;
@@ -185,13 +195,28 @@ export class FiscalContext {
     const issuedAt = await this.localNow(profile.ownerId);
     const at = this.nowIso();
     const id = this.config.newId();
+    const replace =
+      input.replacing === undefined
+        ? undefined
+        : { previous: input.replacing, transition: this.scheduled(input.replacing, { kind: "REPLACE", replacedById: id }) };
+    const request = {
+      ownerId: profile.ownerId,
+      issuerCnpj: profile.cnpj,
+      issuingPointId: point.id,
+      environment: profile.environment,
+      model: input.model,
+      seriesKind: input.seriesKind,
+      series,
+    };
     return this.config.store.createDocument(
-      { ownerId: profile.ownerId, issuingPointId: point.id, environment: profile.environment, model: input.model, seriesKind: input.seriesKind, series },
+      request,
       (number) => {
         const keyCode = drawKeyCode(number);
+        const sale = { ...draft, series, number, keyCode, issuedAt, issuer: issuerOf(profile) };
         return {
           id,
           ownerId: profile.ownerId,
+          issuerCnpj: profile.cnpj,
           subjectId: input.subjectId,
           issuingPointId: point.id,
           model: input.model,
@@ -201,10 +226,10 @@ export class FiscalContext {
           number,
           keyCode,
           status: "PENDING",
-          sale: { ...draft, series, number, keyCode, issuedAt, issuer: issuerOf(profile) },
+          sale,
           totals: totalsOf(draft),
           buyerTaxId: draft.buyer?.document.number ?? null,
-          accessKey: null,
+          accessKey: computeAccessKey({ sale, model: input.model, seriesKind: input.seriesKind }),
           protocol: null,
           statusCode: null,
           statusReason: null,
@@ -221,10 +246,15 @@ export class FiscalContext {
           xmlKey: null,
           eventXmlKey: null,
           attempts: 0,
+          failures: 0,
+          nextAttemptAt: new Date(Date.parse(at) + this.config.staleAfterMs).toISOString(),
+          attention: false,
+          deadlineWarnedAt: null,
           createdAt: at,
           updatedAt: at,
         };
       },
+      replace,
     );
   }
 }

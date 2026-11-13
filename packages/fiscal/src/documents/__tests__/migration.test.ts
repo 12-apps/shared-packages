@@ -25,9 +25,9 @@ beforeEach(async () => {
   await db.exec(`
     INSERT INTO "fiscal_issuing_points" ("id", "owner_id", "model", "online_series", "contingency_series")
     VALUES ('register-1', 'owner-1', 'NFCE', 1, 2);
-    INSERT INTO "fiscal_number_counters" ("owner_id", "environment", "model", "series", "issuing_point_id", "series_kind", "next_number")
-    VALUES ('owner-1', 'homologacao', 'NFCE', 1, 'register-1', 'ONLINE', 1201),
-           ('owner-1', 'homologacao', 'NFCE', 2, 'register-1', 'CONTINGENCY', 1);
+    INSERT INTO "fiscal_number_counters" ("issuer_cnpj", "environment", "model", "series", "issuing_point_id", "series_kind", "next_number")
+    VALUES ('11222333000181', 'homologacao', 'NFCE', 1, 'register-1', 'ONLINE', 1201),
+           ('11222333000181', 'homologacao', 'NFCE', 2, 'register-1', 'CONTINGENCY', 1);
   `);
 });
 
@@ -35,17 +35,17 @@ afterEach(async () => {
   await db.close();
 });
 
-const DRAW = ["owner-1", "homologacao", "NFCE", 1, "register-1"];
+const DRAW = ["11222333000181", "homologacao", "NFCE", 1, "register-1"];
 
 async function draw(tx: Pick<PGlite, "query"> = db): Promise<number | undefined> {
   const { rows } = await tx.query<{ number: number }>(FISCAL_NEXT_NUMBER_SQL, DRAW);
   return rows[0]?.number;
 }
 
-function insertDocument(id: string, number: number, status = "PENDING"): string {
-  return `INSERT INTO "fiscal_documents" ("id", "owner_id", "subject_id", "issuing_point_id", "model", "environment",
+function insertDocument(id: string, number: number, status = "PENDING", subject = id): string {
+  return `INSERT INTO "fiscal_documents" ("id", "owner_id", "issuer_cnpj", "subject_id", "issuing_point_id", "model", "environment",
       "series_kind", "series", "number", "key_code", "status", "sale", "totals", "issued_at", "created_at", "updated_at")
-    VALUES ('${id}', 'owner-1', 'order-1', 'register-1', 'NFCE', 'homologacao', 'ONLINE', 1, ${number}, '12345678',
+    VALUES ('${id}', 'owner-1', '11222333000181', '${subject}', 'register-1', 'NFCE', 'homologacao', 'ONLINE', 1, ${number}, '12345678',
       '${status}', '{}', '{}', '2026-11-20T12:30:00-03:00', now(), now())`;
 }
 
@@ -71,15 +71,15 @@ describe("the fiscal migration", () => {
   });
 
   it("answers no number for a series that is not the issuing point's", async () => {
-    const { rows } = await db.query(FISCAL_NEXT_NUMBER_SQL, ["owner-1", "homologacao", "NFCE", 1, "register-2"]);
+    const { rows } = await db.query(FISCAL_NEXT_NUMBER_SQL, ["11222333000181", "homologacao", "NFCE", 1, "register-2"]);
     expect(rows).toEqual([]);
   });
 
-  it("lets a series belong to one issuing point only", async () => {
+  it("lets a series of a CNPJ belong to one issuing point only, whichever owner holds it", async () => {
     await db.exec(`INSERT INTO "fiscal_issuing_points" ("id", "owner_id", "model", "online_series") VALUES ('register-2', 'owner-1', 'NFCE', 3)`);
     await expect(
-      db.exec(`INSERT INTO "fiscal_number_counters" ("owner_id", "environment", "model", "series", "issuing_point_id", "series_kind", "next_number")
-        VALUES ('owner-1', 'homologacao', 'NFCE', 2, 'register-2', 'ONLINE', 1)`),
+      db.exec(`INSERT INTO "fiscal_number_counters" ("issuer_cnpj", "environment", "model", "series", "issuing_point_id", "series_kind", "next_number")
+        VALUES ('11222333000181', 'homologacao', 'NFCE', 2, 'register-2', 'ONLINE', 1)`),
     ).rejects.toThrow(/fiscal_number_counters_pkey/);
   });
 

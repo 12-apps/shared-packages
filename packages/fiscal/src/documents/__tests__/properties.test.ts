@@ -32,12 +32,19 @@ const INPUTS: readonly DocumentInput[] = [
   { kind: "LOOKUP", answer: lookedUp("AUTHORIZED") },
   { kind: "LOOKUP", answer: lookedUp("CANCELLED") },
   { kind: "INUTILIZE", answer: INUTILIZED, eventXmlKey: null },
+  { kind: "LOOKUP", answer: lookedUp("DENIED") },
+  { kind: "DEFER", reason: "settlement failed", error: sidecarError("REJECTED", { code: "241" }), attention: true },
+  { kind: "DEFER", reason: "unanswered", error: null, attention: false },
+  { kind: "RELEASE" },
+  { kind: "WARN" },
+  { kind: "RESIGN", answer: SIGNED, sale: aDocument().sale, xmlKey: "x" },
 ];
 
 const AT = "2026-11-20T15:31:00.000Z";
 const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
 
 interface Walk {
+  readonly contingency: boolean;
   readonly visited: FiscalDocumentStatus[];
   readonly accepted: Array<{ from: FiscalDocumentStatus; to: FiscalDocumentStatus; kind: DocumentInput["kind"] }>;
 }
@@ -63,7 +70,7 @@ function walk(seed: number): Walk {
       expect(JSON.stringify(document), `seed ${seed}: a refusal changed the document`).toBe(before);
     }
   }
-  return { visited, accepted };
+  return { contingency: start.seriesKind === "CONTINGENCY", visited, accepted };
 }
 
 const WALKS = SEEDS.map((seed) => ({ seed, ...walk(seed) }));
@@ -86,18 +93,21 @@ describe("random transition sequences", () => {
     }
   });
 
-  it("never reach AUTHORIZED once REJECTED, DENIED, REPLACED or CANCELLED", () => {
-    for (const { seed, visited } of WALKS) {
-      const final = visited.findIndex((status) => ["REJECTED", "DENIED", "REPLACED", "CANCELLED"].includes(status));
-      if (final >= 0) expect(visited.slice(final), `seed ${seed}`).not.toContain("AUTHORIZED");
+  it("never step to AUTHORIZED from REJECTED, DENIED, REPLACED or CANCELLED", () => {
+    for (const { seed, accepted } of WALKS) {
+      for (const step of accepted) {
+        if (step.to === "AUTHORIZED") expect(["SUBMITTED", "CONTINGENCY", "AUTHORIZED"], `seed ${seed}`).toContain(step.from);
+      }
     }
   });
 
-  it("keep a final state final", () => {
-    for (const { seed, visited } of WALKS) {
-      for (const final of ["REJECTED", "DENIED", "REPLACED"] as const) {
-        const at = visited.indexOf(final);
-        if (at >= 0) expect(new Set(visited.slice(at)), `seed ${seed}`).toEqual(new Set([final]));
+  it("keep DENIED, REPLACED and CANCELLED final; REJECTED leaves only a contingency number, back to CONTINGENCY", () => {
+    for (const { seed, accepted, contingency } of WALKS) {
+      for (const step of accepted) {
+        if (["DENIED", "REPLACED", "CANCELLED"].includes(step.from)) expect(step.to, `seed ${seed}`).toBe(step.from);
+        if (step.from === "REJECTED" && step.to !== "REJECTED") {
+          expect([contingency, step.kind, step.to], `seed ${seed}`).toEqual([true, "RESIGN", "CONTINGENCY"]);
+        }
       }
     }
   });

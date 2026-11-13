@@ -107,6 +107,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
       substitution: "Substituida por documento emitido em contingencia",
     },
     staleAfterMs: 5 * 60_000,
+    nfceOnlineToleranceMs: 15 * 60_000,
     newId: () => `doc-${(ids += 1)}`,
   });
   await service.saveProfile("owner-1", { ...PROFILE, ...profile });
@@ -148,7 +149,7 @@ describe("the document service", () => {
     const { service, store } = await setup({ issue: ["nfce-issue-authorized"] });
     const first = await service.issue(ISSUE);
     expect(await service.issue(ISSUE)).toEqual(first);
-    expect(store.counters.get("owner-1|homologacao|NFCE|1")).toBe(1202);
+    expect(store.counters.get("11222333000181|homologacao|NFCE|1")).toBe(1202);
   });
 
   it("refuses a bad certificate password without quoting it", async () => {
@@ -175,14 +176,17 @@ describe("the document service", () => {
     const first = await service.issue(ISSUE);
     expect(first).toMatchObject({ status: "SUBMITTED", lastErrorClass: "RETRYABLE" });
     expect((await service.sweep(10)).advanced).toEqual([]);
+    // One failure doubles the wait: 10 minutes, still inside the 15-minute online tolerance.
     later(6 * 60_000);
+    expect((await service.sweep(10)).advanced).toEqual([]);
+    later(5 * 60_000);
     await service.sweep(10);
     expect(await service.getDocument("owner-1", first.id)).toMatchObject({ status: "AUTHORIZED", number: 1201 });
     expect(calls.map((c) => (c.call as { document: { keyCode: string } }).document.keyCode)).toEqual([first.keyCode, first.keyCode]);
   });
 
   it("goes offline on CONTINGENCY: the sale moves to the contingency series, which the transmission authorises", async () => {
-    const { service, store } = await setup({
+    const { service, store, later } = await setup({
       issue: ["nfce-issue-contingency"],
       signContingency: ["nfce-sign-contingency"],
       transmit: ["nfce-transmit-authorized"],
@@ -193,6 +197,8 @@ describe("the document service", () => {
     const [online] = await store.listBySubject("owner-1", "order-77", "NFCE");
     expect(online).toMatchObject({ status: "REPLACED", replacedById: offline.id, numberVoid: "INUTILIZE" });
 
+    expect((await service.transmitContingency(10)).advanced).toEqual([]);
+    later(6 * 60_000);
     const transmitted = await service.transmitContingency(10);
     expect(transmitted.advanced).toEqual([{ documentId: offline.id, status: "AUTHORIZED" }]);
   });
@@ -233,7 +239,7 @@ describe("the document service", () => {
 
     const platform = await setup({}, { signingIdentity: "PLATFORM" });
     await expect(platform.service.issue(ISSUE)).rejects.toThrow(expect.objectContaining({ code: "NOT_SUPPORTED" }));
-    expect(platform.store.counters.get("owner-1|homologacao|NFCE|1")).toBe(1201);
+    expect(platform.store.counters.get("11222333000181|homologacao|NFCE|1")).toBe(1201);
   });
 
   it("refuses a series already held by another issuing point", async () => {
