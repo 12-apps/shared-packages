@@ -3,15 +3,47 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "Brazilian consumption-tax machinery for any host that sells. Its first module is the IBS/CBS engine (./engine): a pure function from priced lines, the seller's regime, the destination, the exclusions, a versioned rate table and the date of the supply to a per-line and per-order breakdown, with the NF-e layout's per-item rounding and an injected official-calculator port for running it as an oracle. Rate tables are versioned data (./tables/*). Its second is the neutral sale document (./sale) and a stateless HTTP service over sped-nfe that issues NF-e and NFC-e, shipped with its Dockerfile in sidecar/ (./sidecar types its wire contract). Implements @12-apps/wiring (./manifest).",
+  "description": "Brazilian consumption-tax machinery and fiscal documents for any host that sells. The IBS/CBS engine (./engine): a pure function from priced lines, the seller's regime, the destination, the exclusions, a versioned rate table and the date of the supply to a per-line and per-order breakdown. The neutral sale document (./sale) and a stateless HTTP service over sped-nfe that issues NF-e and NFC-e, shipped with its Dockerfile in sidecar/ (./sidecar types its wire contract). The fiscal document module (./documents): the state machine, the per-series number counters, the issuer port and its sidecar adapter (./issuer), the signing identity, and the DANFE NFC-e as ESC/POS-ready lines (./danfe). Implements @12-apps/wiring (./manifest): db, http, jobs, permissions.",
   "exports": {
+    "./danfe": {
+      "types": "./dist/danfe/index.d.ts",
+      "default": "./dist/danfe/index.js"
+    },
+    "./danfe/pt-BR": {
+      "types": "./dist/danfe/pt-BR.d.ts",
+      "default": "./dist/danfe/pt-BR.js"
+    },
+    "./documents": {
+      "types": "./dist/documents/index.d.ts",
+      "default": "./dist/documents/index.js"
+    },
     "./engine": {
       "types": "./dist/engine/index.d.ts",
       "default": "./dist/engine/index.js"
     },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    },
+    "./issuer": {
+      "types": "./dist/issuer/index.d.ts",
+      "default": "./dist/issuer/index.js"
+    },
+    "./jobs": {
+      "types": "./dist/jobs.d.ts",
+      "default": "./dist/jobs.js"
+    },
     "./manifest": {
       "types": "./dist/manifest/index.d.ts",
       "default": "./dist/manifest/index.js"
+    },
+    "./manifest/server": {
+      "types": "./dist/manifest/server.d.ts",
+      "default": "./dist/manifest/server.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications.d.ts",
+      "default": "./dist/notifications.js"
     },
     "./sale": {
       "types": "./dist/sale/index.d.ts",
@@ -35,7 +67,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@12-apps/wiring": ">=1.0.0"
+    "@12-apps/wiring": ">=1.3.0"
   },
   "peerDependenciesMeta": {
     "@12-apps/wiring": {
@@ -72,6 +104,7 @@
     "dist",
     "tables",
     "sidecar",
+    "prisma",
     "*.md",
     "!eslint.config.js",
     "!tsup.config.ts",
@@ -81,5 +114,11 @@
     "!sidecar/tests",
     "!sidecar/phpunit.xml",
     "!sidecar/.phpunit.cache"
-  ]
+  ],
+  "wiring": {
+    "db": {
+      "partial": "prisma/fiscal.prisma",
+      "migrations": "prisma/migrations"
+    }
+  }
 }

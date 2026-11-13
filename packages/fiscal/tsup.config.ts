@@ -7,8 +7,16 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: {
+    "danfe/index": "src/danfe/index.ts",
+    "danfe/pt-BR": "src/danfe/pt-BR.ts",
+    "documents/index": "src/documents/index.ts",
     "engine/index": "src/engine/index.ts",
+    http: "src/http.ts",
+    "issuer/index": "src/issuer/index.ts",
+    jobs: "src/jobs.ts",
     "manifest/index": "src/manifest/index.ts",
+    "manifest/server": "src/manifest/server.ts",
+    notifications: "src/notifications.ts",
     "sale/index": "src/sale/index.ts",
     "sidecar/index": "src/sidecar/index.ts",
   },

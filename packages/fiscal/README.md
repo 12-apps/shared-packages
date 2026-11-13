@@ -1,13 +1,18 @@
 # @12-apps/fiscal
 
-Brazilian consumption-tax machinery for any host that sells. The package is
-built module by module; the first is the **IBS/CBS engine**.
+Brazilian consumption-tax machinery and fiscal documents for any host that
+sells: the **IBS/CBS engine**, the neutral sale document, the fiscal service
+over sped-nfe, and the **fiscal document module** that issues through it.
 
 | subpath | what it is |
 |---|---|
 | `@12-apps/fiscal/engine` | `computeTax(input) → TaxBreakdown`: pure, no I/O, no clock, no defaults. Plus `computeTaxWithOracle` over an injected `OfficialCalculator` port, and `compareBreakdowns`. |
 | `@12-apps/fiscal/tables/<file>.json` | Versioned rate tables — DATA, never code. The engine stamps the table's `version` on every result. |
-| `@12-apps/fiscal/manifest` | The `@12-apps/wiring` manifest. A skeleton today: the four permissions. |
+| `@12-apps/fiscal/documents` | The fiscal document: its state machine, the emitter profile and issuing points, the ports a host implements (store, storage, cipher, sale source), the signing identity, the per-series number draw (`FISCAL_NEXT_NUMBER_SQL`), the engine-to-document line mapping and `createFiscalDocuments`, the service. |
+| `@12-apps/fiscal/issuer` | The Issuer port and its first adapter, `createSidecarIssuer`, over the fiscal service's HTTP contract. |
+| `@12-apps/fiscal/danfe` | The DANFE NFC-e as ESC/POS-ready lines for 58 and 80 mm; `./danfe/pt-BR` carries the Manual's own words. |
+| `@12-apps/fiscal/http`, `/jobs`, `/notifications` | The wiring capabilities: the routes, the job blueprints, the notification blueprints over host copy. |
+| `@12-apps/fiscal/manifest` | The `@12-apps/wiring` manifest: permissions, db, observability, `server: ["http", "jobs"]` (`./manifest/server`). |
 | `@12-apps/fiscal/sale` | `SaleForDocument`, the neutral document shape: one sale, host-agnostic, as the fiscal service accepts it. Types only; its JSON schema is `@12-apps/fiscal/sidecar/schema/sale-for-document.schema.json`. |
 | `@12-apps/fiscal/sidecar` | The fiscal service's wire contract: each endpoint's request and answer, and the error classes (`REJECTED`, `RETRYABLE`, `CONTINGENCY`, `AUTH`, `INVALID`). |
 | `sidecar/` (folder) | The fiscal service itself: PHP over sped-nfe, stateless, with its `Dockerfile` (images pinned by digest). Issues, signs offline, transmits, cancels, looks up and inutilizes NF-e and NFC-e. See [sidecar/README.md](./sidecar/README.md). |
@@ -119,10 +124,98 @@ The package's suite replays REAL recorded calculator answers for 2026
 calculator has no rates for 2027 and later yet, so those years' goldens are
 the engine's own estimates, marked `provisional`.
 
+## The fiscal documents
+
+```ts
+import { createFiscalDocuments, createSigningIdentities } from "@12-apps/fiscal/documents";
+import { createSidecarIssuer } from "@12-apps/fiscal/issuer";
+
+const documents = createFiscalDocuments({
+  store,                 // FiscalStore over the Prisma partial (createMemoryFiscalStore for tests)
+  issuer: createSidecarIssuer({ baseUrl: "http://fiscal-sidecar:8080", fetch, timeoutMs: 90_000 }),
+  signing: createSigningIdentities({ cipher }),
+  cipher,                // the host's { encrypt, decrypt }: certificate, password and CSC at rest
+  readCertificate,       // the host's: an A1's expiry, or a throw when it does not open
+  storage,               // where the XMLs live
+  sales,                 // SaleSource: the host's sale as a SaleDraft (`documentLines` maps the engine's breakdown)
+  notify,                // the host's notifier (never throws)
+  now: () => new Date(),
+  utcOffset: (ownerId, at) => "-03:00",
+  reasons: { contingency, inutilization, substitution }, // host words SEFAZ receives, 15–255 chars
+  staleAfterMs: 5 * 60_000,
+  newId: () => crypto.randomUUID(),
+});
+await documents.issue({ ownerId, subjectId, issuingPointId, model: "NFCE" });
+```
+
+**One document is one number.** The state machine (`transition`) is pure:
+
+```
+PENDING ─SUBMIT→ SUBMITTED ─AUTHORIZE→ AUTHORIZED ─CANCEL→ CANCELLED
+                     ├─DENY→ DENIED   ├─REJECT→ REJECTED   └─RETRY→ SUBMITTED
+PENDING | SUBMITTED ─REPLACE→ REPLACED
+PENDING ─SIGN_OFFLINE→ CONTINGENCY ─AUTHORIZE | DENY | REJECT | RETRY→ …
+```
+
+Every step yields an event carrying the fiscal service's raw answer, with any
+secret-named key scrubbed. `CANCELLED` is reached only from `AUTHORIZED`, and
+nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
+(a property suite walks random sequences).
+
+- **The counters are the package's.** Every issuing point (an opaque id the
+  host maps: a register, the online store) has an ONLINE series and, for an
+  NFC-e, a CONTINGENCY series; a series belongs to one point. A number is drawn
+  in the same transaction as the document's insert (`FISCAL_NEXT_NUMBER_SQL`),
+  so a failed write gives it back. A number SEFAZ never used — a rejection, a
+  document replaced by its contingency twin — is owed a settlement
+  (`numberVoid`): looked up first when a request went out unanswered,
+  cancelled if SEFAZ authorised it after all, inutilized otherwise.
+- **Going offline is a second document.** When the service answers
+  `CONTINGENCY` for an NFC-e at a point with a contingency series, the sale is
+  numbered on that series and signed offline (`tpEmis = 9`), and the online
+  document is `REPLACED`. The `transmit-contingency` job sends it later.
+- **What the classes mean here.** `REJECTED`, `INVALID` and `INTERNAL` reject
+  (the same call fails again); `RETRYABLE`, `AUTH` and a `CONTINGENCY` with no
+  offline path retry, with the same number and key code, from the sweep.
+- **Who signs** is the profile's `signingIdentity`: `STORE_CERTIFICATE` (the
+  store's A1, decrypted for one call) or `PLATFORM`, declared and answering
+  `NOT_SUPPORTED` until FUT-2229 q4 says how the platform signs.
+- **Secrets** are encrypted through the host's cipher on arrival, decrypted by
+  the signing identity for one call, and never stored in clear, logged,
+  answered or put in an error.
+
+NFS-e is not covered: only the platform's own NFS-e is planned (FUT-2242).
+
+## The DANFE NFC-e
+
+`renderDanfeNfce({ xml, paperWidth: 58 | 80, labels })` reads the authorised
+XML (or the signed XML of a document issued offline, which prints the
+"EMITIDA EM CONTINGÊNCIA" variant) and answers lines in the Manual do DANFE
+NFC-e's divisions I–VIII: the issuer, the title, every item, the totals and
+payments, the fiscal message and the key, the consumer, the number and
+protocol, and the QR code (a line carrying `qrCode`, for the host to
+rasterise). Each line is `{ text, align, emphasis }`, the shape
+`@12-apps/thermal-printing` encodes, at 32 or 48 columns.
+
 ## The manifest
 
 `@12-apps/fiscal/manifest` declares the permissions `fiscal:read`,
-`fiscal:manage`, `fiscal:issue` and `fiscal:cancel`, here and nowhere else. The
-document module adds `db`, `server: ["http", "jobs"]`, `notifications`,
-`web: ["surface"]` and `observability`; until then `.wiring-conformance.json`
-answers each with its reason.
+`fiscal:manage`, `fiscal:issue` and `fiscal:cancel`, here and nowhere else;
+the Prisma partial `prisma/fiscal.prisma` and its migrations; the `fiscal`
+observability namespace; and `server: ["http", "jobs"]`:
+
+| route (under the host's mount) | permission |
+|---|---|
+| `GET /fiscal/profile`, `GET /fiscal/issuing-points` | `fiscal:read` |
+| `PUT /fiscal/profile`, `PUT /fiscal/profile/certificate`, `POST /fiscal/issuing-points` | `fiscal:manage` |
+| `POST /fiscal/documents` | `fiscal:issue` |
+| `GET /fiscal/documents/:documentId`, `POST …/lookup`, `GET …/danfe?paper=58\|80` | `fiscal:read` |
+| `POST /fiscal/documents/:documentId/cancel` | `fiscal:cancel` |
+
+The jobs are `fiscal.sweep` and `fiscal.transmit-contingency` (every five
+minutes, leased) and `fiscal.certificate-expiry` (daily, telling owners on the
+30th, 15th, 7th, 3rd and last day, and daily once expired). The two alerts
+ship as `createFiscalNotificationBlueprints(copy)`, over the host's words. The
+settings screen and the documents list (`web: ["surface"]`) come with their
+screen tickets; `.wiring-conformance.json` argues each capability not
+declared.
