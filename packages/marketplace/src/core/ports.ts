@@ -1,5 +1,6 @@
 import type { AdapterRegistry } from "./registry";
 import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp } from "./adapter";
+import type { CatalogueImage, CatalogueItem } from "./catalogue-port";
 import type { NormalizedMarketplaceOrder } from "./types";
 
 /**
@@ -50,6 +51,17 @@ export interface MarketplaceDb {
     findFirst(args: unknown): Promise<unknown>;
     findMany(args: unknown): Promise<unknown[]>;
     create(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<{ count: number }>;
+  };
+  /**
+   * OPTIONAL in the type, so a host on 1.x that has not yet composed the
+   * catalogue model still compiles; the catalogue calls refuse without it
+   * (FUT-4768, migration `20261113120000_marketplace_catalogue`).
+   */
+  marketplaceCataloguePublication?: {
+    findFirst(args: unknown): Promise<unknown>;
+    findMany(args: unknown): Promise<unknown[]>;
+    upsert(args: unknown): Promise<unknown>;
     updateMany(args: unknown): Promise<{ count: number }>;
   };
 }
@@ -239,6 +251,19 @@ export interface MarketplaceLogger {
   error(message: string, ...meta: unknown[]): void;
 }
 
+/**
+ * The host's catalogue, as the catalogue publishing reads it (FUT-4768). The
+ * engine never reads a host table: the host maps its product into the item
+ * shape, at the moment the job sends it, so what goes out is the product as it
+ * is now rather than as it was when the switch was turned on.
+ */
+export interface MarketplaceCataloguePort {
+  /** These products as they go out, keyed by product id. Missing ids are products that no longer exist. */
+  items(clientId: string, productIds: readonly string[]): Promise<Map<string, CatalogueItem>>;
+  /** The bytes behind an item's photo, for a marketplace that takes an upload; null when they cannot be read. */
+  image(url: string): Promise<CatalogueImage | null>;
+}
+
 /** Everything the host plugs in. */
 export interface MarketplacePorts {
   db: () => Promise<MarketplaceDb>;
@@ -270,6 +295,11 @@ export interface MarketplacePorts {
    * only given up on after `OUTBOUND_GIVE_UP_MS`.
    */
   cancellationWindowMs?: number;
+  /**
+   * OPTIONAL. The host's catalogue, for publishing products to a marketplace's
+   * catalogue. Absent: every catalogue call answers `UNSUPPORTED`.
+   */
+  catalogue?: MarketplaceCataloguePort;
   /** The acceptance window a connection gets when it does not state its own. */
   defaultAckSlaSeconds: number;
   /** How many stored deliveries one reconciliation pass re-runs. */

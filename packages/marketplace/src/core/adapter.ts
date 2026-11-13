@@ -1,3 +1,4 @@
+import type { MarketplaceCatalogue } from "./catalogue-port";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 /**
@@ -41,7 +42,8 @@ export interface MarketplaceCredentials {
 
 /** What the host's HTTP client takes. */
 export interface MarketplaceHttpRequest {
-  method: "GET" | "POST" | "PUT";
+  /** `PATCH` since FUT-4768: iFood's catalogue sets an item's status with it. */
+  method: "GET" | "POST" | "PUT" | "PATCH";
   url: string;
   headers: Record<string, string>;
   body?: string;
@@ -171,6 +173,13 @@ export interface MarketplaceAdapter {
    * order (iFood) leaves it out.
    */
   fetchOrder?(ctx: AdapterCallContext, order: { externalOrderId: string }): Promise<FetchOrderResult>;
+  /**
+   * OPTIONAL. Publishing the store's products to this marketplace's catalogue
+   * (FUT-4768): `push` (the adapter writes each item) or `pull` (the
+   * marketplace reads a menu document the host serves). Absent: the
+   * marketplace cannot be published to, and the host says so.
+   */
+  readonly catalogue?: MarketplaceCatalogue;
   /** Where "open it on the marketplace" goes: the order when `perOrderAppLink`, else the portal. Always https. */
   appLink(order: Pick<OutboundOrderRef, "externalOrderId" | "externalDisplayId">): string;
 }

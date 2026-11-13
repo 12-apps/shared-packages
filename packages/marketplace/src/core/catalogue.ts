@@ -1,0 +1,204 @@
+import { catalogueDedupeKey, enqueueCatalogue, type CatalogueJobPayload } from "./catalogue-job";
+import type { CatalogueMenuEntry, CatalogueMenuOptions } from "./catalogue-port";
+import {
+  CATALOGUE_ROW_SELECT,
+  catalogueConnection,
+  catalogueTable,
+  viewOf,
+  type CataloguePublicationView,
+  type CatalogueRow,
+  type CatalogueTable,
+} from "./catalogue-store";
+import type { EngineContext } from "./ports";
+import type { MarketplaceProvider } from "./types";
+
+/**
+ * Catalogue publishing, as a host calls it (FUT-4768): from a product's page,
+ * the store turns the product ON (`publish`) or OFF (`withdraw`) per connected
+ * marketplace, with an optional price for that marketplace, and reads where
+ * each stands (`catalogueState`, one read for a whole page).
+ *
+ * Nothing here calls a marketplace: a publish or withdraw stamps the row and
+ * queues `marketplace.catalogue`, whose job makes the call. The host's product
+ * is read through its `catalogue` port, never from a host table, and only the
+ * job reads it for sending, so what goes out is the product as it is then.
+ */
+
+/** Why a catalogue call was refused before anything was stamped. Vocabulary, not copy. */
+export type CatalogueRefusalCode =
+  /** The marketplace has no catalogue capability, or the host bound no catalogue port or table. */
+  | "UNSUPPORTED"
+  /** No live connection with credentials and a merchant id. */
+  | "NOT_CONNECTED"
+  /** The host's catalogue does not have this product. */
+  | "UNKNOWN_PRODUCT"
+  /** The price for the marketplace is not a positive integer of the smallest unit. */
+  | "INVALID_PRICE";
+
+/** What `publish` and `withdraw` answer. */
+export type CatalogueActionResult =
+  /** Stamped and queued (or already on its way: a double tap is this, with nothing new queued). */
+  | { kind: "queued"; publication: CataloguePublicationView }
+  /** Nothing to do: the product is not in that marketplace's catalogue, or was never there. */
+  | { kind: "unchanged"; publication: CataloguePublicationView | null }
+  | { kind: "refused"; code: CatalogueRefusalCode };
+
+/** What a pull marketplace's menu document read answers. */
+export type CatalogueDocumentResult =
+  | { kind: "document"; document: unknown }
+  | { kind: "refused"; code: Exclude<CatalogueRefusalCode, "UNKNOWN_PRODUCT" | "INVALID_PRICE"> };
+
+/** One product on one marketplace. */
+export interface CatalogueTarget {
+  clientId: string;
+  provider: MarketplaceProvider;
+  productId: string;
+}
+
+/** A publish: the target, and the price for this marketplace — absent keeps the stored one, null is the store's. */
+export interface CataloguePublishInput extends CatalogueTarget {
+  priceCents?: number | null;
+}
+
+const refused = (code: CatalogueRefusalCode): CatalogueActionResult => ({ kind: "refused", code });
+
+/** The table, or why the catalogue cannot be used at all for this marketplace. */
+async function usableTable(ctx: EngineContext, provider: string): Promise<CatalogueTable | null> {
+  if (!ctx.ports.catalogue || !ctx.registry.get(provider)?.catalogue) return null;
+  return catalogueTable(ctx);
+}
+
+async function findRow(table: CatalogueTable, target: CatalogueTarget): Promise<CatalogueRow | null> {
+  return (await table.findFirst({
+    where: { clientId: target.clientId, provider: target.provider, productId: target.productId },
+    select: CATALOGUE_ROW_SELECT,
+  })) as CatalogueRow | null;
+}
+
+async function queue(ctx: EngineContext, row: CatalogueRow, action: CatalogueJobPayload["action"]): Promise<CatalogueActionResult> {
+  const payload: CatalogueJobPayload = { clientId: row.clientId, publicationId: row.id, action };
+  await enqueueCatalogue(ctx, payload, catalogueDedupeKey(payload, row.requestedAt));
+  ctx.ports.publishChanged(row.clientId);
+  return { kind: "queued", publication: viewOf(row) };
+}
+
+const validPrice = (price: number | null | undefined): boolean =>
+  price === undefined || price === null || (Number.isInteger(price) && price > 0);
+
+/** Why a publish cannot be asked, or null. */
+async function publishRefusal(ctx: EngineContext, input: CataloguePublishInput): Promise<CatalogueRefusalCode | null> {
+  if (!validPrice(input.priceCents)) return "INVALID_PRICE";
+  if (typeof (await catalogueConnection(ctx, input.clientId, input.provider)) === "string") return "NOT_CONNECTED";
+  const items = await ctx.ports.catalogue?.items(input.clientId, [input.productId]);
+  return items?.has(input.productId) ? null : "UNKNOWN_PRODUCT";
+}
+
+/**
+ * Put the product in the marketplace's catalogue, or send it again (a new
+ * price, a retry after FAILED). A double tap while it is on its way keeps the
+ * same ask and queues nothing new.
+ */
+export async function publishToCatalogue(ctx: EngineContext, input: CataloguePublishInput): Promise<CatalogueActionResult> {
+  const table = await usableTable(ctx, input.provider);
+  if (!table) return refused("UNSUPPORTED");
+  const refusal = await publishRefusal(ctx, input);
+  if (refusal) return refused(refusal);
+  const existing = await findRow(table, input);
+  const now = ctx.ports.clock.now();
+  const price = input.priceCents === undefined ? {} : { priceCents: input.priceCents };
+  const asked = existing?.status === "PUBLISHING" ? {} : { requestedAt: now };
+  const row = (await table.upsert({
+    where: { clientId_provider_productId: { clientId: input.clientId, provider: input.provider, productId: input.productId } },
+    create: { clientId: input.clientId, provider: input.provider, productId: input.productId, status: "PUBLISHING", requestedAt: now, ...price },
+    update: { status: "PUBLISHING", failedAction: null, failureReason: null, failedAt: null, ...asked, ...price },
+    select: CATALOGUE_ROW_SELECT,
+  })) as CatalogueRow;
+  return queue(ctx, row, "publish");
+}
+
+/** A publish that FAILED before anything reached the marketplace: withdrawing it is only a stamp. */
+const neverLanded = (row: CatalogueRow): boolean =>
+  row.status === "FAILED" && row.failedAction === "PUBLISH" && row.publishedAt === null && row.externalId === null;
+
+/**
+ * Take the product out of the marketplace's catalogue. A product never there
+ * (no row, WITHDRAWN, or a first publish that failed) is `unchanged` and calls
+ * nobody; a double tap while it is on its way out queues nothing new; a
+ * withdraw while a publish is on its way wins (the job re-withdraws a publish
+ * that lands after it).
+ */
+export async function withdrawFromCatalogue(ctx: EngineContext, target: CatalogueTarget): Promise<CatalogueActionResult> {
+  const table = await usableTable(ctx, target.provider);
+  if (!table) return refused("UNSUPPORTED");
+  const existing = await findRow(table, target);
+  if (!existing || existing.status === "WITHDRAWN") return { kind: "unchanged", publication: existing && viewOf(existing) };
+  if (existing.status === "WITHDRAWING") return queue(ctx, existing, "withdraw");
+  const now = ctx.ports.clock.now();
+  const local = neverLanded(existing);
+  const data = local
+    ? { status: "WITHDRAWN", withdrawnAt: now, requestedAt: now, failedAction: null, failureReason: null, failedAt: null }
+    : { status: "WITHDRAWING", requestedAt: now, failedAction: null, failureReason: null, failedAt: null };
+  const moved = await table.updateMany({ where: { id: existing.id, status: existing.status }, data });
+  // Lost a race with another write: answer what the row now says.
+  const row = (await findRow(table, target)) ?? existing;
+  if (moved.count === 0 || local) {
+    ctx.ports.publishChanged(target.clientId);
+    return { kind: "unchanged", publication: viewOf(row) };
+  }
+  return queue(ctx, row, "withdraw");
+}
+
+/**
+ * Where these products stand on these marketplaces, in ONE read: a product's
+ * page asks for one product on every connected marketplace; a list asks for
+ * many. Rows only for what was ever switched on.
+ */
+export async function readCatalogueState(
+  ctx: EngineContext,
+  input: { clientId: string; productIds: readonly string[]; providers?: readonly string[] },
+): Promise<CataloguePublicationView[]> {
+  const table = await catalogueTable(ctx);
+  if (!table || input.productIds.length === 0) return [];
+  const rows = (await table.findMany({
+    where: {
+      clientId: input.clientId,
+      productId: { in: [...input.productIds] },
+      ...(input.providers ? { provider: { in: [...input.providers] } } : {}),
+    },
+    select: CATALOGUE_ROW_SELECT,
+  })) as CatalogueRow[];
+  return rows.map(viewOf);
+}
+
+/** Every product a pull marketplace's menu lists: switched on, or on its way. */
+const IN_MENU = ["PUBLISHING", "PUBLISHED"];
+
+/**
+ * The menu part of the document a pull marketplace reads, for the host to
+ * serve (merged into the rest of that document, which is the host's). Built
+ * from every product switched on for the connection, read through the host's
+ * catalogue port; a product that no longer exists is left out.
+ */
+export async function readCatalogueDocument(
+  ctx: EngineContext,
+  input: { clientId: string; provider: MarketplaceProvider; options: CatalogueMenuOptions },
+): Promise<CatalogueDocumentResult> {
+  const catalogue = ctx.registry.get(input.provider)?.catalogue;
+  const table = await usableTable(ctx, input.provider);
+  if (!table || catalogue?.mode !== "pull") return { kind: "refused", code: "UNSUPPORTED" };
+  const connection = await catalogueConnection(ctx, input.clientId, input.provider);
+  if (typeof connection === "string") return { kind: "refused", code: "NOT_CONNECTED" };
+  const rows = (await table.findMany({
+    where: { clientId: input.clientId, provider: input.provider, status: { in: IN_MENU } },
+    select: CATALOGUE_ROW_SELECT,
+    orderBy: { createdAt: "asc" },
+  })) as CatalogueRow[];
+  const items = (await ctx.ports.catalogue?.items(input.clientId, rows.map((row) => row.productId))) ?? new Map();
+  const entries: CatalogueMenuEntry[] = rows.flatMap((row) => {
+    const item = items.get(row.productId);
+    if (!item) return [];
+    return [{ ...item, priceCents: row.priceCents ?? item.priceCents, ref: row.id, productId: row.productId, externalId: row.externalId }];
+  });
+  const document = catalogue.menuDocument({ externalMerchantId: connection.externalMerchantId, entries, options: input.options });
+  return { kind: "document", document };
+}

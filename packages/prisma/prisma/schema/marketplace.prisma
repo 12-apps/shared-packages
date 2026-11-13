@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @12-apps/marketplace — CANONICAL Prisma model partial.
 //
-// The four tables the marketplace engine owns. A host does NOT copy these
+// The five tables the marketplace engine owns. A host does NOT copy these
 // models by hand: it composes this file into its multi-file schema folder from
 // the `db` capability (`package.json` "wiring.db"), and discovers the
 // migrations beside it.
@@ -249,4 +249,54 @@ model MarketplaceAcceptance {
   // cancellation_requested_at WHERE cancellation_status IN ('PENDING','REQUESTED'):
   // SQL-only (migration 20261112120000), since Prisma cannot express the WHERE.
   @@map("marketplace_acceptances")
+}
+
+/// One host product's place in one marketplace's catalogue (FUT-4768).
+///
+/// One row per (store, marketplace, product): the store's switch for that
+/// marketplace, and what the marketplace made of it. `productId` is an OPAQUE
+/// host catalog id, like `menuItemId` above; the engine never reads the
+/// product, the host maps it at send time.
+///
+/// `status` is the MECHANISM's vocabulary (CHECK in the migration):
+/// PUBLISHING (asked, not yet in the catalogue) → PUBLISHED, WITHDRAWING (asked
+/// out) → WITHDRAWN, and FAILED with the marketplace's own reason. A FAILED row
+/// is asked again by the same publish or withdraw.
+model MarketplaceCataloguePublication {
+  id        String @id @default(uuid())
+  clientId  String @map("client_id")
+  provider  String
+  /// The host product this row publishes. Opaque here.
+  productId String @map("product_id")
+
+  status String @default("PUBLISHING")
+
+  /// The store's price for THIS marketplace, in the smallest currency unit.
+  /// NULL is "the store's own price"; it never changes the store's price.
+  priceCents     Int? @map("price_cents")
+  /// The price the last successful publish sent, whichever rule chose it.
+  sentPriceCents Int? @map("sent_price_cents")
+
+  /// The marketplace's id for the item, from the last successful publish.
+  externalId String? @map("external_id")
+
+  /// Which action FAILED: PUBLISH | WITHDRAW (CHECK); NULL unless FAILED.
+  failedAction  String? @map("failed_action")
+  /// The marketplace's reason, as it answered (truncated by the writer).
+  failureReason String? @map("failure_reason")
+
+  /// When the current action was asked: what the job matches its run to, and
+  /// what the outbound sweep ages a row still owed by.
+  requestedAt DateTime  @map("requested_at")
+  publishedAt DateTime? @map("published_at")
+  withdrawnAt DateTime? @map("withdrawn_at")
+  failedAt    DateTime? @map("failed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider, productId])
+  @@index([clientId, productId])
+  @@index([status, requestedAt])
+  @@map("marketplace_catalogue_publications")
 }

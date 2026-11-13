@@ -32,13 +32,13 @@ const TOKEN_MARGIN_MS = 60_000;
 const DEFAULT_TOKEN_SECONDS = 3600;
 
 /** The base URL with its trailing slashes cut, by a loop: a `/\/+$/` regex backtracks polynomially on many slashes. */
-function baseOf(ctx: AdapterCallContext, bases: NinetyNineFoodApiBaseUrls): string {
+export function baseOf(ctx: AdapterCallContext, bases: NinetyNineFoodApiBaseUrls): string {
   const base = bases[ctx.environment];
   let end = base.length;
   while (end > 0 && base.charCodeAt(end - 1) === 47) end -= 1;
   return base.slice(0, end);
 }
-const tokenKey = (ctx: AdapterCallContext): string =>
+export const tokenKey = (ctx: AdapterCallContext): string =>
   `${NINETY_NINE_FOOD_PROVIDER}:${ctx.environment}:${ctx.credentials.clientId}`;
 
 /** The spec's `TokenResponse` (`access_token`, `token_type`, `expires_in`), read defensively. */
@@ -59,7 +59,7 @@ function tokenOf(body: string): { token: string; expiresInSeconds: number } | nu
  * grant (`POST /oauth/token`, form-encoded `client_id`, `client_secret`,
  * `grant_type`). Keyed by environment and client id; memory only.
  */
-async function bearer(
+export async function bearer(
   ctx: AdapterCallContext,
   bases: NinetyNineFoodApiBaseUrls,
 ): Promise<{ token: string } | Exclude<OutboundResult, { kind: "accepted" }>> {

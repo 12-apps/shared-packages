@@ -1,6 +1,7 @@
 import type { JobsContribution, WireJobBlueprint } from "@12-apps/wiring";
 
 import type { MarketplaceEngine } from "../core/engine";
+import { CatalogueRetryError, type CatalogueJobPayload } from "../core/catalogue-job";
 import { FetchOrderRetryError, type FetchOrderJobPayload } from "../core/fetch-order";
 import { OutboundRetryError } from "../core/outbound";
 import type { OutboundJobPayload } from "../core/outbound-queue";
@@ -21,25 +22,28 @@ import type { OutboundJobPayload } from "../core/outbound-queue";
  * - `fetch-order`, on demand: one GET of an order a marketplace's event only
  *   announced (`orderToFetch`), then the one ingest path. Three attempts with
  *   backoff; the reconciliation sweep re-queues a row still owed.
+ * - `catalogue`, on demand: one publish or withdraw of one product on one
+ *   marketplace's catalogue (FUT-4768). Three attempts with backoff; the
+ *   last one stamps FAILED with the marketplace's reason.
  * - `outbound-sweep`, every five minutes: re-queues every call a row still
- *   owes (a PENDING request, an accept with no confirm stamp) once it is older
- *   than the job's own retry span, so a refused enqueue or a dead process
- *   loses nothing.
+ *   owes (a PENDING request, an accept with no confirm stamp, a catalogue
+ *   publish or withdraw on its way) once it is older than the job's own retry
+ *   span, so a refused enqueue or a dead process loses nothing.
  *
  * What stays the host's: whether to run them at all, on which runtime, and the
  * lease implementation. A host with no worker declines `jobs` in writing.
  *
  * Bound with `{ engine }`, these arrive at a runner as
  * `marketplace.expire-acceptances`, `marketplace.reconcile-inbox`,
- * `marketplace.outbound`, `marketplace.fetch-order` and
- * `marketplace.outbound-sweep`.
+ * `marketplace.outbound`, `marketplace.fetch-order`, `marketplace.catalogue`
+ * and `marketplace.outbound-sweep`.
  */
 
 /** What the host closes over at bind time: the mounted engine. */
 export interface MarketplaceJobDeps {
   engine: Pick<
     MarketplaceEngine,
-    "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "runFetchOrder" | "sweepOutbound"
+    "expireLapsed" | "retryable" | "reprocess" | "runOutbound" | "runFetchOrder" | "runCatalogue" | "sweepOutbound"
   >;
 }
 
@@ -135,6 +139,30 @@ const fetchOrder: WireJobBlueprint<FetchOrderJobPayload, MarketplaceJobDeps> = {
   },
 };
 
+/** The catalogue job's attempts: the last one stamps FAILED. */
+export const MARKETPLACE_CATALOGUE_ATTEMPTS = 3;
+
+const catalogue: WireJobBlueprint<CatalogueJobPayload, MarketplaceJobDeps> = {
+  name: "catalogue",
+  attempts: MARKETPLACE_CATALOGUE_ATTEMPTS,
+  // Short: a person is watching the switch say "sending".
+  backoff: { type: "exponential", delayMs: 10_000 },
+  handle: async (payload, deps, context) => {
+    try {
+      const outcome = await deps.engine.runCatalogue(payload, {
+        attempt: context.attempt,
+        maxAttempts: context.maxAttempts,
+      });
+      if (outcome.kind === "skipped") {
+        context.logger.info(`marketplace.catalogue: ${payload.action} ${payload.publicationId} skipped: ${outcome.reason}`);
+      }
+    } catch (error) {
+      if (error instanceof CatalogueRetryError) context.logger.warn(`marketplace.catalogue: ${error.message}`);
+      throw error;
+    }
+  },
+};
+
 const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
   name: "outbound-sweep",
   queue: MARKETPLACE_SWEEP_QUEUE,
@@ -144,10 +172,11 @@ const outboundSweep: WireJobBlueprint<void, MarketplaceJobDeps> = {
   lease: { ttlMs: SWEEP_LEASE_MS },
   handle: async (_payload, deps, context) => {
     const result = await deps.engine.sweepOutbound();
-    if (result.requeued === 0 && result.givenUp === 0 && result.timedOut === 0) return;
+    const idle = result.requeued + result.givenUp + result.timedOut + result.catalogueRequeued === 0;
+    if (idle) return;
     context.logger.info(
-      `marketplace.outbound-sweep: re-queued ${result.requeued} call(s), timed out ${result.timedOut} ` +
-        `cancellation request(s), gave up on ${result.givenUp}.`,
+      `marketplace.outbound-sweep: re-queued ${result.requeued} call(s) and ${result.catalogueRequeued} catalogue ` +
+        `call(s), timed out ${result.timedOut} cancellation request(s), gave up on ${result.givenUp}.`,
     );
   },
 };
@@ -160,6 +189,7 @@ export const MARKETPLACE_JOBS = {
     "reconcile-inbox": reconcileInbox,
     outbound,
     "fetch-order": fetchOrder,
+    catalogue,
     "outbound-sweep": outboundSweep,
   },
 } as const satisfies JobsContribution<MarketplaceJobDeps>;
