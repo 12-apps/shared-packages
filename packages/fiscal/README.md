@@ -8,6 +8,9 @@ built module by module; the first is the **IBS/CBS engine**.
 | `@12-apps/fiscal/engine` | `computeTax(input) → TaxBreakdown`: pure, no I/O, no clock, no defaults. Plus `computeTaxWithOracle` over an injected `OfficialCalculator` port, and `compareBreakdowns`. |
 | `@12-apps/fiscal/tables/<file>.json` | Versioned rate tables — DATA, never code. The engine stamps the table's `version` on every result. |
 | `@12-apps/fiscal/manifest` | The `@12-apps/wiring` manifest. A skeleton today: the four permissions. |
+| `@12-apps/fiscal/sale` | `SaleForDocument`, the neutral document shape: one sale, host-agnostic, as the fiscal service accepts it. Types only; its JSON schema is `@12-apps/fiscal/sidecar/schema/sale-for-document.schema.json`. |
+| `@12-apps/fiscal/sidecar` | The fiscal service's wire contract: each endpoint's request and answer, and the error classes (`REJECTED`, `RETRYABLE`, `CONTINGENCY`, `AUTH`, `INVALID`). |
+| `sidecar/` (folder) | The fiscal service itself: PHP over sped-nfe, stateless, with its `Dockerfile` (images pinned by digest). Issues, signs offline, transmits, cancels, looks up and inutilizes NF-e and NFC-e. See [sidecar/README.md](./sidecar/README.md). |
 
 ## The engine
 

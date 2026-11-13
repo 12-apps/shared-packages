@@ -1,0 +1,30 @@
+{
+  "name": "12-apps/fiscal-sidecar",
+  "description": "A stateless HTTP door in front of sped-nfe: build, sign, transmit, cancel, look up and void NF-e and NFC-e.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": "~8.3.0",
+    "ext-curl": "*",
+    "ext-dom": "*",
+    "ext-json": "*",
+    "ext-libxml": "*",
+    "ext-openssl": "*",
+    "nfephp-org/sped-nfe": "5.2.9"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
+  },
+  "autoload": {
+    "psr-4": { "Fiscal\\Sidecar\\": "src/" }
+  },
+  "autoload-dev": {
+    "psr-4": { "Fiscal\\Sidecar\\Tests\\": "tests/" }
+  },
+  "config": {
+    "platform": { "php": "8.3.6" },
+    "sort-packages": true,
+    "optimize-autoloader": true,
+    "allow-plugins": false
+  }
+}

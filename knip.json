@@ -27,7 +27,11 @@
     "// scripts/payments-portability-selftest.mjs under a pretend file path.",
     "// Nothing imports them — that is the point — so knip reads every one",
     "// as an unused file.",
-    "scripts/payments-portability-fixtures/**"
+    "scripts/payments-portability-fixtures/**",
+    "// A PHP service's Composer dependencies (packages/fiscal/sidecar): third-",
+    "// party code, gitignored, installed by `composer install`; some of it",
+    "// ships JS assets nothing in this repository imports.",
+    "packages/*/sidecar/vendor/**"
   ],
   "ignoreBinaries": [
     "only-allow"
