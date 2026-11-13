@@ -90,6 +90,7 @@ describe("99Food catalogue, telling it the menu changed", () => {
       externalMerchantId: "m-1",
       loadImage: async () => null,
       category: (_name, resolve) => resolve(),
+      forgetCategory: async () => undefined,
     };
     return { ctx, requests: recorded };
   }

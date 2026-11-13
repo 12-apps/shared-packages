@@ -94,3 +94,17 @@ export async function resolveCategory(
   }
   return result;
 }
+
+/** Forget a stored category id the marketplace no longer has, so the next resolve finds or creates it again. */
+export async function forgetCategory(
+  ctx: EngineContext,
+  connection: { clientId: string; provider: MarketplaceProvider },
+  name: string,
+): Promise<void> {
+  const table = (await ctx.ports.db()).marketplaceCatalogueCategory;
+  if (!table) return;
+  await table.updateMany({
+    where: { clientId: connection.clientId, provider: connection.provider, name: name.trim() },
+    data: { externalId: null, claimedAt: null },
+  });
+}

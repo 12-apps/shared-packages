@@ -98,6 +98,12 @@ export interface CatalogueCallContext extends AdapterCallContext {
    * being created is answered `retry`, so a new category is created once.
    */
   category(name: string, resolve: () => Promise<{ id: string } | CatalogueFailure>): Promise<{ id: string } | CatalogueFailure>;
+  /**
+   * Forget the id stored for the host category `name` (the marketplace no
+   * longer has it: the store deleted it on the marketplace's portal), so the
+   * next `category` finds or creates it again.
+   */
+  forgetCategory(name: string): Promise<void>;
 }
 
 /** A publish's answer: the marketplace's id for the item, or the refusal and retry shapes of every outbound call. */

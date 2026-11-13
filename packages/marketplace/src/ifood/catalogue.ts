@@ -210,12 +210,35 @@ export function ifoodItemBody(item: CatalogueItemOut, category: string, image: s
   };
 }
 
-async function publish(ctx: CatalogueCallContext, item: CatalogueItemOut): Promise<CataloguePublishResult> {
+/**
+ * Whether a refused PUT was refused because the stored category is gone (the
+ * store deleted it on iFood's portal): iFood's 400 and 404 do not say which id
+ * was unknown, so the list is read again, and a category of that name with
+ * another id, or none at all, means the stored one is stale. ESTIMATED that a
+ * deleted category answers 400 or 404.
+ */
+async function categoryWentStale(ctx: CatalogueCallContext, put: MarketplaceHttpResponse, name: string, used: string): Promise<boolean> {
+  if (put.status !== 400 && put.status !== 404) return false;
+  const found = await findCategory(ctx, name);
+  return !("kind" in found) && found.id !== used;
+}
+
+/** `PUT /items`, once more with the category found or created again when the stored one went stale. */
+async function putItem(ctx: CatalogueCallContext, item: CatalogueItemOut, image: string | null): Promise<MarketplaceHttpResponse | Failure> {
   const category = await categoryId(ctx, item.categoryName);
   if ("kind" in category) return category;
+  const put = await call(ctx, "PUT", "items", ifoodItemBody(item, category.id, image));
+  if ("kind" in put || ok(put) || !(await categoryWentStale(ctx, put, item.categoryName, category.id))) return put;
+  await ctx.forgetCategory(item.categoryName);
+  const again = await categoryId(ctx, item.categoryName);
+  if ("kind" in again) return again;
+  return call(ctx, "PUT", "items", ifoodItemBody(item, again.id, image));
+}
+
+async function publish(ctx: CatalogueCallContext, item: CatalogueItemOut): Promise<CataloguePublishResult> {
   const photo = await photoFor(ctx, item);
   if ("kind" in photo) return photo;
-  const put = await call(ctx, "PUT", "items", ifoodItemBody(item, category.id, photo.image?.ref ?? null));
+  const put = await putItem(ctx, item, photo.image?.ref ?? null);
   if ("kind" in put) return put;
   if (!ok(put)) return failureOf(put);
   // iFood's orders carry the item's `externalCode` as the line's SKU (the order normalizer reads it).

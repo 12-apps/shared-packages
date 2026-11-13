@@ -705,6 +705,63 @@ describe("a category creation that did not finish", () => {
   });
 });
 
+describe("a stored category the store deleted on the marketplace", () => {
+  function ifoodWith(listed: { id: string; name: string }[]) {
+    return scriptedHttp((request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok" }) };
+      if (request.method === "GET") return { status: 200, body: JSON.stringify(listed) };
+      if (request.method === "PUT") {
+        const used = JSON.parse(request.body ?? "{}").item.categoryId as string;
+        return listed.some((category) => category.id === used) ? { status: 200, body: "{}" } : { status: 404, body: "category" };
+      }
+      return { status: 201, body: JSON.stringify({ id: "cat-created", name: "Burgers" }) };
+    });
+  }
+  function storedCategory(h: Harness, externalId: string) {
+    h.memory.tables.marketplaceCatalogueCategory.rows.push({
+      id: "stored-1",
+      clientId: TENANT,
+      provider: "IFOOD",
+      name: "Burgers",
+      externalId,
+      claimedAt: null,
+    });
+  }
+
+  it("forgets the stale id, finds the category again and publishes into it", async () => {
+    const http = ifoodWith([{ id: "cat-new", name: "Burgers" }]);
+    const h = createHarness({ http, catalogue: hostCatalogue({ "p-1": { ...BURGER, imageUrl: null } }) });
+    await h.connect("IFOOD");
+    storedCategory(h, "cat-gone");
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    await runLatest(h);
+
+    const puts = http.requests.filter((request) => request.method === "PUT");
+    expect(puts.map((request) => JSON.parse(request.body ?? "{}").item.categoryId)).toEqual(["cat-gone", "cat-new"]);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "PUBLISHED" });
+    expect(h.memory.tables.marketplaceCatalogueCategory.rows[0]).toMatchObject({ externalId: "cat-new" });
+  });
+
+  it("keeps the stored id and the refusal when the category is still there", async () => {
+    const http = scriptedHttp((request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok" }) };
+      if (request.method === "GET") return { status: 200, body: JSON.stringify([{ id: "cat-1", name: "Burgers" }]) };
+      return { status: 400, body: "price missing" };
+    });
+    const h = createHarness({ http, catalogue: hostCatalogue({ "p-1": { ...BURGER, imageUrl: null } }) });
+    await h.connect("IFOOD");
+    storedCategory(h, "cat-1");
+    await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+
+    await runLatest(h);
+
+    expect(http.requests.filter((request) => request.method === "PUT")).toHaveLength(1);
+    expect(await stateOf(h, "IFOOD")).toMatchObject({ status: "FAILED", failureCode: "REFUSED", failureReason: "price missing" });
+    expect(h.memory.tables.marketplaceCatalogueCategory.rows[0]).toMatchObject({ externalId: "cat-1" });
+  });
+});
+
 describe("a host with no catalogue port", () => {
   it("answers UNSUPPORTED and states no mode, though iFood's adapter is push", async () => {
     const h = createHarness({ http: scriptedHttp([{ status: 200, body: "{}" }]) });

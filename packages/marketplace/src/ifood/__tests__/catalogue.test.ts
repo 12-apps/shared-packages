@@ -41,6 +41,7 @@ function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpRes
     externalMerchantId: "m-1",
     loadImage: async () => image,
     category: (_name, resolve) => resolve(),
+    forgetCategory: async () => undefined,
   };
   return { ctx, requests: recorded };
 }

@@ -1,4 +1,4 @@
-import { resolveCategory, type CategoryRunState } from "./catalogue-category";
+import { forgetCategory, resolveCategory, type CategoryRunState } from "./catalogue-category";
 import type { CatalogueCallContext, CatalogueWarningCode } from "./catalogue-port";
 import { connectionMerchantId, readOutboundConnection } from "./integration";
 import type { EngineContext, MarketplaceDb } from "./ports";
@@ -161,6 +161,7 @@ export async function catalogueConnection(
       externalMerchantId: merchantId,
       loadImage: (url) => (catalogue ? catalogue.image(url) : Promise.resolve(null)),
       category: (name, resolve) => resolveCategory(ctx, { clientId, provider }, name, resolve, categoryState),
+      forgetCategory: (name) => forgetCategory(ctx, { clientId, provider }, name),
     };
   } catch (error) {
     ctx.ports.logger.error(

@@ -121,6 +121,7 @@ there, chosen in the adapter's code and marked so beside it.
 | `item.productId` names the item's product, and `products[].imagePath` carries the uploaded photo | ESTIMATED (the pages read show neither field on a full example; the Errors page names `imagePath` as what the item carries) |
 | OFF is the item paused (`UNAVAILABLE`): no item delete is listed on the Endpoints page; a paused item is not shown in the app | ESTIMATED as the meaning of "removed"; the call is CONFIRMED |
 | A 404 on the withdraw means the item is already out | ESTIMATED |
+| A category the store deleted on iFood's portal makes `PUT /items` answer 400 or 404; then the list is read again, and a category of that name with another id (or none) means the stored id is stale: it is forgotten, found or created again, and the PUT sent once more | ESTIMATED (the Errors page does not say which id a 400/404 is about) |
 | A publish lands in the DEFAULT (delivery) context only; no `contextModifiers` are sent | choice |
 
 **99Food — pull, Open Delivery v1.7.1** (`src/99food/catalogue.ts`)
