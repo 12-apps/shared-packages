@@ -5,6 +5,7 @@ import type { Hosts } from './app';
 import { CHAT_MOUNT_PATH } from './chat-host';
 import { ROUTING_MOUNT_PATH } from './routing-host';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
+import { FISCAL_MOUNT_PATH } from './fiscal-host';
 import { MARKETPLACE_MOUNT_PATH } from './marketplace-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
@@ -38,6 +39,8 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // `/admin/:tenantSlug/marketplace`) that no broader mount below may claim
   // first. The webhook is unauthenticated by design; the bridge asks no actor.
   app.route(MARKETPLACE_MOUNT_PATH, hosts.marketplace.router);
+  // @12-apps/fiscal (FUT-2237) the same way: every path is a literal `/fiscal/…`.
+  app.route(FISCAL_MOUNT_PATH, hosts.fiscal.router);
 
   // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
   // reversing these two blocks is a red test, not a silent 404.

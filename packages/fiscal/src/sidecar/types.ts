@@ -70,6 +70,16 @@ export interface CancelRequest extends Authenticated {
   readonly reason: string;
 }
 
+/**
+ * `POST /nfce/cancel-substitution`: the NFC-e "cancelamento por substituição"
+ * (event 110112) — an online NFC-e found authorised after its sale was issued
+ * again in contingency, cancelled naming the substitute. Answers as `/cancel`.
+ */
+export interface CancelBySubstitutionRequest extends CancelRequest {
+  /** The contingency document that replaced it (`chNFeRef`). */
+  readonly substituteAccessKey: string;
+}
+
 /** `POST /<model>/lookup`. */
 export interface LookupRequest extends Authenticated {
   readonly accessKey: string;

@@ -1,0 +1,27 @@
+{
+    "path": "/inutilize",
+    "request": {
+        "environment": "homologacao",
+        "model": "nfce",
+        "uf": "SP",
+        "cnpj": "11222333000181",
+        "year": 2026,
+        "series": 1,
+        "from": 1300,
+        "to": 1305,
+        "reason": "Numbers skipped by a failed batch"
+    },
+    "status": 422,
+    "body": {
+        "error": {
+            "class": "REJECTED",
+            "code": "241",
+            "message": "SEFAZ [241] Rejeição: Um número da faixa já foi utilizado",
+            "details": [],
+            "accessKey": null,
+            "signedXml": null,
+            "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4\"><retInutNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infInut><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>241</cStat><xMotivo>Rejeição: Um número da faixa já foi utilizado</xMotivo><cUF>35</cUF><dhRecbto>2026-11-20T14:00:00-03:00</dhRecbto></infInut></retInutNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+            "outcomeUnknown": false
+        }
+    }
+}

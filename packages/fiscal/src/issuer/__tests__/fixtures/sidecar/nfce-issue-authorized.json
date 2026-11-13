@@ -1,0 +1,175 @@
+{
+    "path": "/nfce/issue",
+    "request": {
+        "environment": "homologacao",
+        "document": {
+            "version": 1,
+            "series": 1,
+            "number": 1201,
+            "keyCode": "48213907",
+            "issuedAt": "2026-11-20T12:30:00-03:00",
+            "operationNature": "VENDA",
+            "purpose": "NORMAL",
+            "destination": "INTERNAL",
+            "presence": "IN_PERSON",
+            "finalConsumer": true,
+            "intermediary": null,
+            "issuer": {
+                "cnpj": "11222333000181",
+                "stateRegistration": "123456789012",
+                "legalName": "EXAMPLE FOODS LTDA",
+                "tradeName": "Example Foods",
+                "taxRegime": "SIMPLES",
+                "address": {
+                    "street": "Rua das Flores",
+                    "number": "100",
+                    "complement": null,
+                    "district": "Centro",
+                    "municipalityIbge": "3550308",
+                    "municipalityName": "Sao Paulo",
+                    "uf": "SP",
+                    "postalCode": "01001000",
+                    "phone": "1133334444"
+                }
+            },
+            "buyer": null,
+            "lines": [
+                {
+                    "id": "line-1",
+                    "code": "SKU-1",
+                    "gtin": null,
+                    "description": "Sandwich",
+                    "ncm": "21069090",
+                    "cest": null,
+                    "cfop": "5102",
+                    "unit": "UN",
+                    "quantity": 2,
+                    "valueCents": 3990,
+                    "discountCents": 0,
+                    "approximateTaxCents": 523,
+                    "additionalInfo": null,
+                    "icms": {
+                        "regime": "SIMPLES",
+                        "origin": 0,
+                        "csosn": "102"
+                    },
+                    "pis": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "cofins": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "ibsCbs": {
+                        "cst": "000",
+                        "classCode": "000001",
+                        "figures": {
+                            "baseCents": 3990,
+                            "reductionBp": 0,
+                            "cbsRateBp": 90,
+                            "cbsCents": 36,
+                            "ibsUfRateBp": 10,
+                            "ibsUfCents": 4,
+                            "ibsMunRateBp": 0,
+                            "ibsMunCents": 0
+                        }
+                    }
+                },
+                {
+                    "id": "line-2",
+                    "code": "SKU-2",
+                    "gtin": null,
+                    "description": "Orange juice",
+                    "ncm": "20091200",
+                    "cest": null,
+                    "cfop": "5102",
+                    "unit": "UN",
+                    "quantity": 1,
+                    "valueCents": 1200,
+                    "discountCents": 100,
+                    "approximateTaxCents": null,
+                    "additionalInfo": "Fresh",
+                    "icms": {
+                        "regime": "SIMPLES",
+                        "origin": 0,
+                        "csosn": "102"
+                    },
+                    "pis": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "cofins": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "ibsCbs": {
+                        "cst": "200",
+                        "classCode": "200047",
+                        "figures": {
+                            "baseCents": 1100,
+                            "reductionBp": 4000,
+                            "cbsRateBp": 90,
+                            "cbsCents": 6,
+                            "ibsUfRateBp": 10,
+                            "ibsUfCents": 1,
+                            "ibsMunRateBp": 0,
+                            "ibsMunCents": 0
+                        }
+                    }
+                }
+            ],
+            "freight": "NONE",
+            "payments": [
+                {
+                    "method": "CREDIT_CARD",
+                    "amountCents": 4000,
+                    "card": {
+                        "integrated": false,
+                        "acquirerCnpj": null,
+                        "brand": "01",
+                        "authorizationCode": "A1B2C3"
+                    },
+                    "description": null
+                },
+                {
+                    "method": "CASH",
+                    "amountCents": 1500,
+                    "card": null,
+                    "description": null
+                }
+            ],
+            "changeCents": 410,
+            "additionalInfo": {
+                "forTaxpayer": "Thank you",
+                "forTaxAuthority": null
+            },
+            "technicalResponsible": {
+                "cnpj": "11222333000181",
+                "contactName": "Support Desk",
+                "email": "support@example.com",
+                "phone": "1133334444"
+            }
+        }
+    },
+    "status": 200,
+    "body": {
+        "statusCode": "100",
+        "statusReason": "Autorizado o uso da NF-e",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4\"><retEnviNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>104</cStat><xMotivo>Lote processado</xMotivo><cUF>35</cUF><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><chNFe>35261111222333000181650010000012011482139076</chNFe><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><nProt>135260000123456</nProt><digVal>Ci2VwcDN4DA9ZfC8mCRQ/WGzgqM=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+        "status": "AUTHORIZED",
+        "accessKey": "35261111222333000181650010000012011482139076",
+        "protocol": "135260000123456",
+        "authorizedAt": "2026-11-20T12:30:05-03:00",
+        "signedXml": "<?xml version=\"1.0\"?><NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infNFe Id=\"NFe35261111222333000181650010000012011482139076\" versao=\"4.00\"><ide><cUF>35</cUF><cNF>48213907</cNF><natOp>VENDA</natOp><mod>65</mod><serie>1</serie><nNF>1201</nNF><dhEmi>2026-11-20T12:30:00-03:00</dhEmi><tpNF>1</tpNF><idDest>1</idDest><cMunFG>3550308</cMunFG><tpImp>4</tpImp><tpEmis>1</tpEmis><cDV>6</cDV><tpAmb>2</tpAmb><finNFe>1</finNFe><indFinal>1</indFinal><indPres>1</indPres><procEmi>0</procEmi><verProc>fiscal-sidecar-1</verProc></ide><emit><CNPJ>11222333000181</CNPJ><xNome>EXAMPLE FOODS LTDA</xNome><xFant>Example Foods</xFant><enderEmit><xLgr>Rua das Flores</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>Sao Paulo</xMun><UF>SP</UF><CEP>01001000</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>1133334444</fone></enderEmit><IE>123456789012</IE><CRT>1</CRT></emit><det nItem=\"1\"><prod><cProd>SKU-1</cProd><cEAN>SEM GTIN</cEAN><xProd>NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</xProd><NCM>21069090</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>19.9500000000</vUnCom><vProd>39.90</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>2.0000</qTrib><vUnTrib>19.9500000000</vUnTrib><indTot>1</indTot></prod><imposto><vTotTrib>5.23</vTotTrib><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>39.90</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>0.04</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.04</vIBS><gCBS><pCBS>0.9000</pCBS><vCBS>0.36</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>39.90</vItem></det><det nItem=\"2\"><prod><cProd>SKU-2</cProd><cEAN>SEM GTIN</cEAN><xProd>Orange juice</xProd><NCM>20091200</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>1.0000</qCom><vUnCom>12.0000000000</vUnCom><vProd>12.00</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>1.0000</qTrib><vUnTrib>12.0000000000</vUnTrib><vDesc>1.00</vDesc><indTot>1</indTot></prod><imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>200</CST><cClassTrib>200047</cClassTrib><gIBSCBS><vBC>11.00</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0600</pAliqEfet></gRed><vIBSUF>0.01</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0000</pAliqEfet></gRed><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.01</vIBS><gCBS><pCBS>0.9000</pCBS><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.5400</pAliqEfet></gRed><vCBS>0.06</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><infAdProd>Fresh</infAdProd><vItem>11.00</vItem></det><total><ICMSTot><vBC>0.00</vBC><vICMS>0.00</vICMS><vICMSDeson>0.00</vICMSDeson><vFCP>0.00</vFCP><vBCST>0.00</vBCST><vST>0.00</vST><vFCPST>0.00</vFCPST><vFCPSTRet>0.00</vFCPSTRet><vProd>51.90</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>1.00</vDesc><vII>0.00</vII><vIPI>0.00</vIPI><vIPIDevol>0.00</vIPIDevol><vPIS>0.00</vPIS><vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>50.90</vNF><vTotTrib>5.23</vTotTrib></ICMSTot><IBSCBSTot><vBCIBSCBS>50.90</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>0.05</vIBSUF></gIBSUF><gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.05</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS><gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>0.42</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS><gMono><vIBSMono>0.00</vIBSMono><vCBSMono>0.00</vCBSMono><vIBSMonoReten>0.00</vIBSMonoReten><vCBSMonoReten>0.00</vCBSMonoReten><vIBSMonoRet>0.00</vIBSMonoRet><vCBSMonoRet>0.00</vCBSMonoRet></gMono></IBSCBSTot><vNFTot>50.90</vNFTot></total><transp><modFrete>9</modFrete></transp><pag><detPag><tPag>03</tPag><vPag>40.00</vPag><card><tpIntegra>2</tpIntegra><tBand>01</tBand><cAut>A1B2C3</cAut></card></detPag><detPag><tPag>01</tPag><vPag>15.00</vPag></detPag><vTroco>4.10</vTroco></pag><infAdic><infCpl>Thank you</infCpl></infAdic><infRespTec><CNPJ>11222333000181</CNPJ><xContato>Support Desk</xContato><email>support@example.com</email><fone>1133334444</fone></infRespTec></infNFe><infNFeSupl><qrCode>https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode?p=35261111222333000181650010000012011482139076|3|2</qrCode><urlChave>https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica</urlChave></infNFeSupl><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/><SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/><Reference URI=\"#NFe35261111222333000181650010000012011482139076\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/><DigestValue>Ci2VwcDN4DA9ZfC8mCRQ/WGzgqM=</DigestValue></Reference></SignedInfo><SignatureValue>TJy8HaZaHGMLXg/nA+6w+qR840af8LjXgDKr96CVj4LeufCi1nX+Q6tJg01BnSyJcatFERIWjV5WzTngSyTfHxDddgXPZ6Im0bHBtL5+TNmva8rTzZgqrr0hnI0w/EJDQ+ZotH8qz/ZeCfuXXL3kdvUvYi/2atIoL1miV9c0nRFpMZmHfxqqh+dKgYCR41JJHhotvACZTNhcgQuoIWDwpXFSqDJJ12+v0YWjm4Ym08IOpJ/vctgApGvEm/SM4HghAjrZhaL6dKlPEPXD/qMqO3xKVkkK6u1H6Eo9QboRrm4jRIZtse4dYl9w1Bd1DK1RwDs8a9k8HQTpIRWsnkFfyg==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDKDCCAhCgAwIBAgIIfUQHTgKcTJMwDQYJKoZIhvcNAQELBQAwMzEkMCIGA1UEAwwbVEVTVCBDT01QQU5ZOjExMjIyMzMzMDAwMTgxMQswCQYDVQQGEwJCUjAeFw0yNjExMTMxOTA5NDJaFw0yNjEyMTMxOTA5NDJaMDMxJDAiBgNVBAMMG1RFU1QgQ09NUEFOWToxMTIyMjMzMzAwMDE4MTELMAkGA1UEBhMCQlIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0wHuq472oKfA64JLL5D9/aSMrke7wdTXG+SxLcc+5DywVjTQBS5SHbp+v6M0O89jhmR9eJtA88pmpJ2fZ9j6/A7MsXSZejxuzg8L9LKYvED7ImOCi3zBqHP4ufH0N3Y/rdltAlKQkVmkE6sZhzIeBFH0pV8cMn5kZZYpi4dd0gF1HjQH5O39PwcK56wk87EU1rgU6NMEc9sMoE5OzDTsfTaXyxkwnhqtN5LG7GWmwvkfKIaegbUz19EYeRfR1ONL/cWKaKptQ4ywhcnpIrTvgxrk9xMkVSztkn1hgkYDS37w7r+0tKWiTbhta+lhKGYNHlCenBBRtbiZPDhVAUd21AgMBAAGjQDA+MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMCQGA1UdEQQdMBugGQYFYEwBAwOgEBMOMTEyMjIzMzMwMDAxODEwDQYJKoZIhvcNAQELBQADggEBALNnqeZd4tPj9HwhUlJ6hjgZeOXmW3E5YMLvZP4yJH/MRZxJvxWsbwLG9+RIwsPvzSiORLJd1FvddSudsqyOzTfuLMjZ/YsNSR6zWmh7wzNsn4PTBSOW7GDLUPUX2e2nNrt2oyMGHEY0Uxcwbd+v22x47YcG9KEi8DteSYxCXPamWLi3gCloLJygQ9oDf78ZhteD6IG4bYHP45lepFvn0Zyu5wOI8NVCREWhhF0TRWv8HMJRkOWVqF4PmvNcZZSezthY/DRIUATktk8x0yly+onooAU5bvjGnqZU9albOnR1UKtO3kkkVJM/h/W4MdZtg3CnlF2vy6/tWDFtXvEuZuc=</X509Certificate></X509Data></KeyInfo></Signature></NFe>",
+        "authorizedXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><nfeProc versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infNFe Id=\"NFe35261111222333000181650010000012011482139076\" versao=\"4.00\"><ide><cUF>35</cUF><cNF>48213907</cNF><natOp>VENDA</natOp><mod>65</mod><serie>1</serie><nNF>1201</nNF><dhEmi>2026-11-20T12:30:00-03:00</dhEmi><tpNF>1</tpNF><idDest>1</idDest><cMunFG>3550308</cMunFG><tpImp>4</tpImp><tpEmis>1</tpEmis><cDV>6</cDV><tpAmb>2</tpAmb><finNFe>1</finNFe><indFinal>1</indFinal><indPres>1</indPres><procEmi>0</procEmi><verProc>fiscal-sidecar-1</verProc></ide><emit><CNPJ>11222333000181</CNPJ><xNome>EXAMPLE FOODS LTDA</xNome><xFant>Example Foods</xFant><enderEmit><xLgr>Rua das Flores</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>Sao Paulo</xMun><UF>SP</UF><CEP>01001000</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>1133334444</fone></enderEmit><IE>123456789012</IE><CRT>1</CRT></emit><det nItem=\"1\"><prod><cProd>SKU-1</cProd><cEAN>SEM GTIN</cEAN><xProd>NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</xProd><NCM>21069090</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>19.9500000000</vUnCom><vProd>39.90</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>2.0000</qTrib><vUnTrib>19.9500000000</vUnTrib><indTot>1</indTot></prod><imposto><vTotTrib>5.23</vTotTrib><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>39.90</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>0.04</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.04</vIBS><gCBS><pCBS>0.9000</pCBS><vCBS>0.36</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>39.90</vItem></det><det nItem=\"2\"><prod><cProd>SKU-2</cProd><cEAN>SEM GTIN</cEAN><xProd>Orange juice</xProd><NCM>20091200</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>1.0000</qCom><vUnCom>12.0000000000</vUnCom><vProd>12.00</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>1.0000</qTrib><vUnTrib>12.0000000000</vUnTrib><vDesc>1.00</vDesc><indTot>1</indTot></prod><imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>200</CST><cClassTrib>200047</cClassTrib><gIBSCBS><vBC>11.00</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0600</pAliqEfet></gRed><vIBSUF>0.01</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0000</pAliqEfet></gRed><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.01</vIBS><gCBS><pCBS>0.9000</pCBS><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.5400</pAliqEfet></gRed><vCBS>0.06</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><infAdProd>Fresh</infAdProd><vItem>11.00</vItem></det><total><ICMSTot><vBC>0.00</vBC><vICMS>0.00</vICMS><vICMSDeson>0.00</vICMSDeson><vFCP>0.00</vFCP><vBCST>0.00</vBCST><vST>0.00</vST><vFCPST>0.00</vFCPST><vFCPSTRet>0.00</vFCPSTRet><vProd>51.90</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>1.00</vDesc><vII>0.00</vII><vIPI>0.00</vIPI><vIPIDevol>0.00</vIPIDevol><vPIS>0.00</vPIS><vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>50.90</vNF><vTotTrib>5.23</vTotTrib></ICMSTot><IBSCBSTot><vBCIBSCBS>50.90</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>0.05</vIBSUF></gIBSUF><gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.05</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS><gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>0.42</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS><gMono><vIBSMono>0.00</vIBSMono><vCBSMono>0.00</vCBSMono><vIBSMonoReten>0.00</vIBSMonoReten><vCBSMonoReten>0.00</vCBSMonoReten><vIBSMonoRet>0.00</vIBSMonoRet><vCBSMonoRet>0.00</vCBSMonoRet></gMono></IBSCBSTot><vNFTot>50.90</vNFTot></total><transp><modFrete>9</modFrete></transp><pag><detPag><tPag>03</tPag><vPag>40.00</vPag><card><tpIntegra>2</tpIntegra><tBand>01</tBand><cAut>A1B2C3</cAut></card></detPag><detPag><tPag>01</tPag><vPag>15.00</vPag></detPag><vTroco>4.10</vTroco></pag><infAdic><infCpl>Thank you</infCpl></infAdic><infRespTec><CNPJ>11222333000181</CNPJ><xContato>Support Desk</xContato><email>support@example.com</email><fone>1133334444</fone></infRespTec></infNFe><infNFeSupl><qrCode>https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode?p=35261111222333000181650010000012011482139076|3|2</qrCode><urlChave>https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica</urlChave></infNFeSupl><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/><SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/><Reference URI=\"#NFe35261111222333000181650010000012011482139076\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/><DigestValue>Ci2VwcDN4DA9ZfC8mCRQ/WGzgqM=</DigestValue></Reference></SignedInfo><SignatureValue>TJy8HaZaHGMLXg/nA+6w+qR840af8LjXgDKr96CVj4LeufCi1nX+Q6tJg01BnSyJcatFERIWjV5WzTngSyTfHxDddgXPZ6Im0bHBtL5+TNmva8rTzZgqrr0hnI0w/EJDQ+ZotH8qz/ZeCfuXXL3kdvUvYi/2atIoL1miV9c0nRFpMZmHfxqqh+dKgYCR41JJHhotvACZTNhcgQuoIWDwpXFSqDJJ12+v0YWjm4Ym08IOpJ/vctgApGvEm/SM4HghAjrZhaL6dKlPEPXD/qMqO3xKVkkK6u1H6Eo9QboRrm4jRIZtse4dYl9w1Bd1DK1RwDs8a9k8HQTpIRWsnkFfyg==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDKDCCAhCgAwIBAgIIfUQHTgKcTJMwDQYJKoZIhvcNAQELBQAwMzEkMCIGA1UEAwwbVEVTVCBDT01QQU5ZOjExMjIyMzMzMDAwMTgxMQswCQYDVQQGEwJCUjAeFw0yNjExMTMxOTA5NDJaFw0yNjEyMTMxOTA5NDJaMDMxJDAiBgNVBAMMG1RFU1QgQ09NUEFOWToxMTIyMjMzMzAwMDE4MTELMAkGA1UEBhMCQlIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0wHuq472oKfA64JLL5D9/aSMrke7wdTXG+SxLcc+5DywVjTQBS5SHbp+v6M0O89jhmR9eJtA88pmpJ2fZ9j6/A7MsXSZejxuzg8L9LKYvED7ImOCi3zBqHP4ufH0N3Y/rdltAlKQkVmkE6sZhzIeBFH0pV8cMn5kZZYpi4dd0gF1HjQH5O39PwcK56wk87EU1rgU6NMEc9sMoE5OzDTsfTaXyxkwnhqtN5LG7GWmwvkfKIaegbUz19EYeRfR1ONL/cWKaKptQ4ywhcnpIrTvgxrk9xMkVSztkn1hgkYDS37w7r+0tKWiTbhta+lhKGYNHlCenBBRtbiZPDhVAUd21AgMBAAGjQDA+MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMCQGA1UdEQQdMBugGQYFYEwBAwOgEBMOMTEyMjIzMzMwMDAxODEwDQYJKoZIhvcNAQELBQADggEBALNnqeZd4tPj9HwhUlJ6hjgZeOXmW3E5YMLvZP4yJH/MRZxJvxWsbwLG9+RIwsPvzSiORLJd1FvddSudsqyOzTfuLMjZ/YsNSR6zWmh7wzNsn4PTBSOW7GDLUPUX2e2nNrt2oyMGHEY0Uxcwbd+v22x47YcG9KEi8DteSYxCXPamWLi3gCloLJygQ9oDf78ZhteD6IG4bYHP45lepFvn0Zyu5wOI8NVCREWhhF0TRWv8HMJRkOWVqF4PmvNcZZSezthY/DRIUATktk8x0yly+onooAU5bvjGnqZU9albOnR1UKtO3kkkVJM/h/W4MdZtg3CnlF2vy6/tWDFtXvEuZuc=</X509Certificate></X509Data></KeyInfo></Signature></NFe><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><chNFe>35261111222333000181650010000012011482139076</chNFe><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><nProt>135260000123456</nProt><digVal>Ci2VwcDN4DA9ZfC8mCRQ/WGzgqM=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>"
+    }
+}

@@ -28,6 +28,7 @@ SEFAZ carries `environment` (`homologacao` | `producao`) and `certificate`
 | `POST /nfce/sign-contingency` | the same, plus `contingency: { since, reason }`; builds and signs with `tpEmis = 9`, sends nothing | `SIGNED`: `accessKey`, `signedXml` |
 | `POST /<model>/transmit` | `{ environment, certificate, signedXml }` | as `/issue` |
 | `POST /<model>/cancel` | `{ environment, certificate, accessKey, protocol, reason }` | `CANCELLED`: the event's `protocol`, `registeredAt`, `eventXml` (each `null` when a retried cancel is settled by a lookup that does not carry them) |
+| `POST /nfce/cancel-substitution` | the cancel's body plus `substituteAccessKey`: the NFC-e "cancelamento por substituição" (event 110112), for an online NFC-e found authorised after its sale was issued again in contingency | as `/cancel` |
 | `POST /<model>/lookup` | `{ environment, certificate, accessKey }` | `AUTHORIZED`, `CANCELLED`, `DENIED` or `NOT_FOUND`, with the authorisation `protocol` |
 | `POST /inutilize` | `{ environment, certificate, model, uf, cnpj, year, series, from, to, reason }` | `INUTILIZED`: `protocol`, `registeredAt`, `inutilizationXml` (`protocol` and the XML `null` on a retry SEFAZ answers 563) |
 | `GET /health` | | `{ status: "ok", libraries, nfeSchemas, sefazTlsVerify }` |

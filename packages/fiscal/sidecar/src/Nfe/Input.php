@@ -87,11 +87,11 @@ final class Input
         return ['since' => $since, 'reason' => trim($reason)];
     }
 
-    public function accessKey(): string
+    public function accessKey(string $field = 'accessKey'): string
     {
-        $key = $this->body['accessKey'] ?? null;
+        $key = $this->body[$field] ?? null;
         if (!is_string($key) || preg_match('/^[0-9]{6}[A-Z0-9]{12}[0-9]{26}$/', $key) !== 1) {
-            throw ServiceError::invalid('accessKey must be the 44-character access key.');
+            throw ServiceError::invalid("$field must be the 44-character access key.");
         }
         return $key;
     }
