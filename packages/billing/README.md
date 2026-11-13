@@ -85,7 +85,10 @@ while an attempt is in flight. The host's two writes are conditional, so a late
 "pending" never overwrites a refund. Keep the series rows apart from any other
 refund's: `runDue` drives every due row of the store it is given through this
 binding. A provider PENDING snapshot is recorded as refunded, `confirmed:
-false`; the host confirms it from the provider's refund notification. WHEN a
+false`, and `confirmDue` follows it: the charge read back as refunded confirms
+it; still unfinished after the host's `confirmations.confirmWithinMs`, it is
+reopened as pending (`NOT_CONFIRMED`), asked for again so a person's retry is a
+new request. WHEN a
 payment is refundable, what a cancel does to the plan and who may settle are
 the host's.
 
@@ -95,6 +98,7 @@ await refunds.refund(paymentId, { reason: "withdrawal" }); // REFUNDED | PENDING
 await refunds.retry(paymentId);                            // a person, after a refusal
 await refunds.settleByHand(paymentId, { by, via, reason });
 await refunds.runDue();                                    // the host's sweep
+await refunds.confirmDue();                                // …and its other half
 ```
 
 Nothing here has a parameter a card could travel in. The number goes from the

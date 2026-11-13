@@ -32,7 +32,12 @@ export type RefundPendingReason =
   /** The platform has no usable credentials at that provider any more. Nothing was sent. */
   | "NO_CREDENTIALS"
   /** The payment is paid but carries no provider charge (recorded by hand, say). */
-  | "NO_CHARGE";
+  | "NO_CHARGE"
+  /**
+   * The provider accepted a refund it then never confirmed: the charge still
+   * read as paid when the host's confirmation deadline passed (`confirmDue`).
+   */
+  | "NOT_CONFIRMED";
 
 /** One subscription payment, as the host's own row maps onto it. */
 export interface RefundablePayment {
@@ -98,6 +103,39 @@ export interface RefundablePaymentStore {
   markRefundPending(paymentId: string, record: RefundPendingRecord): Promise<boolean>;
 }
 
+/** A refund recorded unconfirmed (`confirmed: false`), waiting for the provider to finish it. */
+export interface UnconfirmedRefund {
+  id: string;
+  provider: string | null;
+  providerChargeId: string | null;
+  /** When the refund was recorded: the confirmation deadline counts from here. */
+  refundedAt: Date;
+}
+
+/**
+ * The host's rows of refunds recorded unconfirmed. Both writes are conditional
+ * on the row still being REFUNDED and unconfirmed, and answer whether they wrote.
+ */
+export interface RefundConfirmationStore {
+  /** Unconfirmed refunds, oldest first. */
+  unconfirmed(limit: number): Promise<readonly UnconfirmedRefund[]>;
+  /** The provider finished it: mark it confirmed. */
+  confirm(paymentId: string, at: Date): Promise<boolean>;
+  /**
+   * The provider never finished it: REFUNDED → REFUND_PENDING, the refund asked
+   * for again at `record.at` (the payment's new `requestedAt`), for a person.
+   */
+  reopen(paymentId: string, record: RefundPendingRecord): Promise<boolean>;
+}
+
+/** What one `confirmDue` pass came to. */
+export interface ConfirmationPass {
+  confirmed: number;
+  reopened: number;
+  /** Still processing at the provider, inside the deadline. */
+  waiting: number;
+}
+
 /** Why nothing was asked of the provider. */
 export type NotRefundableWhy =
   | "NOT_FOUND"
@@ -132,6 +170,13 @@ export interface SubscriptionRefund {
   settleByHand(paymentId: string, byHand: { by: string; via: string; reason: string }): Promise<SettleByHandResult>;
   /** The sweep: run the background attempts that are due. Answers how many were looked at. */
   runDue(limit?: number): Promise<number>;
+  /**
+   * The sweep's other half: follow the refunds recorded unconfirmed. The charge
+   * read REFUNDED (or CANCELED) confirms one; one still unfinished when
+   * `confirmations.confirmWithinMs` has passed is reopened as pending
+   * (`NOT_CONFIRMED`) for a person. Needs `confirmations`.
+   */
+  confirmDue(limit?: number): Promise<ConfirmationPass>;
 }
 
 export interface SubscriptionRefundDeps {
@@ -156,6 +201,15 @@ export interface SubscriptionRefundDeps {
   attemptMs?: number;
   /** Where a series that gave up is reported (once per series). */
   onProviderFailure?: ProviderFailureReporter;
+  /**
+   * Following refunds the provider accepted but did not confirm. Required by
+   * `confirmDue`. `confirmWithinMs` is the host's commercial patience: how long
+   * a refund may stay unfinished at the provider before a person is asked.
+   */
+  confirmations?: {
+    store(): Promise<RefundConfirmationStore>;
+    confirmWithinMs: number;
+  };
 }
 
 /** What a subscription payment's series is opened under. */

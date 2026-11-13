@@ -22,6 +22,7 @@ import {
   type SubscriptionRefundDeps,
   type SubscriptionRefundResult,
 } from "./refund-ports";
+import { confirmDue } from "./refund-confirm";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -119,8 +120,10 @@ function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSer
     providerChargeId: payment.providerChargeId ?? "",
     reference: payment.id,
     subject: SUBSCRIPTION_REFUND_SUBJECT,
-    // A payment is refunded once: its series is bound to the payment itself.
-    boundTo: payment.id,
+    // Bound to the refund REQUEST: a refund reopened after the provider never
+    // confirmed it is asked for again at a new instant, so its series is a new
+    // one rather than the settled series of the first request.
+    boundTo: payment.requestedAt ? `${payment.id}@${payment.requestedAt.toISOString()}` : payment.id,
     cause: reason ?? null,
   };
 }
@@ -316,5 +319,6 @@ export function createSubscriptionRefund(deps: SubscriptionRefundDeps): Subscrip
     retry: async (paymentId) => retry(await ctx(), paymentId),
     settleByHand: async (paymentId, byHand) => settleByHand(await ctx(), paymentId, byHand),
     runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
+    confirmDue: (limit) => confirmDue(deps, limit),
   };
 }

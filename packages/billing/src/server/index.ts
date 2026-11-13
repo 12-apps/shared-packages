@@ -20,7 +20,10 @@ export {
 export { createSubscriptionRefund } from "./refund";
 export {
   SUBSCRIPTION_REFUND_SUBJECT,
+  type ConfirmationPass,
   type NotRefundableWhy,
+  type RefundConfirmationStore,
+  type UnconfirmedRefund,
   type RefundablePayment,
   type RefundablePaymentState,
   type RefundablePaymentStore,
