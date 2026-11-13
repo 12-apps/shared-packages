@@ -6,6 +6,7 @@ namespace Fiscal\Sidecar\Tests\Live;
 
 use Fiscal\Sidecar\Http\Request;
 use Fiscal\Sidecar\Kernel;
+use Fiscal\Sidecar\Nfe\Transport\CurlTransport;
 use Fiscal\Sidecar\RequestLog;
 use Fiscal\Sidecar\Tests\Support\Fixtures;
 use NFePHP\Common\TimeZoneByUF;
@@ -53,6 +54,13 @@ final class HomologacaoTest extends TestCase
                 'Live SEFAZ homologação suite skipped: set ' . implode(', ', $missing)
                 . ' (a real A1 of a CNPJ accredited for NFC-e, and its homologação CSC).',
             );
+        }
+        // The acceptance proves the trust store too: it never runs unverified.
+        self::assertTrue(CurlTransport::verifiesFromEnvironment(), 'unset FISCAL_SEFAZ_TLS_VERIFY=off: the live suite runs verified');
+        $base = (string) getenv('FISCAL_TEST_BASE_URL');
+        if ($base !== '') {
+            $health = json_decode((string) @file_get_contents(rtrim($base, '/') . '/health'), true);
+            self::assertTrue($health['sefazTlsVerify'] ?? false, 'the running service must verify SEFAZ (sefazTlsVerify)');
         }
     }
 
