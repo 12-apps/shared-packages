@@ -2,7 +2,7 @@
 
 One integration engine for every marketplace a store sells through. Each
 marketplace is an **adapter** on that engine, shipped inside this package at
-its own subpath (`@12-apps/marketplace/ifood` today).
+its own subpath (`@12-apps/marketplace/ifood`, `@12-apps/marketplace/99food`).
 
 ```ts
 import { createMarketplaceEngine } from "@12-apps/marketplace";
@@ -44,8 +44,9 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | **SKU map** | External SKU → host catalog id, every SKU ever seen a row; mapping checks the id is the tenant's. |
 | **Integration settings** | Enabled, environment, merchant id, auto-accept, acknowledgement window; credentials sealed as one blob by the host's secrets port, never returned. A connection is archived (reversible, audited), never deleted. |
 | **Outbound engine** | The `marketplace.outbound` job: confirm after accept (with the preparation time where the marketplace takes one), cancellation request with the stored reason code and SKUs. 2xx done; a 4xx other than 408/425/429 refused and final; anything else retried until the last attempt, which ends FAILED whatever went wrong. Stamps `confirmed_at`, `confirm_failed_at`, `cancellation_status` (PENDING, REQUESTED, CONFIRMED, FAILED). Idempotent by the row. Queued BEFORE the host's half runs, and the `marketplace.outbound-sweep` job re-queues every call still owed, so nothing is lost. The same sweep fails a request still waiting (never delivered, or delivered and unanswered) as TIMEOUT once past its answer window, and its retries stop (the adapter's `cancellationAnswerWindowMs`, or the engine's `cancellationWindowMs`), so no request waits forever. |
+| **Order fetch** | For a marketplace whose events name an order without carrying it (Open Delivery's `CREATED`), the adapter marks the event `orderToFetch`: the webhook records it PENDING and queues `marketplace.fetch-order`, which calls the adapter's `fetchOrder` and ingests through the same ingest path. No request calls out; the reconciliation sweep re-queues a row still owed, and a host that holds the job holds every fetch. |
 | **Inbound outcomes** | A marketplace CANCELLED confirms a pending request; CANCELLATION_REQUEST_FAILED marks it FAILED; CONFIRMED is terminal. |
-| **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, and `capabilities`. |
+| **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, `capabilities`, and the optional `fetchOrder`. |
 
 ## Subpaths
 
@@ -54,6 +55,8 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | `@12-apps/marketplace` | the engine, the adapter port and registry, every type |
 | `@12-apps/marketplace/ifood` | `createIfoodAdapter({ copy })` |
 | `@12-apps/marketplace/ifood/pt-BR`, `/en-US` | the iFood adapter's copy packs (reason labels, "no street number") |
+| `@12-apps/marketplace/99food` | `createNinetyNineFoodAdapter({ copy, apiBaseUrl, portalUrl })`, provider `NINETY_NINE_FOOD`, on Open Delivery |
+| `@12-apps/marketplace/99food/pt-BR`, `/en-US` | the 99Food adapter's copy packs |
 | `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS` (six: a read and a bulk write per entity), `MARKETPLACE_PERMISSIONS`, the strict Zod inputs |
 | `@12-apps/marketplace/server/pt-BR`, `/en-US` | the routes' copy packs |
 | `@12-apps/marketplace/hono` | `marketplaceRouter(config)` — the routes as one Hono router (`hono` is an optional peer) |
@@ -67,3 +70,46 @@ fields and reason codes come from the portal's search snippets (2026-11-11).
 They live only in `src/ifood/outbound.ts` and `src/ifood/copy.ts`, whose
 headers say so, so the homologation run corrects two files. Tests never reach
 iFood: the HTTP client is the host's port.
+
+## 99Food, on Open Delivery
+
+99Food completed Open Delivery (Abrasel) adherence, so its adapter speaks
+[Open Delivery v1.7.1](https://abrasel-nacional.github.io/opendelivery/openapi.yaml)
+and is registered as `NINETY_NINE_FOOD`. Its webhook is the engine's one
+route, `POST /webhooks/marketplace/:tenantSlug/NINETY_NINE_FOOD`.
+
+```ts
+import { createNinetyNineFoodAdapter } from "@12-apps/marketplace/99food";
+import { NINETY_NINE_FOOD_ADAPTER_COPY_PT_BR } from "@12-apps/marketplace/99food/pt-BR";
+
+createNinetyNineFoodAdapter({
+  copy: NINETY_NINE_FOOD_ADAPTER_COPY_PT_BR,
+  apiBaseUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" }, // from 99Food, at partner onboarding
+  portalUrl: "https://…",                                        // the merchant portal
+});
+```
+
+| part | from the spec |
+|---|---|
+| Webhook | `X-App-Signature`: lowercase hex HMAC-SHA256 of the body, keyed by the CLIENT SECRET. A connection stores that same value as its `webhookSecret`. The merchant is the `X-App-MerchantId` header; the engine attributes by the URL's store slug. |
+| Events | `CREATED` → fetch the order (`GET /v1/orders/{orderId}`); `CANCELLED` → cancelled (answers a pending request); `CANCELLATION_REQUEST_DENIED` → the request FAILED. The rest (`CONFIRMED`, `CANCELLATION_REQUESTED`, `ORDER_CANCELLATION_REQUEST`, `DISPATCHED`…) are recorded and IGNORED. |
+| Auth | `POST /oauth/token`, form-encoded `client_credentials`; the token is cached per process. |
+| Confirm | `POST /v1/orders/{orderId}/confirm` with `OrderConfirmed` (`orderExternalCode` = the host's order id, `createdAt`, `preparationTime` when stated). A 422 is "already received": done. |
+| Cancel | `POST /v1/orders/{orderId}/requestCancellation` with `{ reason, code, mode }`; the eleven merchant codes are the adapter's static reasons. 202, then an event. A 422 whose `cancellationStatus` is `CANCELLED` is done. |
+| Order | `total.orderAmount` is the gross total. The `Order` states no commission, so `commissionCents` is null. An item's options and instructions go into the line's note; a weighed item is one line at its total. |
+
+The fixtures are the spec's own examples (`src/99food/__tests__/fixtures.ts`).
+`src/99food/__tests__/engine.test.ts` drives the engine through the adapter
+end to end: event, fetch, ingest, aceite, confirm, cancel, the answer.
+
+**ESTIMATED, to be checked live once 99Food grants partner access:**
+
+- the base URLs and the portal: not public, so they are required config;
+- `OrderConfirmed.createdAt` is sent as the moment of the confirmation (the
+  spec's description of that field is copied from the order's);
+- the cancellation answer window, 5 minutes (the spec names none);
+- a token with no `expires_in` lives an hour (the field is optional);
+- `outOfStockItems` is not sent: the spec wants item uuids there, and the
+  engine keeps the marketplace's SKUs (`externalCode`);
+- that 99Food sends every event by webhook (Open Delivery also allows
+  polling, which this adapter does not do).
