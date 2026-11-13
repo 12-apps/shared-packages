@@ -377,11 +377,15 @@ function isSessionCookie(line: string): boolean {
   return line.startsWith("authjs.session-token=");
 }
 
-/** Every Set-Cookie with its value blanked, so two runs can be compared. */
+/**
+ * Every Set-Cookie with its value and its `Expires` date blanked, so two runs
+ * can be compared: the two round trips run at different moments, and a second
+ * boundary between them moves the session cookie's date (FUT-4897).
+ */
 function cookieShapes(response: Response): string[] {
   return response.headers
     .getSetCookie()
-    .map((line) => line.replace(/^([^=]+)=[^;]*/, "$1=<value>"))
+    .map((line) => line.replace(/^([^=]+)=[^;]*/, "$1=<value>").replace(/; Expires=[^;]*/, "; Expires=<date>"))
     .sort();
 }
 
