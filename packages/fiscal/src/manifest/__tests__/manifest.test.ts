@@ -36,8 +36,23 @@ describe("the fiscal manifest", () => {
   });
 
   it("ships the engine and the tables beside the manifest", () => {
-    expect(Object.keys(packageJson.exports)).toEqual(["./engine", "./manifest", "./tables/*", "./package.json"]);
+    expect(Object.keys(packageJson.exports)).toEqual([
+      "./engine",
+      "./manifest",
+      "./sale",
+      "./sidecar",
+      "./sidecar/schema/*",
+      "./tables/*",
+      "./package.json",
+    ]);
     expect(packageJson.files).toContain("tables");
+  });
+
+  it("ships the fiscal service's sources, never its installed dependencies or its tests", () => {
+    expect(packageJson.files).toContain("sidecar");
+    expect(packageJson.files).toEqual(
+      expect.arrayContaining(["!sidecar/vendor", "!sidecar/tests", "!sidecar/phpunit.xml"]),
+    );
   });
 
   it("is adopted by a server host, which collects the permissions", () => {
