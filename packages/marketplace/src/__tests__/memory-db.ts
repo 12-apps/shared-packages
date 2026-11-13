@@ -16,6 +16,8 @@ const COMPOUND_KEYS: Record<string, readonly string[]> = {
   provider_eventId: ["provider", "eventId"],
   clientId_provider: ["clientId", "provider"],
   clientId_provider_externalSku: ["clientId", "provider", "externalSku"],
+  clientId_provider_productId: ["clientId", "provider", "productId"],
+  clientId_provider_name: ["clientId", "provider", "name"],
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -172,7 +174,7 @@ class MemoryTable {
 
 const EPOCH = new Date("2026-01-01T00:00:00.000Z");
 
-/** The four tables, with the defaults and uniques of the shipped migration. */
+/** The six tables, with the defaults and uniques of the shipped migration. */
 export function createMemoryDb() {
   const tables = {
     marketplaceIntegration: new MemoryTable("integration", {
@@ -224,6 +226,29 @@ export function createMemoryDb() {
         createdAt: EPOCH,
       }),
       unique: [["orderId"], ["provider", "externalOrderId"]],
+    }),
+    marketplaceCataloguePublication: new MemoryTable("publication", {
+      defaults: () => ({
+        status: "PUBLISHING",
+        priceCents: null,
+        sentPriceCents: null,
+        externalId: null,
+        imageRef: null,
+        imageSourceUrl: null,
+        warningCode: null,
+        failedAction: null,
+        failureCode: null,
+        failureReason: null,
+        publishedAt: null,
+        withdrawnAt: null,
+        failedAt: null,
+        createdAt: EPOCH,
+      }),
+      unique: [["clientId", "provider", "productId"]],
+    }),
+    marketplaceCatalogueCategory: new MemoryTable("category", {
+      defaults: () => ({ externalId: null, claimedAt: null, createdAt: EPOCH }),
+      unique: [["clientId", "provider", "name"]],
     }),
   };
   const db: MarketplaceDb = tables;

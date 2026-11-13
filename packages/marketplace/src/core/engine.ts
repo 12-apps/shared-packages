@@ -21,6 +21,19 @@ import {
   type DecisionResult,
 } from "./decisions";
 import {
+  publishToCatalogue,
+  readCatalogueDocument,
+  readCatalogueState,
+  withdrawFromCatalogue,
+  type CatalogueActionResult,
+  type CatalogueDocumentResult,
+  type CataloguePublishInput,
+  type CatalogueTarget,
+} from "./catalogue";
+import { runCatalogue, type CatalogueJobPayload, type CatalogueOutcome } from "./catalogue-job";
+import type { CatalogueMenuOptions } from "./catalogue-port";
+import type { CataloguePublicationView } from "./catalogue-store";
+import {
   runFetchOrder,
   type FetchOrderJobPayload,
   type FetchOrderOutcome,
@@ -170,6 +183,31 @@ export interface MarketplaceEngine {
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
   /** Fetch and ingest one announced order (the `marketplace.fetch-order` job's body). */
   runFetchOrder(payload: FetchOrderJobPayload, attempt: OutboundAttempt): Promise<FetchOrderOutcome>;
+
+  /**
+   * How this marketplace's catalogue is published (`push`, `pull`), or null
+   * when it cannot be: the adapter states no catalogue, or the host bound no
+   * catalogue port (FUT-4768).
+   */
+  catalogueMode(provider: string): "push" | "pull" | null;
+  /** Put a product in a marketplace's catalogue (or send it again), with an optional price for it. Queued. */
+  publish(input: CataloguePublishInput): Promise<CatalogueActionResult>;
+  /** Take a product out of a marketplace's catalogue. Queued. */
+  withdraw(input: CatalogueTarget): Promise<CatalogueActionResult>;
+  /** Where these products stand on these marketplaces, in one read. */
+  catalogueState(input: {
+    clientId: string;
+    productIds: readonly string[];
+    providers?: readonly string[];
+  }): Promise<CataloguePublicationView[]>;
+  /** The menu part of the document a PULL marketplace reads, for the host to serve. */
+  catalogueDocument(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+    options: CatalogueMenuOptions;
+  }): Promise<CatalogueDocumentResult>;
+  /** Run one queued publish or withdraw (the `marketplace.catalogue` job's body). */
+  runCatalogue(payload: CatalogueJobPayload, attempt: OutboundAttempt): Promise<CatalogueOutcome>;
 }
 
 /**
@@ -233,5 +271,13 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     sweepOutbound: (now) => sweepOutbound(ctx, now ?? ports.clock.now()),
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
     runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
+
+    // Null too when the host bound no catalogue port: nothing could be published.
+    catalogueMode: (provider) => (ports.catalogue ? (registry.get(provider)?.catalogue?.mode ?? null) : null),
+    publish: (input) => publishToCatalogue(ctx, input),
+    withdraw: (input) => withdrawFromCatalogue(ctx, input),
+    catalogueState: (input) => readCatalogueState(ctx, input),
+    catalogueDocument: (input) => readCatalogueDocument(ctx, input),
+    runCatalogue: (payload, attempt) => runCatalogue(ctx, payload, attempt),
   };
 }

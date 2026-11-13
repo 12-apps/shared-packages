@@ -3,7 +3,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it, vi } from "vitest";
 
-import { createHarness } from "./harness";
+import type { CatalogueJobPayload } from "../core/catalogue-job";
+import { TENANT, createHarness, scriptedHttp } from "./harness";
 import { pgliteDb } from "./pglite-db";
 
 /**
@@ -235,3 +236,102 @@ describe("adopting the predecessor's accepted orders", () => {
   });
 });
 
+
+/**
+ * FUT-4768: the catalogue publication table, on real Postgres — its states and
+ * prices CHECKed, and the engine's publish → job → withdraw meeting them.
+ */
+describe("the catalogue migration", () => {
+  const insertPublication = (status: string, price = "NULL") =>
+    `INSERT INTO marketplace_catalogue_publications (id, client_id, provider, product_id, status, price_cents, requested_at, updated_at)
+     VALUES ('c-${status}-${price}', 't', 'IFOOD', 'p-${status}-${price}', '${status}', ${price}, now(), now())`;
+
+  it("builds the table with its five states, and refuses any other state or a price of zero", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+
+    await expect(db.exec(insertPublication("PUBLISHING"))).resolves.toBeDefined();
+    await expect(db.exec(insertPublication("LIVE"))).rejects.toThrow(/status_check/);
+    await expect(db.exec(insertPublication("PUBLISHED", "0"))).rejects.toThrow(/price_check/);
+    expect(await constraints(db, "marketplace_catalogue_publications")).toContain(
+      "marketplace_catalogue_publications_provider_shape",
+    );
+    await db.close();
+  });
+
+  it("carries the engine's publish, job and withdraw through its CHECKs", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    const h = createHarness({
+      store: pgliteDb(db),
+      http: scriptedHttp((request) =>
+        request.url.endsWith("/oauth/token")
+          ? { status: 200, body: JSON.stringify({ accessToken: "tok" }) }
+          : { status: 200, body: JSON.stringify([{ id: "cat-1", name: "Burgers" }]) },
+      ),
+      catalogue: {
+        items: async (_clientId, ids) =>
+          new Map(ids.map((id) => [id, { name: "Burger", description: null, imageUrl: null, categoryName: "Burgers", priceCents: 2500 }])),
+        image: async () => null,
+      },
+    });
+    await h.connect("IFOOD");
+
+    const asked = await h.engine.publish({ clientId: TENANT, provider: "IFOOD", productId: "p-1", priceCents: 2900 });
+    if (asked.kind !== "queued") throw new Error(`publish answered ${asked.kind}`);
+    const job = h.enqueued.at(-1)?.payload as unknown as CatalogueJobPayload;
+    await h.engine.runCatalogue(job, { attempt: 1, maxAttempts: 3 });
+    await h.engine.withdraw({ clientId: TENANT, provider: "IFOOD", productId: "p-1" });
+    await h.engine.runCatalogue(h.enqueued.at(-1)?.payload as unknown as CatalogueJobPayload, { attempt: 1, maxAttempts: 3 });
+
+    const rows = (await db.query<{ status: string; sent_price_cents: number }>(
+      "SELECT status, sent_price_cents FROM marketplace_catalogue_publications",
+    )).rows;
+    expect(rows).toEqual([{ status: "WITHDRAWN", sent_price_cents: 2900 }]);
+    await db.close();
+  });
+});
+
+/**
+ * Every index the partial declares exists in the migrations under the name
+ * Prisma gives it, and that name fits Postgres's 63 characters. Prisma names
+ * an unmapped `@@unique` `<table>_<columns>_key` and an `@@index`
+ * `<table>_<columns>_idx`; past 63 characters Postgres truncates what the
+ * migration creates and Prisma expects another name, which is drift.
+ */
+describe("the partial's index names", () => {
+  const PARTIAL = new URL("../../prisma/marketplace.prisma", import.meta.url);
+
+  function expectedIndexNames(): string[] {
+    const names: string[] = [];
+    for (const block of readFileSync(PARTIAL, "utf8").split(/\nmodel /u).slice(1)) {
+      const table = /@@map\("([^"]+)"\)/u.exec(block)?.[1];
+      if (!table) continue;
+      const columnOf = (field: string): string =>
+        new RegExp(`\\n\\s+${field}\\s[^\\n]*@map\\("([^"]+)"\\)`, "u").exec(block)?.[1] ?? field;
+      for (const match of block.matchAll(/@@(unique|index)\(\[([^\]]+)\](?:,\s*map:\s*"([^"]+)")?\)/gu)) {
+        const [, kind, fields = "", map] = match;
+        const columns = fields.split(",").map((field) => columnOf(field.trim()));
+        names.push(map ?? `${table}_${columns.join("_")}_${kind === "unique" ? "key" : "idx"}`);
+      }
+    }
+    return names;
+  }
+
+  it("fit in 63 characters", () => {
+    const tooLong = expectedIndexNames().filter((name) => name.length > 63);
+    expect(tooLong).toEqual([]);
+  });
+
+  it("are the names the migrations create", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    const created = new Set(
+      (await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename LIKE 'marketplace_%'")).rows.map(
+        (row) => row.indexname,
+      ),
+    );
+    expect(expectedIndexNames().filter((name) => !created.has(name))).toEqual([]);
+    await db.close();
+  });
+});
