@@ -173,6 +173,24 @@ export interface IngestionTarget {
 }
 
 /**
+ * The merchant id a store's live connection states, read alone: no
+ * credentials are opened. Null when it states none, or when there is no live
+ * connection (archived or absent).
+ */
+export async function connectionMerchantId(
+  ctx: EngineContext,
+  clientId: string,
+  provider: MarketplaceProvider,
+): Promise<string | null> {
+  const db = await ctx.ports.db();
+  const row = (await db.marketplaceIntegration.findUnique({
+    where: { clientId_provider: { clientId, provider } },
+    select: { externalMerchantId: true, archivedAt: true },
+  })) as { externalMerchantId: string | null; archivedAt: Date | null } | null;
+  return row && !row.archivedAt ? (row.externalMerchantId ?? null) : null;
+}
+
+/**
  * The connection a delivery belongs to, plus the two things the webhook path
  * needs from it: the shared secret to verify against, and whether the store has
  * the connection ON.

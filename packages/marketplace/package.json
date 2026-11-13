@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "One marketplace integration engine for every marketplace: the durable inbox, the ingest pipeline, the acceptance clock and its sweep, the SKU map, the integration settings with sealed credentials, and the outbound engine (confirm, cancellation request, retries), behind an adapter port. Each marketplace is an adapter at its own subpath (./ifood, ./99food on Open Delivery). Framework-neutral wiring route descriptors (./server) with a Hono adapter (./hono), dep-free job blueprints, MCP tools and the package-owned Prisma partial + migrations.",
+  "description": "One marketplace integration engine for every marketplace: the durable inbox, the ingest pipeline, the acceptance clock and its sweep, the SKU map, the integration settings with sealed credentials, and the outbound engine (confirm, cancellation request, retries), behind an adapter port. Each marketplace is an adapter at its own subpath (./ifood, ./99food on Open Delivery, ./rappi). Framework-neutral wiring route descriptors (./server) with a Hono adapter (./hono), dep-free job blueprints, MCP tools and the package-owned Prisma partial + migrations.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -32,6 +32,18 @@
     "./99food/en-US": {
       "types": "./dist/99food/en-US.d.ts",
       "default": "./dist/99food/en-US.js"
+    },
+    "./rappi": {
+      "types": "./dist/rappi/index.d.ts",
+      "default": "./dist/rappi/index.js"
+    },
+    "./rappi/pt-BR": {
+      "types": "./dist/rappi/pt-BR.d.ts",
+      "default": "./dist/rappi/pt-BR.js"
+    },
+    "./rappi/en-US": {
+      "types": "./dist/rappi/en-US.d.ts",
+      "default": "./dist/rappi/en-US.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",

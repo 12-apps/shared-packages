@@ -216,13 +216,17 @@ model MarketplaceAcceptance {
   /// The store's own cancellation request: PENDING (asked here, not
   /// yet sent) → REQUESTED (the marketplace took the request) → CONFIRMED (it
   /// cancelled) | FAILED (it refused, or every attempt failed). CHECK in the
-  /// migration; NULL when the store never asked. CONFIRMED is terminal.
+  /// migration; NULL when the store never asked, or when an accept cleared a
+  /// FAILED request (`cancellationRequestedAt` then stays as its tombstone).
+  /// CONFIRMED is terminal.
   cancellationStatus     String? @map("cancellation_status")
   /// The marketplace's own reason code the request carries, sent verbatim. Lives on the row, never in a job payload.
   cancellationReasonCode String? @map("cancellation_reason_code")
   /// The SKUs the request names, for a reason that needs them (a JSON array).
   cancellationOffendingSkus Json? @map("cancellation_offending_skus")
   /// When the request was stamped PENDING: what the outbound sweep ages it by.
+  /// With a NULL status it is a TOMBSTONE: the request an accept cleared,
+  /// which a synchronous marketplace's late "cancelled" can still match.
   cancellationRequestedAt DateTime? @map("cancellation_requested_at")
   /// Why the request FAILED: REFUSED (the marketplace said no, or every
   /// attempt failed) or TIMEOUT (no answer inside its window). CHECK in the

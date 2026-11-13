@@ -2,7 +2,8 @@
 
 One integration engine for every marketplace a store sells through. Each
 marketplace is an **adapter** on that engine, shipped inside this package at
-its own subpath (`@12-apps/marketplace/ifood`, `@12-apps/marketplace/99food`).
+its own subpath (`@12-apps/marketplace/ifood`, `@12-apps/marketplace/99food`,
+`@12-apps/marketplace/rappi`).
 
 ```ts
 import { createMarketplaceEngine } from "@12-apps/marketplace";
@@ -57,6 +58,8 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | `@12-apps/marketplace/ifood/pt-BR`, `/en-US` | the iFood adapter's copy packs (reason labels, "no street number") |
 | `@12-apps/marketplace/99food` | `createNinetyNineFoodAdapter({ copy, apiBaseUrl, portalUrl })`, provider `NINETY_NINE_FOOD`, on Open Delivery |
 | `@12-apps/marketplace/99food/pt-BR`, `/en-US` | the 99Food adapter's copy packs |
+| `@12-apps/marketplace/rappi` | `createRappiAdapter({ copy, apiBaseUrl, tokenUrl, portalUrl, amountUnit })`, provider `RAPPI` |
+| `@12-apps/marketplace/rappi/pt-BR`, `/en-US` | the Rappi adapter's copy packs |
 | `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS` (six: a read and a bulk write per entity), `MARKETPLACE_PERMISSIONS`, the strict Zod inputs |
 | `@12-apps/marketplace/server/pt-BR`, `/en-US` | the routes' copy packs |
 | `@12-apps/marketplace/hono` | `marketplaceRouter(config)` — the routes as one Hono router (`hono` is an optional peer) |
@@ -116,3 +119,96 @@ end to end: event, fetch, ingest, aceite, confirm, cancel, the answer.
 - with no `externalCode`, a line keys on the item id, which may be per order (then each such order adds an unmapped SKU row);
 - that 99Food sends every event by webhook (Open Delivery also allows
   polling, which this adapter does not do).
+
+## Rappi, from its public developer portal
+
+Built now (owner, 2026-11-11) from what [dev-portal.rappi.com](https://dev-portal.rappi.com)
+shows publicly (managing-user-orders, api-reference/orders, webhook-events,
+authentication-process, read 2026-11-13), to be confirmed against Rappi's
+sandbox once Rappi's account manager opens it. Registered as `RAPPI`; its
+webhooks are the engine's one route, `POST /webhooks/marketplace/:tenantSlug/RAPPI`.
+
+```ts
+import { createRappiAdapter } from "@12-apps/marketplace/rappi";
+import { RAPPI_ADAPTER_COPY_PT_BR } from "@12-apps/marketplace/rappi/pt-BR";
+
+createRappiAdapter({
+  copy: RAPPI_ADAPTER_COPY_PT_BR,
+  apiBaseUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" }, // https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api
+  tokenUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" },   // https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations
+  portalUrl: "https://…",                                         // the partner portal
+  amountUnit: "MINOR_UNITS",                                      // or "MAJOR_UNITS": how Rappi states money here
+});
+```
+
+| part | from the portal |
+|---|---|
+| Webhook | Register `NEW_ORDER` and `ORDER_EVENT_CANCEL` (each its own subscription, both pointing at this one URL). `Rappi-Signature: t=<timestamp>,sign=<signature>`, HMAC-SHA256 of `<t>.<raw body>` keyed by the webhook's secret. A connection stores that secret as its `webhookSecret`, and a connection without one REFUSES every delivery. |
+| Events | Rappi's bodies do not name their event, so the adapter reads the shape. An `order_detail` is `NEW_ORDER` → ingested (with `action: "scheduled"` / `"cancelled"`, the two scheduled notices → IGNORED). `{ event, order_id, store_id }` naming a cancellation (`canceled_with_charge`) → cancelled. `ORDER_OTHER_EVENT` (it carries `event_time`) → IGNORED. PING, menu and store events name no order and are acknowledged 200 and dropped. |
+| Merchant id | A connection's `externalMerchantId` for Rappi is **Rappi's store id**: `store.internal_id` on `NEW_ORDER`, `store_id` on every other event. A `NEW_ORDER` naming another store is settled FAILED (so the reconciliation sweep ingests it once the id is corrected) and the webhook answers 500. |
+| Auth | `POST {tokenUrl}` (the portal's `https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations`), JSON `{ client_id, client_secret }` → `access_token`, valid one week; sent as `x-authorization: Bearer <token>`; cached per process. |
+| Take (the confirm) | `PUT {apiBaseUrl}/orders/{orderId}/take/{cookingTime}` (the portal's base is `https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api`), the store's preparation minutes (`take/` keeps the order's own). 400 "Invalid state transition" and 404 are refusals: "não confirmou" and the app link. |
+| Reject (the cancel) | `PUT …/orders/{orderId}/reject` with `{ reason, cancel_type, items_skus }`: one of the portal's six `cancel_type`s, the three item ones requiring the offending SKUs. Only from SENT. The 200 IS the outcome (`asyncCancellationOutcome: false`): CONFIRMED at once. Every refused answer is a refusal (FAILED, the portal link). |
+| Cancel after take | No public endpoint: `cancelAfterAccept: false`, so the store's cancel of a taken order is FAILED at once and opens the partner portal (`appLink`; Rappi names no per-order link). |
+| Windows | Rappi gives a SENT order 6 minutes to be taken or rejected before its own TIMEOUT, so a reject still waiting 6 minutes after it was asked is failed as TIMEOUT (`cancellationAnswerWindowMs`). Rappi counts from the order's arrival and the engine from the request, so a reject asked late may still be sent after Rappi's TIMEOUT and come back 400 (FAILED, the portal link). A connection's acknowledgement window should be at most 360 s. |
+| Order | `totals.total_order`, "the total amount that the restaurant receives", is the total; Rappi states no commission (`commissionCents` null). A line is an item at `price` plus its subitems, `× quantity`, so its rows add up exactly to it; subitems and comments go into the note; an item with no `sku` keys on Rappi's item id. `delivery` is Rappi's courier, `marketplace` the store's own, `pickup` a take-out. |
+
+The fixtures are the portal's own examples (`src/rappi/__tests__/fixtures.ts`).
+`src/rappi/__tests__/engine.test.ts` drives the engine through the adapter end
+to end: webhook, ingest, aceite, take, reject, Rappi's cancel, and R3-N2.
+
+**ESTIMATED, to be checked against the Rappi sandbox (api.dev.rappi.com):**
+
+- the orders API's base and the token URL per environment, and the portal:
+  Rappi names its domains by country, so they are required config (whole
+  URLs, path included: the paths name the origin application's own noun);
+- how money is stated: integers with no unit in the portal; `amountUnit` is
+  required config (`MINOR_UNITS` cents, `MAJOR_UNITS` whole units);
+- that the `NEW_ORDER` body is ONE `GET orders` element (the portal says "the
+  same information" and shows no example);
+- telling `ORDER_EVENT_CANCEL` from `ORDER_OTHER_EVENT`: no `event_time` or
+  `additional_information`, and `cancel` in the `event` name; anything else is
+  recorded and IGNORED, never a cancellation;
+- the signature digest is lowercase hex (the example is 64 hex characters); no
+  timestamp tolerance is applied (the portal states none; a replay is an inbox
+  duplicate);
+- the token answer's shape beyond `access_token`: an `expires_in` is read when
+  present, else the portal's one week;
+- a subitem's `price × quantity` is per unit of its item;
+- an offending item with no `sku` is sent in `items_skus` under Rappi's item
+  id, where the portal wants `items_ids`;
+- no `PING` answer: the route answers `{ received: true }`, not Rappi's
+  `{ "status": "OK" }`, so do not subscribe `PING` until the host answers it;
+- that Rappi sends every order by webhook: `GET orders` / `orders/status/sent`
+  polling is not done by this adapter;
+- that Rappi serves `…/take/` with an empty cooking-time segment (the guide's
+  spelling) when the store states no preparation time;
+- the reject window counted from the request, where Rappi counts from the
+  order's arrival (see Windows);
+- that the 500 a merchant mismatch answers is harmless: Rappi redelivers, the
+  redelivery is an inbox duplicate answered 200; whether Rappi throttles or
+  disables a webhook after repeated 500s is not public.
+
+Out of scope: the merchant check applies to the NEW_ORDER body only. An
+`ORDER_EVENT_CANCEL` naming another `store_id` under this connection's secret
+still cancels a matching order id: the signature binds the connection's own
+secret, and judging event merchants in the engine would change iFood's path.
+
+### A late synchronous answer (R3-N2)
+
+A synchronous marketplace answers a cancellation in the response. When the
+outbound sweep times a request out while the call is still in flight, the
+store may accept the order before the answer lands. The accept clears the
+request but keeps its `cancellation_requested_at` as a TOMBSTONE, and the job
+matches a status-less row of a STILL ACCEPTED order carrying the same
+instant: a late "rejected" to the call in flight still moves the order to
+REJECTED (CONFIRMED) and tells the host `onCancellationConfirmed`. A late
+refusal matches nothing and leaves the accepted order as it is; and once the
+marketplace's own cancel event has rejected the order (telling the host), the
+tombstone answers nothing more, so the host is told once.
+
+What it does NOT cover: a call Rappi APPLIED but answered with a 5xx or not at
+all. Its retry runs after the store's accept, finds no request and sends
+nothing, so the order stays ACCEPTED here while cancelled on Rappi. The take
+the accept queued is then answered 400, so the order shows "não confirmou"
+with the portal link and a person settles it there.

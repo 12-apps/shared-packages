@@ -98,10 +98,13 @@ host.adoptServer({
 | `observability` | namespace `marketplace`. |
 
 The route copy (`MarketplaceServerCopy`) and each adapter's copy
-(`IfoodAdapterCopy`, `NinetyNineFoodAdapterCopy`) are required config; pt-BR
-and en-US packs ship beside each. The 99Food adapter also requires its
-`apiBaseUrl` per environment and its `portalUrl`, which 99Food gives a partner
-at onboarding.
+(`IfoodAdapterCopy`, `NinetyNineFoodAdapterCopy`, `RappiAdapterCopy`) are
+required config; pt-BR and en-US packs ship beside each. The 99Food adapter
+also requires its `apiBaseUrl` per environment and its `portalUrl`, which
+99Food gives a partner at onboarding. The Rappi adapter requires its
+`apiBaseUrl` and `tokenUrl` per environment (on Rappi's country domains), its
+`portalUrl` and its `amountUnit` (how Rappi states money for the host's
+country); see the README's Rappi section for what is still ESTIMATED.
 
 ## 4. What the origin host changes when it adopts this package
 
