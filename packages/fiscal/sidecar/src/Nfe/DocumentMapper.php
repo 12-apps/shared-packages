@@ -65,6 +65,18 @@ final class DocumentMapper
     public const PROCESS_VERSION = 'fiscal-sidecar-1';
 
     /**
+     * From 2027 the IBS/CBS go INSIDE `vProd`, and the price without tax
+     * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source:
+     * future-pay docs/tax/02-fiscal-document-platforms.md §7, "the tax goes into
+     * `vProd` from 2027"). sped-nfe 5.2.9 cannot write those fields, and document
+     * version 1 does not carry them, so a document issued on or after this day
+     * is refused rather than emitted wrong. Lifted by the sped-nfe bump that
+     * brings NT 2026.008, with document version 2.
+     */
+    public const LAYOUT_LIMIT = '2027-01-01';
+    public const LAYOUT_LIMIT_CODE = 'NT_2026_008_NOT_SUPPORTED';
+
+    /**
      * @param array<string, mixed> $document
      * @param array{since: string, reason: string}|null $contingency an NFC-e signed offline (`tpEmis = 9`)
      * @return array{xml: string, accessKey: string}
@@ -72,6 +84,7 @@ final class DocumentMapper
      */
     public function build(array $document, Model $model, int $environment, ?array $contingency = null): array
     {
+        self::refuseWhatThisLayoutCannotSay($document);
         $make = new Make(NfeModule::SCHEMES);
         $make->setOnlyAscii(false);
         $make->setCheckGtin(true);
@@ -96,6 +109,29 @@ final class DocumentMapper
             throw ServiceError::invalid('The document could not be built.', $errors);
         }
         return ['xml' => $xml, 'accessKey' => $make->getChave()];
+    }
+
+    /** @param array<string, mixed> $document */
+    private static function refuseWhatThisLayoutCannotSay(array $document): void
+    {
+        if (substr((string) $document['issuedAt'], 0, 10) >= self::LAYOUT_LIMIT) {
+            throw new ServiceError(
+                \Fiscal\Sidecar\ErrorClass::INVALID,
+                'A document issued on or after ' . self::LAYOUT_LIMIT . ' needs NT 2026.008 (vProdLiq), '
+                . 'which this service\'s sped-nfe does not write yet.',
+                self::LAYOUT_LIMIT_CODE,
+            );
+        }
+        $details = [];
+        foreach (array_values($document['lines']) as $index => $line) {
+            $quantity = (float) $line['quantity'];
+            if (abs(round($quantity, 4) - $quantity) > 1e-9) {
+                $details[] = "lines[$index].quantity: at most four decimals (qCom)";
+            }
+        }
+        if ($details !== []) {
+            throw ServiceError::invalid('The document does not fit the NF-e layout.', $details);
+        }
     }
 
     /** @param array<string, mixed> $d */

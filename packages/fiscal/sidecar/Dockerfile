@@ -35,6 +35,18 @@ RUN set -eux; \
 COPY docker/php.ini /usr/local/etc/php/conf.d/zz-fiscal-sidecar.ini
 COPY docker/openssl.cnf /etc/ssl/fiscal-sidecar-openssl.cnf
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/mpm.conf /etc/apache2/mods-available/mpm_prefork.conf
+# The trust store SEFAZ's server certificate is verified against: the image's
+# Mozilla bundle (ca-certificates) plus the ICP-Brasil chain, the public roots
+# and intermediates ITI publishes (acraiz.icpbrasil.gov.br; see the PEM's own
+# per-certificate comments). Some SEFAZ hosts present ICP-Brasil server
+# certificates, others public ones, so both are needed. The PEM is checked
+# against this sha256; replacing it means changing this line too.
+COPY docker/icp-brasil.pem /tmp/icp-brasil.pem
+RUN set -eux; \
+    echo "9374b11042655df7c226fa7de2b1321f4024263572419b491e7fbd5c76c09a99  /tmp/icp-brasil.pem" | sha256sum -c -; \
+    cat /etc/ssl/certs/ca-certificates.crt /tmp/icp-brasil.pem > /etc/ssl/fiscal-sidecar-ca.pem; \
+    rm /tmp/icp-brasil.pem
 # A1 certificates issued before OpenSSL 3 are encrypted with RC2/3DES, which
 # only the legacy provider reads. The config turns it on beside the default.
 ENV OPENSSL_CONF=/etc/ssl/fiscal-sidecar-openssl.cnf

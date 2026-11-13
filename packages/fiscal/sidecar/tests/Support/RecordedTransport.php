@@ -26,6 +26,9 @@ final class RecordedTransport implements Transport
     /** @var list<array{url: string, action: string, envelope: string, certificate: string}> */
     public array $sent = [];
 
+    /** @var array<string, string> what earlier requests carried, for a reply to a later one (a lookup echoes the digest) */
+    private array $seen = [];
+
     public function __construct(string|TransportFailure ...$replies)
     {
         $this->queue = $replies;
@@ -34,6 +37,16 @@ final class RecordedTransport implements Transport
     public function post(string $url, string $action, string $envelope, Certificate $certificate): string
     {
         $this->sent[] = ['url' => $url, 'action' => $action, 'envelope' => $envelope, 'certificate' => (string) $certificate->publicKey];
+        foreach ([
+            '{{accessKey}}' => ['/<chNFe>([A-Z0-9]{44})<\/chNFe>/', '/Id="NFe([A-Z0-9]{44})"/'],
+            '{{digVal}}' => ['/<DigestValue>([^<]+)<\/DigestValue>/'],
+            '{{idLote}}' => ['/<idLote>([0-9]+)<\/idLote>/'],
+        ] as $placeholder => $patterns) {
+            $value = self::first($envelope, $patterns);
+            if ($value !== '') {
+                $this->seen[$placeholder] = $value;
+            }
+        }
         $next = array_shift($this->queue);
         if ($next === null) {
             throw new RuntimeException("No recorded reply left for $action");
@@ -42,11 +55,13 @@ final class RecordedTransport implements Transport
             throw $next;
         }
         $reply = (string) file_get_contents(self::FIXTURES . $next . '.xml');
-        return strtr($reply, [
-            '{{accessKey}}' => self::first($envelope, ['/<chNFe>([A-Z0-9]{44})<\/chNFe>/', '/Id="NFe([A-Z0-9]{44})"/']),
-            '{{digVal}}' => self::first($envelope, ['/<DigestValue>([^<]+)<\/DigestValue>/']),
-            '{{idLote}}' => self::first($envelope, ['/<idLote>([0-9]+)<\/idLote>/']),
-        ]);
+        return strtr($reply, $this->seen);
+    }
+
+    /** Recorded replies come from no server at all. */
+    public function verifiesServer(): bool
+    {
+        return false;
     }
 
     /** @param list<string> $patterns */

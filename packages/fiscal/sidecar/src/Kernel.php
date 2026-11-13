@@ -75,11 +75,13 @@ final class Kernel
                 $request->path,
                 500,
                 $startedAt,
-                ErrorClass::RETRYABLE,
+                ErrorClass::INTERNAL,
                 null,
                 (new \ReflectionClass($unexpected))->getShortName(),
             );
-            $error = new ServiceError(ErrorClass::RETRYABLE, 'The service failed unexpectedly.');
+            // INTERNAL, not RETRYABLE: a defect answers the same way every time,
+            // and a retry loop would only repeat it.
+            $error = new ServiceError(ErrorClass::INTERNAL, 'The service failed unexpectedly.');
             return new Response(500, $error->toBody());
         }
     }
@@ -87,13 +89,11 @@ final class Kernel
     private function health(): Response
     {
         $libraries = [];
+        $facts = [];
         foreach ($this->modules as $module) {
             $libraries += $module->libraries();
+            $facts += $module->health();
         }
-        return new Response(200, [
-            'status' => 'ok',
-            'libraries' => $libraries,
-            'nfeSchemas' => Nfe\NfeModule::SCHEMES,
-        ]);
+        return new Response(200, ['status' => 'ok', 'libraries' => $libraries] + $facts);
     }
 }

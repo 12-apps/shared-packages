@@ -25,6 +25,7 @@ final class ServiceError extends RuntimeException
         public readonly ?string $signedXml = null,
         public readonly ?string $sefazReply = null,
         ?Throwable $previous = null,
+        public readonly bool $outcomeUnknown = false,
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -47,6 +48,7 @@ final class ServiceError extends RuntimeException
             $this->signedXml ?? $signedXml,
             $this->sefazReply,
             $this,
+            $this->outcomeUnknown,
         );
     }
 
@@ -61,6 +63,7 @@ final class ServiceError extends RuntimeException
             'accessKey' => $this->accessKey,
             'signedXml' => $this->signedXml,
             'sefazReply' => $this->sefazReply,
+            'outcomeUnknown' => $this->outcomeUnknown,
         ]];
     }
 }

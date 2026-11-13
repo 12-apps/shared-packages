@@ -21,4 +21,11 @@ interface Module
      * @return array<string, string>
      */
     public function libraries(): array;
+
+    /**
+     * What this module adds to `/health`.
+     *
+     * @return array<string, scalar>
+     */
+    public function health(): array;
 }

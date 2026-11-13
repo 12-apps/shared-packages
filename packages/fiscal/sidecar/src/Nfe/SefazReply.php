@@ -61,6 +61,13 @@ final class SefazReply
         return $node === null ? null : trim($node->nodeValue ?? '');
     }
 
+    /** The first `$tag` element, serialised, or null. */
+    public function element(string $tag): ?string
+    {
+        $node = $this->group($tag);
+        return $node === null ? null : (string) $this->dom->saveXML($node);
+    }
+
     public function has(string $group): bool
     {
         return $this->group($group) !== null;

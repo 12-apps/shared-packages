@@ -14,4 +14,7 @@ interface Transport
      * @throws TransportFailure
      */
     public function post(string $url, string $action, string $envelope, Certificate $certificate): string;
+
+    /** Whether SEFAZ's server certificate is verified — what `/health` reports. */
+    public function verifiesServer(): bool;
 }

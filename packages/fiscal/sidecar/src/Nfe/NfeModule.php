@@ -43,6 +43,11 @@ final class NfeModule implements Module
         return [self::LIBRARY => (string) InstalledVersions::getPrettyVersion(self::LIBRARY)];
     }
 
+    public function health(): array
+    {
+        return ['nfeSchemas' => self::SCHEMES, 'sefazTlsVerify' => $this->transport->verifiesServer()];
+    }
+
     /** A fresh service per call: nothing one call opens is reachable from the next. */
     private function service(): NfeService
     {

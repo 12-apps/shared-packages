@@ -6,7 +6,8 @@ namespace Fiscal\Sidecar;
 
 /**
  * How a failed call is classified. The first four are the issuer port's own
- * classes; INVALID is a malformed request, which no retry fixes.
+ * classes; INVALID is a malformed request, which no retry fixes; INTERNAL is a
+ * defect of the service itself, which a retry would only repeat.
  */
 enum ErrorClass: string
 {
@@ -15,6 +16,7 @@ enum ErrorClass: string
     case CONTINGENCY = 'CONTINGENCY';
     case AUTH = 'AUTH';
     case INVALID = 'INVALID';
+    case INTERNAL = 'INTERNAL';
 
     public function httpStatus(): int
     {
@@ -23,6 +25,7 @@ enum ErrorClass: string
             self::AUTH => 401,
             self::REJECTED => 422,
             self::RETRYABLE, self::CONTINGENCY => 503,
+            self::INTERNAL => 500,
         };
     }
 }

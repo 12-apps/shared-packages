@@ -13,23 +13,39 @@ use Fiscal\Sidecar\ServiceError;
  * port's classes. Everything not listed is a REJECTED with its code: the
  * layout's rejection table is open-ended, and a code the service does not know
  * is still SEFAZ saying no to this document.
+ *
+ * The codes and their meanings are the MOC table as sped-nfe carries it,
+ * `vendor/nfephp-org/sped-nfe/storage/cstat.json`.
  */
 final class Classifier
 {
-    /** The certificate itself refused: the transmitter's (280–286), the signature's (290–294), and a CNPJ-base mismatch (213). */
+    /**
+     * The certificate itself refused: the transmitter's (280 invalid, 281
+     * validity, 282 no CNPJ, 283 chain, 284 revoked, 285 not ICP-Brasil), the
+     * signature's (290–295, the same six), and a CNPJ-base mismatch (213).
+     */
     private const AUTH = [
-        '213', '280', '281', '282', '283', '284', '285', '286', '290', '291', '292', '293', '294',
+        '213', '280', '281', '282', '283', '284', '285', '290', '291', '292', '293', '294', '295',
     ];
-    /** Service stopped, momentarily or with no forecast: go offline. */
-    private const CONTINGENCY = ['108', '109'];
-    /** Receipt only, batch still processing, rate-limited, uncatalogued error: ask again. */
-    private const RETRYABLE = ['103', '105', '656', '999'];
+    /** Service stopped, momentarily or with no forecast. */
+    private const STOPPED = ['108', '109'];
+    /**
+     * Ask again: a receipt only (103), a batch still processing (105), SEFAZ
+     * failing to reach a revocation list for the transmitter's or the signing
+     * certificate (286, 296 — SEFAZ's trouble, not the certificate's), rate
+     * limiting (656), an uncatalogued error (999).
+     */
+    private const RETRYABLE = ['103', '105', '286', '296', '656', '999'];
 
-    public static function fromStatus(string $status, string $reason, SefazReply $reply): ServiceError
+    /**
+     * @param bool $issuing an authorisation request: SEFAZ stopped (108, 109)
+     *   means contingency there, and only "try again" anywhere else
+     */
+    public static function fromStatus(string $status, string $reason, SefazReply $reply, bool $issuing): ServiceError
     {
         $class = match (true) {
             in_array($status, self::AUTH, true) => ErrorClass::AUTH,
-            in_array($status, self::CONTINGENCY, true) => ErrorClass::CONTINGENCY,
+            in_array($status, self::STOPPED, true) => $issuing ? ErrorClass::CONTINGENCY : ErrorClass::RETRYABLE,
             in_array($status, self::RETRYABLE, true) => ErrorClass::RETRYABLE,
             default => ErrorClass::REJECTED,
         };
@@ -37,23 +53,29 @@ final class Classifier
     }
 
     /**
-     * @param bool $issuing an authorisation request: SEFAZ unreachable means
-     *   contingency there, and only "try again" anywhere else
+     * @param bool $offlineAllowed issuing an NFC-e, the one call that can go
+     *   offline (`tpEmis = 9`) when nothing reached SEFAZ
      */
-    public static function fromTransport(TransportFailure $failure, bool $issuing): ServiceError
+    public static function fromTransport(TransportFailure $failure, bool $offlineAllowed): ServiceError
     {
         return match ($failure->kind) {
             TransportFailure::TLS_REFUSED => new ServiceError(
                 ErrorClass::AUTH,
-                'SEFAZ refused the client certificate at the TLS handshake.',
+                'SEFAZ refused the client certificate (' . $failure->getMessage() . ').',
             ),
-            TransportFailure::TIMEOUT => new ServiceError(
+            TransportFailure::NOT_SENT => new ServiceError(
+                $offlineAllowed ? ErrorClass::CONTINGENCY : ErrorClass::RETRYABLE,
+                'The request never reached SEFAZ (' . $failure->getMessage() . ').',
+            ),
+            TransportFailure::NO_ANSWER => new ServiceError(
                 ErrorClass::RETRYABLE,
-                'SEFAZ did not answer in time; the outcome is unknown, so look the key up before issuing again.',
+                'The request went out and SEFAZ did not answer (' . $failure->getMessage()
+                . '); the outcome is unknown, so look the key up before sending it again.',
+                outcomeUnknown: true,
             ),
             default => new ServiceError(
-                $issuing ? ErrorClass::CONTINGENCY : ErrorClass::RETRYABLE,
-                'SEFAZ is unreachable (' . $failure->getMessage() . ').',
+                ErrorClass::RETRYABLE,
+                'An answer that is not SEFAZ\'s (' . $failure->getMessage() . '); nothing was processed.',
             ),
         };
     }
