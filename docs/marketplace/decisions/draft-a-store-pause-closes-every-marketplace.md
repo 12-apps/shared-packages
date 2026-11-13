@@ -36,9 +36,13 @@ What follows for the engine:
    key a create went out under while its answer is in doubt. A resume deletes
    those and nothing else; a marketplace where nothing of ours stands is not
    called at all.
-4. **A renewal never opens the store.** iFood shows no call that moves an
-   interruption's end, so the engine creates the later one first, then
-   deletes the earlier.
+4. **A renewal never opens the store, and follows the kitchen both ways.**
+   iFood shows no call that moves an interruption's end, so on any new end,
+   later or EARLIER, the engine creates the new interruption first, then
+   deletes the old one: an earlier estimate shortens the closure, since the
+   store is never closed longer than the kitchen's pause. A replaced
+   interruption whose delete failed stays on a list and is deleted before
+   the next renewal.
 5. **Never closed past the kitchen's pause.** An interruption carries the end
    itself. For anything else, and for a host that stops renewing, the sweep
    resumes a pause whose `until` has passed.
@@ -58,15 +62,21 @@ closure once the old is gone. A short lease on the row keeps two runs from
 calling one marketplace for one store at once.
 
 **A lost answer makes no second closure.** Every create goes out under a
-stable key kept on the row until the answer is known. iFood's create is
-preceded by a list, and an interruption under the key is reused; a resume of a
-pause whose every answer was lost lists by the key and deletes what it finds.
-A final refusal clears the key: nothing was created.
+stable key, written on the row with the end it carries BEFORE the call and
+kept until the answer is known. iFood's create is preceded by a list, and an
+interruption is reused when it carries the key or, where iFood assigned its
+own id, exactly the end and description the create sent; a resume of a pause
+whose every answer was lost finds it the same way and deletes it. A final
+refusal clears the key: nothing was created. Because the key is written only
+by the job, just before its call, a resume that lands before the job ran
+finds nothing of ours and calls nobody: a switch is never turned on before
+the engine tried to turn it off.
 
 **Codes, not copy.** A failure is a machine code (`PAUSE_REFUSED`,
 `PAUSE_UNANSWERED`, `RESUME_REFUSED`, `RESUME_UNANSWERED`, `NOT_CONNECTED`,
 `UNSUPPORTED`) for the host's copy; the marketplace's own words travel
-separately, verbatim and cut.
+separately, verbatim and cut, and only for a refusal. An engine sentence or
+an internal error never reaches the row; it goes to the logger.
 
 **Additive.** A new table, an optional delegate, an optional adapter member,
 `DELETE` in the HTTP request's methods, two new job blueprints. No existing

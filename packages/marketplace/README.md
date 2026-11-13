@@ -338,9 +338,10 @@ marketplace's sandbox.
 |---|---|---|---|
 | iFood | Interruptions: `GET`/`POST /merchant/v1.0/merchants/{merchantId}/interruptions`, `DELETE …/interruptions/{interruptionId}` on `https://merchant-api.ifood.com.br`; a temporary closure that does not change the opening hours | ESTIMATED (two independent public clients agree; iFood's portal, developer.ifood.com.br, answers our reader 403) | npm `@theyahia/ifood-mcp` (`dist/tools/*-interruption.js`), npm `n8n-nodes-ifood-completo`, npm `n8n-nodes-ifood` |
 | iFood | Create body `{ description, start, end }`, 201 with the interruption; delete answers 204 | ESTIMATED (same clients) | as above |
-| iFood | The client may send its own `id` in the create body (sent, as the idempotency key) | ESTIMATED; covered anyway: every create is preceded by a list, and an interruption under the key is reused | none public |
+| iFood | The client may send its own `id` in the create body (sent, as the idempotency key) | ESTIMATED, and not relied on: every create is preceded by a list, and an interruption is ours when it carries our id OR, where iFood assigned its own, exactly the end and the description the create sent (the end compared as the string sent, as an instant, or as the store's wall clock without offset). A retry after a lost answer reuses it, and a resume by key deletes it; a hand-made interruption matches neither. The key and the end it carried are written BEFORE the call, so a lost answer is never forgotten | none public |
 | iFood | Times are read as the store's local clock, the payload's offset discarded | ESTIMATED (one client says so); the adapter sends the store's wall clock WITH its offset, which reads the same either way | `@theyahia/ifood-mcp` |
-| iFood | No call moves an interruption's end | ESTIMATED; the engine creates the later one first, then deletes the earlier, so the store is never open between them | none found |
+| iFood | No call moves an interruption's end | ESTIMATED; on a renewal (a later end OR an earlier one) the engine creates the new interruption first, then deletes the old, so the store is never open between them | none found |
+| iFood | iFood ACCEPTS two overlapping interruptions for the moment of a renewal | ESTIMATED. If it refuses the overlap, the renewal is FAILED (`PAUSE_REFUSED`, iFood's words) and the old interruption still holds to its own end | none found |
 | iFood | Auth: the merchant app's client-credentials token (`POST /authentication/v1.0/oauth/token`), as every other call of the adapter | ESTIMATED (as the rest of the iFood adapter, "iFood is unverified" above); no public scope list for the merchant module was readable | the adapter's existing outbound |
 | iFood | Limits (rate, interruptions per merchant, maximum length, description length) | ESTIMATED: none published that we could read; a refusal is FAILED with iFood's own words | none |
 | Rappi | `PUT https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api/availability/stores/enable`, synchronous, `{ stores: [{ store_id, is_enabled }] }`; 200 with `results[]` (`store_id`, `is_enabled`, `operation_result`, `operation_result_type`, `operation_result_message`, `suspended_reason`, `suspended_at`, `suspended_time`), 400, 403, 422 (over 300 stores), 502 | CONFIRMED | [dev-portal.rappi.com/en/api-reference/availability](https://dev-portal.rappi.com/en/api-reference/availability/) |
@@ -359,7 +360,8 @@ No sentence a host shows is the engine's. A FAILED record carries a
 `failureCode` (`UNSUPPORTED`, `NOT_CONNECTED`, `PAUSE_REFUSED`,
 `PAUSE_UNANSWERED`, `RESUME_REFUSED`, `RESUME_UNANSWERED`) for the host's copy,
 and the marketplace's own words, verbatim and cut to 300 characters, in
-`failureDetail`.
+`failureDetail` — only for a refusal; an unanswered call, a missing connection
+or an engine error leaves it null and goes to the logger.
 
 ### Tests
 

@@ -9,7 +9,7 @@ import { AvailabilityRetryError } from "../core/pause-job";
 import type { AvailabilityJobPayload } from "../core/pause-store";
 
 /**
- * The engine's three jobs, declared here because every number in them is the
+ * The engine's eight jobs, declared here because every number in them is the
  * engine's knowledge, not a host's:
  *
  * - `expire-acceptances`, every minute: the unit being measured is minutes (a
@@ -43,8 +43,9 @@ import type { AvailabilityJobPayload } from "../core/pause-store";
  *
  * Bound with `{ engine }`, these arrive at a runner as
  * `marketplace.expire-acceptances`, `marketplace.reconcile-inbox`,
- * `marketplace.outbound`, `marketplace.fetch-order`, `marketplace.catalogue`
- * and `marketplace.outbound-sweep`.
+ * `marketplace.outbound`, `marketplace.fetch-order`, `marketplace.catalogue`,
+ * `marketplace.outbound-sweep`, `marketplace.availability` and
+ * `marketplace.availability-sweep`.
  */
 
 /** What the host closes over at bind time: the mounted engine. */
