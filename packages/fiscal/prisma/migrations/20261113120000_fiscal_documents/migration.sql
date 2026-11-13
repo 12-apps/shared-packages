@@ -167,10 +167,12 @@ CREATE INDEX "fiscal_documents_owner_id_subject_id_model_idx" ON "fiscal_documen
 -- Prisma cannot express a partial unique index. This is the per-subject guard:
 -- at most ONE live document per (owner, subject, model) — not a replaced one,
 -- nor an online one SEFAZ rejected (its number is voided and the sale issued
--- again); a rejected contingency NFC-e stays live, for the store to resend.
+-- again) unless a lookup had found it authorised (its protocol is kept); a
+-- rejected contingency NFC-e stays live, for the store to resend.
 CREATE UNIQUE INDEX "fiscal_documents_live_subject_key"
   ON "fiscal_documents"("owner_id", "subject_id", "model")
-  WHERE "status" <> 'REPLACED' AND NOT ("status" = 'REJECTED' AND "series_kind" = 'ONLINE');
+  WHERE "status" <> 'REPLACED'
+    AND NOT ("status" = 'REJECTED' AND "series_kind" = 'ONLINE' AND "protocol" IS NULL);
 -- The sweep's and the transmission's queue: by next attempt, never a row waiting for a person.
 CREATE INDEX "fiscal_documents_next_attempt_at_idx"
   ON "fiscal_documents"("next_attempt_at") WHERE "attention" = false;

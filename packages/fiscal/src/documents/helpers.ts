@@ -61,6 +61,9 @@ export function totalsOf(sale: SaleDraft): DocumentTotals {
 /** Storage keys, by access key: one folder per document, whatever its owner. */
 export const xmlKeys = {
   signed: (accessKey: string) => `fiscal/${accessKey}/signed.xml`,
+  /** One signed XML per digest: every XML a failed call returned under a key is kept, none overwritten. */
+  signedByDigest: (accessKey: string, digest: string) =>
+    `fiscal/${accessKey}/signed-${digest.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}.xml`,
   authorized: (accessKey: string) => `fiscal/${accessKey}/authorized.xml`,
   cancel: (accessKey: string) => `fiscal/${accessKey}/cancel.xml`,
   inutilization: (document: FiscalDocument) =>

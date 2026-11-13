@@ -85,13 +85,15 @@ export interface DocumentTotals {
 /**
  * Whether the document is the one its subject stands on. At most one live
  * document per (owner, subject, model): a REPLACED one is not, nor an online
- * one SEFAZ rejected (its number is voided and the sale is issued again). A
+ * one SEFAZ rejected (its number is voided and the sale is issued again) —
+ * unless a lookup had found it authorised (its protocol is kept). A
  * REJECTED contingency NFC-e stays live: the buyer holds its DANFE, and the
  * store corrects and resends it under the same number.
  */
-export function isLive(document: Pick<FiscalDocument, "status" | "seriesKind">): boolean {
+export function isLive(document: Pick<FiscalDocument, "status" | "seriesKind" | "protocol">): boolean {
   if (document.status === "REPLACED") return false;
-  return !(document.status === "REJECTED" && document.seriesKind === "ONLINE");
+  // An online rejection with a protocol known (a lookup found it SEFAZ's) is still the sale's.
+  return !(document.status === "REJECTED" && document.seriesKind === "ONLINE" && document.protocol === null);
 }
 
 /** One fiscal document. */

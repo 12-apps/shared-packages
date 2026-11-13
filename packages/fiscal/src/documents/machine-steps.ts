@@ -15,7 +15,7 @@ import type {
 } from "../sidecar/types";
 import type { SaleForDocument } from "../sale/types";
 import { FiscalDocumentError } from "./errors";
-import type { DocumentEventKind, DocumentTotals, FiscalDocument, NumberVoid } from "./types";
+import { type DocumentEventKind, type DocumentTotals, type FiscalDocument, type NumberVoid, isLive } from "./types";
 
 export type SidecarError = SidecarErrorBody["error"];
 
@@ -122,6 +122,18 @@ function voidAfterLookup(answer: LookedUpDocument): NumberVoid {
 
 function lookupOfSettledNumber(document: FiscalDocument, answer: LookedUpDocument): Partial<FiscalDocument> {
   if (document.numberVoid !== "LOOKUP_FIRST") refuse(document, "LOOKUP", "its number is already settled");
+  if (isLive(document) && (answer.status === "AUTHORIZED" || answer.status === "DENIED")) {
+    // The sale's own document, SEFAZ's, whose XML could not be fetched: never
+    // cancelled, never voided — a person settles it (`attention`).
+    return {
+      numberVoid: null,
+      attention: true,
+      outcomeUnknown: false,
+      protocol: answer.protocol ?? document.protocol,
+      statusCode: answer.statusCode,
+      statusReason: answer.statusReason,
+    };
+  }
   return {
     ...SETTLED,
     numberVoid: voidAfterLookup(answer),
@@ -171,10 +183,17 @@ function cancelFields(document: FiscalDocument, input: InputOf<"CANCEL">): Parti
 }
 
 /** A rejected online number may have been authorised by an unanswered first send: look it up first. */
+/**
+ * A rejected online number may have been authorised by an unanswered first
+ * send — or a lookup already found it authorised (its protocol is kept, and
+ * a re-send for the XML met a 704 or a different XML under the key): either
+ * way it is looked up, never voided blindly.
+ */
 function rejectFields(document: FiscalDocument, error: SidecarError): Partial<FiscalDocument> {
   const failed = failedFields(document, error);
   if (document.seriesKind === "CONTINGENCY") return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: null };
-  return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: failed.outcomeUnknown ? "LOOKUP_FIRST" : "INUTILIZE" };
+  const mayBeSefazs = failed.outcomeUnknown === true || document.protocol !== null;
+  return { status: "REJECTED", ...failed, ...SETTLED, numberVoid: mayBeSefazs ? "LOOKUP_FIRST" : "INUTILIZE" };
 }
 
 export const STEPS: Step = {

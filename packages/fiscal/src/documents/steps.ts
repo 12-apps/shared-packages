@@ -19,6 +19,7 @@ import { FISCAL_ISSUE } from "../manifest/permissions";
 import type { IssuedDocument } from "../sidecar/types";
 import { FISCAL_DOCUMENT_REJECTED, type FiscalContext, draftOf, xmlKeys } from "./context";
 import { FiscalDocumentError } from "./errors";
+import { digestOf } from "./nfe-proc";
 import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { FiscalDocument } from "./types";
 
@@ -116,13 +117,18 @@ export async function goOffline(
 }
 
 /**
- * The signed XML a failed call returned, stored: a lookup that later finds the
- * key authorised joins it to the protocol to make the `nfeProc`.
+ * The signed XML a failed call returned, stored UNDER ITS DIGEST and never
+ * over another: each send under a key may carry a different XML (a service
+ * upgrade between sends changes `verProc`, say), and only the one SEFAZ
+ * authorised may become the `nfeProc`. A lookup reads the protocol's `digVal`
+ * and fetches exactly that XML (`xmlKeys.signedByDigest`), so pairing is by
+ * digest, not by "the last one stored". `xmlKey` points at the latest.
  */
 async function keepSigned(ctx: FiscalContext, document: FiscalDocument, error: IssuerFailure): Promise<{ xmlKey?: string }> {
   const key = document.accessKey ?? error.accessKey;
-  if (error.signedXml === null || key === null) return {};
-  const xmlKey = xmlKeys.signed(key);
+  const digest = error.signedXml === null ? null : digestOf(error.signedXml);
+  if (error.signedXml === null || key === null || digest === null) return {};
+  const xmlKey = xmlKeys.signedByDigest(key, digest);
   await ctx.config.storage.put(xmlKey, error.signedXml, "application/xml");
   return { xmlKey };
 }

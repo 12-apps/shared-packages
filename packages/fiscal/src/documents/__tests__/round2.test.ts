@@ -17,6 +17,7 @@ import type { Issuer } from "../../issuer/port";
 import type { SaleForDocument } from "../../sale/types";
 import { computeAccessKey, draftOf } from "../context";
 import { createMemoryFiscalStore } from "../memory";
+import { digestOf } from "../nfe-proc";
 import type { FiscalStore, SaleDraft } from "../ports";
 import { createFiscalDocuments } from "../service";
 import { createSigningIdentities } from "../signing";
@@ -37,8 +38,9 @@ const signed = (key: string) => ({ ok: true, answer: { status: "SIGNED", accessK
 const keyOf = (document: SaleForDocument) => computeAccessKey({ sale: document, model: "NFCE", seriesKind: "ONLINE" });
 /** The service's recorded signed XML, re-keyed to the document at hand. */
 const signedXmlFor = (key: string) => RECORDED_SIGNED.split(RECORDED_KEY).join(key);
+/** A lookup reply whose protocol certifies exactly the XML signed for `key` (its `digVal` is that XML's digest). */
 const lookupReply = (key: string, nProt: string) =>
-  `<retConsSitNFe><cStat>100</cStat><protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><chNFe>${key}</chNFe><dhRecbto>2026-11-20T12:31:00-03:00</dhRecbto><nProt>${nProt}</nProt><cStat>100</cStat></infProt></protNFe></retConsSitNFe>`;
+  `<retConsSitNFe><cStat>100</cStat><protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><chNFe>${key}</chNFe><dhRecbto>2026-11-20T12:31:00-03:00</dhRecbto><nProt>${nProt}</nProt><digVal>${digestOf(signedXmlFor(key))}</digVal><cStat>100</cStat></infProt></protNFe></retConsSitNFe>`;
 
 const METHODS = ["issue", "signContingency", "transmit", "cancel", "cancelBySubstitution", "lookup", "inutilize"] as const;
 type Impl = Partial<Record<(typeof METHODS)[number], (call: never) => Promise<unknown>>>;

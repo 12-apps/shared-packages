@@ -20,7 +20,7 @@ import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveP
 import { settleNumber } from "./settle";
 import { signPending, submit, transmit } from "./steps";
 import { type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
-import { assembleNfeProc } from "./nfe-proc";
+import { assembleNfeProc, protocolDigestOf } from "./nfe-proc";
 
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
 
@@ -181,8 +181,11 @@ async function cancel(
  * stays SUBMITTED, and the sweep sends the same call again for the XML.
  */
 async function storeNfeProc(deps: Deps, document: FiscalDocument, answer: LookedUpDocument): Promise<string | undefined> {
-  if ((answer.status !== "AUTHORIZED" && answer.status !== "DENIED") || document.accessKey === null || document.xmlKey === null) return undefined;
-  const signedXml = await deps.config.storage.get(document.xmlKey);
+  if ((answer.status !== "AUTHORIZED" && answer.status !== "DENIED") || document.accessKey === null) return undefined;
+  // The XML the protocol certifies, by its digest; never simply the last one stored.
+  const digest = protocolDigestOf(answer.sefazReply);
+  if (digest === null) return undefined;
+  const signedXml = await deps.config.storage.get(xmlKeys.signedByDigest(document.accessKey, digest));
   if (signedXml === null) return undefined;
   const nfeProc = assembleNfeProc({ signedXml, sefazReply: answer.sefazReply, accessKey: document.accessKey });
   if (nfeProc === null) return undefined;
