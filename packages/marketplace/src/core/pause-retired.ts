@@ -22,7 +22,7 @@ import type { EngineContext } from "./ports";
  */
 
 /** One replaced closure still to delete. */
-export interface RetiredClosure {
+interface RetiredClosure {
   by: "id" | "key";
   value: string;
   /** The end the marketplace was given; null when unknown (kept until a delete answers). */
@@ -30,7 +30,7 @@ export interface RetiredClosure {
 }
 
 /** At most this many replaced closures are kept. */
-export const RETIRED_CAP = 10;
+const RETIRED_CAP = 10;
 
 function parse(token: string): RetiredClosure | null {
   const at = token.lastIndexOf("@");
@@ -73,12 +73,30 @@ export function withRetired(ctx: EngineContext, row: StorePauseRow, entry: Retir
 /** Whether a closure's own end has passed: it is over, nothing to delete. */
 export const ended = (entry: RetiredClosure, now: Date): boolean => entry.end !== null && entry.end.getTime() <= now.getTime();
 
+/** The ids the engine holds on the marketplace for this record: never what a key matches. */
+export function heldIds(row: StorePauseRow): string[] {
+  const replaced = retiredOf(row).filter((entry) => entry.by === "id").map((entry) => entry.value);
+  return row.externalId === null ? replaced : [row.externalId, ...replaced];
+}
+
 /** The ref one entry is deleted by. */
 export function refOf(entry: RetiredClosure, row: StorePauseRow, merchantId: string): StorePauseRef {
   if (entry.by === "id") return { merchantId, externalId: entry.value, key: null, sent: null };
   const sent = entry.end ? { until: entry.end, reason: row.reason ?? "", timeZone: row.timeZone ?? "UTC" } : null;
-  return { merchantId, externalId: null, key: entry.value, sent };
+  return { merchantId, externalId: null, key: entry.value, sent, keep: heldIds(row) };
 }
+
+/**
+ * During a pause, a lost create whose end is the one the current closure
+ * carries (to the second) cannot be told apart from it by end and reason:
+ * it is kept, not deleted, and goes with the resume (which deletes the
+ * current closure first) or when its end passes.
+ */
+const sameEndAsCurrent = (entry: RetiredClosure, row: StorePauseRow): boolean =>
+  entry.by === "key" &&
+  entry.end !== null &&
+  row.sentUntil !== null &&
+  Math.floor(entry.end.getTime() / 1000) === Math.floor(row.sentUntil.getTime() / 1000);
 
 interface RetireEnv {
   ctx: EngineContext;
@@ -97,7 +115,7 @@ export async function retire(env: RetireEnv, row: StorePauseRow): Promise<Retire
   const left: RetiredClosure[] = [];
   for (const entry of retiredOf(row)) {
     if (ended(entry, env.call.now)) continue;
-    if (await stillOwed(env, row, entry)) left.push(entry);
+    if (sameEndAsCurrent(entry, row) || (await stillOwed(env, row, entry))) left.push(entry);
   }
   return left;
 }

@@ -123,15 +123,20 @@ function sameEnd(end: string, until: Date, timeZone: string): boolean {
   return end.slice(0, 19) === sent.slice(0, 19);
 }
 
-/** The interruption the create under `key` made: by our id, or by the end and description it carried. */
+/**
+ * The interruption the create under `key` made: by our id, or by the end and
+ * description it carried, never one the engine already holds (`keep`).
+ */
 function ours(
   list: readonly Interruption[],
   key: string,
   sent: { until: Date; reason: string; timeZone: string } | null,
+  keep: readonly string[] = [],
 ): Interruption | undefined {
-  const byKey = list.find((entry) => entry.id === key);
+  const candidates = list.filter((entry) => !keep.includes(entry.id));
+  const byKey = candidates.find((entry) => entry.id === key);
   if (byKey || !sent) return byKey;
-  return list.find(
+  return candidates.find(
     (entry) => entry.description === sent.reason && entry.end !== null && sameEnd(entry.end, sent.until, sent.timeZone),
   );
 }
@@ -223,7 +228,7 @@ export function ifoodResume(ctx: AdapterCallContext, ref: StorePauseRef): Promis
     if (id === null && ref.key !== null) {
       const list = await listInterruptions(ctx, ref.merchantId);
       if (!Array.isArray(list)) return list;
-      id = ours(list, ref.key, ref.sent)?.id ?? null;
+      id = ours(list, ref.key, ref.sent, ref.keep)?.id ?? null;
     }
     // Nothing of ours stands: there is nothing to delete.
     if (id === null) return { kind: "accepted" };

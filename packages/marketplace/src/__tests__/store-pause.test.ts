@@ -92,6 +92,36 @@ function switchMarketplace() {
   return { availability, state, calls, script, during };
 }
 
+/** A marketplace that names its closures itself and finds a key's closure by end and reason only. */
+function marketplaceAssigningIds(script: string[]) {
+  const closures = new Map<string, { end: number; reason: string }>();
+  const ids = { next: 0 };
+  const availability: MarketplaceAvailability = {
+    kind: "interruption",
+    pause: async (_ctx, request) => {
+      if ((script.shift() ?? "ok") === "lost-nothing") return { kind: "retry", reason: "timeout" };
+      ids.next += 1;
+      const id = `c${ids.next}`;
+      closures.set(id, { end: request.until.getTime(), reason: request.reason });
+      return { kind: "paused", externalId: id, until: request.until };
+    },
+    resume: async (_ctx, ref) => {
+      if (ref.externalId) {
+        closures.delete(ref.externalId);
+        return { kind: "accepted" };
+      }
+      if (script[0] === "retry-delete") {
+        script.shift();
+        return { kind: "retry", reason: "status 503" };
+      }
+      const hit = [...closures].find(([, value]) => ref.sent && value.end === ref.sent.until.getTime() && value.reason === ref.sent.reason);
+      if (hit) closures.delete(hit[0]);
+      return { kind: "accepted" };
+    },
+  };
+  return { availability, closures };
+}
+
 function adapter(provider: string, availability?: MarketplaceAvailability): MarketplaceAdapter {
   return {
     provider,
@@ -590,6 +620,66 @@ describe("review round 2", () => {
     expect(calls[0]).toBe(`pause:${minutes(25).toISOString()}`);
     expect(calls[1]).toMatch(/^resume:key=/u);
     expect([...acme.closures.values()]).toEqual([{ until: minutes(25), byHand: false }]);
+  });
+});
+
+describe("review round 3", () => {
+  it("retiring a lost create never deletes the current closure that carries the same end and reason (R3-1)", async () => {
+    // iFood-like: its own ids; a key ref matched by end and reason, ignoring `keep`, so the engine alone must hold.
+    const fake = marketplaceAssigningIds(["lost-nothing", "ok", "retry-delete", "ok"]);
+    const h = createHarness({ adapters: [adapter(ACME, fake.availability)] });
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    const ask = (until: Date, at: number) =>
+      h.engine.pauseStore({ clientId: TENANT, until, reason: "Cozinha cheia", timeZone: "America/Sao_Paulo", now: minutes(at) });
+    // T1: the create is lost and never landed; its key stays in doubt.
+    await ask(minutes(20), 0);
+    await drain(h, seen, { attempt: 3, maxAttempts: 3 });
+    // T2: the key joins the replaced list; c1 is created; the key's delete gets no answer.
+    await ask(minutes(25), 1);
+    await drain(h, seen);
+    // Back to exactly T1: c2 carries the key's end and reason, and must survive.
+    await ask(minutes(20), 2);
+    await drain(h, seen);
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", externalId: "c2" });
+    expect([...fake.closures.keys()]).toEqual(["c2"]);
+    // The resume deletes the current closure first; the key then matches nothing.
+    await h.engine.resumeStore({ clientId: TENANT, now: minutes(3) });
+    await drain(h, seen);
+    expect(fake.closures.size).toBe(0);
+    expect(pauseRow(h)).toMatchObject({ state: "OPEN", retiredExternalIds: null });
+  });
+
+  it("a resume whose every predicated write misses still lands, as RESUMING with its job queued (R3-2)", async () => {
+    const memory = createMemoryDb();
+    const table = memory.tables.marketplaceStorePause;
+    const misses = { left: 3 };
+    const db = {
+      ...memory.tables,
+      marketplaceStorePause: {
+        findFirst: (args: unknown) => table.findFirst(args),
+        findMany: (args: unknown) => table.findMany(args),
+        upsert: (args: unknown) => table.upsert(args),
+        updateMany: async (args: unknown) => {
+          const where = (args as { where: Record<string, unknown> }).where;
+          if ("attemptKey" in where && misses.left > 0) {
+            misses.left -= 1;
+            // The row moves under the resume each time: a job claims a new key.
+            Object.assign(table.rows[0]!, { attemptKey: `moved-${misses.left}` });
+          }
+          // eslint-disable-next-line test-flakiness/no-database-operations -- the in-memory table, wrapped to inject the race.
+          return table.updateMany(args);
+        },
+      },
+    } as MarketplaceDb;
+    const switchy = switchMarketplace();
+    const h = createHarness({ adapters: [adapter(SWITCHY, switchy.availability)], store: { db, transaction: memory.transaction } });
+    await h.connect(SWITCHY);
+    await pause(h, minutes(20));
+    const queuedBefore = h.enqueued.length;
+    expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({ marketplaces: [{ provider: SWITCHY, outcome: "queued" }] });
+    expect(table.rows[0]).toMatchObject({ wanted: "OPEN", state: "RESUMING" });
+    expect(h.enqueued.length).toBe(queuedBefore + 1);
   });
 });
 

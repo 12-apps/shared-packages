@@ -193,4 +193,3 @@ export {
   type StorePauseWanted,
 } from "./core/pause-store";
 export type { AvailabilitySweepResult } from "./core/pause-sweep";
-export { RETIRED_CAP, type RetiredClosure } from "./core/pause-retired";

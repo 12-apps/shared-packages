@@ -186,7 +186,23 @@ async function askResume(ctx: EngineContext, read: StorePauseRow, now: Date): Pr
     if (outcome !== null) return outcome;
     row = await readPause(ctx, read.clientId, read.provider);
   }
-  return "unchanged";
+  return row ? forceResume(ctx, row, now) : "unchanged";
+}
+
+/**
+ * Every predicated write missed (the row kept moving): the resume is never
+ * lost. RESUMING with no predicate, and the job queued: it re-reads the row
+ * and deletes whatever of ours stands, or finds nothing and settles OPEN.
+ */
+async function forceResume(ctx: EngineContext, row: StorePauseRow, now: Date): Promise<ResumeOutcome> {
+  const table = pauseTable(await ctx.ports.db());
+  await table.updateMany({
+    where: { id: row.id },
+    data: { wanted: "OPEN", state: "RESUMING", requestedAt: now, failureCode: null, failureDetail: null, failedAt: null },
+  });
+  const payload = { clientId: row.clientId, provider: row.provider };
+  await enqueueAvailability(ctx, payload, availabilityDedupeKey(payload, now));
+  return "queued";
 }
 
 /** Whether a resume already stands: on its way, or OPEN with nothing of ours left. */

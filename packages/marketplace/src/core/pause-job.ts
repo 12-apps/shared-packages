@@ -13,7 +13,7 @@ import {
   type StorePauseFailureCode,
   type StorePauseRow,
 } from "./pause-store";
-import { ended, refOf, retire, retiredOf, retiredValue, withRetired } from "./pause-retired";
+import { ended, heldIds, refOf, retire, retiredOf, retiredValue, withRetired } from "./pause-retired";
 import type { EngineContext } from "./ports";
 
 /**
@@ -247,7 +247,7 @@ function nextDelete(row: StorePauseRow, kind: MarketplaceAvailability["kind"]): 
   if (retired !== undefined) return { ref: refOf(retired, row, ""), clear: { retiredExternalIds: retiredValue(rest) }, replaced: true };
   if (row.attemptKey !== null) {
     return {
-      ref: { merchantId: "", externalId: null, key: row.attemptKey, sent: sentOf(row, row.attemptUntil) },
+      ref: { merchantId: "", externalId: null, key: row.attemptKey, sent: sentOf(row, row.attemptUntil), keep: heldIds(row) },
       clear: { attemptKey: null, attemptUntil: null, sentUntil: null },
     };
   }

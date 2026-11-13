@@ -160,6 +160,22 @@ describe("iFood assigning its own ids (B1): a lost create answer never makes a s
     expect([...ifoodSide.stored.keys()]).toEqual(["owner-1"]);
   });
 
+  it("never returns, for a key, an interruption the engine already holds (R3-1)", async () => {
+    const ifoodSide = ifoodAssigningIds();
+    // The current closure carries exactly the end and reason the lost create would have.
+    ifoodSide.stored.set("current", { description: "Cozinha cheia", start: "x", end: "2026-11-13T12:25:00-03:00" });
+    const ref = {
+      merchantId: "merchant-1",
+      externalId: null,
+      key: "key-1",
+      sent: { until: UNTIL, reason: "Cozinha cheia", timeZone: "America/Sao_Paulo" },
+      keep: ["current"],
+    };
+    expect(await ifood.availability!.resume(ifoodSide.ctx, ref)).toEqual({ kind: "accepted" });
+    expect([...ifoodSide.stored.keys()]).toEqual(["current"]);
+    expect(ifoodSide.sent().map((req) => req.method)).toEqual(["GET"]);
+  });
+
   it("recognises an end iFood echoes in UTC or without its offset", async () => {
     for (const end of ["2026-11-13T15:25:00Z", "2026-11-13T12:25:00", "2026-11-13T15:25:00.000+00:00"]) {
       const { ctx } = context(() => ({ status: 200, body: JSON.stringify([{ id: "ifood-7", description: "Cozinha cheia", end }]) }));

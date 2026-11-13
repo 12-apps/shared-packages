@@ -66,6 +66,12 @@ export interface StorePauseRef {
    * is the one a lost answer created. Null with no key in doubt.
    */
   sent: { until: Date; reason: string; timeZone: string } | null;
+  /**
+   * OPTIONAL. The marketplace ids the engine already holds (the current
+   * closure, the replaced ones): a closure found under `key` is never one of
+   * them, so deleting a lost create can never delete the closure that stands.
+   */
+  keep?: readonly string[];
 }
 
 /** One pause or extend's answer. */
