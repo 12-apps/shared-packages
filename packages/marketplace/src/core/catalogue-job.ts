@@ -197,7 +197,9 @@ async function runOnce(
   if (!row) return { kind: "skipped", reason: "no such publication for this tenant" };
   const { action } = payload;
   if (row.status !== WANTED[action]) return { kind: "skipped", reason: `the publication is ${row.status}, not ${WANTED[action]}` };
-  const run = await runFor(ctx, row, action);
+  let run = await runFor(ctx, row, action);
+  // A withdraw for a connection that is gone (archived, removed) has nobody to tell: it is out.
+  if ("code" in run && run.code === "NOT_CONNECTED" && action === "withdraw") run = { result: { kind: "accepted" }, sentPriceCents: null };
   if ("code" in run) return fail(ctx, table, row, action, { code: run.code, reason: null }, run.code);
   const { result } = run;
   if (result.kind === "accepted" || result.kind === "published") {

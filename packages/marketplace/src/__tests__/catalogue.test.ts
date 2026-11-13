@@ -282,22 +282,56 @@ describe("catalogue publishing, push", () => {
     expect(await stateOf(h)).toMatchObject({ status: "WITHDRAWN" });
   });
 
-  it("withdrawing what never reached the marketplace calls nobody", async () => {
-    const h = mount([{ status: 422, body: "no" }]);
+  it("a withdraw after a failed publish is still sent: its answer may have been lost after it landed", async () => {
+    const h = mount([
+      { status: 503, body: "busy" },
+      { status: 200, body: "{}" },
+    ]);
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h, LAST);
+    expect((await stateOf(h))?.status).toBe("FAILED");
+
+    expect(await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-1" })).toMatchObject({
+      kind: "queued",
+      publication: { status: "WITHDRAWING" },
+    });
+    await runLatest(h);
+
+    expect(h.http.requests.map((request) => request.method)).toEqual(["PUT", "PATCH"]);
+    expect((await stateOf(h))?.status).toBe("WITHDRAWN");
+    expect(await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-2" })).toEqual({
+      kind: "unchanged",
+      publication: null,
+    });
+  });
+
+  it("a withdraw for a connection archived since is out at once, with nobody to tell", async () => {
+    const h = mount();
     await h.connect(PUSHY);
     await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
     await runLatest(h);
-    const calls = h.http.requests.length;
+    h.patchIntegration({ archivedAt: new Date("2026-11-11T11:00:00.000Z") });
 
     expect(await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-1" })).toMatchObject({
       kind: "unchanged",
       publication: { status: "WITHDRAWN" },
     });
-    expect(await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-2" })).toEqual({
-      kind: "unchanged",
-      publication: null,
-    });
-    expect(h.http.requests).toHaveLength(calls);
+    expect(h.http.requests).toHaveLength(1);
+  });
+
+  it("a withdraw already queued when the connection was archived ends WITHDRAWN, not FAILED", async () => {
+    const h = mount();
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h);
+    await h.engine.withdraw({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    h.patchIntegration({ archivedAt: new Date("2026-11-11T11:00:00.000Z") });
+
+    await runLatest(h);
+
+    expect(await stateOf(h)).toMatchObject({ status: "WITHDRAWN", failureCode: null });
+    expect(h.http.requests).toHaveLength(1);
   });
 
   it("refuses before stamping anything: no catalogue, not connected, unknown product, a bad price", async () => {

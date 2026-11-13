@@ -10,6 +10,7 @@ import {
   type CatalogueRow,
   type CatalogueTable,
 } from "./catalogue-store";
+import { connectionMerchantId } from "./integration";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -121,16 +122,16 @@ export async function publishToCatalogue(ctx: EngineContext, input: CataloguePub
   return queue(ctx, row, "publish");
 }
 
-/** A publish that FAILED before anything reached the marketplace: withdrawing it is only a stamp. */
-const neverLanded = (row: CatalogueRow): boolean =>
-  row.status === "FAILED" && row.failedAction === "PUBLISH" && row.publishedAt === null && row.externalId === null;
-
 /**
- * Take the product out of the marketplace's catalogue. A product never there
- * (no row, WITHDRAWN, or a first publish that failed) is `unchanged` and calls
- * nobody; a double tap while it is on its way out queues nothing new; a
- * withdraw while a publish is on its way wins (the job re-withdraws a publish
- * that lands after it).
+ * Take the product out of the marketplace's catalogue. A product never
+ * switched on (no row, or WITHDRAWN) is `unchanged`; a double tap while it is
+ * on its way out queues nothing new; a withdraw while a publish is on its way
+ * wins (the job re-withdraws a publish that lands after it).
+ *
+ * A withdraw is SENT even after a publish that FAILED: a call whose answer was
+ * lost may have put the item there, and a marketplace answers a withdraw of
+ * an item it does not have as done. Only a store with no live connection any
+ * more (archived, removed) ends WITHDRAWN at once: there is nobody to tell.
  */
 export async function withdrawFromCatalogue(ctx: EngineContext, target: CatalogueTarget): Promise<CatalogueActionResult> {
   const table = await usableTable(ctx, target.provider);
@@ -139,7 +140,8 @@ export async function withdrawFromCatalogue(ctx: EngineContext, target: Catalogu
   if (!existing || existing.status === "WITHDRAWN") return { kind: "unchanged", publication: existing && viewOf(existing) };
   if (existing.status === "WITHDRAWING") return queue(ctx, existing, "withdraw");
   const now = ctx.ports.clock.now();
-  const local = neverLanded(existing);
+  // No live connection (archived, removed): nothing to tell, so it is out here and now.
+  const local = (await connectionMerchantId(ctx, target.clientId, target.provider)) === null;
   const data = local
     ? { status: "WITHDRAWN", withdrawnAt: now, requestedAt: now, ...NO_FAILURE }
     : { status: "WITHDRAWING", requestedAt: now, ...NO_FAILURE };

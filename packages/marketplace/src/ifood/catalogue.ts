@@ -194,7 +194,8 @@ async function withdraw(ctx: CatalogueCallContext, item: CatalogueItemRef): Prom
   const itemId = item.externalId ?? ifoodItemId(item.ref);
   const patched = await call(ctx, "PATCH", "items/status", { itemId, status: "UNAVAILABLE" });
   if ("kind" in patched) return patched;
-  // An item iFood does not have is already out of its catalogue.
+  // ESTIMATED: a 404 means iFood does not have the item, so it is already out
+  // of its catalogue (the Errors page says 404 is "the resource does not exist").
   if (patched.status === 404) return { kind: "accepted" };
   return outboundResultOf(patched);
 }
