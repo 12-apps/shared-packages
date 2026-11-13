@@ -1,0 +1,45 @@
+{
+  "id": "fiscal-half-cent-2026",
+  "versao": "1.0.0",
+  "dataHoraEmissao": "2026-11-20T12:00:00-03:00",
+  "municipio": 3550308,
+  "uf": "SP",
+  "itens": [
+    {
+      "numero": 1,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 5.0,
+      "cClassTrib": "000001"
+    },
+    {
+      "numero": 2,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 15.0,
+      "cClassTrib": "000001"
+    },
+    {
+      "numero": 3,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 25.0,
+      "cClassTrib": "000001"
+    },
+    {
+      "numero": 4,
+      "ncm": "21069090",
+      "quantidade": 1,
+      "unidade": "UN",
+      "cst": "000",
+      "baseCalculo": 45.0,
+      "cClassTrib": "000001"
+    }
+  ]
+}

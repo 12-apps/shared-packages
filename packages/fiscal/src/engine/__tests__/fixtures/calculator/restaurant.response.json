@@ -1,0 +1,181 @@
+{
+  "objetos": [
+    {
+      "nObj": 1,
+      "tribCalc": {
+        "IBSCBS": {
+          "CST": "200",
+          "cClassTrib": "200047",
+          "gIBSCBS": {
+            "vBC": "39.90",
+            "gIBSUF": {
+              "pIBSUF": "0.10",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.06"
+              },
+              "vIBSUF": "0.02",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 39.90000000, com alíquota de 0.100000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            },
+            "gIBSMun": {
+              "pIBSMun": "0.00",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.00"
+              },
+              "vIBSMun": "0.00",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 39.90000000, com alíquota de 0.000000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            },
+            "vIBS": "0.02",
+            "gCBS": {
+              "pCBS": "0.90",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.54"
+              },
+              "vCBS": "0.22",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 39.90000000, com alíquota de 0.900000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            }
+          }
+        }
+      },
+      "calculoSimulado": false
+    },
+    {
+      "nObj": 2,
+      "tribCalc": {
+        "IBSCBS": {
+          "CST": "200",
+          "cClassTrib": "200047",
+          "gIBSCBS": {
+            "vBC": "12.00",
+            "gIBSUF": {
+              "pIBSUF": "0.10",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.06"
+              },
+              "vIBSUF": "0.01",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 12.00000000, com alíquota de 0.100000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            },
+            "gIBSMun": {
+              "pIBSMun": "0.00",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.00"
+              },
+              "vIBSMun": "0.00",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 12.00000000, com alíquota de 0.000000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            },
+            "vIBS": "0.01",
+            "gCBS": {
+              "pCBS": "0.90",
+              "gRed": {
+                "pRedAliq": "40.00",
+                "pAliqEfet": "0.54"
+              },
+              "vCBS": "0.06",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em Art. 275, tributada conforme Alíquota reduzida em 40%. A base de cálculo utilizada é de R$ 12.00000000, com alíquota de 0.900000%, sendo que esse regime define uma redução de 40.000000% na alíquota."
+            }
+          }
+        }
+      },
+      "calculoSimulado": false
+    },
+    {
+      "nObj": 3,
+      "tribCalc": {
+        "IBSCBS": {
+          "CST": "000",
+          "cClassTrib": "000001",
+          "gIBSCBS": {
+            "vBC": "6.50",
+            "gIBSUF": {
+              "pIBSUF": "0.10",
+              "vIBSUF": "0.01",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 6.50000000, com alíquota de 0.100000%."
+            },
+            "gIBSMun": {
+              "pIBSMun": "0.00",
+              "vIBSMun": "0.00",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 6.50000000, com alíquota de 0.000000%."
+            },
+            "vIBS": "0.01",
+            "gCBS": {
+              "pCBS": "0.90",
+              "vCBS": "0.06",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 6.50000000, com alíquota de 0.900000%."
+            }
+          }
+        }
+      },
+      "calculoSimulado": false
+    },
+    {
+      "nObj": 4,
+      "tribCalc": {
+        "IBSCBS": {
+          "CST": "000",
+          "cClassTrib": "000001",
+          "gIBSCBS": {
+            "vBC": "8.00",
+            "gIBSUF": {
+              "pIBSUF": "0.10",
+              "vIBSUF": "0.01",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 8.00000000, com alíquota de 0.100000%."
+            },
+            "gIBSMun": {
+              "pIBSMun": "0.00",
+              "vIBSMun": "0.00",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 8.00000000, com alíquota de 0.000000%."
+            },
+            "vIBS": "0.01",
+            "gCBS": {
+              "pCBS": "0.90",
+              "vCBS": "0.07",
+              "memoriaCalculo": "Operação de consumo com enquadramento legal em LC 214/2025, tributada conforme Tributação integral. A base de cálculo utilizada é de R$ 8.00000000, com alíquota de 0.900000%."
+            }
+          }
+        }
+      },
+      "calculoSimulado": false
+    }
+  ],
+  "total": {
+    "tribCalc": {
+      "IBSCBSTot": {
+        "vBCIBSCBS": "66.40",
+        "gIBS": {
+          "gIBSUF": {
+            "vDif": "0.00",
+            "vDevTrib": "0.00",
+            "vIBSUF": "0.05"
+          },
+          "gIBSMun": {
+            "vDif": "0.00",
+            "vDevTrib": "0.00",
+            "vIBSMun": "0.00"
+          },
+          "vIBS": "0.05",
+          "vCredPres": "0.00",
+          "vCredPresCondSus": "0.00"
+        },
+        "gCBS": {
+          "vDif": "0.00",
+          "vDevTrib": "0.00",
+          "vCBS": "0.41",
+          "vCredPres": "0.00",
+          "vCredPresCondSus": "0.00"
+        },
+        "gMono": {
+          "vIBSMono": "0.00",
+          "vCBSMono": "0.00",
+          "vIBSMonoReten": "0.00",
+          "vCBSMonoReten": "0.00",
+          "vIBSMonoRet": "0.00",
+          "vCBSMonoRet": "0.00"
+        }
+      }
+    }
+  }
+}
