@@ -4,7 +4,7 @@ import type { SettingsService } from '../config/service';
 import { toClientChargeView } from '../core/client-view';
 import { InvalidCredentialsInputError } from '../core/errors';
 import type { PaymentsGateway } from '../core/gateway';
-import type { ChargeStore } from '../core/ports';
+import type { ChargeStore, WebhookEventHandler } from '../core/ports';
 import type {
   ChargeInput,
   MerchantRef,
@@ -31,6 +31,11 @@ export type { VaultRequestResolvers } from './vault-handlers';
  */
 export interface PaymentsRequestContext {
   merchant: MerchantRef;
+  /**
+   * `handleWebhook` only: a reaction this delivery adds after the gateway's own
+   * (see `WebhookDeliveryOptions`). Ignored by every other handler.
+   */
+  onWebhookEvent?: WebhookEventHandler;
 }
 
 /**
@@ -348,12 +353,16 @@ export function createPaymentsHttp(deps: PaymentsHttpDeps): PaymentsHttpHandlers
 
     handleWebhook: (request, ctx, provider) =>
       guardedWebhook(async () => {
-        const events = await gateway.handleWebhook(ctx.merchant, {
-          provider,
-          // RAW body — signature schemes verify bytes, never a re-serialize.
-          rawBody: await request.text(),
-          headers: lowerHeaders(request),
-        });
+        const events = await gateway.handleWebhook(
+          ctx.merchant,
+          {
+            provider,
+            // RAW body — signature schemes verify bytes, never a re-serialize.
+            rawBody: await request.text(),
+            headers: lowerHeaders(request),
+          },
+          ctx.onWebhookEvent ? { onWebhookEvent: ctx.onWebhookEvent } : undefined,
+        );
         return json({ processed: events.length });
       }),
 

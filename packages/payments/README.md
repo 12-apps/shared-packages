@@ -80,6 +80,10 @@ export const paymentsHttp = createPaymentsHttp({
 The HTTP handlers are WHATWG `Request → Response` functions — mount them in
 Next.js route handlers today; run them as a standalone service later. The
 HOST owns auth and merchant attribution (it passes `{ merchant }` per call).
+A webhook route may also pass `{ merchant, onWebhookEvent }`: that handler runs
+after the gateway's own, for THAT delivery only, and a throw marks the delivery
+FAILED like the gateway's would. A replay (`replayWebhooks`) runs the gateway's
+handler alone.
 
 ## Frontend quick start
 
