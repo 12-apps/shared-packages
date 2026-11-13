@@ -1,0 +1,16 @@
+{
+    "path": "/nfce/lookup",
+    "request": {
+        "environment": "homologacao",
+        "accessKey": "35261111222333000181650010000012011482139076"
+    },
+    "status": 200,
+    "body": {
+        "statusCode": "217",
+        "statusReason": "Rejeição: NF-e não consta na base de dados da SEFAZ",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4\"><retConsSitNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>217</cStat><xMotivo>Rejeição: NF-e não consta na base de dados da SEFAZ</xMotivo><cUF>35</cUF><dhRecbto>2026-11-20T12:31:00-03:00</dhRecbto><chNFe>35261111222333000181650010000012011482139076</chNFe></retConsSitNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+        "status": "NOT_FOUND",
+        "accessKey": "35261111222333000181650010000012011482139076",
+        "protocol": null
+    }
+}

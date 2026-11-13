@@ -1,0 +1,22 @@
+{
+    "path": "/nfce/cancel",
+    "request": {
+        "environment": "homologacao",
+        "accessKey": "35261111222333000181650010000012011482139076",
+        "protocol": "135260000123456",
+        "reason": "Customer gave up the order"
+    },
+    "status": 422,
+    "body": {
+        "error": {
+            "class": "REJECTED",
+            "code": "501",
+            "message": "SEFAZ [501] Rejeição: Prazo de cancelamento superior ao previsto na Legislação",
+            "details": [],
+            "accessKey": null,
+            "signedXml": null,
+            "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4\"><retEnvEvento versao=\"1.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><idLote>202611131609427</idLote><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>128</cStat><xMotivo>Lote de Evento Processado</xMotivo><retEvento versao=\"1.00\"><infEvento><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>501</cStat><xMotivo>Rejeição: Prazo de cancelamento superior ao previsto na Legislação</xMotivo><chNFe>35261111222333000181650010000012011482139076</chNFe><tpEvento>110111</tpEvento><xEvento>Cancelamento registrado</xEvento><nSeqEvento>1</nSeqEvento><dhRegEvento>2026-11-20T13:00:00-03:00</dhRegEvento></infEvento></retEvento></retEnvEvento></nfeResultMsg></soap:Body></soap:Envelope>",
+            "outcomeUnknown": false
+        }
+    }
+}

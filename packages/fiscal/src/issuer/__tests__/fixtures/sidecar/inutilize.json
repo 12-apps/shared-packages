@@ -1,0 +1,24 @@
+{
+    "path": "/inutilize",
+    "request": {
+        "environment": "homologacao",
+        "model": "nfce",
+        "uf": "SP",
+        "cnpj": "11222333000181",
+        "year": 2026,
+        "series": 1,
+        "from": 1300,
+        "to": 1305,
+        "reason": "Numbers skipped by a failed batch"
+    },
+    "status": 200,
+    "body": {
+        "statusCode": "102",
+        "statusReason": "Inutilização de número homologado",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4\"><retInutNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infInut><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><cUF>35</cUF><ano>26</ano><CNPJ>11222333000181</CNPJ><mod>65</mod><serie>1</serie><nNFIni>1300</nNFIni><nNFFin>1305</nNFFin><dhRecbto>2026-11-20T14:00:00-03:00</dhRecbto><nProt>135260000300001</nProt></infInut></retInutNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+        "status": "INUTILIZED",
+        "protocol": "135260000300001",
+        "registeredAt": "2026-11-20T14:00:00-03:00",
+        "inutilizationXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ProcInutNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><inutNFe xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\"><infInut Id=\"ID35261122233300018165001000001300000001305\"><tpAmb>2</tpAmb><xServ>INUTILIZAR</xServ><cUF>35</cUF><ano>26</ano><CNPJ>11222333000181</CNPJ><mod>65</mod><serie>1</serie><nNFIni>1300</nNFIni><nNFFin>1305</nNFFin><xJust>Numbers skipped by a failed batch</xJust></infInut><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/><SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/><Reference URI=\"#ID35261122233300018165001000001300000001305\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/><DigestValue>LaLhgzZBgBpDkfNSBRYHLQoSW3s=</DigestValue></Reference></SignedInfo><SignatureValue>egS3J4PtKk/74j7WGE3gfopVKrU3Jf9ne+ahDGJDBv5lv8pMlG08fBeBLkSCuiFBcYUvF+/TMyDKsuiI5oM8cmTxcxpYUJiSy2ni25KfgNsrScv1vTZz6XsZLoEEZmusB5D/Aisdm94j0Bksx3/drWtHwVjfbj5NQJ+XOS+Uove8iujAtmgwqA0Ib4VwHtEYzbELGp3e1xD9YrDHJRHYaDyj5GvDLRXyYpE2MygnGcMhw7K9ZUhYxu9CgE4qd9lVzZbcTWfecY+yZ7gCFLp4SG0uvJFywjYQCvC/aHVl5L2EI1n3kkDVAly1VSJfLpLoCCYzOWTWUdX8a7m4UjnFYg==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDKDCCAhCgAwIBAgIIfUQHTgKcTJMwDQYJKoZIhvcNAQELBQAwMzEkMCIGA1UEAwwbVEVTVCBDT01QQU5ZOjExMjIyMzMzMDAwMTgxMQswCQYDVQQGEwJCUjAeFw0yNjExMTMxOTA5NDJaFw0yNjEyMTMxOTA5NDJaMDMxJDAiBgNVBAMMG1RFU1QgQ09NUEFOWToxMTIyMjMzMzAwMDE4MTELMAkGA1UEBhMCQlIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0wHuq472oKfA64JLL5D9/aSMrke7wdTXG+SxLcc+5DywVjTQBS5SHbp+v6M0O89jhmR9eJtA88pmpJ2fZ9j6/A7MsXSZejxuzg8L9LKYvED7ImOCi3zBqHP4ufH0N3Y/rdltAlKQkVmkE6sZhzIeBFH0pV8cMn5kZZYpi4dd0gF1HjQH5O39PwcK56wk87EU1rgU6NMEc9sMoE5OzDTsfTaXyxkwnhqtN5LG7GWmwvkfKIaegbUz19EYeRfR1ONL/cWKaKptQ4ywhcnpIrTvgxrk9xMkVSztkn1hgkYDS37w7r+0tKWiTbhta+lhKGYNHlCenBBRtbiZPDhVAUd21AgMBAAGjQDA+MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMCQGA1UdEQQdMBugGQYFYEwBAwOgEBMOMTEyMjIzMzMwMDAxODEwDQYJKoZIhvcNAQELBQADggEBALNnqeZd4tPj9HwhUlJ6hjgZeOXmW3E5YMLvZP4yJH/MRZxJvxWsbwLG9+RIwsPvzSiORLJd1FvddSudsqyOzTfuLMjZ/YsNSR6zWmh7wzNsn4PTBSOW7GDLUPUX2e2nNrt2oyMGHEY0Uxcwbd+v22x47YcG9KEi8DteSYxCXPamWLi3gCloLJygQ9oDf78ZhteD6IG4bYHP45lepFvn0Zyu5wOI8NVCREWhhF0TRWv8HMJRkOWVqF4PmvNcZZSezthY/DRIUATktk8x0yly+onooAU5bvjGnqZU9albOnR1UKtO3kkkVJM/h/W4MdZtg3CnlF2vy6/tWDFtXvEuZuc=</X509Certificate></X509Data></KeyInfo></Signature></inutNFe><retInutNFe xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\"><infInut><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><cUF>35</cUF><ano>26</ano><CNPJ>11222333000181</CNPJ><mod>65</mod><serie>1</serie><nNFIni>1300</nNFIni><nNFFin>1305</nNFFin><dhRecbto>2026-11-20T14:00:00-03:00</dhRecbto><nProt>135260000300001</nProt></infInut></retInutNFe></ProcInutNFe>"
+    }
+}

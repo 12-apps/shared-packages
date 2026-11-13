@@ -1,0 +1,16 @@
+{
+    "path": "/nfce/lookup",
+    "request": {
+        "environment": "homologacao",
+        "accessKey": "35261111222333000181650010000012011482139076"
+    },
+    "status": 200,
+    "body": {
+        "statusCode": "100",
+        "statusReason": "Autorizado o uso da NF-e",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4\"><retConsSitNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><cUF>35</cUF><dhRecbto>2026-11-20T12:31:00-03:00</dhRecbto><chNFe>35261111222333000181650010000012011482139076</chNFe><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><chNFe>35261111222333000181650010000012011482139076</chNFe><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><nProt>135260000123456</nProt><digVal>AAAAAAAAAAAAAAAAAAAAAAAAAAA=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+        "status": "AUTHORIZED",
+        "accessKey": "35261111222333000181650010000012011482139076",
+        "protocol": "135260000123456"
+    }
+}

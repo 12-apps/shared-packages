@@ -1,0 +1,176 @@
+{
+    "path": "/nfce/issue",
+    "request": {
+        "environment": "homologacao",
+        "document": {
+            "version": 1,
+            "series": 1,
+            "number": 1201,
+            "keyCode": "48213907",
+            "issuedAt": "2027-01-02T10:00:00-03:00",
+            "operationNature": "VENDA",
+            "purpose": "NORMAL",
+            "destination": "INTERNAL",
+            "presence": "IN_PERSON",
+            "finalConsumer": true,
+            "intermediary": null,
+            "issuer": {
+                "cnpj": "11222333000181",
+                "stateRegistration": "123456789012",
+                "legalName": "EXAMPLE FOODS LTDA",
+                "tradeName": "Example Foods",
+                "taxRegime": "SIMPLES",
+                "address": {
+                    "street": "Rua das Flores",
+                    "number": "100",
+                    "complement": null,
+                    "district": "Centro",
+                    "municipalityIbge": "3550308",
+                    "municipalityName": "Sao Paulo",
+                    "uf": "SP",
+                    "postalCode": "01001000",
+                    "phone": "1133334444"
+                }
+            },
+            "buyer": null,
+            "lines": [
+                {
+                    "id": "line-1",
+                    "code": "SKU-1",
+                    "gtin": null,
+                    "description": "Sandwich",
+                    "ncm": "21069090",
+                    "cest": null,
+                    "cfop": "5102",
+                    "unit": "UN",
+                    "quantity": 2,
+                    "valueCents": 3990,
+                    "discountCents": 0,
+                    "approximateTaxCents": 523,
+                    "additionalInfo": null,
+                    "icms": {
+                        "regime": "SIMPLES",
+                        "origin": 0,
+                        "csosn": "102"
+                    },
+                    "pis": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "cofins": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "ibsCbs": {
+                        "cst": "000",
+                        "classCode": "000001",
+                        "figures": {
+                            "baseCents": 3990,
+                            "reductionBp": 0,
+                            "cbsRateBp": 90,
+                            "cbsCents": 36,
+                            "ibsUfRateBp": 10,
+                            "ibsUfCents": 4,
+                            "ibsMunRateBp": 0,
+                            "ibsMunCents": 0
+                        }
+                    }
+                },
+                {
+                    "id": "line-2",
+                    "code": "SKU-2",
+                    "gtin": null,
+                    "description": "Orange juice",
+                    "ncm": "20091200",
+                    "cest": null,
+                    "cfop": "5102",
+                    "unit": "UN",
+                    "quantity": 1,
+                    "valueCents": 1200,
+                    "discountCents": 100,
+                    "approximateTaxCents": null,
+                    "additionalInfo": "Fresh",
+                    "icms": {
+                        "regime": "SIMPLES",
+                        "origin": 0,
+                        "csosn": "102"
+                    },
+                    "pis": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "cofins": {
+                        "cst": "49",
+                        "baseCents": 0,
+                        "rateBp": 0,
+                        "amountCents": 0
+                    },
+                    "ibsCbs": {
+                        "cst": "200",
+                        "classCode": "200047",
+                        "figures": {
+                            "baseCents": 1100,
+                            "reductionBp": 4000,
+                            "cbsRateBp": 90,
+                            "cbsCents": 6,
+                            "ibsUfRateBp": 10,
+                            "ibsUfCents": 1,
+                            "ibsMunRateBp": 0,
+                            "ibsMunCents": 0
+                        }
+                    }
+                }
+            ],
+            "freight": "NONE",
+            "payments": [
+                {
+                    "method": "CREDIT_CARD",
+                    "amountCents": 4000,
+                    "card": {
+                        "integrated": false,
+                        "acquirerCnpj": null,
+                        "brand": "01",
+                        "authorizationCode": "A1B2C3"
+                    },
+                    "description": null
+                },
+                {
+                    "method": "CASH",
+                    "amountCents": 1500,
+                    "card": null,
+                    "description": null
+                }
+            ],
+            "changeCents": 410,
+            "additionalInfo": {
+                "forTaxpayer": "Thank you",
+                "forTaxAuthority": null
+            },
+            "technicalResponsible": {
+                "cnpj": "11222333000181",
+                "contactName": "Support Desk",
+                "email": "support@example.com",
+                "phone": "1133334444"
+            }
+        }
+    },
+    "status": 400,
+    "body": {
+        "error": {
+            "class": "INVALID",
+            "code": "NT_2026_008_NOT_SUPPORTED",
+            "message": "A document issued on or after 2027-01-01 needs NT 2026.008 (vProdLiq), which this service's sped-nfe does not write yet.",
+            "details": [],
+            "accessKey": null,
+            "signedXml": null,
+            "sefazReply": null,
+            "outcomeUnknown": false
+        }
+    }
+}
