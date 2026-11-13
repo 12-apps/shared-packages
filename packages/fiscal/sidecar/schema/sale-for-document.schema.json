@@ -1,0 +1,401 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SaleForDocument",
+  "description": "The neutral document shape the fiscal service accepts: one sale, host-agnostic, to be issued as an NF-e (model 55) or an NFC-e (model 65). The model is the request path's, never this document's. Money is integer cents, rates integer basis points (1 bp = 0.01%), quantities at most four decimals. Mirrors the TypeScript type SaleForDocument in @12-apps/fiscal/sale; a test keeps the two in step.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "series",
+    "number",
+    "keyCode",
+    "issuedAt",
+    "operationNature",
+    "purpose",
+    "destination",
+    "presence",
+    "finalConsumer",
+    "intermediary",
+    "issuer",
+    "buyer",
+    "lines",
+    "freight",
+    "payments",
+    "changeCents",
+    "additionalInfo",
+    "technicalResponsible"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "series": { "type": "integer", "minimum": 0, "maximum": 999 },
+    "number": { "type": "integer", "minimum": 1, "maximum": 999999999 },
+    "keyCode": {
+      "description": "cNF: the 8-digit code inside the access key. The caller draws it once and keeps it, so a retried call yields the same key.",
+      "type": "string",
+      "pattern": "^[0-9]{8}$"
+    },
+    "issuedAt": {
+      "description": "dhEmi: ISO 8601 date-time with its UTC offset, e.g. 2026-11-20T12:30:00-03:00.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$"
+    },
+    "operationNature": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "purpose": { "enum": ["NORMAL", "COMPLEMENTARY", "ADJUSTMENT", "RETURN"] },
+    "destination": { "enum": ["INTERNAL", "INTERSTATE", "FOREIGN"] },
+    "presence": {
+      "enum": ["IN_PERSON", "INTERNET", "TELEPHONE", "HOME_DELIVERY", "IN_PERSON_OFF_PREMISES", "OTHER"]
+    },
+    "finalConsumer": { "type": "boolean" },
+    "intermediary": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cnpj", "userId"],
+          "properties": {
+            "cnpj": { "$ref": "#/definitions/cnpj" },
+            "userId": { "type": "string", "minLength": 2, "maxLength": 60 }
+          }
+        }
+      ]
+    },
+    "issuer": { "$ref": "#/definitions/issuer" },
+    "buyer": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/buyer" }] },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 990,
+      "items": { "$ref": "#/definitions/line" }
+    },
+    "freight": {
+      "enum": ["BY_ISSUER", "BY_RECIPIENT", "BY_THIRD_PARTY", "OWN_BY_ISSUER", "OWN_BY_RECIPIENT", "NONE"]
+    },
+    "payments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/definitions/payment" }
+    },
+    "changeCents": { "$ref": "#/definitions/cents" },
+    "additionalInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forTaxpayer", "forTaxAuthority"],
+      "properties": {
+        "forTaxpayer": { "$ref": "#/definitions/optionalText5000" },
+        "forTaxAuthority": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 2000 }] }
+      }
+    },
+    "technicalResponsible": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cnpj", "contactName", "email", "phone"],
+          "properties": {
+            "cnpj": { "$ref": "#/definitions/cnpj" },
+            "contactName": { "type": "string", "minLength": 2, "maxLength": 60 },
+            "email": { "type": "string", "minLength": 6, "maxLength": 60 },
+            "phone": { "type": "string", "pattern": "^[0-9]{6,14}$" }
+          }
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "cents": { "type": "integer", "minimum": 0 },
+    "basisPoints": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "cnpj": {
+      "description": "14 characters: the 2026 alphanumeric CNPJ (12 letters or digits, then 2 check digits) or a numeric one.",
+      "type": "string",
+      "pattern": "^[A-Z0-9]{12}[0-9]{2}$"
+    },
+    "uf": {
+      "enum": [
+        "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA", "PB", "PE",
+        "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO"
+      ]
+    },
+    "optionalText5000": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 5000 }] },
+    "address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "street",
+        "number",
+        "complement",
+        "district",
+        "municipalityIbge",
+        "municipalityName",
+        "uf",
+        "postalCode",
+        "phone"
+      ],
+      "properties": {
+        "street": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "number": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "complement": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 60 }] },
+        "district": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "municipalityIbge": { "type": "string", "pattern": "^[0-9]{7}$" },
+        "municipalityName": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "uf": { "$ref": "#/definitions/uf" },
+        "postalCode": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9]{8}$" }] },
+        "phone": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9]{6,14}$" }] }
+      }
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cnpj", "stateRegistration", "legalName", "tradeName", "taxRegime", "address"],
+      "properties": {
+        "cnpj": { "$ref": "#/definitions/cnpj" },
+        "stateRegistration": { "type": "string", "pattern": "^([0-9]{2,14}|ISENTO)$" },
+        "legalName": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "tradeName": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 60 }] },
+        "taxRegime": { "enum": ["SIMPLES", "SIMPLES_EXCESS", "NORMAL", "MEI"] },
+        "address": {
+          "allOf": [
+            { "$ref": "#/definitions/address" },
+            { "properties": { "postalCode": { "type": "string" } } }
+          ]
+        }
+      }
+    },
+    "buyerDocument": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "number"],
+          "properties": { "kind": { "const": "CPF" }, "number": { "type": "string", "pattern": "^[0-9]{11}$" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "number"],
+          "properties": { "kind": { "const": "CNPJ" }, "number": { "$ref": "#/definitions/cnpj" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "number"],
+          "properties": {
+            "kind": { "const": "FOREIGN" },
+            "number": { "type": "string", "pattern": "^([!-ÿ]{0}|[!-ÿ]{5,20})$" }
+          }
+        }
+      ]
+    },
+    "buyer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "name", "stateRegistrationStatus", "stateRegistration", "email", "address"],
+      "properties": {
+        "document": { "$ref": "#/definitions/buyerDocument" },
+        "name": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 2, "maxLength": 60 }] },
+        "stateRegistrationStatus": { "enum": ["CONTRIBUTOR", "EXEMPT", "NON_CONTRIBUTOR"] },
+        "stateRegistration": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9]{2,14}$" }] },
+        "email": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 60 }] },
+        "address": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/address" }] }
+      }
+    },
+    "origin": { "type": "integer", "minimum": 0, "maximum": 8 },
+    "icms": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regime", "origin", "csosn"],
+          "properties": {
+            "regime": { "const": "SIMPLES" },
+            "origin": { "$ref": "#/definitions/origin" },
+            "csosn": { "enum": ["102", "103", "300", "400", "500"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regime", "origin", "csosn", "creditRateBp", "creditCents"],
+          "properties": {
+            "regime": { "const": "SIMPLES" },
+            "origin": { "$ref": "#/definitions/origin" },
+            "csosn": { "const": "101" },
+            "creditRateBp": { "$ref": "#/definitions/basisPoints" },
+            "creditCents": { "$ref": "#/definitions/cents" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regime", "origin", "cst", "baseCents", "rateBp", "amountCents"],
+          "properties": {
+            "regime": { "const": "NORMAL" },
+            "origin": { "$ref": "#/definitions/origin" },
+            "cst": { "const": "00" },
+            "baseCents": { "$ref": "#/definitions/cents" },
+            "rateBp": { "$ref": "#/definitions/basisPoints" },
+            "amountCents": { "$ref": "#/definitions/cents" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["regime", "origin", "cst"],
+          "properties": {
+            "regime": { "const": "NORMAL" },
+            "origin": { "$ref": "#/definitions/origin" },
+            "cst": { "enum": ["40", "41", "50", "60"] }
+          }
+        }
+      ]
+    },
+    "contribution": {
+      "description": "PIS or COFINS. CST 01/02 carry the base, the rate and the amount; 04 to 09 carry none (send zeros); 49 to 99 carry all three.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cst", "baseCents", "rateBp", "amountCents"],
+      "properties": {
+        "cst": {
+          "enum": [
+            "01", "02", "04", "05", "06", "07", "08", "09", "49", "50", "51", "52", "53", "54", "55", "56",
+            "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"
+          ]
+        },
+        "baseCents": { "$ref": "#/definitions/cents" },
+        "rateBp": { "$ref": "#/definitions/basisPoints" },
+        "amountCents": { "$ref": "#/definitions/cents" }
+      }
+    },
+    "ibsCbsFigures": {
+      "description": "The figures of @12-apps/fiscal/engine's LineTax: vBC and, per tax, the nominal rate and the amount; reductionBp applies to all three rates.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseCents",
+        "reductionBp",
+        "cbsRateBp",
+        "cbsCents",
+        "ibsUfRateBp",
+        "ibsUfCents",
+        "ibsMunRateBp",
+        "ibsMunCents"
+      ],
+      "properties": {
+        "baseCents": { "$ref": "#/definitions/cents" },
+        "reductionBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "cbsRateBp": { "$ref": "#/definitions/basisPoints" },
+        "cbsCents": { "$ref": "#/definitions/cents" },
+        "ibsUfRateBp": { "$ref": "#/definitions/basisPoints" },
+        "ibsUfCents": { "$ref": "#/definitions/cents" },
+        "ibsMunRateBp": { "$ref": "#/definitions/basisPoints" },
+        "ibsMunCents": { "$ref": "#/definitions/cents" }
+      }
+    },
+    "ibsCbs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cst", "classCode", "figures"],
+      "properties": {
+        "cst": { "type": "string", "pattern": "^[0-9]{3}$" },
+        "classCode": { "type": "string", "pattern": "^[0-9]{6}$" },
+        "figures": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/ibsCbsFigures" }] }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "code",
+        "gtin",
+        "description",
+        "ncm",
+        "cest",
+        "cfop",
+        "unit",
+        "quantity",
+        "valueCents",
+        "discountCents",
+        "approximateTaxCents",
+        "additionalInfo",
+        "icms",
+        "pis",
+        "cofins",
+        "ibsCbs"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "code": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "gtin": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^([0-9]{8}|[0-9]{12,14})$" }] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "ncm": { "type": "string", "pattern": "^([0-9]{2}|[0-9]{8})$" },
+        "cest": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9]{7}$" }] },
+        "cfop": { "type": "string", "pattern": "^[1-7][0-9]{3}$" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 6 },
+        "quantity": { "type": "number", "minimum": 0.0001, "maximum": 99999999999 },
+        "valueCents": {
+          "description": "vProd: every unit, before the line's discount.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "discountCents": { "$ref": "#/definitions/cents" },
+        "approximateTaxCents": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/cents" }] },
+        "additionalInfo": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 500 }] },
+        "icms": { "$ref": "#/definitions/icms" },
+        "pis": { "$ref": "#/definitions/contribution" },
+        "cofins": { "$ref": "#/definitions/contribution" },
+        "ibsCbs": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/ibsCbs" }] }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "amountCents", "card", "description"],
+      "properties": {
+        "method": {
+          "enum": [
+            "CASH",
+            "CHECK",
+            "CREDIT_CARD",
+            "DEBIT_CARD",
+            "STORE_CREDIT",
+            "FOOD_VOUCHER",
+            "MEAL_VOUCHER",
+            "GIFT_VOUCHER",
+            "FUEL_VOUCHER",
+            "BANK_SLIP",
+            "BANK_DEPOSIT",
+            "PIX_DYNAMIC",
+            "TRANSFER",
+            "LOYALTY",
+            "PIX_STATIC",
+            "NO_PAYMENT",
+            "OTHER"
+          ]
+        },
+        "amountCents": { "$ref": "#/definitions/cents" },
+        "card": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["integrated", "acquirerCnpj", "brand", "authorizationCode"],
+              "properties": {
+                "integrated": { "type": "boolean" },
+                "acquirerCnpj": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/cnpj" }] },
+                "brand": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9]{2}$" }] },
+                "authorizationCode": {
+                  "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 128 }]
+                }
+              }
+            }
+          ]
+        },
+        "description": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 2, "maxLength": 60 }] }
+      }
+    }
+  }
+}

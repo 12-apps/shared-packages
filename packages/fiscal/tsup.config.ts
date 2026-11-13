@@ -9,6 +9,8 @@ export default defineConfig({
   entry: {
     "engine/index": "src/engine/index.ts",
     "manifest/index": "src/manifest/index.ts",
+    "sale/index": "src/sale/index.ts",
+    "sidecar/index": "src/sidecar/index.ts",
   },
   format: ["esm"],
   dts: true,

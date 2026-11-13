@@ -13,6 +13,15 @@
       "types": "./dist/manifest/index.d.ts",
       "default": "./dist/manifest/index.js"
     },
+    "./sale": {
+      "types": "./dist/sale/index.d.ts",
+      "default": "./dist/sale/index.js"
+    },
+    "./sidecar": {
+      "types": "./dist/sidecar/index.d.ts",
+      "default": "./dist/sidecar/index.js"
+    },
+    "./sidecar/schema/*": "./sidecar/schema/*",
     "./tables/*": "./tables/*",
     "./package.json": "./package.json"
   },
@@ -61,10 +70,15 @@
     "src",
     "dist",
     "tables",
+    "sidecar",
     "*.md",
     "!eslint.config.js",
     "!tsup.config.ts",
     "!**/__tests__/**",
-    "!**/*.test.*"
+    "!**/*.test.*",
+    "!sidecar/vendor",
+    "!sidecar/tests",
+    "!sidecar/phpunit.xml",
+    "!sidecar/.phpunit.cache"
   ]
 }
