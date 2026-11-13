@@ -28,6 +28,7 @@ export default defineConfig({
     'index': 'src/index.ts',
     'server/index': 'src/server/index.ts',
     'hono/index': 'src/hono/index.ts',
+    'schemas': 'src/schemas.ts',
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
     'manifest/web': 'src/manifest/web.tsx',

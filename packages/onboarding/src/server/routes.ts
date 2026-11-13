@@ -7,6 +7,7 @@ import {
   ok,
   OnboardingApiError,
   type OnboardingActor,
+  type OnboardingDataValidator,
   type OnboardingRoute,
   type OnboardingServerConfig,
 } from "./context";
@@ -90,6 +91,7 @@ type Operation =
 function parseSavePatch(
   record: Record<string, unknown>,
   invalid: () => never,
+  dataSchema: OnboardingDataValidator | undefined,
 ): OnboardingStatePatch {
   const patch: OnboardingStatePatch = {};
   if (record.status !== undefined) {
@@ -105,14 +107,26 @@ function parseSavePatch(
   if (record.data !== undefined) {
     const data = asRecord(record.data);
     if (!data) invalid();
-    patch.data = data;
+    patch.data = dataSchema ? validData(dataSchema, data, invalid) : data;
   }
   return patch;
+}
+
+/** The feature's own check of a `save`'s data (FUT-4867): its output, or the 400. */
+function validData(
+  dataSchema: OnboardingDataValidator,
+  data: Record<string, unknown>,
+  invalid: () => never,
+): Record<string, unknown> {
+  const parsed = dataSchema.safeParse(data);
+  if (!parsed.success) return invalid();
+  return asRecord(parsed.data) ?? invalid();
 }
 
 /** Parse + validate the PATCH body into one of the three operations. */
 function parseOperation(
   config: OnboardingServerConfig,
+  featureKey: string,
   body: unknown,
   locale: string | undefined,
 ): Operation {
@@ -126,7 +140,7 @@ function parseOperation(
   if (record.op === "reset") return { op: "reset" };
   if (record.op !== "save") return invalid();
 
-  return { op: "save", patch: parseSavePatch(record, invalid) };
+  return { op: "save", patch: parseSavePatch(record, invalid, config.dataSchemas?.[featureKey]) };
 }
 
 interface RouteDeps {
@@ -194,7 +208,7 @@ export function onboardingRoutes(deps: RouteDeps): OnboardingRoute[] {
       async handle({ actor, params, body, locale }) {
         try {
           const featureKey = requireFeatureKey(deps.config, params, locale);
-          const operation = parseOperation(deps.config, body, locale);
+          const operation = parseOperation(deps.config, featureKey, body, locale);
           return ok(await applyOperation(deps, actor, featureKey, operation, locale));
         } catch (error) {
           return foldApiError(error);

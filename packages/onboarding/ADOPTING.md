@@ -54,6 +54,7 @@ the library updates, every host updates with **no app changes**. Same contract
 | `db` | yes | — | lazy provider of the structural `OnboardingPrisma` seam |
 | `featureKeys` | no | any key accepted | an undeclared key is 404 (see rule 3) |
 | `resetEnabled` | no | `NODE_ENV !== 'production'` | the DEV-only reset gate |
+| `dataSchemas` | no | any JSON object per key | `{ [featureKey]: schema }` — a `save` whose `data` a key's schema refuses is the 400 `invalidOperation`, and the schema's output is what is merged; any object with a zod-style `safeParse` (see [Closed step data](#closed-step-data-opt-in)) |
 | `messages` | no | pt-BR product copy | every user-facing string |
 | `resolveActor` (hono) | yes | — | `{ userId, clientId }`; `null` → 401 |
 | `unauthenticatedMessage` (hono) | no | `Não autenticado.` | the 401 body |
@@ -67,6 +68,48 @@ Mounted under whatever prefix the host chooses (the origin host uses
 |---|---|---|
 | GET | `/onboarding/:featureKey` | `{ data: snapshot \| null }` — the caller's progress |
 | PATCH | `/onboarding/:featureKey` | `{ data: snapshot }` for `{ op: 'save', status?, step?, data? }` (data is shallow-MERGED), `{ op: 'dismiss' }`, `{ op: 'reset' }`; 400 on an unknown op or a bad field, 403 on a refused reset, 404 on an undeclared feature |
+
+## Closed step data (opt-in)
+
+A step's `data` is open by default (`Record<string, unknown>`). A host whose rule is that
+every request input is closed at every depth — no non-strict object, no `z.unknown()`, no
+record keyed by any string — states each guided feature's `data` once and hands the same
+map to the server and to its own route validator:
+
+```ts
+import { onboardingPatchBodyOf } from '@12-apps/onboarding/schemas';
+import { z } from 'zod';
+
+const dataSchemas = {
+  // `.partial()`: data is shallow-merged, so a save carries only what changed.
+  ai_integration: z.strictObject({ selectedHost: z.string() }).partial(),
+  // A collection the host used to key by e-mail is a LIST of keyed entries:
+  // a record keyed by any string is an open place.
+  team_setup: z
+    .strictObject({ invites: z.array(z.strictObject({ email: z.string(), phone: z.string().nullable() })) })
+    .partial(),
+  // A first-visit flag carries no data at all.
+  config_store: z.strictObject({}),
+};
+
+createApiOnboarding({ db, messages, featureKeys, dataSchemas }); // the package refuses per key
+export const onboardingBody = onboardingPatchBodyOf(dataSchemas); // the host route's body schema
+```
+
+`onboardingPatchBodyOf` is the discriminated union `{ op: 'save', status?, step?, data? }` |
+`{ op: 'dismiss' }` | `{ op: 'reset' }`, every member strict. The body cannot know which
+feature it is for (the key is in the path), so `data` accepts any declared feature's shape
+and the server's per-key check narrows it to the right one. The body is closed exactly when
+every schema in the map is.
+
+**Stored rows are never re-validated.** Only the incoming patch is checked, so progress
+saved before a schema existed — or under an old shape — still reads back as stored. A host
+that changes a field's shape (a record keyed by e-mail becoming a list) writes the new field
+from then on and keeps reading the old one until its rows are rewritten; dropping the old
+reader is its own later release.
+
+Opt-in throughout: without `dataSchemas` every key takes any JSON object, as before, and a
+key missing from the map stays open.
 
 ## Minimal host (Hono)
 

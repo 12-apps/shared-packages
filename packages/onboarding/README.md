@@ -27,6 +27,7 @@ for a host that already has the table.
 | `./server` | `createApiOnboarding({ db })` | The progress surface as framework-neutral route descriptors — `GET` and `PATCH` with `save` / `dismiss` / `reset`. |
 | `./server` | `createOnboardingRepository(getPrisma)` | The Prisma read/write helper under it (data-merge + started/completed stamping). |
 | `./hono` | `onboardingRouter({ db, resolveActor })` | The same surface as a mountable Hono router. `hono` is an OPTIONAL peer. |
+| `./schemas` | `onboardingPatchBodyOf(dataSchemas)` | The PATCH body as a strict zod schema, with each feature's `data` drawn from the host's per-key schemas — for a host whose own route must validate a closed input. `zod` is an OPTIONAL peer. See [Closed step data](./ADOPTING.md#closed-step-data-opt-in). |
 | `prisma/` | `onboarding.prisma` + its migration | The package OWNS the `OnboardingState` model — a host syncs it (below) rather than retyping it. |
 
 ## The data model comes with the package
