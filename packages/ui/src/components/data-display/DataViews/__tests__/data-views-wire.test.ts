@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { coerceViewState, toSavedViewSummary, type DataViewState } from "../data-views-types";
+import {
+  coerceViewState,
+  DATA_VIEWS_LAYOUTS,
+  toSavedViewSummary,
+  type DataViewState,
+} from "../data-views-types";
 import {
   fromDataViewStateWire,
   readStoredViewState,
@@ -101,6 +106,13 @@ describe("the converters", () => {
 });
 
 describe("dataViewStateWireSchema", () => {
+  it("accepts every layout DATA_VIEWS_LAYOUTS declares, and only those", () => {
+    for (const layout of DATA_VIEWS_LAYOUTS) {
+      expect(dataViewStateWireSchema.safeParse({ ...wireOfFull, layout }).success, layout).toBe(true);
+    }
+    expect(dataViewStateWireSchema.shape.layout.unwrap().options).toEqual([...DATA_VIEWS_LAYOUTS]);
+  });
+
   it("has no open place at any depth", () => {
     expect(openPlaces(dataViewStateWireSchema)).toEqual([]);
   });
@@ -137,6 +149,23 @@ describe("reading a stored view, legacy or wire", () => {
     const sparse = { search: "x", pills: { status: ["aberto"] } };
     expect(toSavedViewSummary({ ...record, state: sparse }).state).toEqual(sparse);
     expect(toSavedViewSummary({ ...record, state: null }).state).toEqual({});
+  });
+
+  it("hands a non-opt-in caller its own stored value back, the same reference", () => {
+    const legacy = { search: "x", pills: { status: ["aberto"] }, ranges: { valor: { min: 1 } } };
+    expect(readStoredViewState(legacy)).toBe(legacy);
+    expect(toSavedViewSummary({ ...record, state: legacy }).state).toBe(legacy);
+    const noMaps = { search: "x" };
+    expect(readStoredViewState(noMaps)).toBe(noMaps);
+  });
+
+  it("passes a non-object stored value through unchanged, as before", () => {
+    for (const raw of ["not a state", ["a", "b"], 7, true]) {
+      expect(readStoredViewState(raw)).toBe(raw);
+      expect(toSavedViewSummary({ ...record, state: raw }).state).toBe(raw);
+    }
+    // `null`/absent still read as `{}`, which `toSavedViewSummary` defaulted before.
+    expect(toSavedViewSummary({ ...record, state: undefined }).state).toEqual({});
   });
 
   it("reads a wire stored view as the in-memory state", () => {

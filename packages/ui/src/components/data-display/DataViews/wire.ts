@@ -21,7 +21,7 @@
  */
 import { z } from "zod";
 
-import type { DataViewsLayout } from "./data-views-types";
+import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
 import type { DataViewStateWire } from "./data-views-wire";
 
 export {
@@ -36,8 +36,11 @@ export {
 /** A range bound: a number for a `number` field, an `AAAA-MM-DD` day for a `day` one. */
 const rangeBound = z.union([z.number(), z.string()]);
 
-/** Every layout this build renders, as a closed enum (`DATA_VIEWS_LAYOUTS`'s values). */
-const layoutSchema = z.enum(["cards", "list", "board", "table"]) satisfies z.ZodType<DataViewsLayout>;
+/**
+ * Every layout this build renders, as a closed enum — derived from
+ * `DATA_VIEWS_LAYOUTS`, so a layout added there is accepted here too.
+ */
+const layoutSchema = z.enum(DATA_VIEWS_LAYOUTS as readonly [DataViewsLayout, ...DataViewsLayout[]]);
 
 /**
  * A saved view's state as stored: strict at every depth, every key declared.

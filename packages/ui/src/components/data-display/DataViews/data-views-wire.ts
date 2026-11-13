@@ -125,10 +125,18 @@ export function storedRangesOf(value: unknown): Record<string, RangeValue> {
  * other key is carried as stored, absent keys stay absent. That is the
  * contract `toSavedViewSummary` always had (it never filled defaults: an
  * absent `visibleColumns` must stay absent so applying the view shows every
- * column), so a legacy view reads back byte-identical.
+ * column).
+ *
+ * A host that never opted in sees nothing change: when neither map is a list
+ * — and when the stored value is not an object at all — the value it passed
+ * comes back as the SAME reference, exactly the cast `toSavedViewSummary` did
+ * before.
  */
 export function readStoredViewState(raw: unknown): DataViewState {
-  const value = objectOf(raw) ?? {};
+  const value = objectOf(raw);
+  if (!value || (!Array.isArray(value.pills) && !Array.isArray(value.ranges))) {
+    return raw as DataViewState;
+  }
   const read: Record<string, unknown> = { ...value };
   if (Array.isArray(value.pills)) read.pills = storedPillsOf(value.pills);
   if (Array.isArray(value.ranges)) read.ranges = storedRangesOf(value.ranges);
