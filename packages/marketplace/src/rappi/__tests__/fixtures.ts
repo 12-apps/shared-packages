@@ -23,8 +23,18 @@ export const PORTAL_ORDER_ID = "392625";
 export const PORTAL_STORE_ID = "30000011";
 
 /** Where the tests say Rappi lives. Not Rappi's hosts: the adapter takes them as config. */
-export const API_BASE = { SANDBOX: "https://api.sandbox.rappi.example.test", PRODUCTION: "https://api.rappi.example.test" };
-export const AUTH_BASE = { SANDBOX: "https://auth.sandbox.rappi.example.test", PRODUCTION: "https://auth.rappi.example.test" };
+const ORDERS_API = "/api/v2/restaurants-integrations-public-api";
+const TOKEN_PATH = "/restaurants/auth/v1/token/login/integrations";
+/** The orders API's base per environment, the portal's path under a test domain. */
+export const API_BASE = {
+  SANDBOX: `https://api.sandbox.rappi.example.test${ORDERS_API}`,
+  PRODUCTION: `https://api.rappi.example.test${ORDERS_API}`,
+};
+/** The token endpoint per environment, the portal's path under a test domain. */
+export const TOKEN_URL = {
+  SANDBOX: `https://auth.sandbox.rappi.example.test${TOKEN_PATH}`,
+  PRODUCTION: `https://auth.rappi.example.test${TOKEN_PATH}`,
+};
 export const PORTAL = "https://partners.rappi.example.test";
 
 export function portalOrder(orderId: string = PORTAL_ORDER_ID) {

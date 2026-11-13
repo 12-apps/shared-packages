@@ -170,7 +170,19 @@ async function applyEvent(
     return { kind: "ignored", reason };
   }
 
-  const mismatch = await carriedOrderMismatch(ctx, clientId, event.order);
+  return ingestCarried(ctx, inboxId, clientId, event.order, settings, now);
+}
+
+/** Ingest the order an event carries, unless it names another merchant than the connection's. */
+async function ingestCarried(
+  ctx: EngineContext,
+  inboxId: string,
+  clientId: string,
+  order: NormalizedMarketplaceOrder,
+  settings: IngestSettings,
+  now: Date | undefined,
+): Promise<DeliveryOutcome> {
+  const mismatch = await carriedOrderMismatch(ctx, clientId, order);
   if (mismatch) {
     // FAILED, so the reconciliation sweep retries it once the connection's
     // merchant id is corrected, within the inbox's attempt bound.
@@ -178,12 +190,7 @@ async function applyEvent(
     ctx.ports.logger.error(`marketplace.ingest: inbox row ${inboxId} refused: ${mismatch}`);
     return { kind: "failed", reason: mismatch };
   }
-  const result = await ingestMarketplaceOrder(ctx, {
-    clientId,
-    order: event.order,
-    settings,
-    now,
-  });
+  const result = await ingestMarketplaceOrder(ctx, { clientId, order, settings, now });
   await settleInboxEvent(ctx, inboxId, "PROCESSED");
   return { kind: "ingested", orderId: result.orderId, unmappedSkus: result.unmappedSkus };
 }

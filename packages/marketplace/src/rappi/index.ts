@@ -26,7 +26,7 @@ import { rappiReject, rappiTake, type RappiBaseUrls } from "./outbound";
  *   …ports,
  *   adapters: [
  *     createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_PT_BR }),
- *     createRappiAdapter({ copy: RAPPI_ADAPTER_COPY_PT_BR, apiBaseUrl, authBaseUrl, portalUrl, amountUnit }),
+ *     createRappiAdapter({ copy: RAPPI_ADAPTER_COPY_PT_BR, apiBaseUrl, tokenUrl, portalUrl, amountUnit }),
  *   ],
  * });
  * ```
@@ -63,19 +63,20 @@ export interface RappiAdapterConfig {
   /** The words the adapter needs: reason labels and the missing-number text. Required. */
   copy: RappiAdapterCopy;
   /**
-   * The orders API's country domain per environment (the portal's
-   * `{COUNTRY_DOMAIN}`; its samples use `https://microservices.dev.rappi.com`),
-   * as an https origin: the adapter appends
-   * `/api/v2/restaurants-integrations-public-api/orders/…`. Required and
-   * defaultless: Rappi's account manager confirms the partner's domains.
+   * The orders API's base per environment, https: the portal's
+   * `https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api` (its
+   * samples use the `https://microservices.dev.rappi.com` domain). The adapter
+   * appends `/orders/{orderId}/take/…` and `/orders/{orderId}/reject`.
+   * Required and defaultless: Rappi's account manager confirms the partner's
+   * country domain.
    */
   apiBaseUrl: RappiBaseUrls;
   /**
-   * The token endpoint's country domain per environment (the portal's "new
-   * country domain", `{NEW_DOMAIN}`), as an https origin: the adapter appends
-   * `/restaurants/auth/v1/token/login/integrations`. Required and defaultless.
+   * The token endpoint per environment, https, whole: the portal's
+   * `https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations`
+   * ("for integrations services"). Required and defaultless.
    */
-  authBaseUrl: RappiBaseUrls;
+  tokenUrl: RappiBaseUrls;
   /** Where "open it on Rappi" goes: the partner portal (Rappi names no per-order link). Required; https only. */
   portalUrl: string;
   /** How Rappi states money for this host's country (see {@link RappiAmountUnit}). Required: ESTIMATED for Brazil. */
@@ -95,7 +96,7 @@ function assertHttps(name: string, url: string): void {
 function assertConfig(config: RappiAdapterConfig): void {
   for (const env of ["SANDBOX", "PRODUCTION"] as const) {
     assertHttps(`apiBaseUrl.${env}`, config.apiBaseUrl[env]);
-    assertHttps(`authBaseUrl.${env}`, config.authBaseUrl[env]);
+    assertHttps(`tokenUrl.${env}`, config.tokenUrl[env]);
   }
   assertHttps("portalUrl", config.portalUrl);
   if (!AMOUNT_UNITS.includes(config.amountUnit)) {
@@ -106,7 +107,7 @@ function assertConfig(config: RappiAdapterConfig): void {
 /** Build the Rappi adapter. Its reasons are static: a dialog never waits on Rappi. */
 export function createRappiAdapter(config: RappiAdapterConfig): MarketplaceAdapter {
   assertConfig(config);
-  const hosts = { api: { ...config.apiBaseUrl }, auth: { ...config.authBaseUrl } };
+  const hosts = { api: { ...config.apiBaseUrl }, token: { ...config.tokenUrl } };
   const reasons: readonly CancellationReason[] = RAPPI_REASON_CODES.map((code) => ({
     code,
     label: config.copy.reasonLabels[code],

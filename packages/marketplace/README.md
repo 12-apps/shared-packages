@@ -58,7 +58,7 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | `@12-apps/marketplace/ifood/pt-BR`, `/en-US` | the iFood adapter's copy packs (reason labels, "no street number") |
 | `@12-apps/marketplace/99food` | `createNinetyNineFoodAdapter({ copy, apiBaseUrl, portalUrl })`, provider `NINETY_NINE_FOOD`, on Open Delivery |
 | `@12-apps/marketplace/99food/pt-BR`, `/en-US` | the 99Food adapter's copy packs |
-| `@12-apps/marketplace/rappi` | `createRappiAdapter({ copy, apiBaseUrl, authBaseUrl, portalUrl, amountUnit })`, provider `RAPPI` |
+| `@12-apps/marketplace/rappi` | `createRappiAdapter({ copy, apiBaseUrl, tokenUrl, portalUrl, amountUnit })`, provider `RAPPI` |
 | `@12-apps/marketplace/rappi/pt-BR`, `/en-US` | the Rappi adapter's copy packs |
 | `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS` (six: a read and a bulk write per entity), `MARKETPLACE_PERMISSIONS`, the strict Zod inputs |
 | `@12-apps/marketplace/server/pt-BR`, `/en-US` | the routes' copy packs |
@@ -134,8 +134,8 @@ import { RAPPI_ADAPTER_COPY_PT_BR } from "@12-apps/marketplace/rappi/pt-BR";
 
 createRappiAdapter({
   copy: RAPPI_ADAPTER_COPY_PT_BR,
-  apiBaseUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" },  // the orders API's country domain
-  authBaseUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" }, // the token's ("new") country domain
+  apiBaseUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" }, // https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api
+  tokenUrl: { SANDBOX: "https://…", PRODUCTION: "https://…" },   // https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations
   portalUrl: "https://…",                                         // the partner portal
   amountUnit: "MINOR_UNITS",                                      // or "MAJOR_UNITS": how Rappi states money here
 });
@@ -146,8 +146,8 @@ createRappiAdapter({
 | Webhook | Register `NEW_ORDER` and `ORDER_EVENT_CANCEL` (each at this one URL). `Rappi-Signature: t=<timestamp>,sign=<signature>`, HMAC-SHA256 of `<t>.<raw body>` keyed by the webhook's secret. A connection stores that secret as its `webhookSecret`, and a connection without one REFUSES every delivery. |
 | Events | Rappi's bodies do not name their event, so the adapter reads the shape. An `order_detail` is `NEW_ORDER` → ingested (with `action: "scheduled"` / `"cancelled"`, the two scheduled notices → IGNORED). `{ event, order_id, store_id }` naming a cancellation (`canceled_with_charge`) → cancelled. `ORDER_OTHER_EVENT` (it carries `event_time`) → IGNORED. PING, menu and store events name no order and are acknowledged 200 and dropped. |
 | Merchant id | A connection's `externalMerchantId` for Rappi is **Rappi's store id**: `store.internal_id` on `NEW_ORDER`, `store_id` on every other event. A `NEW_ORDER` naming another store is settled FAILED (so the reconciliation sweep ingests it once the id is corrected) and the webhook answers 500. |
-| Auth | `POST {authBaseUrl}/restaurants/auth/v1/token/login/integrations`, JSON `{ client_id, client_secret }` → `access_token`, valid one week; sent as `x-authorization: Bearer <token>`; cached per process. |
-| Take (the confirm) | `PUT {apiBaseUrl}/api/v2/restaurants-integrations-public-api/orders/{orderId}/take/{cookingTime}`, the store's preparation minutes (`take/` keeps the order's own). 400 "Invalid state transition" and 404 are refusals: "não confirmou" and the app link. |
+| Auth | `POST {tokenUrl}` (the portal's `https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations`), JSON `{ client_id, client_secret }` → `access_token`, valid one week; sent as `x-authorization: Bearer <token>`; cached per process. |
+| Take (the confirm) | `PUT {apiBaseUrl}/orders/{orderId}/take/{cookingTime}` (the portal's base is `https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api`), the store's preparation minutes (`take/` keeps the order's own). 400 "Invalid state transition" and 404 are refusals: "não confirmou" and the app link. |
 | Reject (the cancel) | `PUT …/orders/{orderId}/reject` with `{ reason, cancel_type, items_skus }`: one of the portal's six `cancel_type`s, the three item ones requiring the offending SKUs. Only from SENT. The 200 IS the outcome (`asyncCancellationOutcome: false`): CONFIRMED at once. Every refused answer is a refusal (FAILED, the portal link). |
 | Cancel after take | No public endpoint: `cancelAfterAccept: false`, so the store's cancel of a taken order is FAILED at once and opens the partner portal (`appLink`; Rappi names no per-order link). |
 | Windows | Rappi gives a SENT order 6 minutes to be taken or rejected before its own TIMEOUT, so a reject still waiting 6 minutes after it was asked is failed as TIMEOUT (`cancellationAnswerWindowMs`). A connection's acknowledgement window should be at most 360 s. |
@@ -159,8 +159,9 @@ to end: webhook, ingest, aceite, take, reject, Rappi's cancel, and R3-N2.
 
 **ESTIMATED, to be checked against the Rappi sandbox (api.dev.rappi.com):**
 
-- the base URLs (orders and token) per environment and the portal: Rappi names
-  them by country, so they are required config;
+- the orders API's base and the token URL per environment, and the portal:
+  Rappi names its domains by country, so they are required config (whole
+  URLs, path included: the paths name the origin application's own noun);
 - how money is stated: integers with no unit in the portal; `amountUnit` is
   required config (`MINOR_UNITS` cents, `MAJOR_UNITS` whole units);
 - that the `NEW_ORDER` body is ONE `GET orders` element (the portal says "the

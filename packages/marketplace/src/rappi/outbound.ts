@@ -26,24 +26,27 @@ import { RAPPI_PROVIDER } from "./normalize";
  *
  * WHERE is not public per partner: the portal names its domains by country
  * (`{COUNTRY_DOMAIN}`, and a "new" one for the token), and Rappi's account
- * manager opens the sandbox. So both base URLs, per environment, are the
- * adapter's REQUIRED config, never a guessed default. Tests never reach
+ * manager opens the sandbox. So the orders API's base and the token URL, per
+ * environment, are the adapter's REQUIRED config, never a guessed default. Tests never reach
  * Rappi: the HTTP client is the host's port, answered by a fake.
  */
 
-/** Where Rappi serves one API, per environment: an https origin (the portal's country domain). */
+/** One https URL per environment. */
 export type RappiBaseUrls = Readonly<Record<"SANDBOX" | "PRODUCTION", string>>;
 
-/** The two hosts the adapter calls: the orders API and the token endpoint. */
+/**
+ * The two places the adapter calls, both host config (the portal's paths
+ * carry the origin application's own noun, so they are the host's to state):
+ * - `api`: the orders API's base, the portal's
+ *   `https://{COUNTRY_DOMAIN}/api/v2/restaurants-integrations-public-api`, to
+ *   which the adapter appends `/orders/{orderId}/…`;
+ * - `token`: the token endpoint itself, the portal's
+ *   `https://{NEW_DOMAIN}/restaurants/auth/v1/token/login/integrations`.
+ */
 export interface RappiHosts {
   api: RappiBaseUrls;
-  auth: RappiBaseUrls;
+  token: RappiBaseUrls;
 }
-
-/** The orders API's path under its country domain (the portal's). */
-const ORDERS_PATH = "/api/v2/restaurants-integrations-public-api/orders";
-/** The token endpoint's path under its country domain (the portal's, "for integrations services"). */
-const TOKEN_PATH = "/restaurants/auth/v1/token/login/integrations";
 /** A token is renewed this long before it expires. */
 const TOKEN_MARGIN_MS = 60_000;
 /**
@@ -88,7 +91,7 @@ async function bearer(
   if (cached && cached.expiresAt > ctx.now.getTime() + TOKEN_MARGIN_MS) return { token: cached.token };
   const response = await ctx.http({
     method: "POST",
-    url: `${trimmed(hosts.auth[ctx.environment])}${TOKEN_PATH}`,
+    url: hosts.token[ctx.environment],
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: ctx.credentials.clientId, client_secret: ctx.credentials.clientSecret }),
   });
@@ -112,7 +115,7 @@ async function putOrder(
   if (!("token" in auth)) return auth;
   const response = await ctx.http({
     method: "PUT",
-    url: `${trimmed(hosts.api[ctx.environment])}${ORDERS_PATH}/${encodeURIComponent(request.externalOrderId)}/${request.action}`,
+    url: `${trimmed(hosts.api[ctx.environment])}/orders/${encodeURIComponent(request.externalOrderId)}/${request.action}`,
     headers: {
       "x-authorization": `Bearer ${auth.token}`,
       ...(request.body === undefined ? {} : { "Content-Type": "application/json" }),

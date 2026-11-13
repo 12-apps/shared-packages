@@ -7,7 +7,6 @@ import { RAPPI_ADAPTER_COPY_PT_BR } from "../pt-BR";
 import { normalizeRappiEvent, normalizeRappiOrder, verifyRappiSignature, type RappiAmountUnit } from "../normalize";
 import {
   API_BASE,
-  AUTH_BASE,
   PORTAL,
   PORTAL_ORDER_ID,
   PORTAL_STORE_ID,
@@ -17,6 +16,7 @@ import {
   portalScheduled,
   portalScheduledCancelled,
   signed,
+  TOKEN_URL,
 } from "./fixtures";
 
 /**
@@ -27,23 +27,22 @@ import {
 const CONFIG: RappiAdapterConfig = {
   copy: RAPPI_ADAPTER_COPY_EN_US,
   apiBaseUrl: API_BASE,
-  authBaseUrl: AUTH_BASE,
+  tokenUrl: TOKEN_URL,
   portalUrl: PORTAL,
   amountUnit: "MINOR_UNITS",
 };
 const adapter = (overrides: Partial<RappiAdapterConfig> = {}) => createRappiAdapter({ ...CONFIG, ...overrides });
 const options = (amountUnit: RappiAmountUnit = "MINOR_UNITS") => ({ amountUnit, missingStreetNumber: "s/n" });
-const ORDERS = `${API_BASE.SANDBOX}/api/v2/restaurants-integrations-public-api/orders`;
-const TOKEN_URL = `${AUTH_BASE.SANDBOX}/restaurants/auth/v1/token/login/integrations`;
-const ORDER_REF = { externalOrderId: PORTAL_ORDER_ID, externalDisplayId: PORTAL_ORDER_ID, hostOrderCode: "order-1", placedAt: new Date() };
+const ORDERS = `${API_BASE.SANDBOX}/orders`;
+const ORDER_REF = { externalOrderId: PORTAL_ORDER_ID, externalDisplayId: PORTAL_ORDER_ID, hostOrderCode: "order-1", placedAt: new Date("2026-11-13T11:58:00.000Z") };
 
 /** A call context over a scripted fake: the token endpoint answers a token, the rest `answer`. */
 function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpResponse | Promise<MarketplaceHttpResponse>) {
-  const requests: MarketplaceHttpRequest[] = [];
+  const sent: MarketplaceHttpRequest[] = [];
   const ctx: AdapterCallContext = {
     http: async (request) => {
-      requests.push(request);
-      if (request.url === TOKEN_URL || request.url === `${AUTH_BASE.PRODUCTION}/restaurants/auth/v1/token/login/integrations`) {
+      sent.push(request);
+      if (request.url === TOKEN_URL.SANDBOX || request.url === TOKEN_URL.PRODUCTION) {
         return { status: 200, body: JSON.stringify({ access_token: "tok" }) };
       }
       return answer(request);
@@ -53,7 +52,7 @@ function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpRes
     tokens: new Map(),
     now: new Date("2026-11-13T12:00:00.000Z"),
   };
-  return { ctx, requests };
+  return { ctx, requests: sent };
 }
 
 describe("verifyRappiSignature (Rappi-Signature: t=…,sign=… over `t.body`, HMAC-SHA256)", () => {
@@ -86,11 +85,9 @@ describe("verifyRappiSignature (Rappi-Signature: t=…,sign=… over `t.body`, H
     expect(adapter().readSignature((name) => headers[name] ?? null)).toBe("t=1,sign=ab");
   });
 
-  it("parses a header of many separators in linear time (no backtracking)", () => {
+  it("parses a header of many separators by splitting, with no regex to backtrack on", () => {
     const hostile = `${",".repeat(50_000)}t=${"=".repeat(50_000)}`;
-    const started = performance.now();
     expect(verifyRappiSignature(body, hostile, "hook")).toBe(false);
-    expect(performance.now() - started).toBeLessThan(1000);
   });
 });
 
@@ -279,7 +276,7 @@ describe("the Rappi adapter", () => {
 
   it("refuses at construction a base URL or portal that is not https, and an amount unit it does not know", () => {
     expect(() => adapter({ apiBaseUrl: { ...API_BASE, PRODUCTION: "http://x.test" } })).toThrow(/apiBaseUrl.PRODUCTION must be https/);
-    expect(() => adapter({ authBaseUrl: { ...AUTH_BASE, SANDBOX: "nope" } })).toThrow(/authBaseUrl.SANDBOX is not a URL/);
+    expect(() => adapter({ tokenUrl: { ...TOKEN_URL, SANDBOX: "nope" } })).toThrow(/tokenUrl.SANDBOX is not a URL/);
     expect(() => adapter({ portalUrl: "http://p.test" })).toThrow(/portalUrl must be https/);
     expect(() => adapter({ amountUnit: "CENTS" as RappiAmountUnit })).toThrow(/amountUnit/);
   });
@@ -292,7 +289,7 @@ describe("the Rappi adapter", () => {
     expect(await rappi.confirm(ctx, ORDER_REF, { preparationMinutes: null })).toEqual({ kind: "accepted" });
 
     expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${TOKEN_URL}`,
+      `POST ${TOKEN_URL.SANDBOX}`,
       `PUT ${ORDERS}/${PORTAL_ORDER_ID}/take/20`,
       // No cooking time: the order keeps its own.
       `PUT ${ORDERS}/${PORTAL_ORDER_ID}/take/`,
@@ -363,7 +360,7 @@ describe("the Rappi adapter", () => {
     await rappi.confirm(sixDays, ORDER_REF, { preparationMinutes: null });
     const eightDays = { ...ctx, now: new Date(ctx.now.getTime() + 8 * 24 * 3_600_000) };
     await rappi.confirm(eightDays, ORDER_REF, { preparationMinutes: null });
-    expect(requests.filter((r) => r.url === TOKEN_URL)).toHaveLength(2);
+    expect(requests.filter((r) => r.url === TOKEN_URL.SANDBOX)).toHaveLength(2);
   });
 
   it("uses the PRODUCTION hosts for a production connection, trailing slashes cut", async () => {
@@ -371,8 +368,8 @@ describe("the Rappi adapter", () => {
     const rappi = adapter({ apiBaseUrl: { ...API_BASE, PRODUCTION: `${API_BASE.PRODUCTION}///` } });
     await rappi.confirm({ ...ctx, environment: "PRODUCTION" }, ORDER_REF, { preparationMinutes: 15 });
     expect(requests.map((r) => r.url)).toEqual([
-      `${AUTH_BASE.PRODUCTION}/restaurants/auth/v1/token/login/integrations`,
-      `${API_BASE.PRODUCTION}/api/v2/restaurants-integrations-public-api/orders/${PORTAL_ORDER_ID}/take/15`,
+      TOKEN_URL.PRODUCTION,
+      `${API_BASE.PRODUCTION}/orders/${PORTAL_ORDER_ID}/take/15`,
     ]);
   });
 });

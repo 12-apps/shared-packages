@@ -8,7 +8,7 @@ import { NINETY_NINE_FOOD_ADAPTER_COPY_EN_US } from "../../99food/en-US";
 import { TENANT, createHarness, scriptedHttp, type Harness } from "../../__tests__/harness";
 import { createRappiAdapter, RAPPI_CANCELLATION_ANSWER_WINDOW_MS, RAPPI_PROVIDER } from "..";
 import { RAPPI_ADAPTER_COPY_EN_US } from "../en-US";
-import { API_BASE, AUTH_BASE, PORTAL, PORTAL_ORDER_ID, PORTAL_STORE_ID, portalCancel, portalOrder, portalOtherEvent } from "./fixtures";
+import { API_BASE, PORTAL, PORTAL_ORDER_ID, PORTAL_STORE_ID, portalCancel, portalOrder, portalOtherEvent, TOKEN_URL } from "./fixtures";
 
 /**
  * The engine, unchanged but for R3-N2, driven through the Rappi adapter end to
@@ -23,7 +23,7 @@ import { API_BASE, AUTH_BASE, PORTAL, PORTAL_ORDER_ID, PORTAL_STORE_ID, portalCa
 
 const P = RAPPI_PROVIDER;
 const ATTEMPT = { attempt: 1, maxAttempts: 3 };
-const ORDERS = `${API_BASE.SANDBOX}/api/v2/restaurants-integrations-public-api/orders`;
+const ORDERS = `${API_BASE.SANDBOX}/orders`;
 const TOKEN = { status: 200, body: JSON.stringify({ access_token: "tok" }) };
 
 /** Rappi's API as the portal describes it: a token, then 200 for take and reject. */
@@ -33,7 +33,7 @@ function rappiApi(
     body: "",
   }),
 ) {
-  return scriptedHttp((request) => (request.url.startsWith(AUTH_BASE.SANDBOX) ? TOKEN : answer(request)));
+  return scriptedHttp((request) => (request.url === TOKEN_URL.SANDBOX ? TOKEN : answer(request)));
 }
 
 function harness(options: { http?: ReturnType<typeof scriptedHttp> } = {}) {
@@ -53,7 +53,7 @@ function harness(options: { http?: ReturnType<typeof scriptedHttp> } = {}) {
       createRappiAdapter({
         copy: RAPPI_ADAPTER_COPY_EN_US,
         apiBaseUrl: API_BASE,
-        authBaseUrl: AUTH_BASE,
+        tokenUrl: TOKEN_URL,
         portalUrl: PORTAL,
         amountUnit: "MINOR_UNITS",
       }),
@@ -124,7 +124,7 @@ describe("the engine through the Rappi adapter, end to end", () => {
     });
 
     expect(http.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${AUTH_BASE.SANDBOX}/restaurants/auth/v1/token/login/integrations`,
+      `POST ${TOKEN_URL.SANDBOX}`,
       `PUT ${ORDERS}/${PORTAL_ORDER_ID}/take/25`,
     ]);
     expect(http.requests[1]?.headers["x-authorization"]).toBe("Bearer tok");
