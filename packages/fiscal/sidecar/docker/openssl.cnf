@@ -1,0 +1,16 @@
+# OpenSSL 3 with the legacy provider beside the default one, so an A1 .pfx
+# encrypted with RC2-40 or 3DES (most issued before 2023) can be opened.
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+legacy = legacy_sect
+
+[default_sect]
+activate = 1
+
+[legacy_sect]
+activate = 1
