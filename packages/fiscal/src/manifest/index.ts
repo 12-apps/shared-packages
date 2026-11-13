@@ -20,6 +20,10 @@
  *   list are built with their screen tickets (FUT-2231, FUT-2238) from the
  *   owner's approved prototypes, over these routes.
  * - **No NFS-e.** Only the platform's own NFS-e is planned (FUT-2242).
+ * - **No register blocks.** An offline register signing on a reserved block of
+ *   the contingency series, and the voiding of a finished block's known rest,
+ *   are FUT-4717's; the port is declared (`ContingencyBlockSource`) and not
+ *   implemented.
  *
  * `@12-apps/wiring` is a TYPE-ONLY dependency: the manifest is a plain
  * `satisfies`-checked value, and the producer's assertions run in this

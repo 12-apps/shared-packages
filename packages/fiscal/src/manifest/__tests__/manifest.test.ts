@@ -97,6 +97,8 @@ describe("the fiscal manifest", () => {
       "POST /fiscal/documents fiscal:issue",
       "GET /fiscal/documents/:documentId fiscal:read",
       "POST /fiscal/documents/:documentId/cancel fiscal:cancel",
+      "POST /fiscal/documents/:documentId/resend fiscal:issue",
+      "POST /fiscal/documents/:documentId/release fiscal:issue",
       "POST /fiscal/documents/:documentId/lookup fiscal:read",
       "GET /fiscal/documents/:documentId/danfe fiscal:read",
     ]);
@@ -115,7 +117,7 @@ describe("the fiscal manifest", () => {
     });
     const wired = host.assemble();
     expect(wired.permissions).toEqual([FISCAL_PERMISSIONS]);
-    expect(wired.routes).toHaveLength(10);
+    expect(wired.routes).toHaveLength(12);
     expect(wired.jobs.map((job) => job.name).sort()).toEqual(["fiscal.certificate-expiry", "fiscal.sweep", "fiscal.transmit-contingency"]);
     expect(wired.db).toEqual([expect.objectContaining({ packageName: "@12-apps/fiscal" })]);
   });
@@ -135,10 +137,10 @@ describe("the fiscal jobs", () => {
     const deps = { documents: { sweep, transmitContingency }, store: {} as never, notify: { emit: vi.fn() }, now: () => new Date() };
     await FISCAL_JOBS.blueprints.sweep.handle(undefined as never, deps, ctx);
     await FISCAL_JOBS.blueprints.transmitContingency.handle(undefined as never, deps, ctx);
-    expect(sweep).toHaveBeenCalledWith(200);
-    expect(transmitContingency).toHaveBeenCalledWith(200);
+    expect(sweep).toHaveBeenCalledWith(10);
+    expect(transmitContingency).toHaveBeenCalledWith(10);
     expect(ctx.logger.error).toHaveBeenCalledWith("fiscal sweep failed for document d2: boom");
-    expect(FISCAL_JOBS.blueprints.sweep.lease).toEqual({ ttlMs: 600_000 });
+    expect(FISCAL_JOBS.blueprints.sweep.lease).toEqual({ ttlMs: 1_800_000 });
   });
 
   it("warns on the 30th, 15th, 7th, 3rd and last day, and daily once expired", async () => {
@@ -158,11 +160,18 @@ describe("the fiscal jobs", () => {
 
 describe("the fiscal notifications", () => {
   it("are blueprints over the host's words, one per event", () => {
-    const [expiring, rejected] = createFiscalNotificationBlueprints({
+    const [expiring, rejected, attention, deadline] = createFiscalNotificationBlueprints({
       certificateExpiring: (payload) => ({ title: `expires in ${payload.daysLeft}`, body: "renew" }),
       documentRejected: (payload) => ({ title: `rejected ${payload.code}`, body: payload.reason }),
+      documentNeedsAttention: (payload) => ({ title: `look at ${payload.number}`, body: payload.reason }),
+      contingencyDeadline: (payload) => ({ title: `transmit ${payload.number}`, body: payload.since }),
     });
-    expect([expiring.type, rejected.type]).toEqual(["fiscal.certificate-expiring", "fiscal.document-rejected"]);
+    expect([expiring.type, rejected.type, attention.type, deadline.type]).toEqual([
+      "fiscal.certificate-expiring",
+      "fiscal.document-rejected",
+      "fiscal.document-needs-attention",
+      "fiscal.contingency-deadline",
+    ]);
     expect(expiring.generate({ ownerId: "o", expiresAt: "x", daysLeft: 7 }).title).toBe("expires in 7");
     expect(() => createFiscalNotificationBlueprints({} as never)).toThrow(/certificateExpiring/);
   });

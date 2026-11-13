@@ -106,8 +106,17 @@ class Paper {
     for (const piece of wrap(value, this.width)) this.lines.push({ division, text: piece, align, emphasis });
   }
 
+  /**
+   * `label ……… value` on one line when it fits; otherwise the label wraps and
+   * the value closes its last line, or takes a line of its own, right-aligned.
+   * Nothing passes the roll's width.
+   */
   pair(division: DanfeDivision, label: string, value: string, emphasis: DanfeLine["emphasis"] = "normal"): void {
-    this.lines.push({ division, text: spread(label, value, this.width), align: "left", emphasis });
+    const labelLines = wrap(label, this.width);
+    const last = labelLines.pop() ?? "";
+    for (const piece of labelLines) this.lines.push({ division, text: piece, align: "left", emphasis });
+    const closing = last.length + 1 + value.length <= this.width ? [spread(last, value, this.width)] : [last, value.padStart(this.width)];
+    for (const piece of closing) this.lines.push({ division, text: piece, align: "left", emphasis });
   }
 
   rule(division: DanfeDivision): void {
@@ -124,6 +133,8 @@ interface Parsed {
   readonly supl: string;
   readonly accessKey: string;
   readonly contingency: boolean;
+  /** The authorisation protocol, once SEFAZ has answered (the `nfeProc`). */
+  readonly infProt: string | null;
   readonly homologation: boolean;
 }
 
@@ -144,6 +155,7 @@ function parse(xml: string): Parsed {
     supl: element(xml, "infNFeSupl") ?? "",
     accessKey,
     contingency: text(ide, "tpEmis") === "9",
+    infProt: element(xml, "infProt"),
     homologation: text(ide, "tpAmb") === "2",
   };
 }
@@ -189,9 +201,11 @@ function totalsPart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels, count: n
 
 function fiscalMessagePart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels): void {
   if (doc.homologation) paper.add("V", labels.homologation, "center", "bold");
-  if (doc.contingency) {
-    paper.add("V", labels.contingency, "center", "bold");
+  if (doc.contingency) paper.add("V", labels.contingency, "center", "bold");
+  // Offline and not yet authorised: ONE copy, the consumer's (reprints are the same paper).
+  if (doc.contingency && doc.infProt === null) {
     paper.add("V", labels.pendingAuthorization, "center", "bold");
+    paper.add("V", labels.consumerCopy, "center", "bold");
   }
   paper.add("V", labels.lookupByKey, "center");
   paper.add("V", text(doc.supl, "urlChave") ?? "", "center");
@@ -212,11 +226,11 @@ function consumerPart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels): void 
   paper.rule("VI");
 }
 
-function identificationPart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels, xml: string): void {
+function identificationPart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels): void {
   const issued = (text(doc.ide, "dhEmi") ?? "").replace("T", " ").slice(0, 19);
   paper.add("VII", `${labels.number} ${text(doc.ide, "nNF") ?? ""} ${labels.series} ${text(doc.ide, "serie") ?? ""} ${issued}`, "center", "bold");
-  const infProt = element(xml, "infProt");
-  if (infProt !== null && !doc.contingency) {
+  const { infProt } = doc;
+  if (infProt !== null) {
     paper.add("VII", `${labels.protocol} ${text(infProt, "nProt") ?? ""}`, "center");
     paper.add("VII", `${labels.authorizedAt} ${(text(infProt, "dhRecbto") ?? "").replace("T", " ").slice(0, 19)}`, "center");
   }
@@ -245,7 +259,7 @@ export function renderDanfeNfce(input: DanfeNfceInput): DanfeLine[] {
   totalsPart(paper, doc, input.labels, count);
   fiscalMessagePart(paper, doc, input.labels);
   consumerPart(paper, doc, input.labels);
-  identificationPart(paper, doc, input.labels, input.xml);
+  identificationPart(paper, doc, input.labels);
   qrPart(paper, doc, input.labels);
   return paper.lines;
 }

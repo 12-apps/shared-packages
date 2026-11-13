@@ -75,33 +75,36 @@ function parse(text: string): unknown {
   }
 }
 
+/** One POST to the service, its answer classified; never throws. */
+async function post<T>(config: SidecarIssuerConfig, base: string, path: string, body: unknown): Promise<IssuerOutcome<T>> {
+  let status: number;
+  let text: string;
+  try {
+    const response = await config.fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+    status = response.status;
+    text = await response.text();
+  } catch (error) {
+    const why = error instanceof Error ? error.name : "unknown";
+    return { ok: false, error: unanswered(`POST ${path} got no answer from the fiscal service (${why}).`) };
+  }
+  const parsed = parse(text);
+  if (status >= 200 && status < 300 && parsed !== undefined && !isErrorBody(parsed)) return { ok: true, answer: parsed as T };
+  if (isErrorBody(parsed)) return { ok: false, error: parsed.error };
+  return { ok: false, error: unanswered(`POST ${path} answered HTTP ${status} without the service's error body.`) };
+}
+
 export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
   if (typeof config?.baseUrl !== "string" || config.baseUrl === "") throw new TypeError("createSidecarIssuer needs baseUrl.");
   if (typeof config.fetch !== "function") throw new TypeError("createSidecarIssuer needs fetch.");
   if (!Number.isInteger(config.timeoutMs) || config.timeoutMs <= 0) throw new TypeError("createSidecarIssuer needs a positive timeoutMs.");
   const base = config.baseUrl.replace(/\/+$/, "");
 
-  async function call<T>(path: string, body: unknown): Promise<IssuerOutcome<T>> {
-    let status: number;
-    let text: string;
-    try {
-      const response = await config.fetch(`${base}${path}`, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(config.timeoutMs),
-      });
-      status = response.status;
-      text = await response.text();
-    } catch (error) {
-      const why = error instanceof Error ? error.name : "unknown";
-      return { ok: false, error: unanswered(`POST ${path} got no answer from the fiscal service (${why}).`) };
-    }
-    const parsed = parse(text);
-    if (status >= 200 && status < 300 && parsed !== undefined && !isErrorBody(parsed)) return { ok: true, answer: parsed as T };
-    if (isErrorBody(parsed)) return { ok: false, error: parsed.error };
-    return { ok: false, error: unanswered(`POST ${path} answered HTTP ${status} without the service's error body.`) };
-  }
+  const call = <T>(path: string, body: unknown) => post<T>(config, base, path, body);
 
   return {
     issue: ({ model, environment, signing, document }) =>

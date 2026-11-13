@@ -46,6 +46,7 @@ function api(cancelAnswer = "nfce-cancel") {
     utcOffset: () => "-03:00",
     reasons: { contingency: "SEFAZ indisponivel no momento", inutilization: "Numero nao utilizado na emissao", substitution: "Substituida por documento em contingencia" },
     staleAfterMs: 300_000,
+    nfceOnlineToleranceMs: 15 * 60_000,
     newId: (() => {
       let n = 0;
       return () => `doc-${(n += 1)}`;
@@ -125,6 +126,32 @@ describe("the fiscal routes", () => {
     expect(cancelled).toMatchObject({ status: 200, body: { data: { status: "CANCELLED" } } });
     const again = await fiscal.call("POST", "/fiscal/documents/:documentId/cancel", { params: { documentId }, body: { reason: "Pedido cancelado pelo cliente" } });
     expect(again).toMatchObject({ status: 409, body: { error: "TRANSITION_REFUSED" } });
+  });
+
+  it("print only an AUTHORIZED or a CONTINGENCY document: a cancelled one is refused, 409", async () => {
+    const fiscal = await ready();
+    const issued = await fiscal.call("POST", "/fiscal/documents", { body: { subjectId: "order-1", issuingPointId: "register-1", model: "NFCE" } });
+    const documentId = (issued.body as { data: { id: string } }).data.id;
+    await fiscal.call("POST", "/fiscal/documents/:documentId/cancel", { params: { documentId }, body: { reason: "Pedido cancelado pelo cliente" } });
+    const danfe = await fiscal.call("GET", "/fiscal/documents/:documentId/danfe", { params: { documentId } });
+    expect(danfe).toMatchObject({ status: 409, body: { error: "NOT_PRINTABLE" } });
+  });
+
+  it("refuse to resend a document that is not a rejected contingency NFC-e, and to release one nobody holds", async () => {
+    const fiscal = await ready();
+    const issued = await fiscal.call("POST", "/fiscal/documents", { body: { subjectId: "order-1", issuingPointId: "register-1", model: "NFCE" } });
+    const documentId = (issued.body as { data: { id: string } }).data.id;
+    expect((await fiscal.call("POST", "/fiscal/documents/:documentId/resend", { params: { documentId } })).status).toBe(409);
+    expect((await fiscal.call("POST", "/fiscal/documents/:documentId/release", { params: { documentId } })).status).toBe(409);
+  });
+
+  it("save the CSC's id and token together: a new id without its token is refused", async () => {
+    const fiscal = await ready();
+    const refused = await fiscal.call("PUT", "/fiscal/profile", { body: { ...PROFILE, cscId: "000002", cscToken: null } });
+    expect(refused).toMatchObject({ status: 400, body: { error: "INVALID_INPUT" } });
+    expect((await fiscal.call("PUT", "/fiscal/profile", { body: { ...PROFILE, cscToken: null } })).status).toBe(200);
+    const cleared = await fiscal.call("PUT", "/fiscal/profile", { body: { ...PROFILE, cscId: null, cscToken: null } });
+    expect(cleared).toMatchObject({ status: 200, body: { data: { hasCsc: false } } });
   });
 
   it("answer a late cancel as the issuer's failure, 422, with the document unchanged", async () => {

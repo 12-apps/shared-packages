@@ -7,7 +7,8 @@
  *   stale, and settles every number SEFAZ never used (a lookup, a cancel or
  *   an inutilization), so a series has no unexplained gap.
  * - `transmit-contingency` (every 5 minutes, offset): transmits the documents
- *   signed offline.
+ *   signed offline, and warns the owner of every one still offline after 20
+ *   hours (SEFAZ's deadline is 24).
  * - `certificate-expiry` (daily, 10:07 UTC): tells each owner whose A1 expires
  *   within 30 days, on the 30th, 15th, 7th, 3rd and last day, and every day
  *   once it has expired.
@@ -29,8 +30,22 @@ export interface FiscalJobDeps {
   readonly now: () => Date;
 }
 
-/** At most this many documents per run: a backlog drains over a few runs, never in one long one. */
-export const FISCAL_SWEEP_BATCH = 200;
+/** The single-flight lease a sweep or a transmission run holds. */
+export const FISCAL_JOB_LEASE_MS = 30 * 60_000;
+
+/**
+ * The worst one document can cost a run: an issue call and the offline
+ * signing after it, each bounded by the issuer's timeout (90 s recommended
+ * for the sidecar adapter, whose own SEFAZ call gets 50 s and a lookup).
+ */
+export const FISCAL_WORST_STEP_MS = 2 * 90_000;
+
+/**
+ * At most this many documents per run, derived so that a run of the worst
+ * steps still ends inside its lease: a second run can never overlap the
+ * first. A backlog drains over several five-minute runs.
+ */
+export const FISCAL_SWEEP_BATCH = Math.floor(FISCAL_JOB_LEASE_MS / FISCAL_WORST_STEP_MS);
 
 /** The days before expiry the owner is told; after expiry, every day. */
 export const CERTIFICATE_WARNING_DAYS: readonly number[] = [30, 15, 7, 3, 1];
@@ -56,8 +71,8 @@ export const FISCAL_JOBS = {
     sweep: {
       name: "sweep",
       schedule: { pattern: "*/5 * * * *" },
-      /** One run may hold the name for 10 minutes: each step waits on SEFAZ. */
-      lease: { ttlMs: 10 * 60_000 },
+      /** The batch is sized so a run of worst-case steps ends inside this lease. */
+      lease: { ttlMs: FISCAL_JOB_LEASE_MS },
       /** A missed run is caught up by the next tick. */
       attempts: 1,
       async handle(_payload, deps, context) {
@@ -67,7 +82,7 @@ export const FISCAL_JOBS = {
     transmitContingency: {
       name: "transmit-contingency",
       schedule: { pattern: "2-59/5 * * * *" },
-      lease: { ttlMs: 10 * 60_000 },
+      lease: { ttlMs: FISCAL_JOB_LEASE_MS },
       attempts: 1,
       async handle(_payload, deps, context) {
         report("transmit-contingency", await deps.documents.transmitContingency(FISCAL_SWEEP_BATCH), context.logger);

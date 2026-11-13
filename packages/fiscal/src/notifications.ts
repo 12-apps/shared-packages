@@ -6,16 +6,26 @@
  * - `fiscal.certificate-expiring`, emitted by the `certificate-expiry` job to
  *   holders of `fiscal:manage`;
  * - `fiscal.document-rejected`, emitted by the document service to holders of
- *   `fiscal:issue` when SEFAZ (or the fiscal service) refuses a document.
+ *   `fiscal:issue` when SEFAZ (or the fiscal service) refuses a document;
+ * - `fiscal.document-needs-attention`, to holders of `fiscal:issue` when a
+ *   document stops being retried: a settlement SEFAZ refused (241, 256, 501, a
+ *   certificate refused) or too many failures in a row;
+ * - `fiscal.contingency-deadline`, to holders of `fiscal:issue` when an NFC-e
+ *   is still offline 20 hours after it was signed (the deadline is 24).
  *
  * Each blueprint is a structural twin of the wiring contract's
  * `WireNotificationBlueprint`; the host feeds them to its notifications mount.
  */
 
-import { FISCAL_CERTIFICATE_EXPIRING, FISCAL_DOCUMENT_REJECTED } from "./documents/context";
-import type { FiscalDocumentModel } from "./documents/types";
+import {
+  FISCAL_CERTIFICATE_EXPIRING,
+  FISCAL_CONTINGENCY_DEADLINE,
+  FISCAL_DOCUMENT_NEEDS_ATTENTION,
+  FISCAL_DOCUMENT_REJECTED,
+} from "./documents/context";
+import type { FiscalDocumentModel, FiscalDocumentStatus, NumberVoid } from "./documents/types";
 
-export { FISCAL_CERTIFICATE_EXPIRING, FISCAL_DOCUMENT_REJECTED };
+export { FISCAL_CERTIFICATE_EXPIRING, FISCAL_CONTINGENCY_DEADLINE, FISCAL_DOCUMENT_NEEDS_ATTENTION, FISCAL_DOCUMENT_REJECTED };
 
 export interface CertificateExpiringPayload {
   readonly ownerId: string;
@@ -36,6 +46,28 @@ export interface DocumentRejectedPayload {
   readonly reason: string;
 }
 
+export interface DocumentNeedsAttentionPayload {
+  readonly documentId: string;
+  readonly subjectId: string;
+  readonly model: FiscalDocumentModel;
+  readonly status: FiscalDocumentStatus;
+  readonly numberVoid: NumberVoid | null;
+  readonly series: number;
+  readonly number: number;
+  readonly code: string | null;
+  readonly reason: string;
+  readonly failures: number;
+}
+
+export interface ContingencyDeadlinePayload {
+  readonly documentId: string;
+  readonly subjectId: string;
+  readonly series: number;
+  readonly number: number;
+  /** When it was signed offline, local time with offset. */
+  readonly since: string;
+}
+
 export interface FiscalNotificationContent {
   title: string;
   body: string;
@@ -51,6 +83,8 @@ export interface FiscalNotificationContext {
 export interface FiscalNotificationCopy {
   certificateExpiring(payload: CertificateExpiringPayload, context?: FiscalNotificationContext): FiscalNotificationContent;
   documentRejected(payload: DocumentRejectedPayload, context?: FiscalNotificationContext): FiscalNotificationContent;
+  documentNeedsAttention(payload: DocumentNeedsAttentionPayload, context?: FiscalNotificationContext): FiscalNotificationContent;
+  contingencyDeadline(payload: ContingencyDeadlinePayload, context?: FiscalNotificationContext): FiscalNotificationContent;
 }
 
 export interface FiscalNotificationBlueprint<TPayload> {
@@ -62,23 +96,25 @@ export interface FiscalNotificationBlueprint<TPayload> {
 /** The suggested preference category; the host's taxonomy decides. */
 export const FISCAL_NOTIFICATION_CATEGORY = "fiscal";
 
+const COPY_KEYS = ["certificateExpiring", "documentRejected", "documentNeedsAttention", "contingencyDeadline"] as const;
+
 export function createFiscalNotificationBlueprints(copy: FiscalNotificationCopy): readonly [
   FiscalNotificationBlueprint<CertificateExpiringPayload>,
   FiscalNotificationBlueprint<DocumentRejectedPayload>,
+  FiscalNotificationBlueprint<DocumentNeedsAttentionPayload>,
+  FiscalNotificationBlueprint<ContingencyDeadlinePayload>,
 ] {
-  if (typeof copy?.certificateExpiring !== "function" || typeof copy.documentRejected !== "function") {
-    throw new TypeError("createFiscalNotificationBlueprints needs certificateExpiring and documentRejected.");
-  }
+  const missing = COPY_KEYS.filter((key) => typeof copy?.[key] !== "function");
+  if (missing.length > 0) throw new TypeError(`createFiscalNotificationBlueprints needs ${missing.join(", ")}.`);
+  const blueprint = <T>(type: string, render: (payload: T, context?: FiscalNotificationContext) => FiscalNotificationContent) => ({
+    type,
+    category: FISCAL_NOTIFICATION_CATEGORY,
+    generate: (payload: T, context?: FiscalNotificationContext) => render(payload, context),
+  });
   return [
-    {
-      type: FISCAL_CERTIFICATE_EXPIRING,
-      category: FISCAL_NOTIFICATION_CATEGORY,
-      generate: (payload, context) => copy.certificateExpiring(payload, context),
-    },
-    {
-      type: FISCAL_DOCUMENT_REJECTED,
-      category: FISCAL_NOTIFICATION_CATEGORY,
-      generate: (payload, context) => copy.documentRejected(payload, context),
-    },
+    blueprint(FISCAL_CERTIFICATE_EXPIRING, copy.certificateExpiring),
+    blueprint(FISCAL_DOCUMENT_REJECTED, copy.documentRejected),
+    blueprint(FISCAL_DOCUMENT_NEEDS_ATTENTION, copy.documentNeedsAttention),
+    blueprint(FISCAL_CONTINGENCY_DEADLINE, copy.contingencyDeadline),
   ];
 }

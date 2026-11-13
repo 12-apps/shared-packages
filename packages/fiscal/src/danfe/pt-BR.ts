@@ -40,6 +40,7 @@ export const DANFE_NFCE_PT_BR: DanfeNfceLabels = {
   homologation: "EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
   contingency: "EMITIDA EM CONTINGÊNCIA",
   pendingAuthorization: "Pendente de autorização",
+  consumerCopy: "Via consumidor",
   consumer: "CONSUMIDOR",
   unidentifiedConsumer: "CONSUMIDOR NÃO IDENTIFICADO",
   number: "NFC-e nº",

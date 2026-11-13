@@ -127,11 +127,12 @@ the engine's own estimates, marked `provisional`.
 ## The fiscal documents
 
 ```ts
-import { createFiscalDocuments, createSigningIdentities } from "@12-apps/fiscal/documents";
+import { createFiscalDocuments, createPrismaFiscalStore, createSigningIdentities } from "@12-apps/fiscal/documents";
 import { createSidecarIssuer } from "@12-apps/fiscal/issuer";
 
 const documents = createFiscalDocuments({
-  store,                 // FiscalStore over the Prisma partial (createMemoryFiscalStore for tests)
+  store: createPrismaFiscalStore({ prisma }), // the package's own store: the host passes its Prisma client
+
   issuer: createSidecarIssuer({ baseUrl: "http://fiscal-sidecar:8080", fetch, timeoutMs: 90_000 }),
   signing: createSigningIdentities({ cipher }),
   cipher,                // the host's { encrypt, decrypt }: certificate, password and CSC at rest
@@ -142,7 +143,8 @@ const documents = createFiscalDocuments({
   now: () => new Date(),
   utcOffset: (ownerId, at) => "-03:00",
   reasons: { contingency, inutilization, substitution }, // host words SEFAZ receives, 15–255 chars
-  staleAfterMs: 5 * 60_000,
+  staleAfterMs: 5 * 60_000,          // the base of the backoff
+  nfceOnlineToleranceMs: 5 * 60_000, // SEFAZ's late-dhEmi limit (704), the state's
   newId: () => crypto.randomUUID(),
 });
 await documents.issue({ ownerId, subjectId, issuingPointId, model: "NFCE" });
@@ -162,27 +164,59 @@ secret-named key scrubbed. `CANCELLED` is reached only from `AUTHORIZED`, and
 nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
 (a property suite walks random sequences).
 
-- **The counters are the package's.** Every issuing point (an opaque id the
-  host maps: a register, the online store) has an ONLINE series and, for an
-  NFC-e, a CONTINGENCY series; a series belongs to one point. A number is drawn
-  in the same transaction as the document's insert (`FISCAL_NEXT_NUMBER_SQL`),
-  so a failed write gives it back. A number SEFAZ never used — a rejection, a
-  document replaced by its contingency twin — is owed a settlement
-  (`numberVoid`): looked up first when a request went out unanswered,
-  cancelled if SEFAZ authorised it after all, inutilized otherwise.
-- **Going offline is a second document.** When the service answers
-  `CONTINGENCY` for an NFC-e at a point with a contingency series, the sale is
-  numbered on that series and signed offline (`tpEmis = 9`), and the online
-  document is `REPLACED`. The `transmit-contingency` job sends it later.
+- **The counters are the package's, and so is their store.**
+  `createPrismaFiscalStore({ prisma })` runs over the host's Prisma client
+  (raw SQL on the package's migration); a host keeps no counter and writes no
+  numbering transaction. A counter is keyed by the issuer's CNPJ, the model
+  and the series, as SEFAZ numbers (one CNPJ can serve several owners); a
+  series belongs to one issuing point. A number is drawn in the same
+  transaction as the document's insert (`FISCAL_NEXT_NUMBER_SQL`), so a failed
+  write gives it back.
+- **One live document per subject.** The partial unique index
+  `fiscal_documents_live_subject_key` refuses a second live document for an
+  (owner, subject, model); `issue()` answers the existing one when a
+  concurrent call won.
+- **Going offline is a second document, in one transaction.** When the
+  service answers `CONTINGENCY` for an NFC-e at a point with a contingency
+  series — or the sweep finds an online NFC-e past `nfceOnlineToleranceMs`,
+  which SEFAZ would refuse as late — the sale is numbered on that series AND
+  the online document is `REPLACED` in the same transaction, before anything
+  is signed. Signing follows (`tpEmis = 9`); the `transmit-contingency` job
+  sends it, and warns at 20 hours (the deadline is 24). Offline, the paper is
+  ONE copy, the consumer's.
+- **Every number SEFAZ never used is settled.** `numberVoid` says what is
+  owed: a lookup first when a send went unanswered (`outcomeUnknown` is
+  sticky until a definitive answer or a lookup clears it — the package
+  computes every access key, so a lookup is always possible), the NFC-e
+  cancel BY SUBSTITUTION (event 110112, naming the contingency twin) when
+  SEFAZ authorised it after all, an inutilization otherwise; `DENIED` when
+  the lookup finds it denied (the denial spent it).
+- **A rejected contingency NFC-e is never voided.** The buyer holds its
+  DANFE: it stays `REJECTED` with SEFAZ's code, the store corrects the sale,
+  and `resendContingency` signs it again under the same series, number and
+  key code (`POST …/resend`).
+- **Nothing is retried silently.** Each failed step counts (`failures`) and
+  backs off (`nextAttemptAt`, doubling to 64 × `staleAfterMs`); the queues
+  are ordered by the next attempt, so a failing row never pins their head. A
+  refusal SEFAZ will repeat (241, 256, 501, a certificate refused), or
+  `MAX_FAILURES` in a row, hands the document to a person (`attention`, the
+  `fiscal.document-needs-attention` notification); `POST …/release` gives it
+  back to the sweep.
 - **What the classes mean here.** `REJECTED`, `INVALID` and `INTERNAL` reject
   (the same call fails again); `RETRYABLE`, `AUTH` and a `CONTINGENCY` with no
-  offline path retry, with the same number and key code, from the sweep.
+  offline path retry, with the same number and key code.
 - **Who signs** is the profile's `signingIdentity`: `STORE_CERTIFICATE` (the
   store's A1, decrypted for one call) or `PLATFORM`, declared and answering
   `NOT_SUPPORTED` until FUT-2229 q4 says how the platform signs.
 - **Secrets** are encrypted through the host's cipher on arrival, decrypted by
   the signing identity for one call, and never stored in clear, logged,
-  answered or put in an error.
+  answered or put in an error. The CSC's id and token are saved together or
+  not at all.
+
+**Not in this release** (FUT-4717): an offline register signing on a block of
+the contingency series reserved in advance, recording what it signed, and
+voiding the known rest of a finished block. The port it will build on is
+declared, unimplemented: `ContingencyBlockSource`.
 
 NFS-e is not covered: only the platform's own NFS-e is planned (FUT-2242).
 
@@ -209,13 +243,19 @@ observability namespace; and `server: ["http", "jobs"]`:
 | `GET /fiscal/profile`, `GET /fiscal/issuing-points` | `fiscal:read` |
 | `PUT /fiscal/profile`, `PUT /fiscal/profile/certificate`, `POST /fiscal/issuing-points` | `fiscal:manage` |
 | `POST /fiscal/documents` | `fiscal:issue` |
-| `GET /fiscal/documents/:documentId`, `POST …/lookup`, `GET …/danfe?paper=58\|80` | `fiscal:read` |
+| `GET /fiscal/documents/:documentId`, `POST …/lookup`, `GET …/danfe?paper=58\|80` (AUTHORIZED or CONTINGENCY only; 409 otherwise) | `fiscal:read` |
 | `POST /fiscal/documents/:documentId/cancel` | `fiscal:cancel` |
+| `POST /fiscal/documents/:documentId/resend` (a rejected contingency NFC-e), `POST …/release` (back from a person) | `fiscal:issue` |
 
 The jobs are `fiscal.sweep` and `fiscal.transmit-contingency` (every five
-minutes, leased) and `fiscal.certificate-expiry` (daily, telling owners on the
-30th, 15th, 7th, 3rd and last day, and daily once expired). The two alerts
-ship as `createFiscalNotificationBlueprints(copy)`, over the host's words. The
+minutes, a 30-minute lease and a batch sized so the worst run ends inside it) and `fiscal.certificate-expiry` (daily, telling owners on the
+30th, 15th, 7th, 3rd and last day, and daily once expired). The alerts (certificate expiring, document rejected)
+and the other two (needs attention, contingency deadline) ship as
+`createFiscalNotificationBlueprints(copy)`, over the host's words. The
 settings screen and the documents list (`web: ["surface"]`) come with their
 screen tickets; `.wiring-conformance.json` argues each capability not
 declared.
+
+The RBAC bullet of the host's tax docs (which still places the four
+permissions in the host's catalog) is corrected in the host's pull request that
+bumps `@12-apps/fiscal`, not here.

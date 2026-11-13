@@ -26,6 +26,8 @@ export interface DanfeNfceLabels {
   readonly homologation: string;
   readonly contingency: string;
   readonly pendingAuthorization: string;
+  /** Printed on a paper signed offline and not yet authorised: the one copy, the consumer's. */
+  readonly consumerCopy: string;
   /** Division VI. */
   readonly consumer: string;
   readonly unidentifiedConsumer: string;
@@ -42,5 +44,6 @@ export interface DanfeNfceLabels {
 export const DANFE_LABEL_KEYS: readonly (keyof DanfeNfceLabels)[] = [
   "cnpj", "stateRegistration", "title", "itemsHeader", "itemCount", "totalValue", "discounts", "amountDue",
   "paymentHeader", "change", "paymentMethods", "lookupByKey", "homologation", "contingency", "pendingAuthorization",
+  "consumerCopy",
   "consumer", "unidentifiedConsumer", "number", "series", "protocol", "authorizedAt", "qrCaption", "approximateTaxes",
 ];

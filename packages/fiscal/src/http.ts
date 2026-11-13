@@ -69,7 +69,16 @@ export const FISCAL_ERROR_STATUS = {
   TRANSITION_REFUSED: 409,
   SERIES_EXHAUSTED: 409,
   CONFLICT: 409,
+  SUBJECT_HAS_DOCUMENT: 409,
+  NOT_PRINTABLE: 409,
 } as const satisfies Record<FiscalDocumentErrorCode, number>;
+
+/**
+ * The states with paper: an authorised document, and one signed offline and
+ * not yet transmitted (its DANFE is what the buyer takes). A denied,
+ * cancelled, rejected or replaced document is not a valid DANFE.
+ */
+const PRINTABLE = new Set(["AUTHORIZED", "CONTINGENCY"]);
 
 const ok = (data: unknown, status = 200): FiscalHttpResponse => ({ status, body: { data } });
 
@@ -158,7 +167,29 @@ function profileRoutes({ documents }: FiscalApiConfig): FiscalRoute[] {
   ];
 }
 
-function documentRoutes({ documents, storage, danfeLabels }: FiscalApiConfig): FiscalRoute[] {
+/** The DANFE of a printable document, as ESC/POS-ready lines. */
+function danfeRoute({ documents, storage, danfeLabels }: FiscalApiConfig): FiscalRoute {
+  return {
+      method: "GET",
+      path: "/fiscal/documents/:documentId/danfe",
+      permission: FISCAL_READ,
+      handle: (request) =>
+        answering(async () => {
+          const paper = Number(request.query["paper"] ?? "80");
+          if (paper !== 58 && paper !== 80) throw new FiscalDocumentError("INVALID_INPUT", "paper must be 58 or 80.");
+          const document = await documents.getDocument(request.actor.ownerId, param(request, "documentId"));
+          if (!PRINTABLE.has(document.status)) {
+            throw new FiscalDocumentError("NOT_PRINTABLE", `document ${document.id} is ${document.status}: only an AUTHORIZED or CONTINGENCY document prints.`);
+          }
+          const xml = document.model === "NFCE" && document.xmlKey !== null ? await storage.get(document.xmlKey) : null;
+          if (xml === null) throw new FiscalDocumentError("NOT_FOUND", `document ${document.id} has no NFC-e XML to print.`);
+          return ok(renderDanfeNfce({ xml, paperWidth: paper as PaperWidth, labels: danfeLabels }));
+        }),
+    };
+}
+
+function documentRoutes(config: FiscalApiConfig): FiscalRoute[] {
+  const { documents } = config;
   return [
     {
       method: "POST",
@@ -199,25 +230,28 @@ function documentRoutes({ documents, storage, danfeLabels }: FiscalApiConfig): F
     },
     {
       method: "POST",
+      path: "/fiscal/documents/:documentId/resend",
+      permission: FISCAL_ISSUE,
+      handle: (request) =>
+        answering(async () =>
+          ok(await documents.resendContingency({ ownerId: request.actor.ownerId, documentId: param(request, "documentId") })),
+        ),
+    },
+    {
+      method: "POST",
+      path: "/fiscal/documents/:documentId/release",
+      permission: FISCAL_ISSUE,
+      handle: (request) =>
+        answering(async () => ok(await documents.release({ ownerId: request.actor.ownerId, documentId: param(request, "documentId") }))),
+    },
+    {
+      method: "POST",
       path: "/fiscal/documents/:documentId/lookup",
       permission: FISCAL_READ,
       handle: (request) =>
         answering(async () => ok(await documents.lookup({ ownerId: request.actor.ownerId, documentId: param(request, "documentId") }))),
     },
-    {
-      method: "GET",
-      path: "/fiscal/documents/:documentId/danfe",
-      permission: FISCAL_READ,
-      handle: (request) =>
-        answering(async () => {
-          const paper = Number(request.query["paper"] ?? "80");
-          if (paper !== 58 && paper !== 80) throw new FiscalDocumentError("INVALID_INPUT", "paper must be 58 or 80.");
-          const document = await documents.getDocument(request.actor.ownerId, param(request, "documentId"));
-          const xml = document.model === "NFCE" && document.xmlKey !== null ? await storage.get(document.xmlKey) : null;
-          if (xml === null) throw new FiscalDocumentError("NOT_FOUND", `document ${document.id} has no NFC-e XML to print.`);
-          return ok(renderDanfeNfce({ xml, paperWidth: paper as PaperWidth, labels: danfeLabels }));
-        }),
-    },
+    danfeRoute(config),
   ];
 }
 

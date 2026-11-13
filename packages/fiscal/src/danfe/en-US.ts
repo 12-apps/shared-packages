@@ -41,6 +41,7 @@ export const DANFE_NFCE_EN_US: DanfeNfceLabels = {
   homologation: "ISSUED IN THE TEST ENVIRONMENT - NO FISCAL VALUE",
   contingency: "ISSUED IN CONTINGENCY",
   pendingAuthorization: "Pending authorisation",
+  consumerCopy: "Consumer copy",
   consumer: "CONSUMER",
   unidentifiedConsumer: "UNIDENTIFIED CONSUMER",
   number: "NFC-e no.",
