@@ -9,8 +9,11 @@ import { describe, expect, it } from "vitest";
 
 import type { NormalizedWebhookEvent } from "@12-apps/payments-backend";
 
+import { createMemoryRefundRetryStore } from "@12-apps/payments-backend";
+
+import { createSubscriptionRefund } from "../server/refund";
 import { MERCHANT } from "./fixtures";
-import { harness, WITHIN } from "./refund-world";
+import { harness, WITHIN, world } from "./refund-world";
 
 function refundEvent(status: "PENDING" | "REFUNDED" | "FAILED"): NormalizedWebhookEvent {
   return {
@@ -69,5 +72,16 @@ describe("onWebhookEvent", () => {
     await expect(flow.onWebhookEvent(refundEvent("REFUNDED"), null, MERCHANT)).rejects.toThrow("db down");
     await flow.onWebhookEvent(refundEvent("REFUNDED"), null, MERCHANT);
     expect(held.confirmed).toBe(true);
+  });
+
+  it("on a binding that follows no refunds, leaves every event alone instead of failing the delivery", async () => {
+    const w = world();
+    const unbound = createSubscriptionRefund({
+      payments: async () => ({ gateway: {} as never }),
+      merchant: MERCHANT,
+      store: async () => w.payments,
+      series: async () => createMemoryRefundRetryStore(),
+    });
+    await expect(unbound.onWebhookEvent(refundEvent("FAILED"), null, MERCHANT)).resolves.toBeUndefined();
   });
 });

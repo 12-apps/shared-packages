@@ -187,6 +187,12 @@ export interface NotReturnedRefund {
   state: "REFUND_PENDING" | "REFUNDED";
   /** REFUNDED only: the provider's refund id recorded by what returned it again; null by hand. */
   settledRefundId: string | null;
+  /**
+   * REFUNDED only: how it was recorded returned (`markRefunded`'s `how`).
+   * ADOPTED with no refund id is the charge read seeing the money back — the
+   * refund said never returned, landing — so its own late word is no double return.
+   */
+  settledHow: RefundSettlement | null;
 }
 
 /** How a charge read back answered: money back, not back (yet), or not readable at all. */
@@ -316,7 +322,8 @@ export interface SubscriptionRefund {
    * `refundUpdated`, shaped as payments-backend's `WebhookEventHandler`, for a
    * host to hand to ONE delivery (`handleWebhook(…, { onWebhookEvent })`): a
    * REFUND_UPDATED event carrying a refund, on THIS binding's merchant, is
-   * handed to `refundUpdated`; every other event is left alone. A throw marks
+   * handed to `refundUpdated`; every other event — and every event, on a
+   * binding with no `confirmations` — is left alone. A throw marks
    * the delivery FAILED, so the provider's redelivery runs it again.
    */
   onWebhookEvent: WebhookEventHandler;

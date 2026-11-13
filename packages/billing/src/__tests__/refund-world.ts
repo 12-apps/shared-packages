@@ -47,6 +47,7 @@ export function world(start: Partial<RefundablePayment> = {}) {
     overdue: false,
     /** The refund a person said never came back, kept on the row by `reopen`. */
     notReturnedRefundId: null as string | null,
+    settledHow: null as RefundRecord["how"] | null,
     doubleReturn: null as { providerRefundId: string; at: Date } | null,
   };
   const payments = {
@@ -62,6 +63,7 @@ export function world(start: Partial<RefundablePayment> = {}) {
       held.refundedAt = record.at;
       held.providerRefundId = record.providerRefundId;
       held.confirmed = record.confirmed;
+      held.settledHow = record.how;
       return true;
     }),
     markRefundPending: vi.fn(async (_id: string, record: RefundPendingRecord) => {
@@ -103,8 +105,10 @@ export function world(start: Partial<RefundablePayment> = {}) {
     }),
     findNotReturned: vi.fn(async (_provider: string, _charge: string, providerRefundId: string) => {
       if (held.notReturnedRefundId === null || held.notReturnedRefundId !== providerRefundId) return null;
-      if (held.row.state === "REFUND_PENDING") return { id: held.row.id, state: "REFUND_PENDING" as const, settledRefundId: null };
-      if (held.row.state === "REFUNDED") return { id: held.row.id, state: "REFUNDED" as const, settledRefundId: held.providerRefundId };
+      if (held.row.state === "REFUND_PENDING") return { id: held.row.id, state: "REFUND_PENDING" as const, settledRefundId: null, settledHow: null };
+      if (held.row.state === "REFUNDED") {
+        return { id: held.row.id, state: "REFUNDED" as const, settledRefundId: held.providerRefundId, settledHow: held.settledHow };
+      }
       return null;
     }),
     doubleReturned: vi.fn(async (_id: string, record: { providerRefundId: string; at: Date }) => {

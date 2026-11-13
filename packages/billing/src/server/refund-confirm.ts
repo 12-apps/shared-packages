@@ -138,6 +138,9 @@ async function lateReturn(
     return "IGNORED";
   }
   if (reopened.settledRefundId === update.providerRefundId) return "IGNORED";
+  // Adopted off a charge read (a retry's consult, a hand settlement's check):
+  // the money seen back WAS this refund, so the customer got it once.
+  if (reopened.settledHow === "ADOPTED" && reopened.settledRefundId === null) return "IGNORED";
   const recorded = await store.doubleReturned(reopened.id, { providerRefundId: update.providerRefundId, at });
   return recorded ? "DOUBLE_RETURN" : "IGNORED";
 }
@@ -168,6 +171,9 @@ export async function refundUpdated(deps: SubscriptionRefundDeps, update: Refund
  */
 export function refundWebhookHandler(deps: SubscriptionRefundDeps) {
   return async (event: NormalizedWebhookEvent, _charge: unknown, merchant: MerchantRef): Promise<void> => {
+    // A binding that follows no refunds has nothing to do with the word: ignored,
+    // so the platform's deliveries are never failed over a missing store.
+    if (!deps.confirmations) return;
     if (event.type !== "REFUND_UPDATED" || !event.refund) return;
     if (merchant.kind !== deps.merchant.kind || merchant.id !== deps.merchant.id) return;
     const { provider, providerChargeId, providerRefundId, status } = event.refund;

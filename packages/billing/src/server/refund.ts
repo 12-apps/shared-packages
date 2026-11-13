@@ -302,8 +302,8 @@ async function notReturnedYet(ctx: Ctx, payment: RefundablePayment): Promise<Set
   if (read === "NOT_BACK") return null;
   if (read === "UNREADABLE") return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "CHARGE_UNREADABLE" };
   const record: RefundRecord = { how: "ADOPTED", providerRefundId: null, refundedCents: null, confirmed: true, at: ctx.now() };
-  await ctx.store.markRefunded(payment.id, record);
-  return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "MONEY_BACK" };
+  const wrote = await ctx.store.markRefunded(payment.id, record);
+  return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: wrote ? "MONEY_BACK" : "ALREADY_REFUNDED" };
 }
 
 async function settleByHand(

@@ -43,4 +43,32 @@ describe('a per-delivery webhook handler', () => {
     expect(extra).toHaveBeenCalledTimes(2);
     expect(Object.values(world.webhooks.statuses())).toEqual(['PROCESSED']);
   });
+
+  it('does not run when the gateway handler throws: the row fails and the redelivery runs both', async () => {
+    const own = vi.fn<WebhookEventHandler>().mockRejectedValueOnce(new Error('orders down')).mockResolvedValue(undefined);
+    const world = setupGatewayWorld(own);
+    await world.gateway.charge(TENANT, pixInput('order-1'));
+    const extra = vi.fn<WebhookEventHandler>(async () => undefined);
+
+    await expect(world.gateway.handleWebhook(TENANT, stoneDelivery('evt-1', 'PAID'), { onWebhookEvent: extra })).rejects.toThrow('orders down');
+    expect(extra).not.toHaveBeenCalled();
+    await world.gateway.handleWebhook(TENANT, stoneDelivery('evt-1', 'PAID'), { onWebhookEvent: extra });
+    expect(extra).toHaveBeenCalledOnce();
+  });
+
+  it('is not run by a replay of the row it failed: only the gateway handler is (the documented gap)', async () => {
+    const own = vi.fn<WebhookEventHandler>(async () => undefined);
+    const world = setupGatewayWorld(own);
+    await world.gateway.charge(TENANT, pixInput('order-1'));
+    const extra = vi.fn<WebhookEventHandler>().mockRejectedValue(new Error('refund store down'));
+    await expect(world.gateway.handleWebhook(TENANT, stoneDelivery('evt-1', 'PAID'), { onWebhookEvent: extra })).rejects.toThrow();
+    own.mockClear();
+
+    const report = await world.gateway.replayWebhooks({ now: new Date('2099-01-01T00:00:00Z') });
+
+    expect(report.processed).toBe(1);
+    expect(own).toHaveBeenCalledOnce();
+    expect(extra).toHaveBeenCalledOnce();
+    expect(Object.values(world.webhooks.statuses())).toEqual(['PROCESSED']);
+  });
 });

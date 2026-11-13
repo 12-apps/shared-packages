@@ -168,6 +168,29 @@ describe("the refund said never returned lands after all", () => {
     await expect(h.flow.refundUpdated({ ...LATE, providerRefundId: "rf-2" })).resolves.toBe("CONFIRMED");
   });
 
+  it("adopted by a hand settlement's charge read: its own late word is no double return", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ why: "MONEY_BACK" });
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+    expect(h.confirmations.doubleReturned).not.toHaveBeenCalled();
+  });
+
+  it("adopted by a retry's consult: its own late word is no double return", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    h.refund.mockClear();
+    await h.flow.retry("pay-1");
+    expect(h.held.row.state).toBe("REFUNDED");
+    expect(h.refund).not.toHaveBeenCalled();
+
+    await expect(h.flow.refundUpdated(LATE)).resolves.toBe("IGNORED");
+    expect(h.confirmations.doubleReturned).not.toHaveBeenCalled();
+  });
+
   it("a redelivery of the word that adopted it is ignored", async () => {
     const h = await overdueRefund();
     await h.flow.markNotReturned("pay-1", BY);
@@ -195,6 +218,15 @@ describe("settling by hand a refund said never returned", () => {
     await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "MONEY_BACK" });
     expect(h.held.row.state).toBe("REFUNDED");
     expect(h.payments.markRefunded.mock.calls.at(-1)?.[1]).toMatchObject({ how: "ADOPTED" });
+  });
+
+  it("money back but recorded returned by someone else first: says so, not MONEY_BACK", async () => {
+    const h = await overdueRefund();
+    await h.flow.markNotReturned("pay-1", BY);
+    h.refreshCharge.mockResolvedValue({ status: "REFUNDED" });
+    h.payments.markRefunded.mockResolvedValueOnce(false);
+
+    await expect(h.flow.settleByHand("pay-1", { ...BY, via: "PIX" })).resolves.toMatchObject({ outcome: "NOT_REFUNDABLE", why: "ALREADY_REFUNDED" });
   });
 
   it("an unreadable charge refuses it: nothing settled", async () => {
