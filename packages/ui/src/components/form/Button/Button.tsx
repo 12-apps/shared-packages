@@ -5,6 +5,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
+import { pressRippleStyles } from './Button.ripple';
 import { buttonHeldStyles } from './Button.held';
 import { ButtonProgressContent, buttonProgressStyles, useButtonPress } from './Button.progress';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
@@ -16,6 +17,7 @@ import {
   buttonVariantStyles,
   getColorFromTheme,
   iconAlignmentStyles,
+  buttonInk,
   buttonSize,
   rippleUnderLabelStyles,
 } from './Button.styles';
@@ -45,6 +47,7 @@ const StyledButton = styled(MuiButton, {
     position: 'relative',
     overflow: 'hidden',
     ...rippleUnderLabelStyles(),
+    ...pressRippleStyles(theme, buttonInk(theme, customVariant, colorPalette, customColor)),
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),

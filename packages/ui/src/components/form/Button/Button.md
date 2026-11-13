@@ -119,7 +119,11 @@ keyboard focus indicator) paint ABOVE the button's own surface and BELOW its
 label, icons and spinner, in every variant, colour and mode. The button is its
 own stacking context (`isolation: isolate`) and MUI's `.MuiTouchRipple-root`
 sits at `z-index: -1`, so a held contained button keeps its label contrast and a
-focused one keeps its pulsate. Colour and timing are MUI's. A host that restyles
+focused one keeps its pulsate. Opacity and timing are MUI's. The press ripple
+is painted in the absolute OPPOSITE the label's ink (black under a light label,
+white under a dark one), read from the colour the variant actually paints, so it
+never moves the surface toward the ink. The focus pulsate keeps the label's own
+colour, so keyboard focus stays as visible as before. A host that restyles
 the ripple keeps it under the label by leaving that `z-index` alone.
 
 ## Rendering as something else

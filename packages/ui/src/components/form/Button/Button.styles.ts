@@ -301,6 +301,14 @@ const VARIANT_STYLES: Record<
   }),
 };
 
+/** The colour a variant paints its label in, or `undefined` for a variant with none of its own. */
+export const buttonInk = (
+  theme: Theme,
+  variant: string | undefined,
+  palette: ColorPalette,
+  color: string,
+): string | undefined => VARIANT_STYLES[variant ?? '']?.(theme, palette, color).color as string | undefined;
+
 export const buttonVariantStyles = (
   theme: Theme,
   variant: string | undefined,
