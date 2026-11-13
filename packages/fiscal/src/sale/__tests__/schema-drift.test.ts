@@ -7,6 +7,15 @@
 import schemaJson from "../../../sidecar/schema/sale-for-document.schema.json";
 import type {
   Address,
+  BuyerDocument,
+  BuyerPresence,
+  ContributionCst,
+  DocumentPurpose,
+  FreightMode,
+  IssuerTaxRegime,
+  OperationDestination,
+  StateRegistrationStatus,
+  Uf,
   CardDetails,
   DocumentBuyer,
   DocumentIssuer,
@@ -211,6 +220,76 @@ describe("the SaleForDocument type and its JSON schema", () => {
     });
     const listed = [...(definition("payment").properties?.method?.enum ?? [])].map(String).sort();
     expect(listed).toEqual(methods);
+  });
+
+  const enumOf = (node: JsonSchemaNode | undefined): string[] => [...(node?.enum ?? [])].map(String).sort();
+  const constsOf = (node: JsonSchemaNode): string[] =>
+    (node.oneOf ?? [])
+      .map((branch) => (branch.properties?.kind as { const?: unknown } | undefined)?.const)
+      .map(String)
+      .sort();
+
+  it.each([
+    [
+      "Uf",
+      enumOf(definition("uf")),
+      fields<Record<Uf, true>>({
+        AC: true, AL: true, AM: true, AP: true, BA: true, CE: true, DF: true, ES: true, GO: true,
+        MA: true, MG: true, MS: true, MT: true, PA: true, PB: true, PE: true, PI: true, PR: true,
+        RJ: true, RN: true, RO: true, RR: true, RS: true, SC: true, SE: true, SP: true, TO: true,
+      }),
+    ],
+    [
+      "BuyerPresence",
+      enumOf(schema.properties?.presence),
+      fields<Record<BuyerPresence, true>>({
+        IN_PERSON: true, INTERNET: true, TELEPHONE: true, HOME_DELIVERY: true, IN_PERSON_OFF_PREMISES: true, OTHER: true,
+      }),
+    ],
+    [
+      "FreightMode",
+      enumOf(schema.properties?.freight),
+      fields<Record<FreightMode, true>>({
+        BY_ISSUER: true, BY_RECIPIENT: true, BY_THIRD_PARTY: true, OWN_BY_ISSUER: true, OWN_BY_RECIPIENT: true, NONE: true,
+      }),
+    ],
+    [
+      "DocumentPurpose",
+      enumOf(schema.properties?.purpose),
+      fields<Record<DocumentPurpose, true>>({ NORMAL: true, COMPLEMENTARY: true, ADJUSTMENT: true, RETURN: true }),
+    ],
+    [
+      "OperationDestination",
+      enumOf(schema.properties?.destination),
+      fields<Record<OperationDestination, true>>({ INTERNAL: true, INTERSTATE: true, FOREIGN: true }),
+    ],
+    [
+      "IssuerTaxRegime",
+      enumOf(definition("issuer").properties?.taxRegime),
+      fields<Record<IssuerTaxRegime, true>>({ SIMPLES: true, SIMPLES_EXCESS: true, NORMAL: true, MEI: true }),
+    ],
+    [
+      "StateRegistrationStatus",
+      enumOf(definition("buyer").properties?.stateRegistrationStatus),
+      fields<Record<StateRegistrationStatus, true>>({ CONTRIBUTOR: true, EXEMPT: true, NON_CONTRIBUTOR: true }),
+    ],
+    [
+      "BuyerDocument kinds",
+      constsOf(definition("buyerDocument")),
+      fields<Record<BuyerDocument["kind"], true>>({ CPF: true, CNPJ: true, FOREIGN: true }),
+    ],
+    [
+      "ContributionCst",
+      enumOf(definition("contribution").properties?.cst),
+      fields<Record<ContributionCst, true>>({
+        "01": true, "02": true, "04": true, "05": true, "06": true, "07": true, "08": true, "09": true,
+        "49": true, "50": true, "51": true, "52": true, "53": true, "54": true, "55": true, "56": true,
+        "60": true, "61": true, "62": true, "63": true, "64": true, "65": true, "66": true, "67": true,
+        "70": true, "71": true, "72": true, "73": true, "74": true, "75": true, "98": true, "99": true,
+      }),
+    ],
+  ])("%s: the schema accepts exactly the type's values", (_name, listed, expected) => {
+    expect(listed).toEqual(expected);
   });
 
   it("is document version 1", () => {

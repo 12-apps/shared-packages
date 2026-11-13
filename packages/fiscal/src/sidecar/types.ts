@@ -99,15 +99,26 @@ export interface SefazAnswer {
   readonly sefazReply: string;
 }
 
-/** `/issue` and `/transmit`: the document is authorised. */
-export interface AuthorizedDocument extends SefazAnswer {
-  readonly status: "AUTHORIZED";
+/**
+ * `/issue` and `/transmit`: SEFAZ's final answer on the document.
+ *
+ * - `AUTHORIZED` (100, 120, 150).
+ * - `DENIED` (110, 301, 302, 303): a denial of use. The number is SPENT and
+ *   the denial is kept like an authorisation (its `authorizedXml` carries the
+ *   denial protocol); it is not a rejection, which leaves the number free.
+ *
+ * A retried call answers the same: SEFAZ's "already authorised" (204) and
+ * "already denied" (205), and a request sent with no answer, are settled by
+ * looking the key up, so a retry never turns an authorised document into an error.
+ */
+export interface IssuedDocument extends SefazAnswer {
+  readonly status: "AUTHORIZED" | "DENIED";
   readonly accessKey: string;
   readonly protocol: string;
   /** `dhRecbto` of the protocol. */
   readonly authorizedAt: string;
   readonly signedXml: string;
-  /** The `nfeProc`: the signed XML with its protocol, what is stored and rendered. */
+  /** The `nfeProc`: the signed XML with its protocol (of authorisation or of denial), what is stored. */
   readonly authorizedXml: string;
 }
 
@@ -119,15 +130,20 @@ export interface ContingencySignedDocument {
   readonly signedXml: string;
 }
 
-/** `/cancel`. */
+/**
+ * `/cancel`. A retried cancel (SEFAZ's 218 "already cancelled" or 573
+ * "duplicate event", or a cancel sent with no answer) is settled by looking
+ * the key up, and answers CANCELLED with what the lookup carries: the event's
+ * protocol and XML when SEFAZ returns them, `null` when it does not.
+ */
 export interface CancelledDocument extends SefazAnswer {
   readonly status: "CANCELLED";
   readonly accessKey: string;
   /** The event's protocol. */
-  readonly protocol: string;
-  readonly registeredAt: string;
+  readonly protocol: string | null;
+  readonly registeredAt: string | null;
   /** The `procEventoNFe`. */
-  readonly eventXml: string;
+  readonly eventXml: string | null;
 }
 
 /** `/lookup`: what SEFAZ knows of the key. `NOT_FOUND` is an answer, not an error. */
@@ -137,29 +153,40 @@ export interface LookedUpDocument extends SefazAnswer {
   readonly protocol: string | null;
 }
 
-/** `/inutilize`. */
+/**
+ * `/inutilize`. A retried inutilização (563, "a request for the same range
+ * already exists") answers INUTILIZED too, with `protocol` and
+ * `inutilizationXml` `null`: the range is void at SEFAZ, and SEFAZ offers no
+ * query that would return the first protocol.
+ */
 export interface InutilizedRange extends SefazAnswer {
   readonly status: "INUTILIZED";
-  readonly protocol: string;
-  readonly registeredAt: string;
+  readonly protocol: string | null;
+  readonly registeredAt: string | null;
   /** The signed request with its reply (`procInutNFe`). */
-  readonly inutilizationXml: string;
+  readonly inutilizationXml: string | null;
 }
 
 /**
  * How a failed call is classified — the issuer port's own classes:
  *
  * - `REJECTED`: SEFAZ refused the document or the event; `code` is its `cStat`.
- *   A denial of use (110, 301, 302) is a rejection too: the number is spent.
- * - `RETRYABLE`: try the same call again later. The outcome may be unknown (a
- *   timeout after sending): look the key up before re-issuing.
- * - `CONTINGENCY`: SEFAZ is unavailable; an NFC-e goes offline (`tpEmis = 9`).
+ *   The number is NOT spent (a denial is not an error: it answers `DENIED`).
+ * - `RETRYABLE`: try the same call again later. When `outcomeUnknown` is true
+ *   the request went out and neither it nor the lookup that would settle it
+ *   was answered: look the key up before sending it again.
+ * - `CONTINGENCY`: SEFAZ is unavailable. For an NFC-e being issued, nothing
+ *   reached SEFAZ (or the lookup after an unanswered request could not reach
+ *   it): go offline through `/nfce/sign-contingency`. For an NF-e (model 55)
+ *   the service has no offline path (no SVC, no EPEC): treat it as RETRYABLE.
  * - `AUTH`: the certificate is unreadable, the password wrong, the certificate
  *   expired, or SEFAZ refused it.
  * - `INVALID`: the request itself is malformed (the schema, a missing CSC, an
- *   XML the layout refuses). Fix the input; never retry it as is.
+ *   XML the layout refuses, a document the layout version cannot express).
+ *   Fix the input; never retry it as is.
+ * - `INTERNAL`: a defect of the service. A retry would only repeat it.
  */
-export type SidecarErrorClass = "REJECTED" | "RETRYABLE" | "CONTINGENCY" | "AUTH" | "INVALID";
+export type SidecarErrorClass = "REJECTED" | "RETRYABLE" | "CONTINGENCY" | "AUTH" | "INVALID" | "INTERNAL";
 
 export const SIDECAR_ERROR_CLASSES: readonly SidecarErrorClass[] = [
   "REJECTED",
@@ -167,13 +194,19 @@ export const SIDECAR_ERROR_CLASSES: readonly SidecarErrorClass[] = [
   "CONTINGENCY",
   "AUTH",
   "INVALID",
+  "INTERNAL",
 ];
 
 /** The body of every non-2xx answer. */
 export interface SidecarErrorBody {
   readonly error: {
     readonly class: SidecarErrorClass;
-    /** The SEFAZ `cStat` for `REJECTED` (and for a SEFAZ-side `AUTH` or `CONTINGENCY`); `null` otherwise. */
+    /**
+     * The SEFAZ `cStat` when SEFAZ answered (always for `REJECTED`); for
+     * `INVALID`, a named code where one applies (`NT_2026_008_NOT_SUPPORTED`:
+     * a document issued on or after 2027-01-01, which needs NT 2026.008's
+     * `vProdLiq`); `null` otherwise.
+     */
     readonly code: string | null;
     readonly message: string;
     /** Per-field problems of an `INVALID` request. */
@@ -182,6 +215,8 @@ export interface SidecarErrorBody {
     readonly accessKey: string | null;
     readonly signedXml: string | null;
     readonly sefazReply: string | null;
+    /** The request went out and its outcome is still unknown: look the key up before sending it again. */
+    readonly outcomeUnknown: boolean;
   };
 }
 
@@ -192,4 +227,6 @@ export interface SidecarHealth {
   readonly libraries: Readonly<Record<string, string>>;
   /** The schema package the NF-e layout is validated against. */
   readonly nfeSchemas: string;
+  /** Whether SEFAZ's server certificate is verified; `false` only with `FISCAL_SEFAZ_TLS_VERIFY=off`. */
+  readonly sefazTlsVerify: boolean;
 }
