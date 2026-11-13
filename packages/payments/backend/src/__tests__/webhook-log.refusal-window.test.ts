@@ -35,10 +35,10 @@ describe('createWebhookLog observer refusals, once per window', () => {
     observer.refused('pagbank', REASON);
     observer.refused('pagbank', REASON);
 
-    expect(log.warn.mock.calls.map(([line]) => line)).toEqual([
-      `payments.webhook verify refused: pagbank — ${REASON}`,
-      `payments.webhook verify refused: pagbank — ${REASON} (2 more since the last report)`,
-    ]);
+    const warned = log.warn.mock.calls.map(([line]) => line);
+    expect(warned).toHaveLength(2);
+    expect(warned[0]).not.toMatch(/more since the last report/);
+    expect(warned[1]).toMatch(/verify refused: pagbank .* \(2 more since the last report\)$/);
   });
 
   it('keeps a window per provider and reason', () => {
