@@ -4,9 +4,7 @@
  * `Record<keyof T, true>`, so the compiler fails it when the TYPE gains or
  * loses a field; the test then fails when the SCHEMA disagrees with it.
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
+import schemaJson from "../../../sidecar/schema/sale-for-document.schema.json";
 import type {
   Address,
   CardDetails,
@@ -30,8 +28,7 @@ interface JsonSchemaObject {
 }
 type JsonSchemaNode = JsonSchemaObject;
 
-const schemaPath = fileURLToPath(new URL("../../../sidecar/schema/sale-for-document.schema.json", import.meta.url));
-const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as JsonSchemaObject & {
+const schema = schemaJson as unknown as JsonSchemaObject & {
   readonly definitions: Readonly<Record<string, JsonSchemaNode>>;
 };
 
