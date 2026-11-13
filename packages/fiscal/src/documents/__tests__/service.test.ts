@@ -115,7 +115,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     id: "register-1",
     model: "NFCE",
     onlineSeries: 1,
-    contingencySeries: 900,
+    contingencySeries: 2,
     firstOnlineNumber: 1201,
     firstContingencyNumber: 1,
   });
@@ -189,7 +189,7 @@ describe("the document service", () => {
       inutilize: ["inutilize"],
     });
     const offline = await service.issue(ISSUE);
-    expect(offline).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY", series: 900, number: 1 });
+    expect(offline).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY", series: 2, number: 1 });
     const [online] = await store.listBySubject("owner-1", "order-77", "NFCE");
     expect(online).toMatchObject({ status: "REPLACED", replacedById: offline.id, numberVoid: "INUTILIZE" });
 
@@ -239,7 +239,7 @@ describe("the document service", () => {
   it("refuses a series already held by another issuing point", async () => {
     const { service } = await setup({});
     await expect(
-      service.createIssuingPoint("owner-1", { id: "register-2", model: "NFCE", onlineSeries: 900, contingencySeries: null, firstOnlineNumber: 1, firstContingencyNumber: 1 }),
+      service.createIssuingPoint("owner-1", { id: "register-2", model: "NFCE", onlineSeries: 2, contingencySeries: null, firstOnlineNumber: 1, firstContingencyNumber: 1 }),
     ).rejects.toThrow(/already belongs/);
   });
 });
