@@ -63,18 +63,18 @@ describe('Button ripple layer (FUT-4861)', () => {
   });
 
   it('asks for no layer of its own for the spinner or the icon: both paint above the ripple', () => {
-    const button = renderButton('light', { loading: true, icon: <span>+</span> });
+    const loadingButton = renderButton('light', { loading: true, icon: <span>+</span> });
     // A loading button is disabled and mounts no ripple; what it does carry is
     // a spinner wrapper at the auto layer and an icon in the flow, both of which
     // paint above a `z-index: -1` ripple.
     expect(screen.getByTestId('b-loading').parentElement?.style.zIndex).toBe('');
     expect(screen.getByTestId('b-icon').style.zIndex).toBe('');
-    expect(button.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
+    expect(loadingButton.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
   });
 
   it('leaves a disabled button with no ripple at all', () => {
-    const button = renderButton('light', { disabled: true });
-    fireEvent.mouseDown(button);
-    expect(button.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
+    const offButton = renderButton('light', { disabled: true });
+    fireEvent.mouseDown(offButton);
+    expect(offButton.querySelectorAll('.MuiTouchRipple-root')).toHaveLength(0);
   });
 });
