@@ -149,7 +149,6 @@ const CLEARED_REQUEST = {
 } as const;
 
 /** Plan one decision against its row, or name what is wrong with it. */
-
 function planOne(
   ctx: EngineContext,
   input: DecisionInput,

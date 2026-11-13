@@ -147,13 +147,17 @@ async function stampCancellation(
 /**
  * Which rows a synchronous "cancelled" answers: the request still waiting or
  * FAILED, or the tombstone an accept left of THIS request (no status, the
- * same `cancellation_requested_at` the job read). A later request of the store
- * carries a new instant and a status of its own, so it is never mistaken for it.
+ * same `cancellation_requested_at` the job read) on an order STILL ACCEPTED.
+ * A later request of the store carries a new instant and a status of its own,
+ * so it is never mistaken for it; and once the marketplace's own cancel event
+ * has moved the order to REJECTED (and told the host), the tombstone answers
+ * nothing more, so the host is never told twice.
  */
 function answerableRequest(row: OutboundRow): Record<string, unknown>[] {
   const waiting = { cancellationStatus: { in: ["PENDING", "FAILED"] } };
   if (row.cancellationRequestedAt === null) return [waiting];
-  return [waiting, { cancellationStatus: null, cancellationRequestedAt: row.cancellationRequestedAt }];
+  const tombstone = { status: "ACCEPTED", cancellationStatus: null, cancellationRequestedAt: row.cancellationRequestedAt };
+  return [waiting, tombstone];
 }
 
 /**

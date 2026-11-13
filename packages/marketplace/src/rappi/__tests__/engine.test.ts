@@ -11,9 +11,12 @@ import { RAPPI_ADAPTER_COPY_EN_US } from "../en-US";
 import { API_BASE, PORTAL, PORTAL_ORDER_ID, PORTAL_STORE_ID, portalCancel, portalOrder, portalOtherEvent, TOKEN_URL } from "./fixtures";
 
 /**
- * The engine, unchanged but for R3-N2, driven through the Rappi adapter end to
- * end: NEW_ORDER webhook → ingest → aceite → take → reject (answered in the
- * response) → ORDER_EVENT_CANCEL.
+ * The engine driven through the Rappi adapter end to end: NEW_ORDER webhook →
+ * ingest → aceite → take → reject (answered in the response) →
+ * ORDER_EVENT_CANCEL. The engine's two generic rules this delivery added (the
+ * R3-N2 tombstone, the merchant check on a carried order) are pinned against a
+ * fake adapter in `src/__tests__/late-answer.test.ts` and
+ * `src/__tests__/carried-merchant.test.ts`; here they are seen through Rappi.
  *
  * The owner's rule is the point: "the integration engine must be the same for
  * all integrations: iFood, Rappi, 99. Only an adapter is made for each one."
@@ -245,6 +248,32 @@ describe("the engine through the Rappi adapter, end to end", () => {
     // The take the accept queued is no longer owed.
     expect(await h.engine.runOutbound({ clientId: TENANT, orderId, action: "confirm" }, ATTEMPT)).toMatchObject({ kind: "skipped" });
     expect(http.requests.some((request) => request.url.includes("/take/"))).toBe(false);
+  });
+
+  it("[R1-1] Rappi's ORDER_EVENT_CANCEL landing inside the in-flight reject, after the timeout and the accept: ONE host callback", async () => {
+    const box: { h?: Harness; orderId?: string } = {};
+    const http = rappiApi(async (request) => {
+      const { h, orderId } = box;
+      if (request.url.endsWith("/reject") && h && orderId) {
+        h.clock.at = new Date(h.clock.at.getTime() + RAPPI_CANCELLATION_ANSWER_WINDOW_MS + 1);
+        await h.engine.sweepOutbound();
+        await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
+        expect(await deliver(h, portalCancel(PORTAL_ORDER_ID, PORTAL_STORE_ID))).toEqual({ kind: "cancelled" });
+      }
+      return { status: 200, body: "" };
+    });
+    const { h } = harness({ http });
+    box.h = h;
+    await connect(h);
+    const orderId = await arrive(h);
+    box.orderId = orderId;
+    await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "ORDER_TOTAL_INCORRECT" });
+
+    await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
+
+    expect(h.acceptance(orderId)?.status).toBe("REJECTED");
+    expect(h.refused).toEqual([{ orderId, reason: "CANCELLED" }]);
+    expect(h.cancellationConfirmed).toEqual([]);
   });
 
   it("[R3-N2] the tombstone is matched only by a cancellation: a late refusal leaves the accepted order as it is", async () => {
