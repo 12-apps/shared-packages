@@ -39,11 +39,18 @@ function openDelivery(overrides: { order?: (request: MarketplaceHttpRequest) => 
   });
 }
 
-function harness(options: { http?: ReturnType<typeof scriptedHttp>; queueDown?: boolean } = {}) {
+function harness(
+  options: {
+    http?: ReturnType<typeof scriptedHttp>;
+    queueDown?: boolean;
+    onCreate?: () => Promise<void>;
+  } = {},
+) {
   const http = options.http ?? openDelivery();
   const mounted = createHarness({
     http,
     queueDown: options.queueDown,
+    onCreate: options.onCreate,
     // Like a real queue: a job id it already took is refused.
     dedupeQueue: true,
     cancellationHooks: true,
@@ -267,7 +274,49 @@ describe("the engine through the 99Food adapter, end to end", () => {
     expect(h.acceptance(outcome.orderId)?.acknowledgeBy).toEqual(new Date(arrived.getTime() + 300_000));
   });
 
-  it("[N5] refuses, and records, an order naming another merchant than the connection's", async () => {
+  it("[NEW-2] the arrival moves ONLY the deadline: the liveness stamp and an auto-accept's time are the ingest's", async () => {
+    const { h } = harness();
+    await connect(h, { autoAccept: true });
+    const arrived = h.clock.at;
+    await deliver(h, specEvent("CREATED"));
+    const ingestedAt = new Date(arrived.getTime() + 3 * 60_000);
+    h.clock.at = ingestedAt;
+
+    const outcome = await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT);
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    expect(h.acceptance(outcome.orderId)).toMatchObject({
+      status: "ACCEPTED",
+      acknowledgeBy: new Date(arrived.getTime() + 300_000),
+      acknowledgedAt: ingestedAt,
+    });
+    expect(h.memory.tables.marketplaceIntegration.rows[0]?.lastEventAt).toEqual(ingestedAt);
+  });
+
+  it("[NEW-1] a CANCELLED that lands while the fetched order is being written still wins, through the cancel path", async () => {
+    const box: { h?: Harness } = {};
+    const { h } = harness({
+      // 99Food's CANCELLED arrives inside the ingest's transaction, before the acceptance row exists.
+      onCreate: async () => {
+        if (box.h) expect(await deliver(box.h, specEvent("CANCELLED"))).toEqual({ kind: "cancelled" });
+      },
+    });
+    box.h = h;
+    await connect(h, { autoAccept: true });
+    await deliver(h, specEvent("CREATED"));
+
+    const outcome = await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT);
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    expect(h.acceptance(outcome.orderId)?.status).toBe("REJECTED");
+    expect(h.refused).toEqual([{ orderId: outcome.orderId, reason: "CANCELLED" }]);
+    // The confirm auto-accept queued is no longer owed.
+    expect(await h.engine.runOutbound({ clientId: TENANT, orderId: outcome.orderId, action: "confirm" }, ATTEMPT)).toMatchObject({
+      kind: "skipped",
+    });
+  });
+
+  it("[N5][NEW-3] settles an order naming another merchant FAILED, and fetches it again once the id is corrected", async () => {
     const { h } = harness();
     await connect(h);
     h.patchIntegration({ externalMerchantId: "another-merchant" });
@@ -277,8 +326,15 @@ describe("the engine through the 99Food adapter, end to end", () => {
 
     expect(outcome).toMatchObject({ kind: "failed", reason: /names merchant/ });
     expect(h.created).toEqual([]);
-    expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "IGNORED", error: /names merchant/ });
+    expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "FAILED", error: /names merchant/ });
     expect(h.logged.some((line) => line.level === "error" && /names merchant/.test(line.message))).toBe(true);
+
+    // The store corrects its merchant id; the sweep retries within its bound.
+    h.patchIntegration({ externalMerchantId: SPEC_MERCHANT_ID });
+    h.clock.at = new Date(h.clock.at.getTime() + FETCH_REQUEUE_AGE_MS + 1);
+    const [stored] = await h.engine.retryable();
+    expect(await h.engine.reprocess(stored!)).toEqual({ kind: "awaitingOrder" });
+    expect(await h.engine.runFetchOrder(fetchJobs(h).at(-1)!, ATTEMPT)).toMatchObject({ kind: "ingested" });
   });
 
   it("a held fetch (the host's queue answers no) leaves the row PENDING and says so", async () => {

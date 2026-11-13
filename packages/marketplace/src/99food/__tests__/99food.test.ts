@@ -333,17 +333,19 @@ describe("the 99Food adapter", () => {
     });
   });
 
-  it("[B3] refuses a confirm's 422, unless its problem says the instruction was already received", async () => {
-    const answers: [string, string][] = [
-      ["{}", "refused"],
-      [JSON.stringify({ title: "Order cannot be confirmed: it was cancelled", status: 422 }), "refused"],
-      ["not json", "refused"],
-      [JSON.stringify({ title: "Order already confirmed", status: 422 }), "accepted"],
-      [JSON.stringify({ title: "x", status: 422, detail: "Pedido já foi confirmado" }), "accepted"],
+  it("[B3] refuses EVERY confirm 422, whatever its problem says: a lost-answer duplicate is a harmless alarm", async () => {
+    const titles = [
+      "Order already cancelled",
+      "Pedido não pode ser confirmado",
+      "Pedido não confirmado: cancelado pelo cliente",
+      "Order cannot be confirmed: it was cancelled",
+      "Order already confirmed",
+      "Pedido já foi confirmado",
     ];
-    for (const [body, kind] of answers) {
+    const bodies = ["{}", "not json", ...titles.map((title) => JSON.stringify({ title, status: 422 }))];
+    for (const body of bodies) {
       const { ctx } = context((request) => (request.url.endsWith("/oauth/token") ? TOKEN : { status: 422, body }));
-      expect((await adapter().confirm(ctx, ref, { preparationMinutes: null })).kind).toBe(kind);
+      expect(await adapter().confirm(ctx, ref, { preparationMinutes: null })).toMatchObject({ kind: "refused", status: 422 });
     }
   });
 

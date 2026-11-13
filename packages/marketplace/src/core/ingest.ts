@@ -80,6 +80,7 @@ function acceptanceData(
   order: NormalizedMarketplaceOrder,
   settings: IngestSettings,
   now: Date,
+  clockStartsAt: Date,
 ): Record<string, unknown> {
   const accepted = settings.autoAccept;
   return {
@@ -91,7 +92,7 @@ function acceptanceData(
     // Who carries a delivery: the merchant's courier or the marketplace's fleet.
     deliveredBy: order.deliveredBy ?? null,
     status: accepted ? "ACCEPTED" : "AWAITING",
-    acknowledgeBy: new Date(now.getTime() + settings.ackSlaSeconds * 1000),
+    acknowledgeBy: new Date(clockStartsAt.getTime() + settings.ackSlaSeconds * 1000),
     acknowledgedAt: accepted ? now : null,
     externalDueAt: order.deliveryDueAt,
     commissionCents: order.commissionCents,
@@ -122,10 +123,17 @@ export async function ingestMarketplaceOrder(
     order: NormalizedMarketplaceOrder;
     settings: IngestSettings;
     now?: Date;
+    /**
+     * When the acceptance window started, if not `now`: the arrival of the
+     * event that announced an order fetched later. Moves ONLY the deadline;
+     * the liveness stamp and an auto-accept's time stay `now`.
+     */
+    clockStartsAt?: Date;
   },
 ): Promise<IngestResult> {
   const { clientId, order, settings } = input;
   const now = input.now ?? ctx.ports.clock.now();
+  const clockStartsAt = input.clockStartsAt ?? now;
 
   const db = await ctx.ports.db();
   // Answered from this package's OWN table rather than through a port: the
@@ -148,7 +156,7 @@ export async function ingestMarketplaceOrder(
   const { orderId, unmappedSkus } = await ctx.ports.transaction(async (tx) => {
     const lines = await composeLines(tx, clientId, order, now);
     const created = await ctx.ports.order.create(clientId, order, lines, tx);
-    await tx.marketplaceAcceptance.create({ data: acceptanceData(clientId, created, order, settings, now) });
+    await tx.marketplaceAcceptance.create({ data: acceptanceData(clientId, created, order, settings, now, clockStartsAt) });
     await markMarketplaceEventSeen(tx, clientId, order.provider, now);
     return { orderId: created, unmappedSkus: lines.filter((l) => l.subjectRef === null).map((l) => l.externalSku) };
   });

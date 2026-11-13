@@ -2,6 +2,7 @@ import { deferInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder } from "./ingest";
 import { readOutboundConnection, resolveIngestionTarget } from "./integration";
 import type { FetchOrderResult } from "./adapter";
+import { cancelAcceptance } from "./acceptance";
 import { cancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
@@ -168,13 +169,15 @@ async function refusalOf(
   clientId: string,
   order: NormalizedMarketplaceOrder,
   connectionMerchantId: string | null,
-): Promise<{ settle: "IGNORED"; reason: string; failed: boolean } | null> {
+): Promise<{ settle: "IGNORED" | "FAILED"; reason: string; failed: boolean } | null> {
   if (await cancelledBeforeIngest(ctx, { clientId, provider: order.provider, externalOrderId: order.externalOrderId })) {
     return { settle: "IGNORED", reason: "cancelled before its order body arrived", failed: false };
   }
   const named = order.externalMerchantId ?? null;
   if (named !== null && connectionMerchantId !== null && named !== connectionMerchantId) {
-    return { settle: "IGNORED", reason: `the order names merchant ${named}, not this connection's`, failed: true };
+    // FAILED, not IGNORED: a connection whose merchant id was entered wrong is
+    // corrected, and the reconciliation sweep then retries within its bound.
+    return { settle: "FAILED", reason: `the order names merchant ${named}, not this connection's`, failed: true };
   }
   return null;
 }
@@ -198,10 +201,15 @@ async function ingestFetched(
     clientId,
     order,
     settings: { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds },
-    // The store's acceptance clock starts when the event arrived, not when a
+    // The store's acceptance window starts when the event arrived, not when a
     // delayed fetch finished: the marketplace's own clock started then.
-    now: row.receivedAt ?? undefined,
+    clockStartsAt: row.receivedAt ?? undefined,
   });
+  // A CANCELLED that read the acceptances while this ingest's transaction was
+  // still open found none and left its marker: honour it now, through the
+  // ordinary cancel path (the order is cancelled; no confirm is owed).
+  const ref = { clientId, provider: order.provider, externalOrderId: order.externalOrderId };
+  if (await cancelledBeforeIngest(ctx, ref)) await cancelAcceptance(ctx, ref);
   await settleInboxEvent(ctx, row.id, "PROCESSED");
   return { kind: "ingested", orderId: ingested.orderId, unmappedSkus: ingested.unmappedSkus };
 }
