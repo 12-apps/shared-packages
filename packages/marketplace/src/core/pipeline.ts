@@ -91,6 +91,11 @@ export async function processDelivery(
   }
 }
 
+/** The event names an order whose body the marketplace serves apart (`orderToFetch`). */
+function announcesOrderToFetch(event: NormalizedEvent): boolean {
+  return event.order === null && event.orderToFetch === true && event.externalOrderId !== null;
+}
+
 /**
  * Act on one recorded delivery: cancel, ingest, or deliberately nothing.
  *
@@ -131,7 +136,7 @@ async function applyEvent(
     return { kind: "cancelled" };
   }
 
-  if (!event.order && event.orderToFetch && event.externalOrderId) {
+  if (announcesOrderToFetch(event)) {
     // The event announces an order whose body the marketplace serves apart.
     // Fetching is a call to the marketplace, so it is a job's, never this
     // request's: the row waits PENDING and the fetch is queued.
