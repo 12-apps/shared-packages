@@ -56,6 +56,19 @@ async function claim(table: CategoryTable, key: Record<string, string>, row: Cat
 }
 
 /**
+ * Store the id this publish resolved, or release its claim. Only this
+ * publish's own claim (`claimedAt` it set) is released: one taken over
+ * meanwhile stays its new holder's.
+ */
+async function release(table: CategoryTable, key: Record<string, string>, claimedAt: Date, id: string | null): Promise<void> {
+  if (id !== null) {
+    await table.updateMany({ where: { ...key, externalId: null }, data: { externalId: id, claimedAt: null } });
+    return;
+  }
+  await table.updateMany({ where: { ...key, externalId: null, claimedAt }, data: { claimedAt: null } });
+}
+
+/**
  * The category's id: the stored one, else `resolve()` (the adapter's find or
  * create) run under this publish's claim and stored. A host without the
  * category table resolves every time, unserialized, as before it.
@@ -86,12 +99,7 @@ export async function resolveCategory(
   } finally {
     // The claim is released whatever happened, so the next attempt (this
     // publish's or another's) goes on at once instead of waiting it out.
-    // Only this publish's own claim is released: one taken over meanwhile stays its new holder's.
-    const id = "id" in result ? result.id : null;
-    await table.updateMany({
-      where: id === null ? { ...key, externalId: null, claimedAt: now } : { ...key, externalId: null },
-      data: id === null ? { claimedAt: null } : { externalId: id, claimedAt: null },
-    });
+    await release(table, key, now, "id" in result ? result.id : null);
   }
   return result;
 }
