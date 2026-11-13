@@ -32,8 +32,21 @@ export interface WebhookArrival {
  * Shared rather than host-written (FUT-3722): every host logs these same
  * lines, only through its own logger.
  */
-export function createWebhookLog(log: WebhookLogger) {
+/** How often one refusal reason may reach the error tracker: once per window per provider and reason. */
+export const WEBHOOK_REFUSAL_REPORT_WINDOW_MS = 15 * 60_000;
+
+/** Test seams: the window and the clock. */
+export interface WebhookLogOptions {
+  refusalWindowMs?: number;
+  now?: () => number;
+}
+
+export function createWebhookLog(log: WebhookLogger, options: WebhookLogOptions = {}) {
   const signersSeen = new Set<string>();
+  const refusalWindowMs = options.refusalWindowMs ?? WEBHOOK_REFUSAL_REPORT_WINDOW_MS;
+  const now = options.now ?? Date.now;
+  /** Per provider and reason: when it last reached WARN, and how many have gone to INFO since. */
+  const refusals = new Map<string, { at: number; held: number }>();
   return {
     logWebhookArrival({ tenantSlug, provider, bytes }: WebhookArrival): void {
       log.info(`payments.webhook received: ${provider} for ${tenantSlug} (${bytes} bytes)`);
@@ -61,9 +74,29 @@ export function createWebhookLog(log: WebhookLogger) {
      * delivery.
      */
     observer: {
-      /** The pipeline's own refusal reason — the fields tried, never a value. */
+      /**
+       * The pipeline's own refusal reason — the fields tried, never a value.
+       *
+       * WARN once per window per provider and reason, INFO for the rest of the
+       * window, with the count carried on the next WARN. A provider that keeps
+       * delivering unsigned (PagBank without `x-authenticity-token`, 2,151 times
+       * in 14 days) is one problem, and at one WARN each it filled the error
+       * tracker's monthly quota on its own (FUT-3968). Every refusal is still
+       * logged, at INFO.
+       */
       refused(provider: string, reason: string) {
-        log.warn(`payments.webhook verify refused: ${provider} — ${reason}`);
+        const line = `payments.webhook verify refused: ${provider} — ${reason}`;
+        const key = `${provider}\u0000${reason}`;
+        const at = now();
+        const seen = refusals.get(key);
+        if (seen && at - seen.at < refusalWindowMs) {
+          seen.held += 1;
+          log.info(line);
+          return;
+        }
+        const suffix = seen && seen.held > 0 ? ` (${seen.held} more since the last report)` : '';
+        refusals.set(key, { at, held: 0 });
+        log.warn(`${line}${suffix}`);
       },
       accepted(provider: string, _events: number, signer?: string | null) {
         if (!signer) return;

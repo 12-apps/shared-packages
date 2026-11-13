@@ -181,15 +181,33 @@ async function reconcileOne(
   }
 }
 
+/** Charges already warned about in this process; bounded so a long-lived process cannot grow it forever. */
+const warnedCharges = new Set<string>();
+const WARNED_CHARGES_CAP = 1_000;
+
 /**
  * No HTTP answer is the network's, not the charge's: the next pass asks again,
- * so only the pass that will not is a warning (FUT-4268). Anything else is as before.
+ * so only the pass that will not is a warning (FUT-4268).
+ *
+ * And a charge that keeps failing the same way is one problem: it is warned
+ * about ONCE per process, and every later pass logs at info. One InfinitePay
+ * charge stuck this way warned on every sweep, 376 times in 14 days, against an
+ * error-tracker quota that ran out (FUT-3968).
  */
 function logFailure(deps: PendingSweepDeps, charge: StoredCharge, error: unknown, last: boolean): void {
   const line =
     `[payments] pending-charge sweep could not reconcile ${charge.provider} ` +
     `${charge.providerChargeId} (${charge.merchant.kind}:${charge.merchant.id}): ` +
     `${error instanceof Error ? error.message : String(error)}`;
-  if ((isTransportError(error) || isRequestTimeout(error)) && !last) deps.logInfo?.(line);
-  else deps.logWarn?.(line);
+  if ((isTransportError(error) || isRequestTimeout(error)) && !last) return deps.logInfo?.(line);
+  const key = `${charge.provider}:${charge.providerChargeId}`;
+  if (warnedCharges.has(key)) return deps.logInfo?.(line);
+  if (warnedCharges.size >= WARNED_CHARGES_CAP) warnedCharges.clear();
+  warnedCharges.add(key);
+  deps.logWarn?.(line);
+}
+
+/** Forget which charges were warned about. Tests only. */
+export function resetSweepWarnings(): void {
+  warnedCharges.clear();
 }
