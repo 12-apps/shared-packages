@@ -26,7 +26,12 @@ import type { AdapterCallContext, OutboundResult } from "./adapter";
 export interface CatalogueItem {
   name: string;
   description: string | null;
-  /** An absolute https URL of the product's photo, or null. */
+  /**
+   * An absolute https URL of the product's photo, or null. It must CHANGE when
+   * the photo changes (a versioned URL: a content hash or an upload id in it):
+   * a marketplace that holds an uploaded copy reuses it while the URL is the
+   * same, so new bytes at an old URL are never sent.
+   */
   imageUrl: string | null;
   /** The name of the host category the product sits in; the adapter finds or creates it. */
   categoryName: string;
