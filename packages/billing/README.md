@@ -94,7 +94,10 @@ list and are read again on every pass until they resolve. `refundUpdated` takes
 the provider's own word (the payments package hands PLATFORM refund updates to
 the host through `platformRefundUpdated`): REFUNDED confirms, FAILED — the one
 evidence of a failure — reopens it as a new request (`requestId`), whose retry
-is a new series. WHEN a
+is a new series. `markNotReturned` is a person's escape for a refund
+the provider never confirms: only past the deadline, after one more read of the
+charge (money back confirms it instead), it reopens the refund as pending
+(`NOT_RETURNED`) under a new request with who and why, and never sends. WHEN a
 payment is refundable, what a cancel does to the plan and who may settle are
 the host's.
 

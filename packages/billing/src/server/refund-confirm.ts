@@ -5,6 +5,8 @@ import { REFUND_ATTEMPT_DEADLINE_MS } from "@12-apps/payments-backend";
 import { BillingConfigError } from "../errors";
 import type {
   ConfirmationPass,
+  NotReturnedBy,
+  NotReturnedResult,
   RefundConfirmationStore,
   RefundUpdate,
   SubscriptionRefundDeps,
@@ -119,4 +121,29 @@ export async function refundUpdated(
     requestId: randomUUID(),
   });
   return reopened ? "REOPENED" : "IGNORED";
+}
+
+export async function markNotReturned(
+  deps: SubscriptionRefundDeps,
+  paymentId: string,
+  byHand: NotReturnedBy,
+): Promise<NotReturnedResult> {
+  const confirmations = confirmationsOf(deps);
+  const store = await confirmations.store();
+  const now = deps.now ?? (() => new Date());
+  const refund = await store.findUnconfirmed(paymentId);
+  if (!refund) return { outcome: "NOT_REOPENED", paymentId, why: "NOT_FOUND" };
+  if (now().getTime() - refund.refundedAt.getTime() < confirmations.confirmWithinMs) {
+    return { outcome: "NOT_REOPENED", paymentId, why: "NOT_OVERDUE" };
+  }
+  // One more read: a refund that landed meanwhile is confirmed, never reopened.
+  if (await moneyBack(deps, refund)) {
+    await store.confirm(refund.id, now());
+    return { outcome: "NOT_REOPENED", paymentId, why: "MONEY_BACK" };
+  }
+  const record = { reason: "NOT_RETURNED" as const, message: null, at: now() };
+  // Conditional on the row still unconfirmed: a confirm or a provider update
+  // that won the race leaves nothing to reopen.
+  const reopened = await store.reopen(refund.id, { ...record, requestId: randomUUID(), byHand });
+  return reopened ? { outcome: "REOPENED", paymentId, record } : { outcome: "NOT_REOPENED", paymentId, why: "NOT_FOUND" };
 }

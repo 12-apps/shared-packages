@@ -24,7 +24,7 @@ import {
   type SubscriptionRefundDeps,
   type SubscriptionRefundResult,
 } from "./refund-ports";
-import { confirmDue, refundUpdated } from "./refund-confirm";
+import { confirmDue, markNotReturned, refundUpdated } from "./refund-confirm";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -325,5 +325,6 @@ export function createSubscriptionRefund(deps: SubscriptionRefundDeps): Subscrip
     runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
     confirmDue: (limit) => confirmDue(deps, limit),
     refundUpdated: (update) => refundUpdated(deps, update),
+    markNotReturned: (paymentId, byHand) => markNotReturned(deps, paymentId, byHand),
   };
 }

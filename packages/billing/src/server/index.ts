@@ -23,6 +23,8 @@ export {
   type ConfirmationPass,
   type NotRefundableWhy,
   type RefundConfirmationStore,
+  type NotReturnedBy,
+  type NotReturnedResult,
   type RefundUpdate,
   type UnconfirmedRefund,
   type RefundablePayment,

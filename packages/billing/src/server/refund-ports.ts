@@ -32,7 +32,12 @@ export type RefundPendingReason =
   /** The platform has no usable credentials at that provider any more. Nothing was sent. */
   | "NO_CREDENTIALS"
   /** The payment is paid but carries no provider charge (recorded by hand, say). */
-  | "NO_CHARGE";
+  | "NO_CHARGE"
+  /**
+   * A person said the provider never returned a refund it had accepted, past
+   * the confirmation deadline (`markNotReturned`).
+   */
+  | "NOT_RETURNED";
 
 /** One subscription payment, as the host's own row maps onto it. */
 export interface RefundablePayment {
@@ -128,6 +133,8 @@ export interface RefundConfirmationStore {
   unconfirmed(limit: number): Promise<readonly UnconfirmedRefund[]>;
   /** The unconfirmed refund of one provider charge, or null. */
   findByCharge(provider: string, providerChargeId: string): Promise<UnconfirmedRefund | null>;
+  /** One payment's unconfirmed refund, or null (not refunded, or confirmed). */
+  findUnconfirmed(paymentId: string): Promise<UnconfirmedRefund | null>;
   /** The provider finished it: mark it confirmed. */
   confirm(paymentId: string, at: Date): Promise<boolean>;
   /**
@@ -141,8 +148,31 @@ export interface RefundConfirmationStore {
    * `record`, the refund asked for again at `record.at` under `requestId` (the
    * payment's new `requestedAt` and `requestId`), for a person.
    */
-  reopen(paymentId: string, record: RefundPendingRecord & { requestId: string }): Promise<boolean>;
+  reopen(paymentId: string, record: RefundPendingRecord & { requestId: string; byHand?: NotReturnedBy }): Promise<boolean>;
 }
+
+/**
+ * Who said a refund was never returned, and why — handed to `reopen` so the
+ * host records it with the row (its audit trail) in one write.
+ */
+export interface NotReturnedBy {
+  by: string;
+  reason: string;
+}
+
+export type NotReturnedResult =
+  | { outcome: "REOPENED"; paymentId: string; record: RefundPendingRecord }
+  | {
+      outcome: "NOT_REOPENED";
+      paymentId: string;
+      /**
+       * NOT_FOUND: no unconfirmed refund on that payment (never refunded, or
+       * confirmed or reopened meanwhile). NOT_OVERDUE: still inside the
+       * deadline. MONEY_BACK: the charge read shows the money returned — the
+       * refund was confirmed instead.
+       */
+      why: "NOT_FOUND" | "NOT_OVERDUE" | "MONEY_BACK";
+    };
 
 /** What one `confirmDue` pass came to. */
 export interface ConfirmationPass {
@@ -212,6 +242,14 @@ export interface SubscriptionRefund {
    * request; PENDING changes nothing. Needs `confirmations`.
    */
   refundUpdated(update: RefundUpdate): Promise<"CONFIRMED" | "REOPENED" | "IGNORED">;
+  /**
+   * A person's escape for a refund the provider accepted and never confirmed:
+   * only past `confirmations.confirmWithinMs`, after one more read of the
+   * charge (money back confirms it instead). Reopens it as pending
+   * (`NOT_RETURNED`) under a NEW request, with who and why for the host's
+   * audit; then retry or settle by hand as usual. Never sends a refund.
+   */
+  markNotReturned(paymentId: string, byHand: NotReturnedBy): Promise<NotReturnedResult>;
 }
 
 export interface SubscriptionRefundDeps {
