@@ -11,6 +11,7 @@
  */
 
 import type { LifecycleAuthorizeGate } from './context';
+import type { LifecycleDraftDataValidator } from './draft-body';
 import type { NewItemDraftsOptions } from '../new-item-drafts';
 import type { DiffOptions, EntityOps, FeatureFlagMap, RetentionPolicy, Snapshot } from '../types';
 
@@ -80,4 +81,15 @@ export interface LifecycleEntityRegistration {
    * every collection that does not wire the two routes.
    */
   newItemDrafts?: NewItemDraftsOptions;
+  /**
+   * Opt-in (FUT-4867): this collection's own validator for a draft's `data` —
+   * typically the same zod schema the host passes to `saveDraftBodyOf` and to
+   * `lifecycleMcpEndpoints({ draftData })`. Given, every draft write
+   * (`PUT /:slug/:id/draft`, `POST /:slug/drafts`, and `PUT /:slug/drafts/:draftId`
+   * for a `newItemDrafts` collection) refuses `data` it does not pass, with the
+   * 422 and a problem per issue at `data.<path>`, and stores the validator's
+   * output. Omitted, any JSON object is a draft — the schema-drift-tolerant
+   * posture, validated only at publish — exactly as before.
+   */
+  draftData?: LifecycleDraftDataValidator;
 }

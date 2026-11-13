@@ -105,6 +105,16 @@ export function messagesOf(
     : source;
 }
 
+/**
+ * One feature's validator for the `data` a `save` writes (FUT-4867), as this
+ * package needs it: anything with a zod-style `safeParse`. Declared
+ * structurally so the server takes no runtime dependency on `zod` — a zod
+ * schema satisfies it as it is (`./schemas` builds the matching body).
+ */
+export interface OnboardingDataValidator {
+  safeParse(value: unknown): { success: true; data: unknown } | { success: false };
+}
+
 export interface OnboardingServerConfig {
   /**
    * Lazily-resolved DB seam. A Prisma client satisfies the structural
@@ -138,6 +148,20 @@ export interface OnboardingServerConfig {
    * single-audience host from paying for a choice it never makes.
    */
   messages: OnboardingCopySource<OnboardingMessages>;
+  /**
+   * Opt-in (FUT-4867): a validator per feature key for the `data` a `save`
+   * writes — typically a `z.strictObject(…).partial()`, since `data` is
+   * shallow-merged and a save carries only the fields it changes. Given for a
+   * key, a `save` whose `data` it refuses is the same 400 `invalidOperation` as
+   * any malformed body, and what is merged is the validator's OUTPUT. A key
+   * with no entry, and every key when this is omitted, takes any JSON object,
+   * exactly as before.
+   *
+   * Only the INCOMING patch is validated, never the stored row: progress saved
+   * before a schema existed still reads back as it was stored, so a host that
+   * changes a field's shape keeps reading the old one until it rewrites it.
+   */
+  dataSchemas?: Readonly<Record<string, OnboardingDataValidator>>;
 }
 
 /** The `{ data }` success envelope (the report-builder / rbac house shape). */

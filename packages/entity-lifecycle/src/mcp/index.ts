@@ -37,6 +37,8 @@ export {
   draftsResponse,
   lifecycleTenantParams,
   saveDraftBody,
+  saveDraftBodyOf,
+  type DraftDataSchema,
   versionItemParams,
   versionsParams,
   versionsQuery,

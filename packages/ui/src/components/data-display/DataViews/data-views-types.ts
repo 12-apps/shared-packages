@@ -3,6 +3,7 @@ import type { DropdownMenuItem } from "../../navigation/DropdownMenu";
 // A re-export does not bring the name into local scope, and the state/query
 // types below are written in terms of it.
 import type { RangeValue } from "./data-views-range-types";
+import { readStoredViewState, storedPillsOf, storedRangesOf } from "./data-views-wire";
 
 /**
  * Shared types for the reusable admin "DataViews" table (FUT-88): a filter bar
@@ -301,13 +302,15 @@ export interface DataViewServer {
  * Coerce an opaque persisted state (a saved view's JSON) into a valid
  * DataViewState, filling any missing part with a sane default. Guards against
  * legacy/older shapes so applying a saved view never renders an empty grid.
+ * `pills` and `ranges` are read in either stored shape — the legacy maps or the
+ * keyed lists of `toDataViewStateWire` (FUT-4867).
  */
 export function coerceViewState(raw: unknown, allColumnIds: string[]): DataViewState {
   const value = (raw ?? {}) as Partial<DataViewState>;
   return {
     search: typeof value.search === "string" ? value.search : "",
-    pills: asRecord<string[]>(value.pills),
-    ranges: asRecord<RangeValue>(value.ranges),
+    pills: storedPillsOf(value.pills),
+    ranges: storedRangesOf(value.ranges),
     sortBy: Array.isArray(value.sortBy) ? value.sortBy : [],
     visibleColumns: Array.isArray(value.visibleColumns) ? value.visibleColumns : allColumnIds,
     order: Array.isArray(value.order) ? value.order : undefined,
@@ -326,11 +329,6 @@ export const DATA_VIEWS_LAYOUTS: readonly DataViewsLayout[] = ["cards", "list", 
 /** Is this a layout this build knows how to render? Guards persisted JSON. */
 function isLayout(value: unknown): value is DataViewsLayout {
   return DATA_VIEWS_LAYOUTS.includes(value as DataViewsLayout);
-}
-
-/** A persisted map, or an empty one — persisted JSON can hold anything. */
-function asRecord<V>(value: unknown): Record<string, V> {
-  return value !== null && typeof value === "object" ? (value as Record<string, V>) : {};
 }
 
 /** A saved view as consumed by the DataViews UI (FUT-89), with ownership flag. */
@@ -358,9 +356,13 @@ interface SavedViewRecordLike {
   isOwner: boolean;
 }
 
-/** Map a repository record to the client summary (opaque state → DataViewState). */
+/**
+ * Map a repository record to the client summary (opaque state → DataViewState).
+ * The stored state may be in either shape — legacy maps or the keyed lists of
+ * `toDataViewStateWire` (FUT-4867) — and comes back as the in-memory one.
+ */
 export function toSavedViewSummary(record: SavedViewRecordLike): SavedViewSummary {
-  return { ...record, state: (record.state ?? {}) as DataViewState };
+  return { ...record, state: readStoredViewState(record.state ?? {}) };
 }
 
 /**

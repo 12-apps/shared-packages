@@ -1,11 +1,13 @@
 import type { McpEndpoint } from '@12-apps/mcp';
 
 import {
+  type DraftDataSchema,
   draftItemParams,
   draftResponse,
   draftsResponse,
   lifecycleTenantParams,
   saveDraftBody,
+  saveDraftBodyOf,
   versionItemParams,
   versionsParams,
   versionsQuery,
@@ -74,6 +76,19 @@ export interface LifecycleEndpointVocabulary {
   summaries: Record<LifecycleOperation, string>;
   /** Defaults to `["lifecycle"]` — the same grouping for every collection. */
   tags?: readonly string[];
+  /**
+   * The collection's own schema for a draft's `data` (FUT-4867). Given, every
+   * draft WRITE tool (`save…Draft`, `create…Draft`, and `updateNew…Draft` from
+   * {@link newItemDraftMcpEndpoints}) advertises `saveDraftBodyOf(draftData)`
+   * instead of the open {@link saveDraftBody}, so the whole input is closed when
+   * the schema is. Omitted, the surface is unchanged.
+   */
+  draftData?: DraftDataSchema;
+}
+
+/** The draft-write body a collection advertises: its own, or the open shared one. */
+function draftBodyOf(vocabulary: { draftData?: DraftDataSchema }) {
+  return vocabulary.draftData ? saveDraftBodyOf(vocabulary.draftData) : saveDraftBody;
 }
 
 
@@ -175,9 +190,11 @@ function versioningEndpoints(
 
 /** The `drafts` half — one unpublished working copy per item, and the tenant's. */
 function draftEndpoints(
-  { collectionPath, noun, summaries }: LifecycleEndpointVocabulary,
+  vocabulary: LifecycleEndpointVocabulary,
   tags: string[],
 ): McpEndpoint[] {
+  const { collectionPath, noun, summaries } = vocabulary;
+  const body = draftBodyOf(vocabulary);
   return [
     {
       operationId: `get${noun}Draft`,
@@ -197,7 +214,7 @@ function draftEndpoints(
       summary: summaries.saveDraft,
       tags,
       params: versionsParams,
-      body: saveDraftBody,
+      body,
       response: draftResponse,
     },
     {
@@ -240,7 +257,7 @@ function draftEndpoints(
       summary: summaries.createDraft,
       tags,
       params: lifecycleTenantParams,
-      body: saveDraftBody,
+      body,
       response: draftResponse,
     },
   ];
@@ -274,6 +291,7 @@ export function newItemDraftMcpEndpoints(
 ): McpEndpoint[] {
   const { collectionPath, noun, summaries } = vocabulary;
   const tags = [...(vocabulary.tags ?? ['lifecycle'])];
+  const body = draftBodyOf(vocabulary);
   return [
     {
       operationId: `getMyNew${noun}Draft`,
@@ -294,7 +312,7 @@ export function newItemDraftMcpEndpoints(
       summary: summaries.updateNewDraft,
       tags,
       params: draftItemParams,
-      body: saveDraftBody,
+      body,
       response: draftResponse,
     },
   ];

@@ -5,7 +5,7 @@
  */
 
 import { LifecycleError, RestoreConflictError } from '../errors';
-import type { DraftRecord, FeatureFlagMap, LifecycleContext, Snapshot, WriteResult } from '../types';
+import type { DraftRecord, FeatureFlagMap, LifecycleContext, WriteResult } from '../types';
 import type { DraftWire, WriteOutcomeWire } from '../wire';
 
 /**
@@ -354,26 +354,6 @@ export function unrecognizedKeys(
   return Object.keys(value)
     .filter((key) => !allowed.includes(key))
     .map((key) => ({ path: `${prefix}${key}`, message: 'Unrecognized key' }));
-}
-
-/**
- * The one body shape the draft writes accept: `{ data: <snapshot> }`, and
- * nothing else — the same strictness `saveDraftBody` advertises (this server
- * half takes no runtime dependency on the optional `zod` peer, so it enforces
- * the schema's rule by hand).
- */
-export function parseSnapshotBody(body: unknown, messages: LifecycleMessages): Snapshot {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    throw invalidInput(messages, [{ path: '', message: 'Expected an object' }]);
-  }
-  const record = body as Record<string, unknown>;
-  const problems = unrecognizedKeys(record, ['data']);
-  const data = record.data;
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    problems.push({ path: 'data', message: 'Expected an object' });
-  }
-  if (problems.length > 0) throw invalidInput(messages, problems);
-  return data as Snapshot;
 }
 
 /** The reject body: `{ note?: string }` (≤500 chars, trimmed — the MCP contract). */

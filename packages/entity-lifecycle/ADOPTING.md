@@ -195,6 +195,7 @@ reporting. It carries no payload beyond the tenant: a listener re-reads.
 | `routePermission` | no | a permission id required for every collection-scoped route (the origin host's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
 | `ops` | yes | the host's `EntityOps` (rule 3) |
 | `newItemDrafts` | no | opt-in `{ staleAfterDays? }` (default 30): this collection's NEW-item drafts get the two routes below, update-in-place and resume, a parked publish closes its draft, and the host's scheduled `sweepStaleNewItemDrafts()` deletes the ones untouched for `staleAfterDays`. Omitted = none of it, and the collection's surface is unchanged (see [New-item drafts](#new-item-drafts-opt-in)) |
+| `draftData` | no | opt-in: the collection's own validator for a draft's `data` — any object with a zod-style `safeParse` (a zod schema as it is). Every draft write (`PUT /:slug/:id/draft`, `POST /:slug/drafts`, and `PUT /:slug/drafts/:draftId` with `newItemDrafts`) then refuses `data` it does not pass with the 422 `invalidBody` and one problem per issue at `data.<path>`, and stores the validator's output. Omitted = any JSON object is a draft, as before (see [Closed draft data](#closed-draft-data-opt-in)) |
 | `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual". The host is then the authority on it, `null` included → **0** (an archived entity, whose read filters `archived_at IS NULL`, so every row keeps its Restaurar button). Omit the callback entirely and the highest recorded version is used |
 
 ### `createWebEntityLifecycle` config
@@ -337,6 +338,45 @@ it the sweep throws). A host's own `DraftStore` implements
 The `EntityLifecycle` / `ApiEntityLifecycle` objects gain members (`updateNewDraft`, `myNewDraft`,
 `sweepStaleNewDrafts`, `sweepStaleNewItemDrafts`), which a hand-written test
 double of either now has to carry.
+
+## Closed draft data (opt-in)
+
+A draft's `data` is open by default — `saveDraftBody` is `{ data: z.record(z.string(), z.unknown()) }`
+— because the package cannot know a collection's fields, and a draft is only checked against the
+live schema at publish. A host whose rule is that every request input is closed at every depth
+(no non-strict object, no `z.unknown()`, no record keyed by any string) cannot accept that one open
+place. Such a host states the fields once and hands the same schema to the three places a draft
+body is read:
+
+```ts
+import { lifecycleMcpEndpoints, saveDraftBodyOf } from '@12-apps/entity-lifecycle/mcp';
+import { z } from 'zod';
+
+// Partial: a draft is a working copy, so a field not filled in yet must still save.
+export const lossReasonDraftData = z
+  .strictObject({
+    name: z.string(),
+    category: z.enum(['QUEBRA', 'VENCIMENTO']),
+    kind: z.enum(['LOSS', 'GAIN']),
+  })
+  .partial();
+
+// 1. the host's own route validator (PUT /:id/draft and POST /drafts)
+export const lossReasonDraftBody = saveDraftBodyOf(lossReasonDraftData);
+
+// 2. the tool surface: save…Draft and create…Draft advertise the closed body
+lifecycleMcpEndpoints({ collectionPath, noun: 'LossReason', summaries, draftData: lossReasonDraftData });
+
+// 3. the registration: the package's own handlers refuse the same unknown key
+const lossReasonRegistration = { entityType: 'loss-reason', /* … */ draftData: lossReasonDraftData };
+```
+
+`saveDraftBodyOf(schema)` is `z.strictObject({ data: schema })`, so the body is closed exactly
+when the schema is. `newItemDraftMcpEndpoints({ …, draftData })` closes `updateNew<Noun>Draft`
+the same way. None of the other draft routes takes an open input: their params
+(`versionsParams`, `lifecycleTenantParams`, `draftItemParams`) are strict, and publish and
+discard take no body. Every piece is opt-in: a host that passes no `draftData` is served
+`saveDraftBody`, the same object, and the same open drafts.
 
 ## Minimal host (Hono)
 
