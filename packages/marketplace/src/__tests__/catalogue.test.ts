@@ -159,8 +159,13 @@ describe("catalogue publishing, push", () => {
     await h.connect(PUSHY);
     await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
 
-    expect(await runLatest(h, FIRST)).toMatchObject({ kind: "failed", reason: "category is paused" });
-    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failedAction: "PUBLISH", failureReason: "category is paused" });
+    expect(await runLatest(h, FIRST)).toMatchObject({ kind: "failed", reason: "REFUSED" });
+    expect(await stateOf(h)).toMatchObject({
+      status: "FAILED",
+      failedAction: "PUBLISH",
+      failureCode: "REFUSED",
+      failureReason: "category is paused",
+    });
 
     expect(await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" })).toMatchObject({
       kind: "queued",
@@ -178,7 +183,8 @@ describe("catalogue publishing, push", () => {
     await expect(runLatest(h, FIRST)).rejects.toBeInstanceOf(CatalogueRetryError);
     expect((await stateOf(h))?.status).toBe("PUBLISHING");
     expect(await runLatest(h, LAST)).toMatchObject({ kind: "failed" });
-    expect((await stateOf(h))?.status).toBe("FAILED");
+    // No words of the marketplace to show, and no internal message either: only the code.
+    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failureCode: "UNAVAILABLE", failureReason: null });
   });
 
   it("a double tap keeps the same ask: same instant, same dedupe key, one call", async () => {
@@ -320,7 +326,7 @@ describe("catalogue publishing, push", () => {
 
     await runLatest(h);
 
-    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failedAction: "PUBLISH" });
+    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failedAction: "PUBLISH", failureCode: "PRODUCT_GONE", failureReason: null });
     expect(h.http.requests).toEqual([]);
   });
 
@@ -394,7 +400,31 @@ describe("the sweep, for the catalogue", () => {
 
     h.clock.at = new Date(h.clock.at.getTime() + 24 * 60 * 60_000);
     expect((await h.engine.sweepOutbound()).catalogueRequeued).toBe(0);
-    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failedAction: "PUBLISH" });
+    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failedAction: "PUBLISH", failureCode: "TIMEOUT", failureReason: null });
+  });
+});
+
+describe("failure codes", () => {
+  it("ends a publish whose credentials will not open as CREDENTIALS, with no internal message on the row", async () => {
+    const h = mount();
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    h.patchIntegration({ credentials: "garbage" });
+
+    await runLatest(h);
+
+    expect(await stateOf(h)).toMatchObject({ status: "FAILED", failureCode: "CREDENTIALS", failureReason: null });
+    expect(h.logged.some((line) => line.level === "error" && line.message.includes("do not open"))).toBe(true);
+  });
+
+  it("ends an adapter that throws on the last attempt as INTERNAL", async () => {
+    const throwing: PushCatalogue = { ...pushCatalogue, publishItem: async () => Promise.reject(new Error("boom at line 3")) };
+    const h = createHarness({ http: scriptedHttp([]), adapters: [fakeAdapter(PUSHY, throwing)], catalogue: hostCatalogue() });
+    await h.connect(PUSHY);
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+
+    expect(await runLatest(h, LAST)).toMatchObject({ kind: "failed", reason: "INTERNAL" });
+    expect(await stateOf(h)).toMatchObject({ failureCode: "INTERNAL", failureReason: null });
   });
 });
 

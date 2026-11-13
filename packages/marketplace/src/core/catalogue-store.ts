@@ -16,6 +16,29 @@ export type CatalogueStatus = "PUBLISHING" | "PUBLISHED" | "WITHDRAWING" | "WITH
 /** Which action a FAILED row failed at. */
 export type CatalogueFailedAction = "PUBLISH" | "WITHDRAW";
 
+/**
+ * Why a row FAILED, as a code the host turns into its own words. Vocabulary,
+ * not copy: the engine writes no sentence a person reads.
+ *
+ * - `REFUSED` — the marketplace said no; its own words are in `failureReason`.
+ * - `UNAVAILABLE` — no usable answer on any attempt (5xx, 429, timeouts).
+ * - `TIMEOUT` — still on its way a day later (the sweep gave up).
+ * - `NOT_CONNECTED` — no live connection with a merchant id (archived, removed).
+ * - `CREDENTIALS` — no credentials on file, or they would not open.
+ * - `PRODUCT_GONE` — the host's catalogue no longer has the product.
+ * - `UNSUPPORTED` — the marketplace has no catalogue capability any more.
+ * - `INTERNAL` — the engine or the adapter threw (logged, never shown).
+ */
+export type CatalogueFailureCode =
+  | "REFUSED"
+  | "UNAVAILABLE"
+  | "TIMEOUT"
+  | "NOT_CONNECTED"
+  | "CREDENTIALS"
+  | "PRODUCT_GONE"
+  | "UNSUPPORTED"
+  | "INTERNAL";
+
 /** One publication as a host reads it. */
 export interface CataloguePublicationView {
   provider: MarketplaceProvider;
@@ -28,7 +51,12 @@ export interface CataloguePublicationView {
   /** The marketplace's id for the item, from the last successful publish. */
   externalId: string | null;
   failedAction: CatalogueFailedAction | null;
-  /** The marketplace's reason, as it answered; null unless FAILED. */
+  /** Why it FAILED; null unless FAILED. The host's copy is keyed by it. */
+  failureCode: CatalogueFailureCode | null;
+  /**
+   * The marketplace's OWN words for a `REFUSED` (its answer's body, truncated);
+   * null for every other code. Never an engine or internal message.
+   */
   failureReason: string | null;
   requestedAt: Date;
   publishedAt: Date | null;
@@ -52,6 +80,7 @@ export const CATALOGUE_ROW_SELECT = {
   sentPriceCents: true,
   externalId: true,
   failedAction: true,
+  failureCode: true,
   failureReason: true,
   requestedAt: true,
   publishedAt: true,
@@ -76,6 +105,7 @@ export function viewOf(row: CatalogueRow): CataloguePublicationView {
     sentPriceCents: row.sentPriceCents,
     externalId: row.externalId,
     failedAction: row.failedAction,
+    failureCode: row.failureCode,
     failureReason: row.failureReason,
     requestedAt: row.requestedAt,
     publishedAt: row.publishedAt,
@@ -84,6 +114,9 @@ export function viewOf(row: CatalogueRow): CataloguePublicationView {
   };
 }
 
+/** The failure columns cleared, for every write that leaves FAILED. */
+export const NO_FAILURE = { failedAction: null, failureCode: null, failureReason: null, failedAt: null } as const;
+
 /** The longest failure reason a row keeps: the column is read by a person in a list. */
 const REASON_LIMIT = 300;
 
@@ -91,21 +124,26 @@ export function truncateReason(reason: string): string {
   return reason.length > REASON_LIMIT ? reason.slice(0, REASON_LIMIT) : reason;
 }
 
+/** Why a connection cannot carry a catalogue call. */
+export interface ConnectionProblem {
+  problem: "NOT_CONNECTED" | "CREDENTIALS";
+}
+
 /**
- * Everything one catalogue call needs from the store's connection, or the
- * reason it cannot be used: none, archived, no credentials, no merchant id, or
- * credentials that will not open.
+ * Everything one catalogue call needs from the store's connection, or why it
+ * cannot be used: NOT_CONNECTED (none, archived, no merchant id) or
+ * CREDENTIALS (none on file, or they will not open).
  */
 export async function catalogueConnection(
   ctx: EngineContext,
   clientId: string,
   provider: MarketplaceProvider,
-): Promise<Omit<CatalogueCallContext, "now"> | string> {
+): Promise<Omit<CatalogueCallContext, "now"> | ConnectionProblem> {
   const merchantId = await connectionMerchantId(ctx, clientId, provider);
-  if (merchantId === null) return "no live connection with a merchant id";
+  if (merchantId === null) return { problem: "NOT_CONNECTED" };
   try {
     const connection = await readOutboundConnection(ctx, clientId, provider);
-    if (!connection) return "no credentials on file";
+    if (!connection) return { problem: "CREDENTIALS" };
     const catalogue = ctx.ports.catalogue;
     return {
       ...connection,
@@ -116,6 +154,9 @@ export async function catalogueConnection(
       category: (name, resolve) => resolveCategory(ctx, { clientId, provider }, name, resolve),
     };
   } catch (error) {
-    return `credentials do not open: ${error instanceof Error ? error.message : String(error)}`;
+    ctx.ports.logger.error(
+      `marketplace.catalogue: ${provider} credentials of ${clientId} do not open: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { problem: "CREDENTIALS" };
   }
 }

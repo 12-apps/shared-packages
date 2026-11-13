@@ -2,6 +2,7 @@ import { catalogueDedupeKey, enqueueCatalogue, type CatalogueJobPayload } from "
 import type { CatalogueMenuEntry, CatalogueMenuOptions } from "./catalogue-port";
 import {
   CATALOGUE_ROW_SELECT,
+  NO_FAILURE,
   catalogueConnection,
   catalogueTable,
   viewOf,
@@ -88,7 +89,7 @@ const validPrice = (price: number | null | undefined): boolean =>
 /** Why a publish cannot be asked, or null. */
 async function publishRefusal(ctx: EngineContext, input: CataloguePublishInput): Promise<CatalogueRefusalCode | null> {
   if (!validPrice(input.priceCents)) return "INVALID_PRICE";
-  if (typeof (await catalogueConnection(ctx, input.clientId, input.provider)) === "string") return "NOT_CONNECTED";
+  if ("problem" in (await catalogueConnection(ctx, input.clientId, input.provider))) return "NOT_CONNECTED";
   const items = await ctx.ports.catalogue?.items(input.clientId, [input.productId]);
   return items?.has(input.productId) ? null : "UNKNOWN_PRODUCT";
 }
@@ -114,7 +115,7 @@ export async function publishToCatalogue(ctx: EngineContext, input: CataloguePub
   const row = (await table.upsert({
     where: { clientId_provider_productId: { clientId: input.clientId, provider: input.provider, productId: input.productId } },
     create: { clientId: input.clientId, provider: input.provider, productId: input.productId, status: "PUBLISHING", requestedAt: now, ...price },
-    update: { status: "PUBLISHING", failedAction: null, failureReason: null, failedAt: null, ...asked, ...price },
+    update: { status: "PUBLISHING", ...NO_FAILURE, ...asked, ...price },
     select: CATALOGUE_ROW_SELECT,
   })) as CatalogueRow;
   return queue(ctx, row, "publish");
@@ -140,8 +141,8 @@ export async function withdrawFromCatalogue(ctx: EngineContext, target: Catalogu
   const now = ctx.ports.clock.now();
   const local = neverLanded(existing);
   const data = local
-    ? { status: "WITHDRAWN", withdrawnAt: now, requestedAt: now, failedAction: null, failureReason: null, failedAt: null }
-    : { status: "WITHDRAWING", requestedAt: now, failedAction: null, failureReason: null, failedAt: null };
+    ? { status: "WITHDRAWN", withdrawnAt: now, requestedAt: now, ...NO_FAILURE }
+    : { status: "WITHDRAWING", requestedAt: now, ...NO_FAILURE };
   const moved = await table.updateMany({ where: { id: existing.id, status: existing.status }, data });
   // Lost a race with another write: answer what the row now says.
   const row = (await findRow(table, target)) ?? existing;
@@ -191,7 +192,7 @@ export async function readCatalogueDocument(
   const table = await usableTable(ctx, input.provider);
   if (!table || catalogue?.mode !== "pull") return { kind: "refused", code: "UNSUPPORTED" };
   const connection = await catalogueConnection(ctx, input.clientId, input.provider);
-  if (typeof connection === "string") return { kind: "refused", code: "NOT_CONNECTED" };
+  if ("problem" in connection) return { kind: "refused", code: "NOT_CONNECTED" };
   const rows = (await table.findMany({
     where: { clientId: input.clientId, provider: input.provider, status: { in: IN_MENU } },
     select: CATALOGUE_ROW_SELECT,

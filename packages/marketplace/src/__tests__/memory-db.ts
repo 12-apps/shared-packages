@@ -234,6 +234,7 @@ export function createMemoryDb() {
         sentPriceCents: null,
         externalId: null,
         failedAction: null,
+        failureCode: null,
         failureReason: null,
         publishedAt: null,
         withdrawnAt: null,

@@ -18,8 +18,6 @@ export const CATALOGUE_STALE_MS = 10 * 60_000;
 /** Past this, the marketplace is not going to answer this ask. */
 export const CATALOGUE_GIVE_UP_MS = 24 * 60 * 60_000;
 
-const GIVE_UP_REASON = "no answer from the marketplace within 24 hours";
-
 /** One pass. Returns how many runs it re-queued. */
 export async function sweepCatalogue(ctx: EngineContext, now: Date): Promise<number> {
   const table = await catalogueTable(ctx);
@@ -29,7 +27,7 @@ export async function sweepCatalogue(ctx: EngineContext, now: Date): Promise<num
   for (const [status, failedAction] of [["PUBLISHING", "PUBLISH"], ["WITHDRAWING", "WITHDRAW"]] as const) {
     await table.updateMany({
       where: { status, requestedAt: { lt: giveUp } },
-      data: { status: "FAILED", failedAction, failureReason: GIVE_UP_REASON, failedAt: now },
+      data: { status: "FAILED", failedAction, failureCode: "TIMEOUT", failureReason: null, failedAt: now },
     });
   }
   const rows = (await table.findMany({

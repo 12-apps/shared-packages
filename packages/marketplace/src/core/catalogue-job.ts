@@ -1,10 +1,12 @@
 import type { OutboundResult } from "./adapter";
-import type { CatalogueCallContext, CataloguePublishResult, MarketplaceCatalogue } from "./catalogue-port";
+import type { CatalogueCallContext, CatalogueFailure, CataloguePublishResult, MarketplaceCatalogue } from "./catalogue-port";
 import {
   CATALOGUE_ROW_SELECT,
+  NO_FAILURE,
   catalogueConnection,
   catalogueTable,
   truncateReason,
+  type CatalogueFailureCode,
   type CatalogueRow,
   type CatalogueTable,
 } from "./catalogue-store";
@@ -48,6 +50,7 @@ export interface CatalogueJobPayload {
 export type CatalogueOutcome =
   | { kind: "skipped"; reason: string }
   | { kind: "done"; action: CatalogueAction }
+  /** `reason` is the row's failure code; the detail went to the log. */
   | { kind: "failed"; action: CatalogueAction; reason: string };
 
 /** Thrown so the queue retries. Its message is what the job log reads. */
@@ -77,22 +80,24 @@ export async function enqueueCatalogue(ctx: EngineContext, payload: CatalogueJob
 
 type RunResult = CataloguePublishResult | OutboundResult;
 
-/** The call this run makes, or the refusal that stands in for it. */
+/** What a run did instead of a call: an engine-side reason it cannot be made. */
+type Run = { result: RunResult; sentPriceCents: number | null } | { code: CatalogueFailureCode };
+
+/** The call this run makes, or the code that stands in for it. */
 async function callFor(
   ctx: EngineContext,
   row: CatalogueRow,
   action: CatalogueAction,
   catalogue: MarketplaceCatalogue,
   call: CatalogueCallContext,
-): Promise<{ result: RunResult; sentPriceCents: number | null }> {
-  const refused = (message: string) => ({ result: { kind: "refused", status: 0, message } as const, sentPriceCents: null });
+): Promise<Run> {
   if (action === "withdraw") {
     if (catalogue.mode === "pull") return { result: await catalogue.notifyMenuChanged(call), sentPriceCents: null };
     const ref = { ref: row.id, productId: row.productId, externalId: row.externalId };
     return { result: await catalogue.withdrawItem(call, ref), sentPriceCents: null };
   }
   const item = (await ctx.ports.catalogue?.items(row.clientId, [row.productId]))?.get(row.productId);
-  if (!item) return refused("the product no longer exists in the store's catalogue");
+  if (!item) return { code: "PRODUCT_GONE" };
   const priceCents = row.priceCents ?? item.priceCents;
   if (catalogue.mode === "pull") return { result: await catalogue.notifyMenuChanged(call), sentPriceCents: priceCents };
   const out = { ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId };
@@ -133,31 +138,53 @@ async function stampSuccess(
 ): Promise<void> {
   const now = ctx.ports.clock.now();
   const externalId = result.kind === "published" ? result.externalId : null;
-  const failure = { failedAction: null, failureReason: null, failedAt: null };
   const data =
     action === "publish"
-      ? { status: "PUBLISHED", publishedAt: now, sentPriceCents, ...(externalId === null ? {} : { externalId }), ...failure }
-      : { status: "WITHDRAWN", withdrawnAt: now, ...failure };
+      ? { status: "PUBLISHED", publishedAt: now, sentPriceCents, ...(externalId === null ? {} : { externalId }), ...NO_FAILURE }
+      : { status: "WITHDRAWN", withdrawnAt: now, ...NO_FAILURE };
   const moved = await table.updateMany({ where: stillAsked(row, action), data });
   if (moved.count === 0 && action === "publish") await withdrawLateLanding(ctx, table, row, externalId);
 }
 
-async function stampFailure(table: CatalogueTable, row: CatalogueRow, action: CatalogueAction, reason: string, now: Date): Promise<void> {
+/** One failure, as the row keeps it: a code, and the marketplace's own words only for a refusal. */
+interface Failure {
+  code: CatalogueFailureCode;
+  reason: string | null;
+}
+
+async function stampFailure(table: CatalogueTable, row: CatalogueRow, action: CatalogueAction, failure: Failure, now: Date): Promise<void> {
   await table.updateMany({
     where: stillAsked(row, action),
     data: {
       status: "FAILED",
       failedAction: action === "publish" ? "PUBLISH" : "WITHDRAW",
-      failureReason: truncateReason(reason),
+      failureCode: failure.code,
+      failureReason: failure.reason === null ? null : truncateReason(failure.reason),
       failedAt: now,
     },
   });
 }
 
-/** The marketplace's own words for a refusal: its message, else its status. */
-function reasonOf(result: Exclude<RunResult, { kind: "accepted" } | { kind: "published" }>): string {
-  if (result.kind === "retry") return result.reason;
-  return result.message === "" ? `refused ${result.status}` : result.message;
+/** A final answer as the row keeps it: the marketplace's refusal with its words, or UNAVAILABLE. */
+function failureOf(result: CatalogueFailure): Failure {
+  if (result.kind === "retry") return { code: "UNAVAILABLE", reason: null };
+  return { code: "REFUSED", reason: result.message === "" ? null : result.message };
+}
+
+/** The run this row gets: the adapter's call, or the code that stands in for it. */
+async function runFor(ctx: EngineContext, row: CatalogueRow, action: CatalogueAction): Promise<Run> {
+  const catalogue = ctx.registry.get(row.provider)?.catalogue;
+  if (!catalogue) return { code: "UNSUPPORTED" };
+  const connection = await catalogueConnection(ctx, row.clientId, row.provider);
+  if ("problem" in connection) return { code: connection.problem };
+  return callFor(ctx, row, action, catalogue, { ...connection, now: ctx.ports.clock.now() });
+}
+
+async function fail(ctx: EngineContext, table: CatalogueTable, row: CatalogueRow, action: CatalogueAction, failure: Failure, detail: string) {
+  await stampFailure(table, row, action, failure, ctx.ports.clock.now());
+  ctx.ports.logger.error(`${MARKETPLACE_CATALOGUE_JOB}: ${action} of ${row.productId} on ${row.provider} failed (${failure.code}): ${detail}`);
+  ctx.ports.publishChanged(row.clientId);
+  return { kind: "failed" as const, action, reason: failure.code };
 }
 
 async function runOnce(
@@ -166,39 +193,37 @@ async function runOnce(
   payload: CatalogueJobPayload,
   attempt: { attempt: number; maxAttempts: number },
 ): Promise<CatalogueOutcome> {
-  const row = (await table.findFirst({
-    where: { id: payload.publicationId, clientId: payload.clientId },
-    select: CATALOGUE_ROW_SELECT,
-  })) as CatalogueRow | null;
+  const row = await readRow(table, payload);
   if (!row) return { kind: "skipped", reason: "no such publication for this tenant" };
   const { action } = payload;
   if (row.status !== WANTED[action]) return { kind: "skipped", reason: `the publication is ${row.status}, not ${WANTED[action]}` };
-  const catalogue = ctx.registry.get(row.provider)?.catalogue;
-  const connection = await catalogueConnection(ctx, row.clientId, row.provider);
-  let run: { result: RunResult; sentPriceCents: number | null };
-  if (!catalogue) run = { result: { kind: "refused", status: 0, message: `${row.provider} has no catalogue` }, sentPriceCents: null };
-  else if (typeof connection === "string") run = { result: { kind: "refused", status: 0, message: connection }, sentPriceCents: null };
-  else run = await callFor(ctx, row, action, catalogue, { ...connection, now: ctx.ports.clock.now() });
+  const run = await runFor(ctx, row, action);
+  if ("code" in run) return fail(ctx, table, row, action, { code: run.code, reason: null }, run.code);
   const { result } = run;
   if (result.kind === "accepted" || result.kind === "published") {
     await stampSuccess(ctx, table, row, action, result, run.sentPriceCents);
     ctx.ports.publishChanged(row.clientId);
     return { kind: "done", action };
   }
-  const reason = reasonOf(result);
+  const detail = result.kind === "retry" ? result.reason : `refused ${result.status}: ${result.message}`;
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
-    throw new CatalogueRetryError(`${action} of ${row.productId} on ${row.provider}: ${reason}`);
+    throw new CatalogueRetryError(`${action} of ${row.productId} on ${row.provider}: ${detail}`);
   }
-  await stampFailure(table, row, action, reason, ctx.ports.clock.now());
-  ctx.ports.logger.error(`${MARKETPLACE_CATALOGUE_JOB}: ${action} of ${row.productId} on ${row.provider} failed: ${reason}`);
-  ctx.ports.publishChanged(row.clientId);
-  return { kind: "failed", action, reason };
+  return fail(ctx, table, row, action, failureOf(result), detail);
+}
+
+function readRow(table: CatalogueTable, payload: CatalogueJobPayload): Promise<CatalogueRow | null> {
+  return table.findFirst({
+    where: { id: payload.publicationId, clientId: payload.clientId },
+    select: CATALOGUE_ROW_SELECT,
+  }) as Promise<CatalogueRow | null>;
 }
 
 /**
  * Run one queued catalogue call. Throws {@link CatalogueRetryError} for an
  * answer worth retrying before the last attempt; any other throw is rethrown
- * for the queue to retry, and on the last attempt ends FAILED.
+ * for the queue to retry, and on the last attempt ends FAILED, INTERNAL (the
+ * message is logged, never stored).
  */
 export async function runCatalogue(
   ctx: EngineContext,
@@ -211,14 +236,10 @@ export async function runCatalogue(
     return await runOnce(ctx, table, payload, attempt);
   } catch (error) {
     if (error instanceof CatalogueRetryError || attempt.attempt < attempt.maxAttempts) throw error;
-    const reason = error instanceof Error ? error.message : String(error);
-    const row = (await table.findFirst({
-      where: { id: payload.publicationId, clientId: payload.clientId },
-      select: CATALOGUE_ROW_SELECT,
-    })) as CatalogueRow | null;
-    if (row && row.status === WANTED[payload.action]) await stampFailure(table, row, payload.action, reason, ctx.ports.clock.now());
-    ctx.ports.logger.error(`${MARKETPLACE_CATALOGUE_JOB}: ${payload.action} of ${payload.publicationId} failed: ${reason}`);
-    ctx.ports.publishChanged(payload.clientId);
-    return { kind: "failed", action: payload.action, reason };
+    const detail = error instanceof Error ? error.message : String(error);
+    const row = await readRow(table, payload);
+    if (row && row.status === WANTED[payload.action]) return fail(ctx, table, row, payload.action, { code: "INTERNAL", reason: null }, detail);
+    ctx.ports.logger.error(`${MARKETPLACE_CATALOGUE_JOB}: ${payload.action} of ${payload.publicationId} failed: ${detail}`);
+    return { kind: "failed", action: payload.action, reason: "INTERNAL" };
   }
 }

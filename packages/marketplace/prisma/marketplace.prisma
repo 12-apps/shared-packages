@@ -282,7 +282,11 @@ model MarketplaceCataloguePublication {
 
   /// Which action FAILED: PUBLISH | WITHDRAW (CHECK); NULL unless FAILED.
   failedAction  String? @map("failed_action")
-  /// The marketplace's reason, as it answered (truncated by the writer).
+  /// Why it FAILED, a code the host words (CHECK): REFUSED, UNAVAILABLE,
+  /// TIMEOUT, NOT_CONNECTED, CREDENTIALS, PRODUCT_GONE, UNSUPPORTED, INTERNAL.
+  failureCode   String? @map("failure_code")
+  /// The marketplace's OWN words for a REFUSED (truncated by the writer);
+  /// NULL for every other code. Never an engine message.
   failureReason String? @map("failure_reason")
 
   /// When the current action was asked: what the job matches its run to, and

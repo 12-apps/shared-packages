@@ -160,5 +160,10 @@ export type {
   PullCatalogue,
   PushCatalogue,
 } from "./core/catalogue-port";
-export type { CatalogueFailedAction, CataloguePublicationView, CatalogueStatus } from "./core/catalogue-store";
+export type {
+  CatalogueFailedAction,
+  CatalogueFailureCode,
+  CataloguePublicationView,
+  CatalogueStatus,
+} from "./core/catalogue-store";
 export { CATALOGUE_GIVE_UP_MS, CATALOGUE_STALE_MS } from "./core/catalogue-sweep";
