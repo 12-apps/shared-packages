@@ -254,10 +254,8 @@ export interface BrowserWalletResult {
 }
 
 /**
- * What the browser needs to open each wallet's sheet for the evidence —
- * computed server-side (FUT-3755). Google Pay runs in the evidence's own
- * environment and is minted against the seller's PagBank account id;
- * Apple Pay only says whether the host has an Apple Pay identity at all.
+ * What the browser needs to open each wallet's sheet, computed server-side (FUT-3755): Google Pay in the evidence's
+ * environment against the seller's PagBank account id; Apple Pay only whether the host has an identity at all.
  */
 export interface EvidenceWalletsConfig {
   /** The amount the sheets show — the amount the wallet orders are raised for. */
@@ -392,6 +390,8 @@ export interface EvidenceOutcomeCopy {
   walletFailures: Readonly<Record<BrowserWalletFailure, string>>;
   /** The host has no Apple Pay identity: waiting for the Apple Developer account. */
   applePayNotConfigured: string;
+  /** Production with no Google merchant id (FUT-4895): waiting for Google's production access. */
+  googlePayNotConfigured: string;
   webhookReceived: (count: number, inboxStatuses: string, chargeStatus: string | null) => string;
   webhookNone: string;
   webhookFailed: string;

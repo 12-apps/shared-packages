@@ -284,6 +284,9 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     applePayNotConfigured:
       'Pending: waiting for the Apple Developer account — Apple Pay identity not configured (Merchant ID and certificate). ' +
       'No Apple Pay order was created.',
+    googlePayNotConfigured:
+      "Pending: waiting for Google Pay's production access — Google merchant id not configured. " +
+      'No Google Pay order was created.',
     webhookReceived: (count, statuses, chargeStatus) =>
       `${count} ${count === 1 ? 'notification' : 'notifications'} received and stored (status: ${statuses})` +
       (chargeStatus ? `; the charge the integration records is ${chargeStatus}.` : '.'),

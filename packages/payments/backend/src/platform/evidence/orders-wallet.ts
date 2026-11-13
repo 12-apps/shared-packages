@@ -51,7 +51,7 @@ async function googlePayConfig(deps: EvidenceRunDeps, accountId: string | null):
   if (!accountId) return null;
   const production = environmentOf(deps) === 'PRODUCTION';
   const merchantInfo = (await deps.googlePayMerchant?.()) ?? null;
-  if (production && !merchantInfo) return null;
+  if (production && !merchantInfo?.merchantId) return null;
   return {
     gateway: 'pagbank',
     gatewayMerchantId: accountId,
@@ -79,10 +79,12 @@ function blockedBecause(
   deps: EvidenceRunDeps,
   wallet: EvidenceWallet,
   result: BrowserWalletResult | undefined,
-  configured: boolean,
+  configured: Readonly<Record<EvidenceWallet, boolean>>,
 ): string | null {
   const name = deps.copy.walletNames[wallet];
-  if (wallet === 'APPLE_PAY' && !configured) return deps.copy.applePayNotConfigured;
+  if (wallet === 'APPLE_PAY' && !configured.APPLE_PAY) return deps.copy.applePayNotConfigured;
+  // No button was drawn, so "not pressed" would be untrue in the file PagBank reads (FUT-4895).
+  if (wallet === 'GOOGLE_PAY' && !configured.GOOGLE_PAY && !result?.token) return deps.copy.googlePayNotConfigured;
   if (!result) return deps.copy.walletNotRun(name);
   if (result.token) return null;
   return deps.copy.walletFailed(name, deps.copy.walletFailures[result.failure ?? 'TOKEN_ERROR']);
@@ -94,7 +96,7 @@ async function walletSteps(
   runId: string,
   wallet: EvidenceWallet,
   results: readonly BrowserWalletResult[],
-  configured: boolean,
+  configured: Readonly<Record<EvidenceWallet, boolean>>,
 ): Promise<EvidenceStep[]> {
   const keys = keysOf(wallet);
   const result = results.find((candidate) => candidate.type === wallet);
@@ -131,7 +133,12 @@ export async function walletSectionSteps(
   results: readonly BrowserWalletResult[],
   onSection: (section: EvidenceWallet) => void = () => undefined,
 ): Promise<EvidenceStep[]> {
-  const configured = (await deps.applePayConfigured?.()) === true;
+  const merchant = (await deps.googlePayMerchant?.()) ?? null;
+  const configured = {
+    // Production needs Google's merchant id; without it the card drew no Google Pay button.
+    GOOGLE_PAY: environmentOf(deps) !== 'PRODUCTION' || Boolean(merchant?.merchantId),
+    APPLE_PAY: (await deps.applePayConfigured?.()) === true,
+  };
   const steps: EvidenceStep[] = [];
   for (const wallet of ['GOOGLE_PAY', 'APPLE_PAY'] as const) {
     onSection(wallet);
