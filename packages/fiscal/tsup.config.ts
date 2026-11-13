@@ -8,6 +8,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     "engine/index": "src/engine/index.ts",
+    "manifest/index": "src/manifest/index.ts",
   },
   format: ["esm"],
   dts: true,

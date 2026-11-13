@@ -80,3 +80,11 @@ at the official Calculadora de Tributos. The package's own suite runs both
 modes over one fixture set and asserts `compareBreakdowns` finds nothing
 (`src/engine/__tests__/oracle.test.ts`); its recorded answers are hand-computed
 until a recording against the live calculator replaces them.
+
+## The manifest
+
+`@12-apps/fiscal/manifest` declares the permissions `fiscal:read`,
+`fiscal:manage`, `fiscal:issue` and `fiscal:cancel`, here and nowhere else. The
+document module adds `db`, `server: ["http", "jobs"]`, `notifications`,
+`web: ["surface"]` and `observability`; until then `.wiring-conformance.json`
+answers each with its reason.
