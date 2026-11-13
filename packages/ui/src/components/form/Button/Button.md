@@ -98,6 +98,20 @@ button with `progress` draw a two-tone `:focus-visible` ring (ink ring, page
 halo), since MUI gives them only a ripple. Any other button is not held, so navigation stays live; a host
 control opts in by reading `useFormBusy()`.
 
+## Host-facing selectors
+
+Every Button carries `data-variant` with the variant it was given (`solid`,
+`outline`, `ghost`, `text`, `glass`, `gradient`; `solid` when none is set). It
+exists because `ghost` renders as MUI's `contained` and `gradient`, `glass` and
+`solid` share classes too, so the DOM class names cannot tell them apart:
+
+```css
+.my-panel button[data-variant='ghost'] { /* correct a ghost button's ink here */ }
+```
+
+A `data-variant` you pass yourself wins over the mark. The attribute is stable
+API: it is never renamed or dropped without a major.
+
 ## Press ripple and focus pulsate
 
 The press ripple and the focus pulsate (an outline or text button's only

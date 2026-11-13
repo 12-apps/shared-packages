@@ -260,6 +260,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onBlur={onBlur}
         sx={buttonSize(size, iconOnly)}
         data-testid={ownTestId}
+        data-variant={variant}
         {...props}
         className={mergedClassName}
       >
