@@ -128,15 +128,27 @@ function decidedOf(input: DecisionInput, plan: CancellationPlan | null, keptStat
   };
 }
 
-/** Plan one decision against its row, or name what is wrong with it. */
-/** The columns of a request that no longer stands, cleared. */
+/**
+ * The columns of a request that no longer stands, cleared, but for its
+ * TOMBSTONE: `cancellation_requested_at` stays, naming the request that was
+ * made (FUT-4765, R3-N2).
+ *
+ * A synchronous marketplace answers a cancellation in the call's response,
+ * never by event. When the sweep times a request out while that call is still
+ * in flight and the store then accepts the order, the late answer must still
+ * find the request it answers: "cancelled" means the marketplace cancelled the
+ * order, and dropping it would leave the order ACCEPTED here and cancelled
+ * there. The outbound job matches a status-less row by this instant
+ * (`stampConfirmedCancellation`); nothing else reads it without a status.
+ */
 const CLEARED_REQUEST = {
   cancellationStatus: null,
   cancellationReasonCode: null,
   cancellationOffendingSkus: null,
-  cancellationRequestedAt: null,
   cancellationFailureReason: null,
 } as const;
+
+/** Plan one decision against its row, or name what is wrong with it. */
 
 function planOne(
   ctx: EngineContext,
@@ -149,7 +161,8 @@ function planOne(
   const stale = notPendingProblem(row, path);
   if (stale || !row) return stale ? [stale] : [];
   if (input.decision === "ACCEPT") {
-    // An accept after a FAILED request (FUT-4758) leaves no request behind it.
+    // An accept after a FAILED request (FUT-4758) leaves no request behind it,
+    // only its tombstone (see CLEARED_REQUEST).
     const data = {
       status: "ACCEPTED",
       acknowledgedAt: now,

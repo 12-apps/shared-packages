@@ -173,13 +173,21 @@ async function refusalOf(
   if (await cancelledBeforeIngest(ctx, { clientId, provider: order.provider, externalOrderId: order.externalOrderId })) {
     return { settle: "IGNORED", reason: "cancelled before its order body arrived", failed: false };
   }
+  const mismatch = merchantMismatch(order, connectionMerchantId);
+  // FAILED, not IGNORED: a connection whose merchant id was entered wrong is
+  // corrected, and the reconciliation sweep then retries within its bound.
+  return mismatch ? { settle: "FAILED", reason: mismatch, failed: true } : null;
+}
+
+/**
+ * Why an order naming a merchant cannot be this connection's, or null. An
+ * order that names none, or a connection that states none, is not judged.
+ * Shared by the fetched path and an order the event carries (`./pipeline.ts`).
+ */
+export function merchantMismatch(order: NormalizedMarketplaceOrder, connectionMerchantId: string | null): string | null {
   const named = order.externalMerchantId ?? null;
-  if (named !== null && connectionMerchantId !== null && named !== connectionMerchantId) {
-    // FAILED, not IGNORED: a connection whose merchant id was entered wrong is
-    // corrected, and the reconciliation sweep then retries within its bound.
-    return { settle: "FAILED", reason: `the order names merchant ${named}, not this connection's`, failed: true };
-  }
-  return null;
+  if (named === null || connectionMerchantId === null || named === connectionMerchantId) return null;
+  return `the order names merchant ${named}, not this connection's`;
 }
 
 /** Ingest a fetched order, unless {@link refusalOf} says otherwise. */

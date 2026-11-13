@@ -145,6 +145,18 @@ async function stampCancellation(
 }
 
 /**
+ * Which rows a synchronous "cancelled" answers: the request still waiting or
+ * FAILED, or the tombstone an accept left of THIS request (no status, the
+ * same `cancellation_requested_at` the job read). A later request of the store
+ * carries a new instant and a status of its own, so it is never mistaken for it.
+ */
+function answerableRequest(row: OutboundRow): Record<string, unknown>[] {
+  const waiting = { cancellationStatus: { in: ["PENDING", "FAILED"] } };
+  if (row.cancellationRequestedAt === null) return [waiting];
+  return [waiting, { cancellationStatus: null, cancellationRequestedAt: row.cancellationRequestedAt }];
+}
+
+/**
  * A marketplace that confirms in its answer: the same stamps as its
  * CANCELLED event (`cancelAcceptance`) — CONFIRMED and REJECTED in one
  * transaction — then the host's `onCancellationConfirmed`, or
@@ -157,9 +169,13 @@ async function stampConfirmedCancellation(ctx: EngineContext, row: OutboundRow, 
     // From FAILED too: the sweep may have timed the request out while this
     // call was in flight, and a marketplace that answers in the response sends
     // no event — its "cancelled" is the only word that it did (the event path's
-    // own rule: a confirmation after a TIMEOUT still confirms).
+    // own rule: a confirmation after a TIMEOUT still confirms). And from the
+    // TOMBSTONE of this same request (FUT-4765, R3-N2): the store may have
+    // accepted the order once the request timed out, which clears the request
+    // but keeps its `cancellation_requested_at`. The order is cancelled on the
+    // marketplace, so it is cancelled here too, and the host hears it.
     const confirmed = await tx.marketplaceAcceptance.updateMany({
-      where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "FAILED"] } },
+      where: { orderId: row.orderId, OR: answerableRequest(row) },
       data: { cancellationStatus: "CONFIRMED", cancellationFailureReason: null },
     });
     if (confirmed.count === 0) return false;

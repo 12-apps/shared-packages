@@ -1,12 +1,12 @@
 import { cancelAcceptance } from "./acceptance";
 import { failCancellationRequest } from "./cancellation";
-import { awaitOrderBody, requeueOwedFetch } from "./fetch-order";
+import { awaitOrderBody, merchantMismatch, requeueOwedFetch } from "./fetch-order";
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { resolveIngestionTarget } from "./integration";
 import { markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
-import type { MarketplaceProvider, NormalizedEvent } from "./types";
+import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 /**
  * One delivery, start to finish: normalize → inbox → ingest.
@@ -98,6 +98,23 @@ function announcesOrderToFetch(event: NormalizedEvent): boolean {
 }
 
 /**
+ * Why an order the event CARRIES must not be ingested for this store: it names
+ * another merchant than the connection's (a wrong webhook URL, a replay), the
+ * rule a fetched order is held to. Read only for an order that names its
+ * merchant (an adapter that sets `externalMerchantId` on the order); an order
+ * that names none costs no read.
+ */
+async function carriedOrderMismatch(
+  ctx: EngineContext,
+  clientId: string,
+  order: NormalizedMarketplaceOrder,
+): Promise<string | null> {
+  if (!order.externalMerchantId) return null;
+  const target = await resolveIngestionTarget(ctx, clientId, order.provider);
+  return merchantMismatch(order, target?.externalMerchantId ?? null);
+}
+
+/**
  * Act on one recorded delivery: cancel, ingest, or deliberately nothing.
  *
  * Extracted so both producers share the ACTION as well as the recording — the
@@ -153,6 +170,14 @@ async function applyEvent(
     return { kind: "ignored", reason };
   }
 
+  const mismatch = await carriedOrderMismatch(ctx, clientId, event.order);
+  if (mismatch) {
+    // FAILED, so the reconciliation sweep retries it once the connection's
+    // merchant id is corrected, within the inbox's attempt bound.
+    await settleInboxEvent(ctx, inboxId, "FAILED", mismatch);
+    ctx.ports.logger.error(`marketplace.ingest: inbox row ${inboxId} refused: ${mismatch}`);
+    return { kind: "failed", reason: mismatch };
+  }
   const result = await ingestMarketplaceOrder(ctx, {
     clientId,
     order: event.order,
