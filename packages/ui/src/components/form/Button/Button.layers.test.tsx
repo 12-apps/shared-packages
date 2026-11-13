@@ -74,10 +74,10 @@ describe('Button ripple layer (FUT-4861)', () => {
   );
 
   it('keeps MUI\'s DOM: the label is a bare text child and nothing in the content takes a layer', () => {
-    const button = renderButton('light', { icon: <span>+</span> });
-    const cls = ownClass(button);
-    expect(Array.from(button.childNodes).some((n) => n.nodeType === 3 && n.textContent === 'Salvar')).toBe(true);
-    expect(button.querySelectorAll(':scope > span:not(.MuiButton-startIcon):not(.MuiTouchRipple-root)')).toHaveLength(0);
+    const domButton = renderButton('light', { icon: <span>+</span> });
+    const cls = ownClass(domButton);
+    expect(Array.from(domButton.childNodes).some((n) => n.nodeType === 3 && n.textContent === 'Salvar')).toBe(true);
+    expect(domButton.querySelectorAll(':scope > span:not(.MuiButton-startIcon):not(.MuiTouchRipple-root)')).toHaveLength(0);
     expect(declared(`.${cls}>.MuiButton-startIcon,.${cls}>.MuiButton-endIcon`, 'z-index')).toBeUndefined();
     expect(screen.getByTestId('b-icon').style.zIndex).toBe('');
   });
