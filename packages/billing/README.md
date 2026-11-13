@@ -85,9 +85,42 @@ while an attempt is in flight. The host's two writes are conditional, so a late
 "pending" never overwrites a refund. Keep the series rows apart from any other
 refund's: `runDue` drives every due row of the store it is given through this
 binding. A provider PENDING snapshot is recorded as refunded, `confirmed:
-false`; the host confirms it from the provider's refund notification. WHEN a
-payment is refundable, what a cancel does to the plan and who may settle are
-the host's.
+false`, and two things follow it. `confirmDue` (the sweep) reads the charge
+back: its money back confirms the refund; still unfinished — or unreadable —
+past the host's `confirmations.confirmWithinMs`, it is only FLAGGED overdue for
+a person and stays refunded, because a charge read cannot tell a slow refund
+from a failed one, so it can never be returned twice. Flagged rows stay in the
+list and are read again on every pass until they resolve. `refundUpdated` takes
+the provider's own word: REFUNDED confirms, FAILED — the one evidence of a
+failure — reopens it as a new request (`requestId`), whose retry is a new
+series. The host hands `onWebhookEvent` (the same thing, shaped as
+payments-backend's `WebhookEventHandler`) to its platform webhook delivery —
+`handleWebhook(…, { onWebhookEvent })` — and it acts only on a REFUND_UPDATED
+event verified against the binding's merchant. `markNotReturned` is a person's
+escape for a refund the provider never confirms: only past the deadline, with a
+non-blank who and why, after one more read of the charge (money back confirms
+it instead; an unreadable charge is reported as `chargeRead: "UNREADABLE"`), it
+reopens the refund as pending (`NOT_RETURNED`) under a new request, and never
+sends. The host keeps the reopened refund's id (`notReturnedRefundId`): if that
+refund lands after all, its REFUNDED word adopts it while the payment is still
+pending, or — when the payment was returned again meanwhile — is recorded once
+as a double return (`doubleReturned`) for a person to recover. A charge read
+that adopts money back records it as that refund only while no second refund
+was sent (`sendingAgain` tells the host before every send, `sentNothing` takes
+it back when the answer proves nothing moved: FAILED, an answered refusal, or a
+refusal before dispatch); after one that may have moved money, which
+refund landed is unknown and the late word counts as a double return; and
+`settleByHand` on such a payment reads the charge first, refusing with
+`MONEY_BACK` or `CHARGE_UNREADABLE`. WHEN a payment is refundable, what a cancel
+does to the plan and who may settle are the host's.
+
+**Caveats.** A webhook replay (`replayWebhooks`) re-runs the gateway's own
+handler only, not a per-delivery one: an update whose handler failed and that
+a replay settles first is not handed to `refundUpdated` again; the sweep and
+`markNotReturned` are the backstop. And a person's word is not the provider's:
+the refund said never returned may still land after a retry or a hand
+settlement sent the money again — the double return is recorded, never
+prevented, so a host shows it to someone who can recover it.
 
 ```ts
 const refunds = createSubscriptionRefund({ payments, merchant, store, series });
@@ -95,6 +128,10 @@ await refunds.refund(paymentId, { reason: "withdrawal" }); // REFUNDED | PENDING
 await refunds.retry(paymentId);                            // a person, after a refusal
 await refunds.settleByHand(paymentId, { by, via, reason });
 await refunds.runDue();                                    // the host's sweep
+await refunds.confirmDue();                                // …and its other half
+await refunds.refundUpdated(update);                       // the provider's word, by hand
+await http.handleWebhook(request, { merchant, onWebhookEvent: refunds.onWebhookEvent }, provider);
+await refunds.markNotReturned(paymentId, { by, reason });  // a person, past the deadline
 ```
 
 Nothing here has a parameter a card could travel in. The number goes from the

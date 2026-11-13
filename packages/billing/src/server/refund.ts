@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   createRefundRetrier,
   CredentialsError,
@@ -22,6 +24,8 @@ import {
   type SubscriptionRefundDeps,
   type SubscriptionRefundResult,
 } from "./refund-ports";
+import { confirmDue, markNotReturned, readCharge, refundUpdated, refundWebhookHandler } from "./refund-confirm";
+import { adoptedRefundId, recordingSends } from "./refund-sends";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -76,7 +80,8 @@ import {
  * completed (common for Pix). It is recorded as refunded with
  * `confirmed: false`: the money is the provider's to return now, and a person
  * must not be asked to settle it. Confirming it (or a later failure) is the
- * provider's refund notification, which the host's webhook already receives.
+ * provider's refund notification: the host hands `onWebhookEvent` to its
+ * platform webhook delivery, and the sweep (`confirmDue`) reads the charge.
  *
  * Server-only.
  */
@@ -119,8 +124,11 @@ function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSer
     providerChargeId: payment.providerChargeId ?? "",
     reference: payment.id,
     subject: SUBSCRIPTION_REFUND_SUBJECT,
-    // A payment is refunded once: its series is bound to the payment itself.
-    boundTo: payment.id,
+    // Bound to the refund REQUEST, by the id the host stores and returns
+    // unchanged: a refund reopened after the provider said it failed is a new
+    // request, so a new series. A request with no stored id (made before the
+    // field existed) keeps the payment id, the binding its live series has.
+    boundTo: payment.requestId ? `${payment.id}:${payment.requestId}` : payment.id,
     cause: reason ?? null,
   };
 }
@@ -130,7 +138,7 @@ async function retrierOf(ctx: Ctx): Promise<RefundRetrier> {
   const { deps, store, now } = ctx;
   const [{ gateway }, series] = await Promise.all([deps.payments(), deps.series()]);
   return createRefundRetrier({
-    gateway,
+    gateway: recordingSends(gateway, store, now),
     store: series,
     now: deps.now,
     attemptMs: deps.attemptMs,
@@ -144,7 +152,13 @@ async function retrierOf(ctx: Ctx): Promise<RefundRetrier> {
       refunded: async (row, outcome) => {
         const record: RefundRecord = outcome.snapshot
           ? snapshotRecord(outcome.snapshot, now())
-          : { how: "ADOPTED", providerRefundId: null, refundedCents: outcome.refundedCents ?? null, confirmed: true, at: now() };
+          : {
+              how: "ADOPTED",
+              providerRefundId: adoptedRefundId(await store.find(row.reference)),
+              refundedCents: outcome.refundedCents ?? null,
+              confirmed: true,
+              at: now(),
+            };
         await store.markRefunded(row.reference, record);
       },
     },
@@ -247,8 +261,9 @@ async function refund(ctx: Ctx, paymentId: string, reason: string | undefined): 
   if (payment.state === "REFUND_PENDING") return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
   if (payment.state !== "PAID") return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_PAID" };
   const at = ctx.now();
-  if (!(await ctx.store.claim(paymentId, at))) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
-  return firstAttempt(ctx, { ...payment, state: "REFUND_PENDING", requestedAt: at }, reason);
+  const requestId = randomUUID();
+  if (!(await ctx.store.claim(paymentId, at, requestId))) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  return firstAttempt(ctx, { ...payment, state: "REFUND_PENDING", requestedAt: at, requestId }, reason);
 }
 
 /** The payment as it stands after the retrier ran, as an outcome. */
@@ -283,6 +298,21 @@ async function retry(ctx: Ctx, paymentId: string): Promise<SubscriptionRefundRes
   return outcomeOf(ctx, payment);
 }
 
+/**
+ * A payment reopened NOT_RETURNED: the refund a person said never came back
+ * may still land, so the charge is read before anything is settled by hand.
+ * Money back → recorded returned (ADOPTED) and the settlement refused; an
+ * unreadable charge refuses it too (settle later). Null: not back, go on.
+ */
+async function notReturnedYet(ctx: Ctx, payment: RefundablePayment): Promise<SettleByHandResult | null> {
+  const read = await readCharge(ctx.deps, payment);
+  if (read === "NOT_BACK") return null;
+  if (read === "UNREADABLE") return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: "CHARGE_UNREADABLE" };
+  const record: RefundRecord = { how: "ADOPTED", providerRefundId: adoptedRefundId(payment), refundedCents: null, confirmed: true, at: ctx.now() };
+  const wrote = await ctx.store.markRefunded(payment.id, record);
+  return { outcome: "NOT_REFUNDABLE", paymentId: payment.id, why: wrote ? "MONEY_BACK" : "ALREADY_REFUNDED" };
+}
+
 async function settleByHand(
   ctx: Ctx,
   paymentId: string,
@@ -290,6 +320,12 @@ async function settleByHand(
 ): Promise<SettleByHandResult> {
   const payment = await pendingPayment(ctx, paymentId);
   if (refused(payment)) return payment;
+  // Keyed on the kept refund id, not the pending reason: a retry after the
+  // reopen rewrites the reason, and the refund said never returned may still land.
+  if (payment.notReturnedRefundId !== null) {
+    const notYet = await notReturnedYet(ctx, payment);
+    if (notYet) return notYet;
+  }
   const retrier = await retrierOf(ctx);
   const key = keyOf(ctx, payment);
   if (payment.provider && payment.providerChargeId && !(await retrier.settleByHand(key))) {
@@ -316,5 +352,9 @@ export function createSubscriptionRefund(deps: SubscriptionRefundDeps): Subscrip
     retry: async (paymentId) => retry(await ctx(), paymentId),
     settleByHand: async (paymentId, byHand) => settleByHand(await ctx(), paymentId, byHand),
     runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
+    confirmDue: (limit) => confirmDue(deps, limit),
+    refundUpdated: (update) => refundUpdated(deps, update),
+    onWebhookEvent: refundWebhookHandler(deps),
+    markNotReturned: (paymentId, byHand) => markNotReturned(deps, paymentId, byHand),
   };
 }

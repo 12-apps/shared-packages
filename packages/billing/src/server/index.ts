@@ -18,9 +18,19 @@ export {
   type SubscriptionCollectionDeps,
 } from "./collect";
 export { createSubscriptionRefund } from "./refund";
+export type { ChargeRead } from "./refund-confirm";
 export {
   SUBSCRIPTION_REFUND_SUBJECT,
+  type ConfirmationPass,
   type NotRefundableWhy,
+  type RefundConfirmationStore,
+  type NotReturnedBy,
+  type NotReturnedResult,
+  type NotReturnedRefund,
+  type ReopenRecord,
+  type RefundUpdateOutcome,
+  type RefundUpdate,
+  type UnconfirmedRefund,
   type RefundablePayment,
   type RefundablePaymentState,
   type RefundablePaymentStore,

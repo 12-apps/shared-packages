@@ -24,6 +24,7 @@ import type { SettlementHints } from './settlement-hints';
 import type { ProviderRegistry } from './registry';
 import { providersStillWalkedPast } from './walk-history';
 import { runWebhookPipeline, type WebhookPipelineObserver } from './webhook-pipeline';
+import { withDeliveryHandler, type WebhookDeliveryOptions } from './webhook-delivery';
 import {
   replayRetryableWebhooks,
   type WebhookReplayOptions,
@@ -241,9 +242,10 @@ export interface PaymentsGateway<P extends string = string>
    * Full inbound-webhook pipeline for a delivery already attributed to a
    * merchant (hosts attribute via the webhook URL, e.g. a per-merchant
    * connect key in the path). Returns the normalized events that were newly
-   * processed ([] for duplicates).
+   * processed ([] for duplicates). `options` adds one delivery's own reaction
+   * (`./webhook-delivery.ts`).
    */
-  handleWebhook(merchant: MerchantRef, delivery: WebhookDelivery): Promise<NormalizedWebhookEvent[]>;
+  handleWebhook(merchant: MerchantRef, delivery: WebhookDelivery, options?: WebhookDeliveryOptions): Promise<NormalizedWebhookEvent[]>;
   /**
    * Re-run the pipeline over inbox rows that are still owed work: handlers that
    * threw (FAILED) and deliveries whose process died before settling them
@@ -391,7 +393,7 @@ export function createPaymentsGateway<P extends string>(
     },
 
     stillWalkedPast: (merchant, key) => providersStillWalkedPast(config.attempts, config.health, merchant, key),
-    handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
+    handleWebhook: (m, d, options) => runWebhookPipeline(withDeliveryHandler(config, options), (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
   }) };
 }
