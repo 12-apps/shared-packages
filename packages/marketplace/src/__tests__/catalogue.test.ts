@@ -149,6 +149,26 @@ describe("catalogue publishing, push", () => {
     expect(links.map((link) => [link.externalSku, link.menuItemId])).toEqual([["p-1", "p-1"]]);
   });
 
+  it("never undoes a store's own mapping of that SKU to another product", async () => {
+    const h = mount();
+    await h.connect(PUSHY);
+    h.memory.tables.marketplaceMenuLink.rows.push({
+      id: "link-own",
+      clientId: TENANT,
+      provider: PUSHY,
+      externalSku: "p-1",
+      externalName: "Burger",
+      menuItemId: "menu-2",
+      lastSeenAt: new Date("2026-11-01T00:00:00.000Z"),
+    });
+
+    await h.engine.publish({ clientId: TENANT, provider: PUSHY, productId: "p-1" });
+    await runLatest(h);
+
+    const links = await h.engine.menuLinks({ clientId: TENANT, provider: PUSHY });
+    expect(links.map((link) => [link.externalSku, link.menuItemId])).toEqual([["p-1", "menu-2"]]);
+  });
+
   it("an iFood order for a published product arrives mapped", async () => {
     const http = scriptedHttp((request) =>
       request.url.endsWith("/oauth/token")

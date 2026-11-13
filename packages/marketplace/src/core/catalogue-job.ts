@@ -153,21 +153,21 @@ async function publishLateLanding(ctx: EngineContext, table: CatalogueTable, row
 /**
  * Map the SKU the marketplace's orders will carry for a published item to the
  * host's product, so those orders arrive mapped instead of on the attention
- * list. Kept on a withdraw: an order placed before it still maps.
+ * list — only when the SKU has no link yet, or an unmapped one: a store that
+ * mapped it to another product on purpose keeps its own mapping. Kept on a
+ * withdraw: an order placed before it still maps.
  */
 async function mapPublishedSku(ctx: EngineContext, row: CatalogueRow, result: RunResult, name: string | undefined): Promise<void> {
   const sku = (result.kind === "published" ? result.sku : undefined) ?? row.productId;
   const db = await ctx.ports.db();
+  const key = { clientId: row.clientId, provider: row.provider, externalSku: sku };
+  const existing = (await db.marketplaceMenuLink.findMany({ where: key, select: { menuItemId: true }, take: 1 })) as {
+    menuItemId: string | null;
+  }[];
+  if (existing[0]?.menuItemId) return;
   await db.marketplaceMenuLink.upsert({
-    where: { clientId_provider_externalSku: { clientId: row.clientId, provider: row.provider, externalSku: sku } },
-    create: {
-      clientId: row.clientId,
-      provider: row.provider,
-      externalSku: sku,
-      externalName: name ?? null,
-      menuItemId: row.productId,
-      lastSeenAt: ctx.ports.clock.now(),
-    },
+    where: { clientId_provider_externalSku: key },
+    create: { ...key, externalName: name ?? null, menuItemId: row.productId, lastSeenAt: ctx.ports.clock.now() },
     update: { menuItemId: row.productId },
   });
 }
