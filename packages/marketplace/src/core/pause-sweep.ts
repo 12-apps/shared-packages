@@ -26,6 +26,8 @@ import type { EngineContext } from "./ports";
  * - **A failed resume that still holds something** is retried each pass until
  *   the give-up: a store must not stay closed because one delete failed.
  * - **A replaced closure** an extend could not delete is retried.
+ * - **An OPEN record that still holds something** (a pause call whose answer
+ *   was lost after a resume landed) goes back to RESUMING and is re-queued.
  *
  * Re-queued under a key of its own per pass, as the outbound sweep does. The
  * job is idempotent by the row and leased, so a duplicate run calls nobody
@@ -102,6 +104,28 @@ async function retryFailedResumes(ctx: EngineContext, stale: Date, cutoff: Date)
   return retried;
 }
 
+/**
+ * An OPEN record that still holds something (a call whose answer was lost
+ * after a resume landed): back to RESUMING, so the job deletes it.
+ */
+async function reopenOrphans(ctx: EngineContext, stale: Date): Promise<StorePauseRow[]> {
+  const table = pauseTable(await ctx.ports.db());
+  const rows = (await table.findMany({
+    where: {
+      state: "OPEN",
+      wanted: "OPEN",
+      requestedAt: { lt: stale },
+      OR: [{ attemptKey: { not: null } }, { externalId: { not: null } }, { sentUntil: { not: null } }, { retiredExternalIds: { not: null } }],
+    },
+  })) as StorePauseRow[];
+  const reopened: StorePauseRow[] = [];
+  for (const row of rows) {
+    const moved = await table.updateMany({ where: { id: row.id, state: "OPEN", wanted: "OPEN" }, data: { state: "RESUMING" } });
+    if (moved.count > 0) reopened.push(row);
+  }
+  return reopened;
+}
+
 /** One sweep pass. A host whose database has no pause model sweeps nothing. */
 export async function sweepAvailability(ctx: EngineContext, now: Date): Promise<AvailabilitySweepResult> {
   const db = await ctx.ports.db();
@@ -117,7 +141,8 @@ export async function sweepAvailability(ctx: EngineContext, now: Date): Promise<
   })) as StorePauseRow[];
   const retired = (await table.findMany({ where: { state: "PAUSED", retiredExternalIds: { not: null } } })) as StorePauseRow[];
   const failedResumes = await retryFailedResumes(ctx, stale, cutoff);
-  const requeued = await requeue(ctx, [...waiting, ...retired, ...failedResumes], now);
+  const orphans = await reopenOrphans(ctx, stale);
+  const requeued = await requeue(ctx, [...waiting, ...retired, ...failedResumes, ...orphans], now);
   if (givenUp > 0) ctx.ports.logger.error(`marketplace.availability-sweep: gave up on ${givenUp} store pause ask(s).`);
   return { expired, requeued, givenUp };
 }

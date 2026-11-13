@@ -107,15 +107,19 @@ async function listInterruptions(ctx: AdapterCallContext, merchantId: string): P
 }
 
 /**
- * Whether iFood's `end` is the instant the create sent: the same string, the
- * same instant once parsed, or the same wall clock with the offset dropped
- * (iFood may echo the store's clock without it).
+ * Whether iFood's `end` is the instant the create sent. An `end` that states
+ * its zone (`Z` or an offset) is compared as an instant, and only as one: an
+ * owner's interruption at another instant is never claimed because its digits
+ * look like ours. Only an `end` with no zone (iFood echoing the store's own
+ * clock) is compared as the store's wall clock.
  */
 function sameEnd(end: string, until: Date, timeZone: string): boolean {
   const sent = ifoodLocalTime(until, timeZone);
   if (end === sent) return true;
-  const parsed = Date.parse(end);
-  if (!Number.isNaN(parsed) && /[zZ]|[+-]\d{2}:?\d{2}$/u.test(end) && parsed === Math.floor(until.getTime() / 1000) * 1000) return true;
+  if (/(?:[zZ]|[+-]\d{2}:?\d{2})$/u.test(end)) {
+    const parsed = Date.parse(end);
+    return !Number.isNaN(parsed) && Math.floor(parsed / 1000) === Math.floor(until.getTime() / 1000);
+  }
   return end.slice(0, 19) === sent.slice(0, 19);
 }
 

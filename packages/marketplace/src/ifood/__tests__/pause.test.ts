@@ -149,6 +149,17 @@ describe("iFood assigning its own ids (B1): a lost create answer never makes a s
     expect([...ifoodSide.stored.keys()]).toEqual(["by-hand"]);
   });
 
+  it("never claims an owner's interruption at another instant whose digits look like ours (R2-4)", async () => {
+    const ifoodSide = ifoodAssigningIds();
+    // Same description; `Z` at 12:25 is 09:25 in Sao Paulo, not our 12:25-03:00.
+    ifoodSide.stored.set("owner-1", { description: "Cozinha cheia", start: "x", end: "2026-11-13T12:25:00Z" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, request)).toMatchObject({ kind: "retry" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, request)).toEqual({ kind: "paused", externalId: "ifood-1", until: UNTIL });
+    const ref = { merchantId: "merchant-1", externalId: null, key: "key-1", sent: { until: UNTIL, reason: "Cozinha cheia", timeZone: "America/Sao_Paulo" } };
+    expect(await ifood.availability!.resume(ifoodSide.ctx, ref)).toEqual({ kind: "accepted" });
+    expect([...ifoodSide.stored.keys()]).toEqual(["owner-1"]);
+  });
+
   it("recognises an end iFood echoes in UTC or without its offset", async () => {
     for (const end of ["2026-11-13T15:25:00Z", "2026-11-13T12:25:00", "2026-11-13T15:25:00.000+00:00"]) {
       const { ctx } = context(() => ({ status: 200, body: JSON.stringify([{ id: "ifood-7", description: "Cozinha cheia", end }]) }));

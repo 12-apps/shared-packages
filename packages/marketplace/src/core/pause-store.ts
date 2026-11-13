@@ -63,7 +63,7 @@ export interface StorePauseRow {
   sentUntil: Date | null;
   attemptKey: string | null;
   attemptUntil: Date | null;
-  /** Space-separated ids, oldest first; null when none. */
+  /** The replaced closures still to delete, oldest first (`./pause-retired.ts` reads and writes it); null when none. */
   retiredExternalIds: string | null;
   failureCode: StorePauseFailureCode | null;
   failureDetail: string | null;
@@ -115,17 +115,8 @@ export async function readPause(ctx: EngineContext, clientId: string, provider: 
 
 /** Whether anything of ours may stand on the marketplace for this record. */
 export function holdsSomething(row: Pick<StorePauseRow, "externalId" | "sentUntil" | "attemptKey" | "retiredExternalIds">): boolean {
-  return row.externalId !== null || row.sentUntil !== null || row.attemptKey !== null || retiredOf(row).length > 0;
-}
-
-/** The replaced closures still to be deleted, oldest first. */
-export function retiredOf(row: Pick<StorePauseRow, "retiredExternalIds">): string[] {
-  return (row.retiredExternalIds ?? "").split(" ").filter((id) => id !== "");
-}
-
-/** The column's value for a list of replaced closures. */
-export function retiredValue(ids: readonly string[]): string | null {
-  return ids.length === 0 ? null : ids.join(" ");
+  const retired = row.retiredExternalIds !== null && row.retiredExternalIds.trim() !== "";
+  return row.externalId !== null || row.sentUntil !== null || row.attemptKey !== null || retired;
 }
 
 /** A fresh key for one closure's create. */

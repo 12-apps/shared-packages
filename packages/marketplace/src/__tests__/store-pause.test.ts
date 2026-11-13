@@ -71,12 +71,16 @@ function switchMarketplace() {
   const state = { enabled: true };
   const calls: string[] = [];
   const script: Script[] = [];
+  const during = { pause: [] as (() => Promise<void>)[] };
   const availability: MarketplaceAvailability = {
     kind: "switch",
     pause: async (_ctx, request) => {
       calls.push("off");
-      if (script.shift() === "refused") return { kind: "refused", status: 403, message: "not allowed" };
+      const next = script.shift();
+      if (next === "refused") return { kind: "refused", status: 403, message: "not allowed" };
       state.enabled = false;
+      await during.pause.shift()?.();
+      if (next === "lost") return { kind: "retry", reason: "timeout" };
       return { kind: "paused", externalId: null, until: request.until };
     },
     resume: async () => {
@@ -85,7 +89,7 @@ function switchMarketplace() {
       return { kind: "accepted" };
     },
   };
-  return { availability, state, calls, script };
+  return { availability, state, calls, script, during };
 }
 
 function adapter(provider: string, availability?: MarketplaceAvailability): MarketplaceAdapter {
@@ -230,7 +234,7 @@ describe("the availability job", () => {
     expect(h.memory.tables.marketplaceStorePause.rows).toHaveLength(0);
   });
 
-  it("keeps a replaced closure whose delete failed, and deletes it before the next renewal (N4)", async () => {
+  it("keeps a replaced closure whose delete got no answer, creates the next one first, then deletes both (N4)", async () => {
     const { h, acme } = setup();
     await h.connect(ACME);
     const seen = { count: 0 };
@@ -238,15 +242,15 @@ describe("the availability job", () => {
     await drain(h, seen);
     const first = pauseRow(h)!.externalId as string;
     await pause(h, minutes(30));
-    // The new closure is made; deleting the replaced one is refused.
-    acme.script.push("ok", "refused");
+    // The new closure is made; deleting the replaced one gets no answer.
+    acme.script.push("ok", "retry");
     await drain(h, seen);
     const second = pauseRow(h)!.externalId as string;
-    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", retiredExternalIds: first });
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", retiredExternalIds: `id:${first}@${minutes(20).toISOString()}` });
     await pause(h, minutes(45));
     await drain(h, seen);
-    // The pending one goes first, then the next renewal retires the second.
-    expect(acme.calls.slice(-3)).toEqual([`resume:${first}`, `pause:${minutes(45).toISOString()}`, `resume:${second}`]);
+    // The next closure first (never open in between), then every replaced one.
+    expect(acme.calls.slice(-3)).toEqual([`pause:${minutes(45).toISOString()}`, `resume:${first}`, `resume:${second}`]);
     expect(pauseRow(h)).toMatchObject({ retiredExternalIds: null, sentUntil: minutes(45) });
     expect(acme.closures.size).toBe(1);
   });
@@ -354,10 +358,13 @@ describe("races: the last ask wins", () => {
     await h.connect(ACME);
     const seen = { count: 0 };
     await pause(h, minutes(20));
+    // A PAUSING record may have a call in flight: the resume is queued, and finds nothing of ours.
     expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({
-      marketplaces: [{ provider: ACME, outcome: "open" }],
+      marketplaces: [{ provider: ACME, outcome: "queued" }],
     });
-    for (const outcome of await drain(h, seen)) expect(outcome).toMatchObject({ kind: "skipped" });
+    const [first, ...later] = await drain(h, seen);
+    expect(first).toEqual({ kind: "done", state: "OPEN" });
+    for (const outcome of later) expect(outcome).toMatchObject({ kind: "skipped" });
     expect(acme.closures.size).toBe(0);
     expect(acme.calls).toEqual([]);
   });
@@ -368,7 +375,7 @@ describe("races: the last ask wins", () => {
     const seen = { count: 0 };
     await pause(h, minutes(20));
     expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({
-      marketplaces: [{ provider: SWITCHY, outcome: "open" }],
+      marketplaces: [{ provider: SWITCHY, outcome: "queued" }],
     });
     await drain(h, seen);
     expect(switchy.calls).toEqual([]);
@@ -453,6 +460,136 @@ describe("races: the last ask wins", () => {
     await h.engine.runAvailability(payload!, { attempt: 1, maxAttempts: 3 });
     expect(second).toHaveLength(1);
     expect(acme.calls.filter((call) => call.startsWith("pause:"))).toHaveLength(1);
+  });
+});
+
+describe("review round 2", () => {
+  it("a resume landing while the OFF call is in flight, whose answer is lost, turns the store back on (R2-1)", async () => {
+    const { h, switchy } = setup();
+    await h.connect(SWITCHY);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    switchy.script.push("lost");
+    switchy.during.pause.push(async () => {
+      expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toMatchObject({ marketplaces: [{ outcome: "queued" }] });
+    });
+    const [payload] = takeJobs(h, seen);
+    await expect(h.engine.runAvailability(payload!, { attempt: 1, maxAttempts: 3 })).rejects.toBeInstanceOf(AvailabilityRetryError);
+    expect(pauseRow(h, SWITCHY)).toMatchObject({ wanted: "OPEN", state: "RESUMING" });
+    expect(switchy.state.enabled).toBe(false);
+    expect(await h.engine.runAvailability(payload!, { attempt: 2, maxAttempts: 3 })).toEqual({ kind: "done", state: "OPEN" });
+    expect(switchy.state.enabled).toBe(true);
+    expect(pauseRow(h, SWITCHY)).toMatchObject({ state: "OPEN", attemptKey: null });
+  });
+
+  it("a resume that read PAUSING before the job wrote its key re-reads instead of writing OPEN over it (R2-1)", async () => {
+    const memory = createMemoryDb();
+    const table = memory.tables.marketplaceStorePause;
+    const between: (() => void)[] = [];
+    const db = {
+      ...memory.tables,
+      marketplaceStorePause: {
+        findFirst: (args: unknown) => table.findFirst(args),
+        upsert: (args: unknown) => table.upsert(args),
+        // eslint-disable-next-line test-flakiness/no-database-operations -- the in-memory table, wrapped to inject the race.
+        updateMany: (args: unknown) => table.updateMany(args),
+        findMany: async (args: unknown) => {
+          const rows = await table.findMany(args);
+          between.shift()?.();
+          return rows;
+        },
+      },
+    } as MarketplaceDb;
+    const switchy = switchMarketplace();
+    const h = createHarness({ adapters: [adapter(SWITCHY, switchy.availability)], store: { db, transaction: memory.transaction } });
+    await h.connect(SWITCHY);
+    await pause(h, minutes(20));
+    // The job's claim lands between the resume's read (no key) and its write.
+    between.push(() => Object.assign(table.rows[0]!, { attemptKey: "claimed" }));
+    expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toMatchObject({ marketplaces: [{ outcome: "queued" }] });
+    expect(table.rows[0]).toMatchObject({ wanted: "OPEN", state: "RESUMING", attemptKey: "claimed" });
+  });
+
+  it("an OPEN record that still holds a key is finished by the job and picked up by the sweep (R2-1)", async () => {
+    const { h, switchy } = setup();
+    await h.connect(SWITCHY);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    await drain(h, seen);
+    // As the race left it before the fix: OPEN/OPEN while the store is off and the key is held.
+    Object.assign(pauseRow(h, SWITCHY)!, { state: "OPEN", wanted: "OPEN", attemptKey: "k-1", requestedAt: NOW });
+    h.clock.at = minutes(11);
+    expect(await h.engine.sweepAvailability()).toMatchObject({ requeued: 1 });
+    await drain(h, seen);
+    expect(switchy.state.enabled).toBe(true);
+    expect(pauseRow(h, SWITCHY)).toMatchObject({ state: "OPEN", attemptKey: null, sentUntil: null });
+  });
+
+  it("keeps the replaced list bounded: past-end ids dropped without a call, refusals dropped, at most ten (R2-2)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    for (let i = 0; i < 12; i += 1) {
+      h.clock.at = minutes(i);
+      await pause(h, minutes(30 + i));
+      // Every delete of a replaced closure gets no answer: the list would grow by one each renewal.
+      acme.script.push("ok", ...(Array(12).fill("retry") as Script[]));
+      await drain(h, seen);
+      acme.script.length = 0;
+      const ids = (pauseRow(h)!.retiredExternalIds as string | null)?.split(" ") ?? [];
+      expect(ids.length).toBeLessThanOrEqual(10);
+    }
+    expect(h.logged.some((line) => line.message.includes("more than 10 replaced closures"))).toBe(true);
+    // Past every replaced closure's own end, none is called: all are dropped.
+    h.clock.at = minutes(200);
+    const before = acme.calls.length;
+    const current = pauseRow(h)!.externalId as string;
+    await h.engine.resumeStore({ clientId: TENANT, now: minutes(200) });
+    await drain(h, seen);
+    // Only the closure the engine holds is deleted; none of the replaced ones is called.
+    expect(acme.calls.slice(before)).toEqual([`resume:${current}`]);
+    expect(pauseRow(h)).toMatchObject({ state: "OPEN", retiredExternalIds: null });
+  });
+
+  it("drops a replaced closure whose delete is refused for good, without failing the resume (R2-2)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    await pause(h, minutes(20));
+    await drain(h, seen);
+    await pause(h, minutes(30));
+    acme.script.push("ok", "refused");
+    await drain(h, seen);
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", retiredExternalIds: null });
+  });
+
+  it("a switch is never turned ON in the middle of a pause when a renewal follows a lost answer (R2-3)", async () => {
+    const { h, switchy } = setup();
+    await h.connect(SWITCHY);
+    const seen = { count: 0 };
+    switchy.script.push("lost" as Script);
+    await pause(h, minutes(20));
+    await drain(h, seen, { attempt: 3, maxAttempts: 3 });
+    await pause(h, minutes(25));
+    await drain(h, seen);
+    expect(switchy.calls).toEqual(["off", "off"]);
+    expect(pauseRow(h, SWITCHY)).toMatchObject({ state: "PAUSED", sentUntil: minutes(25), attemptKey: null });
+  });
+
+  it("an interruption's stale key: the new closure is made first, then the lost one deleted (R2-3)", async () => {
+    const { h, acme } = setup();
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    acme.script.push("lost");
+    await pause(h, minutes(20));
+    await drain(h, seen, { attempt: 3, maxAttempts: 3 });
+    expect(acme.closures.size).toBe(1);
+    await pause(h, minutes(25));
+    await drain(h, seen);
+    const calls = acme.calls.slice(-2);
+    expect(calls[0]).toBe(`pause:${minutes(25).toISOString()}`);
+    expect(calls[1]).toMatch(/^resume:key=/u);
+    expect([...acme.closures.values()]).toEqual([{ until: minutes(25), byHand: false }]);
   });
 });
 

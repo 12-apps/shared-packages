@@ -41,8 +41,9 @@ What follows for the engine:
    later or EARLIER, the engine creates the new interruption first, then
    deletes the old one: an earlier estimate shortens the closure, since the
    store is never closed longer than the kitchen's pause. A replaced
-   interruption whose delete failed stays on a list and is deleted before
-   the next renewal.
+   interruption waits on a bounded list (at most ten) with its own end: it
+   leaves once its delete answers, is refused for good, or its end passes
+   (then it is over by itself, and nobody is called).
 5. **Never closed past the kitchen's pause.** An interruption carries the end
    itself. For anything else, and for a host that stops renewing, the sweep
    resumes a pause whose `until` has passed.
@@ -50,7 +51,8 @@ What follows for the engine:
    rule 3 cannot be held in full: an owner who also closes the store by hand
    on Rappi or 99Food while the kitchen's pause stands sees it reopened when
    the pause ends. The engine still never turns on a store it did not turn
-   off. The host decides, knowing this.
+   off, and never turns it on in the middle of a pause. The host decides,
+   knowing this.
 
 ## Why each part is shaped this way
 

@@ -172,13 +172,35 @@ export async function pauseStore(ctx: EngineContext, input: PauseStoreInput): Pr
   return { kind: "ok", marketplaces };
 }
 
-/** Rewrite one record's ask to OPEN; queue the job only when something of ours stands there. */
-async function askResume(ctx: EngineContext, row: StorePauseRow, now: Date): Promise<ResumeOutcome> {
-  if (row.wanted === "OPEN" && (row.state === "RESUMING" || row.state === "OPEN")) return "unchanged";
+/**
+ * Rewrite one record's ask to OPEN; queue the job when something of ours
+ * stands there OR may be on its way: a PAUSING record may have a call in
+ * flight whose key the job wrote after this read. The write is predicated on
+ * the key read, so a claim that lands in between makes this re-read.
+ */
+async function askResume(ctx: EngineContext, read: StorePauseRow, now: Date): Promise<ResumeOutcome> {
+  let row: StorePauseRow | null = read;
+  for (let tries = 0; row && tries < 3; tries += 1) {
+    if (resumeAsked(row)) return "unchanged";
+    const outcome = await writeResume(ctx, row, now);
+    if (outcome !== null) return outcome;
+    row = await readPause(ctx, read.clientId, read.provider);
+  }
+  return "unchanged";
+}
+
+/** Whether a resume already stands: on its way, or OPEN with nothing of ours left. */
+function resumeAsked(row: StorePauseRow): boolean {
+  if (row.wanted !== "OPEN") return false;
+  return row.state === "RESUMING" || (row.state === "OPEN" && !holdsSomething(row));
+}
+
+/** The resume's write, predicated on the key read; null when the row moved under it. */
+async function writeResume(ctx: EngineContext, row: StorePauseRow, now: Date): Promise<ResumeOutcome | null> {
+  const held = holdsSomething(row) || row.state === "PAUSING";
   const table = pauseTable(await ctx.ports.db());
-  const held = holdsSomething(row);
-  await table.updateMany({
-    where: { id: row.id },
+  const moved = await table.updateMany({
+    where: { id: row.id, attemptKey: row.attemptKey },
     data: {
       wanted: "OPEN",
       state: held ? "RESUMING" : "OPEN",
@@ -189,6 +211,7 @@ async function askResume(ctx: EngineContext, row: StorePauseRow, now: Date): Pro
       ...(held ? {} : { resumedAt: now }),
     },
   });
+  if (moved.count === 0) return null;
   if (!held) return "open";
   const payload = { clientId: row.clientId, provider: row.provider };
   await enqueueAvailability(ctx, payload, availabilityDedupeKey(payload, now));

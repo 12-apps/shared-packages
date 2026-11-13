@@ -382,8 +382,10 @@ model MarketplaceStorePause {
   /// The end that create carried: how a closure the marketplace named with
   /// its own id is still recognised as ours.
   attemptUntil       DateTime? @map("attempt_until")
-  /// The closures a renewal replaced, still to be deleted: their ids,
-  /// space-separated, oldest first. Never dropped until each delete answers.
+  /// The closures a renewal replaced, still to be deleted, oldest first, each
+  /// with its end (`id:<id>@<end>` or `key:<key>@<end>`, space-separated). One
+  /// leaves once its delete answers, its delete is refused for good, or its
+  /// own end passes; at most ten are kept (`src/core/pause-retired.ts`).
   retiredExternalIds String?   @map("retired_external_ids")
 
   failureCode   String? @map("failure_code")
