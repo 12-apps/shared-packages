@@ -3,7 +3,7 @@ import { failCancellationRequest } from "./cancellation";
 import { awaitOrderBody, merchantMismatch, requeueOwedFetch } from "./fetch-order";
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
-import { resolveIngestionTarget } from "./integration";
+import { connectionMerchantId, resolveIngestionTarget } from "./integration";
 import { markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
@@ -110,8 +110,8 @@ async function carriedOrderMismatch(
   order: NormalizedMarketplaceOrder,
 ): Promise<string | null> {
   if (!order.externalMerchantId) return null;
-  const target = await resolveIngestionTarget(ctx, clientId, order.provider);
-  return merchantMismatch(order, target?.externalMerchantId ?? null);
+  // The one column, never the whole target: no credentials opened per order.
+  return merchantMismatch(order, await connectionMerchantId(ctx, clientId, order.provider));
 }
 
 /**
