@@ -32,12 +32,7 @@ export type RefundPendingReason =
   /** The platform has no usable credentials at that provider any more. Nothing was sent. */
   | "NO_CREDENTIALS"
   /** The payment is paid but carries no provider charge (recorded by hand, say). */
-  | "NO_CHARGE"
-  /**
-   * The provider accepted a refund it then never confirmed: the charge still
-   * read as paid when the host's confirmation deadline passed (`confirmDue`).
-   */
-  | "NOT_CONFIRMED";
+  | "NO_CHARGE";
 
 /** One subscription payment, as the host's own row maps onto it. */
 export interface RefundablePayment {
@@ -56,6 +51,13 @@ export interface RefundablePayment {
   requestedAt: Date | null;
   /** The last recorded reason it is pending; null until an attempt answered. */
   pendingReason: RefundPendingReason | null;
+  /**
+   * The refund REQUEST this payment is under, as the host stored it from
+   * `claim` (or `reopen`) and returns it unchanged; null when none was stored
+   * (a request made before this field existed). The retry series is bound to
+   * it, so a refund asked for again is a new series.
+   */
+  requestId: string | null;
 }
 
 /** How the money went back. */
@@ -95,8 +97,11 @@ export interface RefundPendingRecord {
  */
 export interface RefundablePaymentStore {
   find(paymentId: string): Promise<RefundablePayment | null>;
-  /** PAID → REFUND_PENDING, stamping `requestedAt = at`; false when the row was not PAID any more. */
-  claim(paymentId: string, at: Date): Promise<boolean>;
+  /**
+   * PAID → REFUND_PENDING, stamping `requestedAt = at` and storing `requestId`
+   * (returned unchanged by `find`); false when the row was not PAID any more.
+   */
+  claim(paymentId: string, at: Date, requestId: string): Promise<boolean>;
   /** REFUND_PENDING → REFUNDED; false when the row was not pending (refunded already). */
   markRefunded(paymentId: string, record: RefundRecord): Promise<boolean>;
   /** Record why it is pending, ONLY on a row still REFUND_PENDING; false otherwise. */
@@ -108,32 +113,54 @@ export interface UnconfirmedRefund {
   id: string;
   provider: string | null;
   providerChargeId: string | null;
+  /** The provider's id of the refund recorded; a FAILED update for another refund is not this one's. */
+  providerRefundId: string | null;
   /** When the refund was recorded: the confirmation deadline counts from here. */
   refundedAt: Date;
 }
 
 /**
- * The host's rows of refunds recorded unconfirmed. Both writes are conditional
- * on the row still being REFUNDED and unconfirmed, and answer whether they wrote.
+ * The host's rows of refunds recorded unconfirmed. Every write is conditional
+ * on the row still being REFUNDED and unconfirmed, and answers whether it wrote.
  */
 export interface RefundConfirmationStore {
-  /** Unconfirmed refunds, oldest first. */
+  /** Unconfirmed refunds, the least recently followed first (so an overdue one never starves the rest). */
   unconfirmed(limit: number): Promise<readonly UnconfirmedRefund[]>;
+  /** The unconfirmed refund of one provider charge, or null. */
+  findByCharge(provider: string, providerChargeId: string): Promise<UnconfirmedRefund | null>;
   /** The provider finished it: mark it confirmed. */
   confirm(paymentId: string, at: Date): Promise<boolean>;
   /**
-   * The provider never finished it: REFUNDED → REFUND_PENDING, the refund asked
-   * for again at `record.at` (the payment's new `requestedAt`), for a person.
+   * Followed and not finished yet. `overdue` once the host's deadline passed:
+   * the host shows it to a person — the refund stays REFUNDED (the provider
+   * may still finish it), so nobody may return the money again.
    */
-  reopen(paymentId: string, record: RefundPendingRecord): Promise<boolean>;
+  followed(paymentId: string, at: Date, overdue: boolean): Promise<void>;
+  /**
+   * The provider said the refund FAILED: REFUNDED → REFUND_PENDING with
+   * `record`, the refund asked for again at `record.at` under `requestId` (the
+   * payment's new `requestedAt` and `requestId`), for a person.
+   */
+  reopen(paymentId: string, record: RefundPendingRecord & { requestId: string }): Promise<boolean>;
 }
 
 /** What one `confirmDue` pass came to. */
 export interface ConfirmationPass {
   confirmed: number;
-  reopened: number;
-  /** Still processing at the provider, inside the deadline. */
+  /** Still unfinished past the deadline: flagged for a person, never reopened. */
+  overdue: number;
+  /** Still unfinished, inside the deadline. */
   waiting: number;
+  /** Rows whose own write threw; the pass went on past them. */
+  failed: number;
+}
+
+/** A provider's word on a refund (a webhook), as the host hands it in. */
+export interface RefundUpdate {
+  provider: string;
+  providerChargeId: string;
+  providerRefundId: string;
+  status: "PENDING" | "REFUNDED" | "FAILED";
 }
 
 /** Why nothing was asked of the provider. */
@@ -171,12 +198,20 @@ export interface SubscriptionRefund {
   /** The sweep: run the background attempts that are due. Answers how many were looked at. */
   runDue(limit?: number): Promise<number>;
   /**
-   * The sweep's other half: follow the refunds recorded unconfirmed. The charge
-   * read REFUNDED (or CANCELED) confirms one; one still unfinished when
-   * `confirmations.confirmWithinMs` has passed is reopened as pending
-   * (`NOT_CONFIRMED`) for a person. Needs `confirmations`.
+   * The sweep's other half: follow the refunds recorded unconfirmed. A charge
+   * read back REFUNDED (or a PAID charge voided) confirms one; one still
+   * unfinished — or unreadable — past `confirmations.confirmWithinMs` is
+   * flagged overdue for a person and stays REFUNDED: a charge read cannot tell
+   * a refund still processing from one that failed. Needs `confirmations`.
    */
   confirmDue(limit?: number): Promise<ConfirmationPass>;
+  /**
+   * The provider's own word on a refund (its webhook): REFUNDED confirms the
+   * unconfirmed refund of that charge; FAILED — the only evidence of a failed
+   * refund — reopens it as pending (REFUSED), asked for again under a new
+   * request; PENDING changes nothing. Needs `confirmations`.
+   */
+  refundUpdated(update: RefundUpdate): Promise<"CONFIRMED" | "REOPENED" | "IGNORED">;
 }
 
 export interface SubscriptionRefundDeps {

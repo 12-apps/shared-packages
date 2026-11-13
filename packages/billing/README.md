@@ -85,10 +85,16 @@ while an attempt is in flight. The host's two writes are conditional, so a late
 "pending" never overwrites a refund. Keep the series rows apart from any other
 refund's: `runDue` drives every due row of the store it is given through this
 binding. A provider PENDING snapshot is recorded as refunded, `confirmed:
-false`, and `confirmDue` follows it: the charge read back as refunded confirms
-it; still unfinished after the host's `confirmations.confirmWithinMs`, it is
-reopened as pending (`NOT_CONFIRMED`), asked for again so a person's retry is a
-new request. WHEN a
+false`, and two things follow it. `confirmDue` (the sweep) reads the charge
+back: its money back confirms the refund; still unfinished — or unreadable —
+past the host's `confirmations.confirmWithinMs`, it is only FLAGGED overdue for
+a person and stays refunded, because a charge read cannot tell a slow refund
+from a failed one, so it can never be returned twice. Flagged rows stay in the
+list and are read again on every pass until they resolve. `refundUpdated` takes
+the provider's own word (the payments package hands PLATFORM refund updates to
+the host through `platformRefundUpdated`): REFUNDED confirms, FAILED — the one
+evidence of a failure — reopens it as a new request (`requestId`), whose retry
+is a new series. WHEN a
 payment is refundable, what a cancel does to the plan and who may settle are
 the host's.
 
@@ -99,6 +105,7 @@ await refunds.retry(paymentId);                            // a person, after a 
 await refunds.settleByHand(paymentId, { by, via, reason });
 await refunds.runDue();                                    // the host's sweep
 await refunds.confirmDue();                                // …and its other half
+await refunds.refundUpdated(update);                       // the provider's webhook
 ```
 
 Nothing here has a parameter a card could travel in. The number goes from the

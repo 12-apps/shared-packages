@@ -45,6 +45,7 @@ const PAID: RefundablePayment = {
   currency: "BRL",
   requestedAt: null,
   pendingReason: null,
+  requestId: null,
 };
 
 /** The host's rows, with the conditional writes the port asks for. */
@@ -54,9 +55,9 @@ function paymentRows(initial: RefundablePayment | null) {
   const pendingWith: RefundPendingRecord[] = [];
   const store = {
     find: vi.fn(async () => (held.row ? { ...held.row } : null)),
-    claim: vi.fn(async (_id: string, at: Date) => {
+    claim: vi.fn(async (_id: string, at: Date, requestId: string) => {
       if (!held.row || held.row.state !== "PAID") return false;
-      held.row = { ...held.row, state: "REFUND_PENDING", requestedAt: at };
+      held.row = { ...held.row, state: "REFUND_PENDING", requestedAt: at, requestId };
       return true;
     }),
     markRefunded: vi.fn(async (_id: string, record: RefundRecord) => {

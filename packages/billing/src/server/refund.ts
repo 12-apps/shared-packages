@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   createRefundRetrier,
   CredentialsError,
@@ -22,7 +24,7 @@ import {
   type SubscriptionRefundDeps,
   type SubscriptionRefundResult,
 } from "./refund-ports";
-import { confirmDue } from "./refund-confirm";
+import { confirmDue, refundUpdated } from "./refund-confirm";
 
 /**
  * Subscription REFUND (FUT-4864) — returning one paid subscription payment to
@@ -120,10 +122,11 @@ function keyOf(ctx: Ctx, payment: RefundablePayment, reason?: string): RefundSer
     providerChargeId: payment.providerChargeId ?? "",
     reference: payment.id,
     subject: SUBSCRIPTION_REFUND_SUBJECT,
-    // Bound to the refund REQUEST: a refund reopened after the provider never
-    // confirmed it is asked for again at a new instant, so its series is a new
-    // one rather than the settled series of the first request.
-    boundTo: payment.requestedAt ? `${payment.id}@${payment.requestedAt.toISOString()}` : payment.id,
+    // Bound to the refund REQUEST, by the id the host stores and returns
+    // unchanged: a refund reopened after the provider said it failed is a new
+    // request, so a new series. A request with no stored id (made before the
+    // field existed) keeps the payment id, the binding its live series has.
+    boundTo: payment.requestId ? `${payment.id}:${payment.requestId}` : payment.id,
     cause: reason ?? null,
   };
 }
@@ -250,8 +253,9 @@ async function refund(ctx: Ctx, paymentId: string, reason: string | undefined): 
   if (payment.state === "REFUND_PENDING") return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
   if (payment.state !== "PAID") return { outcome: "NOT_REFUNDABLE", paymentId, why: "NOT_PAID" };
   const at = ctx.now();
-  if (!(await ctx.store.claim(paymentId, at))) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
-  return firstAttempt(ctx, { ...payment, state: "REFUND_PENDING", requestedAt: at }, reason);
+  const requestId = randomUUID();
+  if (!(await ctx.store.claim(paymentId, at, requestId))) return { outcome: "NOT_REFUNDABLE", paymentId, why: "IN_PROGRESS" };
+  return firstAttempt(ctx, { ...payment, state: "REFUND_PENDING", requestedAt: at, requestId }, reason);
 }
 
 /** The payment as it stands after the retrier ran, as an outcome. */
@@ -320,5 +324,6 @@ export function createSubscriptionRefund(deps: SubscriptionRefundDeps): Subscrip
     settleByHand: async (paymentId, byHand) => settleByHand(await ctx(), paymentId, byHand),
     runDue: async (limit) => (await retrierOf(await ctx())).runDue(limit),
     confirmDue: (limit) => confirmDue(deps, limit),
+    refundUpdated: (update) => refundUpdated(deps, update),
   };
 }

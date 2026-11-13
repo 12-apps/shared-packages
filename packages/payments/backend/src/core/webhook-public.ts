@@ -11,5 +11,6 @@ export type { DisputeFacts, RefundFacts, ReversalFacts } from './reversal';
 export {
   applyStoredCharge,
   createWebhookReactor,
+  type PlatformRefundUpdate,
   type WebhookReactorPorts,
 } from './webhook-reactor';

@@ -1,87 +1,122 @@
+import { randomUUID } from "node:crypto";
+
 import { REFUND_ATTEMPT_DEADLINE_MS } from "@12-apps/payments-backend";
 
 import { BillingConfigError } from "../errors";
-import type { ConfirmationPass, SubscriptionRefundDeps, UnconfirmedRefund } from "./refund-ports";
+import type {
+  ConfirmationPass,
+  RefundConfirmationStore,
+  RefundUpdate,
+  SubscriptionRefundDeps,
+  UnconfirmedRefund,
+} from "./refund-ports";
 
 /**
  * Following a refund the provider ACCEPTED but did not finish (FUT-4864).
  *
  * A provider can answer a refund with a PENDING snapshot — taken, to be
  * completed (Pix, commonly). The flow records it as refunded, `confirmed:
- * false`, because the money is the provider's to return and nobody should be
- * asked to settle it. This pass is what makes that safe: it consults the
- * charge, the same read the retrier consults before a resend.
+ * false`. Two things follow it:
  *
- *  - The charge reads REFUNDED (or CANCELED, a whole charge voided): the refund
- *    is confirmed.
- *  - Still not back once the host's `confirmWithinMs` passed since it was
- *    recorded — or no answer by then: the refund is REOPENED as pending
- *    (`NOT_CONFIRMED`), asked for again now, so a person retries it (the retry
- *    consults the charge first) or settles it by hand.
- *  - Inside the deadline: it waits for the next pass.
+ *  - `confirmDue`, the sweep, reads the charge back. Its money back confirms
+ *    the refund. Anything else is NOT evidence of a failure — Itaú keeps a Pix
+ *    charge PAID while its devolução processes, PagBank reads an unknown cancel
+ *    as PENDING, and an unreadable charge is an outage — so past the host's
+ *    deadline the refund is only FLAGGED overdue for a person. It stays
+ *    REFUNDED: settling it by hand or retrying it is refused, so the money can
+ *    never be returned twice while the provider's refund may still land.
+ *  - `refundUpdated`, the provider's own word (its webhook): REFUNDED confirms;
+ *    FAILED — the one piece of evidence that the refund will not land —
+ *    reopens it as pending, a NEW refund request (new `requestId`), so the
+ *    retry series starts afresh and a person retries or settles it.
  *
  * Read-only towards the provider: nothing here sends a refund.
  */
 
 const BATCH = 20;
 
-/** A charge that reads this has its money back: a refund, or the whole charge voided. */
+/**
+ * A charge that reads this has its money back. CANCELED counts only because
+ * every row followed here is the refund of a PAID charge: a paid charge voided
+ * returned it whole. (On a charge never paid, CANCELED would mean nothing came
+ * in — never the case here.)
+ */
 const BACK = new Set(["REFUNDED", "CANCELED"]);
 
-type Verdict = "CONFIRMED" | "REOPENED" | "WAITING";
+type Verdict = "CONFIRMED" | "OVERDUE" | "WAITING";
 
-/** The confirmation deadline has passed for this refund. */
-const overdue = (refund: UnconfirmedRefund, now: Date, withinMs: number): boolean =>
-  now.getTime() - refund.refundedAt.getTime() >= withinMs;
+function confirmationsOf(deps: SubscriptionRefundDeps) {
+  const confirmations = deps.confirmations;
+  if (!confirmations) throw new BillingConfigError("confirmations", "following a refund needs a store and a confirmWithinMs");
+  if (!(confirmations.confirmWithinMs > 0)) throw new BillingConfigError("confirmations.confirmWithinMs", "must be positive");
+  return confirmations;
+}
 
-function messageOf(error: unknown): string | null {
-  if (!(error instanceof Error) || error.message.trim() === "") return null;
-  return error.message.trim().slice(0, 500);
+/** The charge's money is back: true; not (yet) or unreadable: false. */
+async function moneyBack(deps: SubscriptionRefundDeps, refund: UnconfirmedRefund): Promise<boolean> {
+  if (!refund.provider || !refund.providerChargeId) return false;
+  try {
+    const { gateway } = await deps.payments();
+    const signal = AbortSignal.timeout(deps.attemptMs ?? REFUND_ATTEMPT_DEADLINE_MS);
+    const charge = await gateway.refreshCharge(deps.merchant, refund.provider, refund.providerChargeId, undefined, { signal });
+    return BACK.has(charge.status);
+  } catch {
+    // Unreadable is not evidence either way: it waits, then is flagged.
+    return false;
+  }
+}
+
+async function follow(
+  deps: SubscriptionRefundDeps,
+  store: RefundConfirmationStore,
+  refund: UnconfirmedRefund,
+  withinMs: number,
+): Promise<Verdict> {
+  const now = deps.now ?? (() => new Date());
+  if (await moneyBack(deps, refund)) {
+    if (await store.confirm(refund.id, now())) return "CONFIRMED";
+  }
+  const at = now();
+  const overdue = at.getTime() - refund.refundedAt.getTime() >= withinMs;
+  await store.followed(refund.id, at, overdue);
+  return overdue ? "OVERDUE" : "WAITING";
 }
 
 export async function confirmDue(deps: SubscriptionRefundDeps, limit: number = BATCH): Promise<ConfirmationPass> {
-  const confirmations = deps.confirmations;
-  if (!confirmations) throw new BillingConfigError("confirmations", "confirmDue needs a store and a confirmWithinMs");
-  if (!(confirmations.confirmWithinMs > 0)) throw new BillingConfigError("confirmations.confirmWithinMs", "must be positive");
-  const now = deps.now ?? (() => new Date());
-  const withinMs = confirmations.confirmWithinMs;
+  const confirmations = confirmationsOf(deps);
   const store = await confirmations.store();
-  const rows = await store.unconfirmed(limit);
-  const pass: ConfirmationPass = { confirmed: 0, reopened: 0, waiting: 0 };
-  if (rows.length === 0) return pass;
-  const { gateway } = await deps.payments();
-
-  async function reopen(refund: UnconfirmedRefund, message: string | null): Promise<Verdict> {
-    const wrote = await store.reopen(refund.id, { reason: "NOT_CONFIRMED", message, at: now() });
-    return wrote ? "REOPENED" : "WAITING";
-  }
-
-  /** The charge's status, or the error that kept it from being read; null with no charge to read. */
-  async function chargeOf(refund: UnconfirmedRefund): Promise<{ status: string } | { error: unknown } | null> {
-    if (!refund.provider || !refund.providerChargeId) return null;
+  const pass: ConfirmationPass = { confirmed: 0, overdue: 0, waiting: 0, failed: 0 };
+  for (const refund of await store.unconfirmed(limit)) {
     try {
-      const signal = AbortSignal.timeout(deps.attemptMs ?? REFUND_ATTEMPT_DEADLINE_MS);
-      const charge = await gateway.refreshCharge(deps.merchant, refund.provider, refund.providerChargeId, undefined, { signal });
-      return { status: charge.status };
-    } catch (error) {
-      return { error };
+      const verdict = await follow(deps, store, refund, confirmations.confirmWithinMs);
+      if (verdict === "CONFIRMED") pass.confirmed += 1;
+      else if (verdict === "OVERDUE") pass.overdue += 1;
+      else pass.waiting += 1;
+    } catch {
+      // One row's write failed: the next pass reads it again; the rest go on.
+      pass.failed += 1;
     }
-  }
-
-  async function verdictOf(refund: UnconfirmedRefund): Promise<Verdict> {
-    const charge = await chargeOf(refund);
-    if (charge && "status" in charge && BACK.has(charge.status)) {
-      return (await store.confirm(refund.id, now())) ? "CONFIRMED" : "WAITING";
-    }
-    if (!overdue(refund, now(), withinMs)) return "WAITING";
-    return reopen(refund, charge && "error" in charge ? messageOf(charge.error) : null);
-  }
-
-  for (const refund of rows) {
-    const verdict = await verdictOf(refund);
-    if (verdict === "CONFIRMED") pass.confirmed += 1;
-    else if (verdict === "REOPENED") pass.reopened += 1;
-    else pass.waiting += 1;
   }
   return pass;
+}
+
+export async function refundUpdated(
+  deps: SubscriptionRefundDeps,
+  update: RefundUpdate,
+): Promise<"CONFIRMED" | "REOPENED" | "IGNORED"> {
+  const store = await confirmationsOf(deps).store();
+  if (update.status === "PENDING") return "IGNORED";
+  const refund = await store.findByCharge(update.provider, update.providerChargeId);
+  if (!refund) return "IGNORED";
+  // A word about another refund of the same charge is not this one's.
+  if (refund.providerRefundId !== null && refund.providerRefundId !== update.providerRefundId) return "IGNORED";
+  const at = (deps.now ?? (() => new Date()))();
+  if (update.status === "REFUNDED") return (await store.confirm(refund.id, at)) ? "CONFIRMED" : "IGNORED";
+  const reopened = await store.reopen(refund.id, {
+    reason: "REFUSED",
+    message: null,
+    at,
+    requestId: randomUUID(),
+  });
+  return reopened ? "REOPENED" : "IGNORED";
 }

@@ -85,6 +85,15 @@ export interface WebhookReactorPorts {
     providerChargeId: string;
   }): Promise<void>;
   /**
+   * A refund of a PLATFORM charge moved — the provider's own word on a refund
+   * the host asked for (a subscription payment returned, say): `REFUNDED` is
+   * the money back, `FAILED` is the refund not made, `PENDING` is still on its
+   * way. Absent, such a delivery is ignored as before. The only evidence a
+   * refund FAILED: a charge read cannot tell one still processing from one
+   * that will never land. Must be idempotent — a provider re-announces.
+   */
+  platformRefundUpdated?(update: PlatformRefundUpdate): Promise<void>;
+  /**
    * Money left: take the payable out of settled, however this host spells it.
    *
    * Must be idempotent, for {@link settlePayable}'s reason and one of its own:
@@ -134,6 +143,15 @@ export interface WebhookReactorPorts {
   ): Promise<string | null>;
 }
 
+/** What {@link WebhookReactorPorts.platformRefundUpdated} is handed. */
+export interface PlatformRefundUpdate {
+  provider: string;
+  providerChargeId: string;
+  providerRefundId: string;
+  status: 'PENDING' | 'REFUNDED' | 'FAILED';
+  amountCents: number;
+}
+
 export function createWebhookReactor(ports: WebhookReactorPorts): WebhookEventHandler {
   return async (event, charge, merchant) => {
     // Rule 1.
@@ -153,8 +171,27 @@ async function react(
   charge: StoredCharge | null,
   merchant: MerchantRef,
 ): Promise<void> {
+  if (await applyPlatformRefund(ports, event, merchant)) return;
   if (await applyReversal(ports, event, charge, merchant)) return;
   await applyPaid(ports, event, charge, merchant);
+}
+
+/** A PLATFORM charge's refund moved: handed to the host as the provider said it. */
+async function applyPlatformRefund(
+  ports: WebhookReactorPorts,
+  event: NormalizedWebhookEvent,
+  merchant: MerchantRef,
+): Promise<boolean> {
+  const refund = event.refund;
+  if (merchant.kind !== 'PLATFORM' || event.type !== 'REFUND_UPDATED' || !refund || !ports.platformRefundUpdated) return false;
+  await ports.platformRefundUpdated({
+    provider: refund.provider,
+    providerChargeId: refund.providerChargeId,
+    providerRefundId: refund.providerRefundId,
+    status: refund.status,
+    amountCents: refund.amount.amountCents,
+  });
+  return true;
 }
 
 /** {@link baseReference}, for the sources that may legitimately be absent. */
