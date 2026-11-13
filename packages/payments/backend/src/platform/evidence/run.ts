@@ -8,7 +8,7 @@ import { pixSteps, cardSteps } from './orders';
 import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
-import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
+import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
 import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
@@ -90,6 +90,8 @@ export interface EvidenceRunDeps {
    * waiting for the Apple Developer account.
    */
   applePayConfigured?: () => boolean | Promise<boolean>;
+  /** The platform's Google merchant id (FUT-4895); absent or null, the production evidence offers no Google Pay. */
+  googlePayMerchant?: () => EvidenceGooglePayMerchant | null | Promise<EvidenceGooglePayMerchant | null>;
   now?: () => Date;
   /** Told ONCE per charge when its Pix refund gives up (FUT-4360); the host's error tracker. */
   onProviderFailure?: ProviderFailureReporter;

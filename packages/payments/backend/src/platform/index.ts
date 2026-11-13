@@ -72,3 +72,4 @@ export {
   type HomologacaoEvidenceStore,
 } from './evidence/types';
 export type { DebitTestData } from './evidence/sandbox-buyer';
+export type { EvidenceGooglePayMerchant } from './evidence/orders-wallet';

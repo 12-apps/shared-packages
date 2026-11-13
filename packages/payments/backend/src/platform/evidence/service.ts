@@ -15,7 +15,7 @@ import {
   type EvidenceDelegate,
   type EvidenceWebhookDelegate,
 } from './prisma';
-import { walletsConfig } from './orders-wallet';
+import { walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
 import { confirmEvidencePix } from './confirm-pix';
 import {
   completeEvidenceRun,
@@ -87,6 +87,13 @@ export interface HomologacaoEvidenceConfig {
    * waiting for the Apple Developer account.
    */
   applePayConfigured?: () => boolean | Promise<boolean>;
+  /**
+   * The platform's Google merchant id (FUT-4895), e.g.
+   * `() => platformGooglePayMerchant(process.env)`. A PRODUCTION Google Pay
+   * request must carry it as `merchantInfo`; absent or null, the production
+   * evidence offers no Google Pay and its section stays PENDING.
+   */
+  googlePayMerchant?: () => EvidenceGooglePayMerchant | null | Promise<EvidenceGooglePayMerchant | null>;
   /** Told once per charge when the production Pix refund gives up (FUT-4360); the host's error tracker. */
   onProviderFailure?: ProviderFailureReporter;
   newId?: () => string;
@@ -239,6 +246,7 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     consultApplication: () => consultConnectApplication(cfg.consult, environment),
     customer: customerFor(environment, undefined),
     ...(cfg.applePayConfigured ? { applePayConfigured: cfg.applePayConfigured } : {}),
+    ...(cfg.googlePayMerchant ? { googlePayMerchant: cfg.googlePayMerchant } : {}),
     ...(cfg.onProviderFailure ? { onProviderFailure: cfg.onProviderFailure } : {}),
   };
   return {

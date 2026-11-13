@@ -163,6 +163,23 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
     expect(google.calls.ready[0]).not.toHaveProperty('existingPaymentMethodRequired');
   });
 
+  it('given the PRODUCTION evidence with the Google merchant id, then the sheet request carries it as merchantInfo (FUT-4895)', async () => {
+    const google = fakeGooglePay();
+    const merchantInfo = { merchantId: 'BCR2DN4T00000000', merchantName: 'Paladira' };
+    mount({
+      googlePayApi: google.api,
+      seller: {
+        ...SELLER,
+        wallets: { ...WALLETS, googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_PROD', environment: 'PRODUCTION', merchantInfo } },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('google-pay-native'));
+
+    await waitFor(() => expect(google.calls.requests).toHaveLength(1));
+    expect(google.calls.requests[0]).toMatchObject({ merchantInfo });
+  });
+
   it('given a pressed Google Pay, then the card shows it ready with its card and never its token, and generating sends the token', async () => {
     const google = fakeGooglePay();
     const { ran } = mount({ googlePayApi: google.api });

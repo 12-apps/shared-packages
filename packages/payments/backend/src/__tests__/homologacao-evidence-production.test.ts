@@ -161,6 +161,30 @@ describe('homologação evidence in production', () => {
     expect(record.steps.find((step) => step.key === 'card.approved')?.observed).toBe(PROD.outcome.buyerMissing);
   });
 
+  it('given no Google merchant id, then the Google Pay section says it was not offered, not that nobody pressed it (FUT-4895)', async () => {
+    const w = production();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER));
+    const apple = wallets().filter((result) => result.type === 'APPLE_PAY');
+    const record = await completeEvidenceRun(w.runDeps, prepared.runId, cards(), apple);
+
+    const google = record.steps.filter((step) => step.key.startsWith('gpay.'));
+    expect(google.map((step) => [step.status, step.observed])).toEqual(
+      Array.from({ length: 4 }, () => ['PENDING', PROD.outcome.googlePayNotConfigured]),
+    );
+    expect(record.steps.find((step) => step.key === 'apay.approved')?.status).toBe('EXECUTED');
+  });
+
+  it('given the Google merchant id and no press, then the Google Pay section says the button was not pressed (FUT-4895)', async () => {
+    const w = production();
+    await connected(w);
+    const runDeps = { ...w.runDeps, googlePayMerchant: () => ({ merchantId: 'BCR2DN4T00000000' }) };
+    const prepared = await prepareEvidenceRun(runDeps, productionDebitTest(BUYER));
+    const record = await completeEvidenceRun(runDeps, prepared.runId, cards(), []);
+
+    expect(record.steps.find((step) => step.key === 'gpay.token')?.observed).toBe(PROD.outcome.walletNotRun('Google Pay'));
+  });
+
   it('given a seller connected in SANDBOX, then the production run refuses and says so', async () => {
     const w = production({ sellerEnvironment: 'SANDBOX' });
     await connected(w);
