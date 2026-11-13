@@ -176,6 +176,20 @@ describe("iFood assigning its own ids (B1): a lost create answer never makes a s
     expect(ifoodSide.sent().map((req) => req.method)).toEqual(["GET"]);
   });
 
+  it("never reuses, on create, an interruption the engine holds that carries our end and reason (R4-1)", async () => {
+    const ifoodSide = ifoodAssigningIds();
+    // A replaced interruption about to be deleted, with exactly this create's end and reason.
+    ifoodSide.stored.set("replaced", { description: "Cozinha cheia", start: "x", end: "2026-11-13T12:25:00-03:00" });
+    // The first create's answer is dropped by the fake: the second attempt finds the one it made, never "replaced".
+    expect(await ifood.availability!.pause(ifoodSide.ctx, { ...request, keep: ["replaced"] })).toMatchObject({ kind: "retry" });
+    expect(await ifood.availability!.pause(ifoodSide.ctx, { ...request, keep: ["replaced"] })).toEqual({
+      kind: "paused",
+      externalId: "ifood-1",
+      until: UNTIL,
+    });
+    expect(ifoodSide.sent().filter((req) => req.method === "POST")).toHaveLength(1);
+  });
+
   it("recognises an end iFood echoes in UTC or without its offset", async () => {
     for (const end of ["2026-11-13T15:25:00Z", "2026-11-13T12:25:00", "2026-11-13T15:25:00.000+00:00"]) {
       const { ctx } = context(() => ({ status: 200, body: JSON.stringify([{ id: "ifood-7", description: "Cozinha cheia", end }]) }));

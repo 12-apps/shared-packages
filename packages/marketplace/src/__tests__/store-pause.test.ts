@@ -122,6 +122,36 @@ function marketplaceAssigningIds(script: string[]) {
   return { availability, closures };
 }
 
+/** A marketplace whose create reuses a closure with the same end and reason, unless the engine keeps its id. */
+function marketplaceReusingClosures() {
+  const closures = new Map<string, { end: number; reason: string }>();
+  const state = { next: 0, failDeletes: 1 };
+  const availability: MarketplaceAvailability = {
+    kind: "interruption",
+    pause: async (_ctx, request) => {
+      const keep = request.keep ?? [];
+      const hit = [...closures].find(
+        ([id, value]) => !keep.includes(id) && value.end === request.until.getTime() && value.reason === request.reason,
+      );
+      if (hit) return { kind: "paused", externalId: hit[0], until: request.until };
+      state.next += 1;
+      const id = `c${state.next}`;
+      closures.set(id, { end: request.until.getTime(), reason: request.reason });
+      return { kind: "paused", externalId: id, until: request.until };
+    },
+    resume: async (_ctx, ref) => {
+      if (!ref.externalId) return { kind: "accepted" };
+      if (state.failDeletes > 0) {
+        state.failDeletes -= 1;
+        return { kind: "retry", reason: "status 503" };
+      }
+      closures.delete(ref.externalId);
+      return { kind: "accepted" };
+    },
+  };
+  return { availability, closures };
+}
+
 function adapter(provider: string, availability?: MarketplaceAvailability): MarketplaceAdapter {
   return {
     provider,
@@ -680,6 +710,29 @@ describe("review round 3", () => {
     expect(await h.engine.resumeStore({ clientId: TENANT, now: NOW })).toEqual({ marketplaces: [{ provider: SWITCHY, outcome: "queued" }] });
     expect(table.rows[0]).toMatchObject({ wanted: "OPEN", state: "RESUMING" });
     expect(h.enqueued.length).toBe(queuedBefore + 1);
+  });
+});
+
+describe("review round 4", () => {
+  it("a renewal back to an earlier end never adopts a closure the engine is about to delete (R4-1)", async () => {
+    // iFood-like create: lists first and reuses an interruption with the same end and reason, unless kept.
+    const fake = marketplaceReusingClosures();
+    const h = createHarness({ adapters: [adapter(ACME, fake.availability)] });
+    await h.connect(ACME);
+    const seen = { count: 0 };
+    const ask = (until: Date, at: number) =>
+      h.engine.pauseStore({ clientId: TENANT, until, reason: "Cozinha cheia", timeZone: "America/Sao_Paulo", now: minutes(at) });
+    await ask(minutes(20), 0);
+    await drain(h, seen);
+    // c2 replaces c1; c1's delete gets no answer, so c1 stays on the replaced list.
+    await ask(minutes(25), 1);
+    await drain(h, seen);
+    expect(pauseRow(h)).toMatchObject({ externalId: "c2", retiredExternalIds: `id:c1@${minutes(20).toISOString()}` });
+    // Back to exactly c1's end: a NEW closure, then c1 and c2 deleted.
+    await ask(minutes(20), 2);
+    await drain(h, seen);
+    expect(pauseRow(h)).toMatchObject({ state: "PAUSED", externalId: "c3", retiredExternalIds: null });
+    expect([...fake.closures.keys()]).toEqual(["c3"]);
   });
 });
 

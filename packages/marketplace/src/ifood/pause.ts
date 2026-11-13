@@ -202,7 +202,7 @@ export function ifoodPause(ctx: AdapterCallContext, request: StorePauseRequest):
   return answeredPause(async () => {
     const list = await listInterruptions(ctx, request.merchantId);
     if (!Array.isArray(list)) return list;
-    const landed = ours(list, request.key, { until: request.until, reason: request.reason, timeZone: request.timeZone });
+    const landed = ours(list, request.key, { until: request.until, reason: request.reason, timeZone: request.timeZone }, request.keep);
     if (landed) return { kind: "paused", externalId: landed.id, until: request.until };
     const response = await call(ctx, {
       method: "POST",

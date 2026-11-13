@@ -51,6 +51,12 @@ export interface StorePauseRequest {
   key: string;
   /** The store's IANA time zone, for a marketplace that reads times as the store's wall clock. */
   timeZone: string;
+  /**
+   * OPTIONAL. The marketplace ids the engine already holds (the current
+   * closure, the replaced ones it is about to delete): a closure found again
+   * for this create is never one of them.
+   */
+  keep?: readonly string[];
 }
 
 /** The closure the engine holds on one marketplace, as a resume or an extend names it. */

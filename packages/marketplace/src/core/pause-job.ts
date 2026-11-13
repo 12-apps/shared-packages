@@ -155,7 +155,7 @@ async function sendPause(run: Run, row: StorePauseRow): Promise<Step> {
   const until = row.until as Date;
   const key = row.attemptKey ?? (await claimKey(run, row));
   if (key === null) return AGAIN;
-  const request = { merchantId: run.merchantId, until, reason: row.reason ?? "", key, timeZone: row.timeZone ?? "UTC" };
+  const request = { merchantId: run.merchantId, until, reason: row.reason ?? "", key, timeZone: row.timeZone ?? "UTC", keep: heldIds(row) };
   const extend = run.availability.extend;
   const ref: StorePauseRef = { merchantId: run.merchantId, externalId: row.externalId, key: null, sent: null };
   const result = await calledSafely(() =>
