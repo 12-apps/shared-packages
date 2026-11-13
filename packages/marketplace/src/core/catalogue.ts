@@ -187,7 +187,10 @@ const IN_MENU = ["PUBLISHING", "PUBLISHED", "FAILED"];
 /** Whether a row belongs in the served menu, and at which price. */
 function menuPrice(row: CatalogueRow, storePrice: number): number | null {
   if (row.status !== "FAILED") return row.priceCents ?? storePrice;
-  const republishFailed = row.failedAction === "PUBLISH" && row.publishedAt !== null;
+  // Published, and not withdrawn since: a withdraw → re-publish that FAILED is
+  // not on the marketplace's menu, so it is not listed at an old price.
+  const live = row.publishedAt !== null && (row.withdrawnAt === null || row.withdrawnAt < row.publishedAt);
+  const republishFailed = row.failedAction === "PUBLISH" && live;
   return republishFailed ? (row.sentPriceCents ?? row.priceCents ?? storePrice) : null;
 }
 

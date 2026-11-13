@@ -518,6 +518,29 @@ describe("catalogue publishing, pull", () => {
     });
   });
 
+  it("does not list a re-publish that FAILED after the item was withdrawn", async () => {
+    const h = mount([
+      { status: 204, body: "" },
+      { status: 204, body: "" },
+      { status: 404, body: "no merchant" },
+    ]);
+    await h.connect(PULLY);
+    const options = { menuName: "Menu", currency: "XTS" };
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-1" });
+    await runLatest(h);
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+    await h.engine.withdraw({ clientId: TENANT, provider: PULLY, productId: "p-1" });
+    await runLatest(h);
+    h.clock.at = new Date(h.clock.at.getTime() + 1000);
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-1", priceCents: 2800 });
+    await runLatest(h);
+
+    expect((await stateOf(h, PULLY))?.status).toBe("FAILED");
+    expect(await h.engine.catalogueDocument({ clientId: TENANT, provider: PULLY, options })).toMatchObject({
+      document: { items: [] },
+    });
+  });
+
   it("serves no document for a push marketplace or one not connected", async () => {
     const h = mount();
     const options = { menuName: "Menu", currency: "XTS" };
