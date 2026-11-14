@@ -68,7 +68,7 @@ describe("a flagged table", () => {
     const rows = within(screen.getByTestId("r-table")).getAllByRole("row");
     // Header + three rows.
     expect(rows).toHaveLength(4);
-    expect(rows[1]?.querySelector("[data-report-row-flag]")).toBeNull();
+    expect(rows[1]?.querySelectorAll("[data-report-row-flag]")).toHaveLength(0);
     const over = rows[2]?.querySelector("[data-report-row-flag]");
     expect(over?.textContent).toBe("34% · acima da meta");
     expect(over?.querySelector("svg")).not.toBeNull();
@@ -80,7 +80,7 @@ describe("a flagged table", () => {
     const flagged = FLAGGED_TABLE as Extract<ReportRender, { kind: "table" }>;
     const plain: ReportRender = { kind: "table", columns: flagged.columns, rows: flagged.rows };
     render(<ReportRenderView render={plain} dataTestId="r" />);
-    expect(screen.getByTestId("r-table").querySelector("[data-report-row-flag]")).toBeNull();
+    expect(screen.getByTestId("r-table").querySelectorAll("[data-report-row-flag]")).toHaveLength(0);
     expect(screen.getByText("34%")).toBeTruthy();
   });
 });
@@ -179,6 +179,6 @@ describe("notes", () => {
         <ReportNotes tenantSlug="acme" dataTestId="b" notes={[{ key: "x", text: "{items}", items: [] }]} />
       </MemoryRouter>,
     );
-    expect(screen.queryByTestId("b-notes")).toBeNull();
+    expect(screen.queryAllByTestId("b-notes")).toHaveLength(0);
   });
 });

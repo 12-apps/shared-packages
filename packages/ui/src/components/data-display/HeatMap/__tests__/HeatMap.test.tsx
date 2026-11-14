@@ -136,7 +136,7 @@ describe("HeatMap", () => {
 
   it("draws no legend when asked not to", () => {
     renderHeatMap({ legend: false });
-    expect(screen.queryByTestId("hm-legend")).toBeNull();
+    expect(screen.queryAllByTestId("hm-legend")).toHaveLength(0);
   });
 
   it("transposes: the hours become rows and the weekdays columns, same cells", () => {
