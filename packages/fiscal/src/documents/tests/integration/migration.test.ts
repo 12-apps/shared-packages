@@ -1,10 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-
-import { PGlite } from "@electric-sql/pglite";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { PGlite } from "@electric-sql/pglite";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { FISCAL_NEXT_NUMBER_SQL } from "../../sql";
+import { migratedDatabase, warmDatabase } from "./pglite";
 
 /**
  * The package's migrations on a real (WASM) Postgres: the number draw is the
@@ -13,15 +11,14 @@ import { FISCAL_NEXT_NUMBER_SQL } from "../../sql";
  * state machine never writes.
  */
 
-const MIGRATIONS = join(import.meta.dirname, "../../../../prisma/migrations");
-
 let db: PGlite;
 
+// Start and migrate the file's one database under the warm-up hook's own budget (FUT-4972): a fresh
+// PGlite per case cost 4-6 s each on a loaded runner, and the first case's cold start passed 10 s.
+beforeAll(warmDatabase, 60_000);
+
 beforeEach(async () => {
-  db = new PGlite();
-  for (const dir of readdirSync(MIGRATIONS).filter((name) => /^\d/.test(name)).sort()) {
-    await db.exec(readFileSync(join(MIGRATIONS, dir, "migration.sql"), "utf8"));
-  }
+  db = await migratedDatabase();
   await db.exec(`
     INSERT INTO "fiscal_issuing_points" ("id", "owner_id", "model", "online_series", "contingency_series")
     VALUES ('register-1', 'owner-1', 'NFCE', 1, 2);
@@ -29,10 +26,6 @@ beforeEach(async () => {
     VALUES ('11222333000181', 'homologacao', 'NFCE', 1, 'register-1', 'ONLINE', 1201),
            ('11222333000181', 'homologacao', 'NFCE', 2, 'register-1', 'CONTINGENCY', 1);
   `);
-});
-
-afterEach(async () => {
-  await db.close();
 });
 
 const DRAW = ["11222333000181", "homologacao", "NFCE", 1, "register-1"];
