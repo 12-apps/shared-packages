@@ -109,7 +109,7 @@ export function withLeg(flow: ChargeFlow, index: number, patch: Partial<FlowLeg>
 }
 
 /** A terminal link with at least one terminal on it. */
-export const linked = (link: ChargeLink): boolean => !link.known || link.terminals > 0;
+const linked = (link: ChargeLink): boolean => !link.known || link.terminals > 0;
 
 /** The leg the flow is on: the first one not yet accounted for, or -1. */
 export function currentIndex(flow: ChargeFlow): number {
