@@ -79,23 +79,10 @@ describe('the operator and the station', () => {
     port.pushAnswers = [{ ok: false, code: 'NOT_CONNECTED' }];
     const { run } = begin({ legs: [{ tender: 'DEBIT' }], changeCents: 0 }, LINKED, port);
     await settle();
-    expect(run.current().legs[0]).toMatchObject({ status: 'refused', exits: ['resend', 'other-tender', 'other-machine', 'manual-pix'] });
+    expect(run.current().legs[0]).toMatchObject({ status: 'refused', exits: ['resend', 'other-tender'] });
     run.resend();
     await settle();
     expect(statusOf(run)).toBe('waiting');
-  });
-
-  it('R04: charged on another machine cancels the charge still on this terminal and settles the leg as elsewhere', async () => {
-    const { port, run, onReady, onNotice } = begin({ legs: [{ tender: 'DEBIT' }], changeCents: 0 });
-    await settle();
-    run.elsewhere(0, { via: 'OTHER_MACHINE', reference: '004512' });
-    await settle();
-    expect(port.cancels).toEqual(['ch-1']);
-    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'DEBIT', amountCents: TOTAL, elsewhere: { via: 'OTHER_MACHINE', reference: '004512' } }], changeCents: 0 });
-
-    // The cancel lost the race: the terminal approved it anyway. Money was taken twice, and the operator is told.
-    port.status('approved', { capture: trace(TOTAL, 'DEBIT'), chargeId: 'ch-1' });
-    expect(onNotice).toHaveBeenCalledWith(expect.objectContaining({ kind: 'received-twice', index: 0 }));
   });
 
   it('R07: moved to cash on the terminal and received, a late approval is received-twice, never applied', async () => {

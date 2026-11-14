@@ -33,26 +33,18 @@ export type LegStatus =
   | 'unbound'
   /** The server refused its capture as disagreeing with the one it holds: charged, and never offered again. */
   | 'conflict'
-  /** The operator recorded it as charged another way (another machine, a manual Pix). */
-  | 'elsewhere'
   | 'approved';
 
 /**
  * A way out of the current leg the operator may take:
  * - `resend`: push it again;
  * - `other-tender`: take it with another of the store's tenders;
- * - `other-machine`: it was charged on another machine;
- * - `manual-pix`: it was paid by a Pix the operator checked by hand;
  * - `cancel`: cancel the charge on the terminal.
+ *
+ * The terminal is the only source of payment truth (owner rule, 2026-11-14):
+ * no way out records a card or Pix payment the terminal did not report.
  */
-export type LegExit = 'resend' | 'other-tender' | 'other-machine' | 'manual-pix' | 'cancel';
-
-/** How a leg was charged when it was not on this terminal. */
-export interface Elsewhere {
-  readonly via: 'OTHER_MACHINE' | 'MANUAL_PIX';
-  /** The other machine's NSU or the Pix's id, when the operator typed it. At most 64 characters. */
-  readonly reference?: string;
-}
+export type LegExit = 'resend' | 'other-tender' | 'cancel';
 
 export interface FlowLeg {
   /** The registry tender this leg settles as — the captured kind once approved. */
@@ -65,7 +57,6 @@ export interface FlowLeg {
   readonly history: readonly string[];
   readonly deviceId: string | null;
   readonly capture: CaptureWire | null;
-  readonly elsewhere: Elsewhere | null;
   /** Why the push was refused. */
   readonly refusal: Extract<TerminalChargeAnswer, { ok: false }>['code'] | null;
   /** The ways out the operator may take from where the leg stands. */
@@ -95,12 +86,11 @@ export interface ChargeFlow {
   readonly pending: FlowPending | null;
 }
 
-/** A leg as the host's server receives it: a terminal leg carries its capture, or how it was charged elsewhere. */
+/** A leg as the host's server receives it: a terminal leg carries the capture the terminal reported. */
 export interface ChargedLeg {
   readonly tender: string;
   readonly amountCents?: number;
   readonly capture?: CaptureWire;
-  readonly elsewhere?: Elsewhere;
 }
 
 /** The split the host settles, with each terminal leg's proof. */
@@ -120,7 +110,7 @@ export type Readiness = 'ready' | 'waiting-link' | 'charging' | 'decide';
 
 /** What a terminal answer means to the screen, beside the new flow. */
 export type FlowNotice =
-  /** The terminal approved a leg already received another way: the buyer paid twice; the operator chooses which goes back. */
+  /** The terminal approved a leg already received in cash: the buyer paid twice; the operator chooses which goes back. */
   | { readonly kind: 'received-twice'; readonly index: number; readonly capture: CaptureWire }
   /** A capture no leg of this flow takes: money for no sale, kept for recovery. Never applied. */
   | { readonly kind: 'orphan'; readonly capture: CaptureWire }

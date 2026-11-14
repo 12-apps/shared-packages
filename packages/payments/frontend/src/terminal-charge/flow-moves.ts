@@ -1,5 +1,5 @@
 import { advance, currentIndex, isLive, isStopped, withLeg } from './charge-flow';
-import type { ChargeFlow, Elsewhere, FlowLeg, FlowMove } from './flow-types';
+import type { ChargeFlow, FlowLeg, FlowMove } from './flow-types';
 import { terminalMethodOf, type TerminalCancelAnswer, type TerminalChargeAnswer } from './port';
 
 /**
@@ -8,9 +8,6 @@ import { terminalMethodOf, type TerminalCancelAnswer, type TerminalChargeAnswer 
  * the station or the operator moves it (FUT-4996 A10: the way out is the exit,
  * never a timeout).
  */
-
-/** The longest reference a leg charged elsewhere may carry. */
-export const ELSEWHERE_REFERENCE_MAX = 64;
 
 /** The charge a leg leaves behind stays the leg's: a late approval of it is still this sale's money. */
 function historyOf(leg: FlowLeg): readonly string[] {
@@ -57,7 +54,7 @@ export function cancelAnswered(flow: ChargeFlow, chargeId: string, answer: Termi
  */
 function takeWith(flow: ChargeFlow, index: number, leg: FlowLeg, tender: string): ChargeFlow {
   const method = terminalMethodOf(tender);
-  const base = { chargeId: null, history: historyOf(leg), refusal: null, capture: null, elsewhere: null };
+  const base = { chargeId: null, history: historyOf(leg), refusal: null, capture: null };
   if (method === null) return advance(withLeg(flow, index, { ...base, status: 'local', tender }));
   return withLeg(flow, index, { ...base, status: 'send', tender: method });
 }
@@ -87,27 +84,6 @@ export function cashReceived(flow: ChargeFlow): ChargeFlow {
   const index = currentIndex(flow);
   if (flow.legs[index]?.status !== 'cash') return flow;
   return advance(withLeg(flow, index, { status: 'local', tender: 'CASH' }));
-}
-
-/**
- * "Charged on another machine" or "received by a manual Pix": the leg is
- * recorded with how it was charged, and the split moves on. A manual Pix is a
- * PIX leg; another machine keeps the leg's method. Any charge the leg left on
- * this terminal stays its own, so a late approval of it reads as received
- * twice, never as the leg's.
- */
-export function chargedElsewhere(flow: ChargeFlow, index: number, elsewhere: Elsewhere): ChargeFlow {
-  const leg = flow.legs[index];
-  if (leg === undefined || leg.status === 'approved' || leg.status === 'local' || leg.status === 'elsewhere') return flow;
-  const reference = elsewhere.reference?.trim();
-  if (reference !== undefined && reference.length > ELSEWHERE_REFERENCE_MAX) {
-    throw new RangeError(`A reference is at most ${ELSEWHERE_REFERENCE_MAX} characters.`);
-  }
-  const tender = elsewhere.via === 'MANUAL_PIX' ? 'PIX' : (terminalMethodOf(leg.tender) ?? leg.tender);
-  const recorded: Elsewhere = reference ? { via: elsewhere.via, reference } : { via: elsewhere.via };
-  return advance(
-    withLeg(flow, index, { status: 'elsewhere', tender, elsewhere: recorded, chargeId: null, history: historyOf(leg), capture: null, refusal: null }),
-  );
 }
 
 /** The charge a reload left on the terminal was cancelled (or ended): nothing is left to show. */

@@ -58,8 +58,7 @@ export interface TerminalPort {
  * Where the station's link stands, as a flow needs it.
  *
  * - `known: false`: no answer yet, or the last read failed. A card or Pix leg
- *   then WAITS (it never degrades to a plain leg): the operator may still
- *   record it as charged elsewhere.
+ *   then WAITS: it never degrades to a plain leg.
  * - `known: true, terminals: 0`: no terminal linked (or no port at all): card
  *   legs are plain tenders, as before.
  * - `pending`: a charge the station still holds on the terminal after a

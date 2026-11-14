@@ -2,8 +2,10 @@
  * `@12-apps/payments-frontend/terminal-charge` — a split charged through the
  * paired payment terminal at a station: each card or Pix leg pushed on its
  * own, the wait, the terminal's answers, and every path that could lose or
- * double money (a late approval after the leg was paid another way, a capture
- * above the total, a terminal that is down, a reload mid-charge).
+ * double money (a late approval after the leg was paid in cash, a capture
+ * above the total, a terminal that is down, a reload mid-charge). The
+ * terminal is the only source of payment truth: nothing here settles a card
+ * or Pix leg on a code or a claim typed at the station.
  *
  * Headless at its core (`startFlow` and the moves are pure; `startChargeRun`
  * drives them over the host's {@link TerminalPort}), with generic screens on
@@ -26,11 +28,9 @@ export {
   type ConfirmWords,
 } from './charge-flow';
 export {
-  ELSEWHERE_REFERENCE_MAX,
   cancelAnswered,
   cancelRequested,
   cashReceived,
-  chargedElsewhere,
   otherTender,
   pendingCancelled,
   pushed,
@@ -43,7 +43,6 @@ export type {
   ChargedLeg,
   ChargedSplit,
   ChargeFlow,
-  Elsewhere,
   FlowLeg,
   FlowMove,
   FlowNotice,
@@ -92,3 +91,16 @@ export {
   type TerminalState,
   type TerminalView,
 } from './port';
+export { useChargeFlow, useTerminalLink } from './hooks';
+export type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from './copy';
+export { ActConfirm, type ActConfirmProps } from './act-confirm';
+export {
+  OverCaptureChoice,
+  ReceivedTwiceBand,
+  type OverCaptureAct,
+  type OverCaptureChoiceProps,
+  type ReceivedTwiceAct,
+  type ReceivedTwiceBandProps,
+} from './money-choices';
+export { RecoveredCaptures, type RecoveredCapturesProps } from './recovered-captures';
+export { TerminalWait, type TerminalWaitProps } from './terminal-wait';

@@ -1,8 +1,8 @@
 import { chargedSplit, currentIndex, linked, partOf, readiness, remainingAfter, startFlow, withLink } from './charge-flow';
 import { holdCharge, noteTaken, releaseCharges } from './charge-claims';
 import { onEvent } from './flow-events';
-import { cancelAnswered, cancelRequested, cashReceived, chargedElsewhere, otherTender, pendingCancelled, pushed, pushing, resend, serverRefused } from './flow-moves';
-import type { ChargedSplit, ChargeFlow, Elsewhere, FlowLeg, FlowNotice } from './flow-types';
+import { cancelAnswered, cancelRequested, cashReceived, otherTender, pendingCancelled, pushed, pushing, resend, serverRefused } from './flow-moves';
+import type { ChargedSplit, ChargeFlow, FlowLeg, FlowNotice } from './flow-types';
 import {
   terminalMethodOf,
   type ChargeLink,
@@ -45,8 +45,6 @@ export interface ChargeRun {
   resend(): void;
   other(tender: string): void;
   cashReceived(): void;
-  /** "Charged on another machine" / "received by a manual Pix" for a leg. */
-  elsewhere(index: number, elsewhere: Elsewhere): void;
   /** Cancel the live leg's charge on the terminal. */
   cancel(): void;
   /** Cancel the charge a reload left on the terminal. */
@@ -113,12 +111,6 @@ class Run implements ChargeRun {
 
   cashReceived(): void {
     this.move(cashReceived(this.flow));
-  }
-
-  elsewhere(index: number, elsewhere: Elsewhere): void {
-    const left = outThere(this.flow.legs[index]);
-    this.move(chargedElsewhere(this.flow, index, elsewhere));
-    if (left !== null) this.quietCancel(left);
   }
 
   cancel(): void {
