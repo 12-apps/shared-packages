@@ -7,9 +7,10 @@ import type { JSX } from "react";
 
 import { Icon } from "@12-apps/ui/icons";
 import { Box } from "@12-apps/ui/mui/Box";
-import { alpha, type Theme } from "@12-apps/ui/mui/styles";
+import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
+import { flaggedRowInk, flaggedRowTint } from "./lib/row-flag";
 import { tableCard } from "./lib/table-cards";
 import type { ReportPhoneCards, ReportRow, ReportTableColumn, ReportTableFlag } from "./reports-api";
 import { useReportEngineCopy } from "./transport-context";
@@ -17,13 +18,14 @@ import { useReportEngineCopy } from "./transport-context";
 function FlagLine({ label }: { label: string }): JSX.Element {
   return (
     <Box
-      component="span"
+      component="div"
       data-report-row-flag=""
       sx={{
-        display: "inline-flex",
+        display: "flex",
+        justifyContent: "flex-end",
         alignItems: "center",
         gap: 0.5,
-        color: "warning.dark",
+        color: flaggedRowInk,
         fontWeight: "fontWeightBold",
         typography: "caption",
       }}
@@ -68,37 +70,40 @@ export function ReportTableCards({
               px: 1,
               borderBottom: "1px solid",
               borderBottomColor: "divider",
-              ...(isFlagged ? { bgcolor: (theme: Theme) => alpha(theme.palette.warning.main, 0.12) } : {}),
+              ...(isFlagged ? { bgcolor: flaggedRowTint } : {}),
             }}
           >
-            <Box sx={{ minWidth: 0 }}>
-              <Text variant="body" size="md" weight="semibold">
+            <Stack sx={{ minWidth: 0 }} data-card-part="name">
+              <Text as="div" variant="body" size="md" weight="semibold">
                 {card.title}
               </Text>
               {card.subtitle ? (
-                <Text variant="body" size="xs" color="secondary">
+                <Text as="div" variant="body" size="xs" color="secondary">
                   {card.subtitle}
                 </Text>
               ) : null}
               {card.lines.map((line) => (
-                <Text key={line.label} variant="body" size="xs" color="secondary">
+                <Text as="div" key={line.label} variant="body" size="xs" color="secondary">
                   {`${line.label}: ${line.value}`}
                 </Text>
               ))}
-            </Box>
-            <Box sx={{ textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+            </Stack>
+            <Stack
+              sx={{ alignItems: "flex-end", textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              data-card-part="figure"
+            >
               {card.figure ? (
-                <Text variant="body" size="md" weight="bold">
+                <Text as="div" variant="body" size="md" weight="bold">
                   {card.figure.text}
                 </Text>
               ) : null}
               {isFlagged && flag ? <FlagLine label={flag.label} /> : null}
               {card.figureCaption ? (
-                <Text variant="body" size="xs" color="secondary">
+                <Text as="div" variant="body" size="xs" color="secondary">
                   {card.figureCaption}
                 </Text>
               ) : null}
-            </Box>
+            </Stack>
           </Box>
         );
       })}

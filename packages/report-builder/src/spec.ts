@@ -119,6 +119,13 @@ const cardPartSchema = z.strictObject({
  */
 export const reportPhoneCardsSchema = z.strictObject({
   layout: z.literal('cards'),
+  /**
+   * When the cards replace the table: `'md'` (default) below the viewport's
+   * `md`; `'always'`; or a number — below that many px of the BLOCK's own
+   * width, so a narrow block on a wide screen (Por área at a third of the
+   * canvas) reads as cards too.
+   */
+  below: z.union([z.literal('md'), z.literal('always'), z.number().int().min(120).max(4000)]).optional(),
   title: z.string().min(1).optional(),
   figure: z.string().min(1).optional(),
   figureCaption: cardPartSchema.optional(),

@@ -8,12 +8,14 @@ import { Table } from "@12-apps/ui/data-display/Table";
 import { Box } from "@12-apps/ui/mui/Box";
 import { useTheme } from "@12-apps/ui/mui/styles";
 import { useMediaQuery } from "@12-apps/ui/mui/useMediaQuery";
+import { useMeasuredWidth } from "@12-apps/ui/utility/Overflow";
 
 import { BOUNDED_TABLE_SX } from "./lib/bounded-table";
 import { TABULAR_FIGURES } from "./lib/render-sx";
 import { reportTableColumns } from "./lib/report-table-columns";
 import { SECTION_LABEL_STYLE } from "./lib/report-surface";
 import { FLAGGED_ROW_SX, FlaggedCell, withFlagMarks } from "./lib/row-flag";
+import { cardsApply } from "./lib/table-cards";
 import { ReportTableCards } from "./report-table-cards";
 import type { ReportPhoneCards, ReportRow, ReportTableColumn, ReportTableFlag } from "./reports-api";
 import { useReportEngineCopy } from "./transport-context";
@@ -112,12 +114,40 @@ export function ReportTable({
   /** The opt-in phone form (FUT-4063): stacked cards below `md`, the table above. */
   phone?: ReportPhoneCards;
 }): JSX.Element {
-  const copy = useReportEngineCopy();
   const theme = useTheme();
   const narrow = useMediaQuery(theme.breakpoints.down("md"), { noSsr: true });
-  if (phone && narrow) {
-    return <ReportTableCards columns={columns} rows={rows} phone={phone} flag={flag} dataTestId={dataTestId} />;
+  const { ref, width } = useMeasuredWidth<HTMLDivElement>();
+  // The same element in both branches (one `Box` at the root), so switching
+  // forms never leaves the width observer watching a box that is gone.
+  if (phone && cardsApply(phone, narrow, width)) {
+    return (
+      <Box ref={ref}>
+        <ReportTableCards columns={columns} rows={rows} phone={phone} flag={flag} dataTestId={dataTestId} />
+      </Box>
+    );
   }
+  return (
+    <Box ref={ref}>
+      <ReportTableGrid columns={columns} rows={rows} dataTestId={dataTestId} bounded={bounded} flag={flag} />
+    </Box>
+  );
+}
+
+/** The table form itself: the house style over the design system's `Table`. */
+function ReportTableGrid({
+  columns,
+  rows,
+  dataTestId,
+  bounded,
+  flag,
+}: {
+  columns: readonly ReportTableColumn[];
+  rows: ReportRow[];
+  dataTestId: string;
+  bounded: boolean;
+  flag?: ReportTableFlag;
+}): JSX.Element {
+  const copy = useReportEngineCopy();
   const flagged = flag
     ? { column: flag.column, render: (text: string) => <FlaggedCell text={text} label={flag.label} /> }
     : undefined;

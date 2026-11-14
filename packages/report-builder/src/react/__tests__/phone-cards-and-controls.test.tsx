@@ -9,12 +9,16 @@ import type { JSX, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createTheme } from "@12-apps/ui/mui/styles";
+
 import { PT_BR_REPORT_ENGINE_COPY } from "../../pt-BR";
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from "../../server/pt-BR";
 import { csvTrailer } from "../lib/export-rows";
 import { initialRange, ReportControls } from "../lib/report-chrome";
 import { blockNotes, noteCsvLines, notesBelowCard } from "../lib/report-notes";
-import { tableCard } from "../lib/table-cards";
+import { cardsApply, tableCard } from "../lib/table-cards";
+import { contrastRatio as getContrastRatio } from "../lib/report-surface";
+import { flaggedFigureInk, flaggedRowInk, flaggedRowTint } from "../lib/row-flag";
 import { PT_BR_REPORT_SCREENS_COPY } from "../pt-BR";
 import { NotesBelowCard } from "../report-notes";
 import { ReportRenderView } from "../report-render";
@@ -219,9 +223,46 @@ describe("a built-in's controls", () => {
     expect(screen.getByTestId("report-range").textContent).toContain("Esta semana · 09–15/11");
   });
 
-  it("opens on 30 dias unless the built-in does not offer it", () => {
+  it("opens on the first period the built-in offers, and on 30 dias when it offers no list", () => {
     expect(initialRange(undefined)).toBe("30d");
-    expect(initialRange(["week", "30d"])).toBe("30d");
-    expect(initialRange(["week", "7d"])).toBe("week");
+    expect(initialRange([])).toBe("30d");
+    expect(initialRange(["week", "7d", "month", "30d"])).toBe("week");
+    expect(initialRange(["7d", "week"])).toBe("7d");
   });
+});
+
+describe("when a table becomes cards", () => {
+  const cards = (below?: "md" | "always" | number) => ({ layout: "cards" as const, ...(below !== undefined ? { below } : {}) });
+
+  it("follows the viewport by default", () => {
+    expect(cardsApply(cards(), true, 900)).toBe(true);
+    expect(cardsApply(cards(), false, 280)).toBe(false);
+  });
+
+  it("follows the BLOCK's width when given one, so a narrow block on a wide screen reads as cards", () => {
+    expect(cardsApply(cards(480), false, 281)).toBe(true);
+    expect(cardsApply(cards(480), true, 600)).toBe(false);
+    // Not measured yet: the viewport decides.
+    expect(cardsApply(cards(480), false, 0)).toBe(false);
+  });
+
+  it("is always cards when asked, and never without a phone form", () => {
+    expect(cardsApply(cards("always"), false, 2000)).toBe(true);
+    expect(cardsApply(undefined, true, 100)).toBe(false);
+  });
+});
+
+describe("the flag's ink reads at 4.5:1 on its tint in every palette and mode", () => {
+  const themes = {
+    "MUI light": createTheme({ palette: { mode: "light" } }),
+    "MUI dark": createTheme({ palette: { mode: "dark" } }),
+    "host light": createTheme({ palette: { mode: "light", warning: { main: "#8C5908" } } }),
+    "host dark": createTheme({ palette: { mode: "dark", warning: { main: "#F5A623" } } }),
+  };
+  for (const [name, theme] of Object.entries(themes)) {
+    it(name, () => {
+      expect(getContrastRatio(flaggedRowInk(theme), flaggedRowTint(theme))).toBeGreaterThanOrEqual(4.5);
+      expect(getContrastRatio(flaggedFigureInk(theme), theme.palette.background.paper)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });

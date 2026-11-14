@@ -55,3 +55,16 @@ export function tableCard(
   if (phone.figureCaption) card.figureCaption = part(row, byKey, phone.figureCaption, copy);
   return card;
 }
+
+/**
+ * Whether a table draws as cards (FUT-4063): `'md'` (the default) follows the
+ * viewport, `'always'` always, a number the block's own measured width — a
+ * width not yet measured falls back to the viewport.
+ */
+export function cardsApply(phone: ReportPhoneCards | undefined, narrowViewport: boolean, blockWidth: number): boolean {
+  if (!phone) return false;
+  const below = phone.below ?? "md";
+  if (below === "always") return true;
+  if (below === "md" || blockWidth <= 0) return narrowViewport;
+  return blockWidth < below;
+}

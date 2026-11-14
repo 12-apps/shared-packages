@@ -157,6 +157,8 @@ export interface ReportCardPart {
 /** A table's opt-in phone form (FUT-4063): each row a stacked card below `md`. */
 export interface ReportPhoneCards {
   layout: "cards";
+  /** When the cards replace the table: below `md` (default), always, or below this block width in px. */
+  below?: "md" | "always" | number;
   title?: string;
   figure?: string;
   figureCaption?: ReportCardPart;

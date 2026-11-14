@@ -139,6 +139,7 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     phone: z
       .object({
         layout: z.literal('cards'),
+        below: z.union([z.literal('md'), z.literal('always'), z.number()]).optional(),
         title: z.string().optional(),
         figure: z.string().optional(),
         figureCaption: z.object({ measure: z.string(), suffix: z.string().optional() }).optional(),

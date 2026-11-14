@@ -24,7 +24,7 @@ import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { initialRange, ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { noteCsvLines } from "./lib/report-notes";
-import { ReportBodyWithNotes } from "./report-notes";
+import { NotesBelowCard, ReportBodyWithNotes } from "./report-notes";
 import { exportColumnsFor } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportNoteView, type ReportRange } from "./reports-api";
 import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
@@ -110,6 +110,9 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
           </Stack>
         ) : null}
         <ReportBodyWithNotes report={report} title={report.title} tenantSlug={tenantSlug} asTable={tableView.asTable} />
+        {/* This page has no block card, so a note that sits below the card on
+          * a phone sits below the rendering here — never nowhere (FUT-4063). */}
+        <NotesBelowCard notes={report.notes} tenantSlug={tenantSlug} dataTestId="report-render" />
       </Stack>
     </Stack>
   );

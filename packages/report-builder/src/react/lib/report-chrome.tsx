@@ -50,10 +50,13 @@ function rangeOptions(
   return offered.map((range) => ({ value: range, label: label(range) }));
 }
 
-/** The period a built-in OPENS on: `30d` as always, unless it does not offer it (FUT-4063). */
+/**
+ * The period a built-in OPENS on (FUT-4063): the FIRST it offers — the host
+ * orders its list with the default first ("Esta semana", then the rest). A
+ * built-in that offers no list opens on `30d`, as every built-in always has.
+ */
 export function initialRange(offered: readonly ReportRange[] | undefined): ReportRange {
-  if (!offered || offered.length === 0 || offered.includes("30d")) return "30d";
-  return offered[0] ?? "30d";
+  return offered?.[0] ?? "30d";
 }
 
 /**
