@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 
 import { HeatMap } from './HeatMap';
 
@@ -37,11 +37,15 @@ type Story = StoryObj<typeof meta>;
 
 /** Every figure cell shows its whole text: nothing clipped by the cell's width. */
 async function expectNoClippedFigure(canvasElement: HTMLElement): Promise<void> {
-  const cells = [...canvasElement.querySelectorAll<HTMLTableCellElement>('td[data-tone]')];
-  await expect(cells.length).toBeGreaterThan(0);
-  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the cell's own overflow: each story pins its frame's width, not the viewport's
-  const clipped = cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent);
-  await expect(clipped).toEqual([]);
+  // The grid settles once its width is measured (a ResizeObserver callback),
+  // so the check waits for that layout rather than reading the first frame.
+  await waitFor(async () => {
+    const cells = [...canvasElement.querySelectorAll<HTMLTableCellElement>('td[data-tone]')];
+    await expect(cells.length).toBeGreaterThan(0);
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the cell's own overflow: each story pins its frame's width, not the viewport's
+    const clipped = cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent);
+    await expect(clipped).toEqual([]);
+  });
 }
 
 export const FitsItsContainer: Story = {
