@@ -57,6 +57,7 @@
     "20261112120000_marketplace_cancellation_failure",
     "20261113120000_marketplace_catalogue",
     "20261113220000_fiscal_documents",
-    "20261113230000_marketplace_store_pause"
+    "20261113230000_marketplace_store_pause",
+    "20261114120000_messaging_connector"
   ]
 }

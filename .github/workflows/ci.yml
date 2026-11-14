@@ -71,6 +71,7 @@ env:
     packages/shared-helpers
     packages/discounts
     packages/marketplace
+    packages/messaging
 
 jobs:
   # ── Change detection ───────────────────────────────────────────────────────
