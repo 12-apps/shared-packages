@@ -10,9 +10,10 @@ import { requireParam } from './wire';
  * mounted after `teamRoutes`, which is safe because no team route shares its
  * four-segment POST shape.
  *
- * Same guard as cancel — `manageTeam` — because it acts on the same row. The WRITE is the host's (`RbacInvitesPort.resend`): only the host
- * knows where the credential lives and whether the mail left, and the contract
- * on the port says it must write nothing when it did not.
+ * Same guard as cancel — `manageTeam` — because it acts on the same row. The
+ * WRITE is the host's (`RbacInvitesPort.resend`): only the host knows where the
+ * credential lives and whether the mail left, and the contract on the port says
+ * it must write nothing when it did not.
  *
  * `not_sent` answers 502: the request was sound and an upstream (the mail
  * vendor, or the absence of one) failed it. The sentence says the previous link

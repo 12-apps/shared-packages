@@ -172,6 +172,23 @@ describe('the Equipe API asks permissions, not a tier (FUT-3661)', () => {
   });
 });
 
+describe('the owner protection on disable holds for a team:manage holder (FUT-3661)', () => {
+  it('PATCH /team/:userId/status refuses to disable an owner, and leaves them active', async () => {
+    const { h } = await host();
+    seedRole(h.state, { clientId: TENANT, name: 'Recrutamento', permissions: ['team:manage'] });
+    enrolMember(h.state, TENANT, 'clerk-1', 'CLERK');
+    linkRole(h.state, 'clerk-1', 'Recrutamento');
+    const response = await call(
+      h,
+      ['PATCH', '/team/:userId/status', { params: { userId: 'owner-1' }, body: { active: false } }],
+      memberActor(TENANT, 'clerk-1'),
+    );
+    expect(response.status).toBe(403);
+    expect((response.body as { error: string }).error).toBe(PT_BR_RBAC_MESSAGES.ownerNotDisableable);
+    expect(h.state.memberships.find((m) => m.userId === 'owner-1')?.active).toBe(true);
+  });
+});
+
 describe('GET /permissions admits a caller who holds any permission here (FUT-3661)', () => {
   it('a member whose roles grant nothing is refused, whatever their tier', async () => {
     const { h } = await host();
