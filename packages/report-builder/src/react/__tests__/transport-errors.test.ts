@@ -15,7 +15,8 @@ import { httpTransport } from '../transport';
  * server's own sentence is pinned to keep winning over them.
  */
 
-const PT_BR = httpTransport({ errors: PT_BR_REPORT_SCREENS_COPY.errors });
+/** A fresh pt-BR transport per call, so no test shares state with another. */
+const ptBr = () => httpTransport({ errors: PT_BR_REPORT_SCREENS_COPY.errors });
 
 function answer(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -40,7 +41,7 @@ afterEach(() => {
 describe('a write (send) that fails', () => {
   it('names the status in the host words when the body carries no sentence', async () => {
     answer(503, {});
-    await expect(PT_BR.send('/api/reports/run', 'POST', {})).resolves.toEqual({
+    await expect(ptBr().send('/api/reports/run', 'POST', {})).resolves.toEqual({
       ok: false,
       error: 'Erro 503',
     });
@@ -48,7 +49,7 @@ describe('a write (send) that fails', () => {
 
   it("keeps the server's own sentence and its field errors", async () => {
     answer(422, { error: 'Dê um nome ao relatório.', issues: { name: 'Obrigatório' } });
-    await expect(PT_BR.send('/api/reports', 'POST', {})).resolves.toEqual({
+    await expect(ptBr().send('/api/reports', 'POST', {})).resolves.toEqual({
       ok: false,
       error: 'Dê um nome ao relatório.',
       fieldErrors: { name: 'Obrigatório' },
@@ -57,7 +58,7 @@ describe('a write (send) that fails', () => {
 
   it("says the connection failed, never the browser's TypeError message", async () => {
     reject(new TypeError('Failed to fetch'));
-    await expect(PT_BR.send('/api/reports', 'POST', {})).resolves.toEqual({
+    await expect(ptBr().send('/api/reports', 'POST', {})).resolves.toEqual({
       ok: false,
       error: 'Falha de conexão',
     });
@@ -65,7 +66,7 @@ describe('a write (send) that fails', () => {
 
   it("says the connection failed, never a thrown error's message", async () => {
     reject(new Error('socket hang up'));
-    await expect(PT_BR.send('/api/reports', 'DELETE')).resolves.toEqual({
+    await expect(ptBr().send('/api/reports', 'DELETE')).resolves.toEqual({
       ok: false,
       error: 'Falha de conexão',
     });
@@ -73,7 +74,7 @@ describe('a write (send) that fails', () => {
 
   it('says the connection failed when something other than an Error is thrown', async () => {
     reject('aborted');
-    await expect(PT_BR.send('/api/reports', 'DELETE')).resolves.toEqual({
+    await expect(ptBr().send('/api/reports', 'DELETE')).resolves.toEqual({
       ok: false,
       error: 'Falha de conexão',
     });
@@ -83,18 +84,18 @@ describe('a write (send) that fails', () => {
 describe('a read (get / getRaw) that fails', () => {
   it('rejects with the status in the host words, without the path', async () => {
     answer(503, {});
-    await expect(PT_BR.get('/api/reports/saved')).rejects.toThrow(/^Erro 503$/);
-    await expect(PT_BR.getRaw('/api/roles')).rejects.toThrow(/^Erro 503$/);
+    await expect(ptBr().get('/api/reports/saved')).rejects.toThrow(/^Erro 503$/);
+    await expect(ptBr().getRaw('/api/roles')).rejects.toThrow(/^Erro 503$/);
   });
 
   it("rejects with the connection failure, never the browser's TypeError message", async () => {
     reject(new TypeError('Failed to fetch'));
-    await expect(PT_BR.get('/api/reports/saved')).rejects.toThrow(/^Falha de conexão$/);
+    await expect(ptBr().get('/api/reports/saved')).rejects.toThrow(/^Falha de conexão$/);
   });
 
   it('still unwraps the envelope when the call succeeds', async () => {
     answer(200, { data: { id: 'r1' } });
-    await expect(PT_BR.get('/api/reports/saved/r1')).resolves.toEqual({ id: 'r1' });
+    await expect(ptBr().get('/api/reports/saved/r1')).resolves.toEqual({ id: 'r1' });
   });
 });
 
