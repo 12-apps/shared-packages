@@ -1,0 +1,28 @@
+{
+  "id": "chatcmpl-Fixture1",
+  "object": "chat.completion",
+  "created": 1794000000,
+  "model": "gpt-fixture-1",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "tool_calls",
+      "logprobs": null,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "tool_calls": [
+          { "id": "call_Fixture1", "type": "function", "function": { "name": "search_menu", "arguments": "{\"query\":\"pizza\",\"limit\":null}" } }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2100,
+    "completion_tokens": 25,
+    "total_tokens": 2125,
+    "prompt_tokens_details": { "cached_tokens": 1920, "audio_tokens": 0 },
+    "completion_tokens_details": { "reasoning_tokens": 0 }
+  }
+}

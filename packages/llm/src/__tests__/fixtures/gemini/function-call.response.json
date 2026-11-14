@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          { "text": "thinking summary", "thought": true },
+          { "text": "Let me check the menu." },
+          { "functionCall": { "id": "fc_fixture_1", "name": "search_menu", "args": { "query": "pizza", "limit": null } }, "thoughtSignature": "c2lnLWZpeHR1cmU=" }
+        ]
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 2200,
+    "cachedContentTokenCount": 2048,
+    "candidatesTokenCount": 20,
+    "thoughtsTokenCount": 64,
+    "totalTokenCount": 2284
+  },
+  "modelVersion": "gemini-fixture-1",
+  "responseId": "resp-fixture-1"
+}

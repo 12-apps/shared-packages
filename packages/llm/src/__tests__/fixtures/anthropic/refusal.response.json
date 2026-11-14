@@ -1,0 +1,24 @@
+{
+  "id": "msg_01FixtureRefusal",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [],
+  "stop_reason": "refusal",
+  "stop_sequence": null,
+  "stop_details": { "type": "refusal", "category": "cyber", "explanation": "The request asks for exploit development." },
+  "container": null,
+  "diagnostics": null,
+  "usage": {
+    "input_tokens": 30,
+    "cache_creation_input_tokens": null,
+    "cache_read_input_tokens": null,
+    "output_tokens": 0,
+    "cache_creation": null,
+    "inference_geo": null,
+    "output_tokens_details": null,
+    "server_tool_use": null,
+    "service_tier": "standard",
+    "speed": null
+  }
+}

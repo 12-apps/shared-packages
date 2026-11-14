@@ -1,0 +1,7 @@
+{
+  "candidates": [
+    { "content": { "role": "model", "parts": [] }, "finishReason": "SAFETY", "index": 0 }
+  ],
+  "usageMetadata": { "promptTokenCount": 33, "candidatesTokenCount": 0, "totalTokenCount": 33 },
+  "modelVersion": "gemini-fixture-1"
+}

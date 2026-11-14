@@ -1,0 +1,73 @@
+{
+  "name": "@12-apps/llm",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "A provider-agnostic model connector. One interface for a chat turn with tools (system blocks with cache breakpoints, strict JSON-schema tools, tool choice, output budget, effort hint) and one normalized result (text, tool calls, stop reason, usage with cache tokens). An abstract factory picks an adapter by provider id from a registry the host can extend; Anthropic, OpenAI and Gemini adapters ship over each provider's official SDK, loaded only when used. Credentials are a strategy: an API key or an OAuth access token with a host-supplied refresh. A tool-use loop reports every turn's usage. Typed errors and one host retry hook.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsup",
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=1.6.0",
+    "@google/genai": ">=3.1.0",
+    "openai": ">=7.55.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@google/genai": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@google/genai": "^3.1.0",
+    "@types/node": "^22.10.6",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "openai": "^7.55.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/llm"
+  },
+  "files": [
+    "dist",
+    "*.md",
+    "!eslint.config.js",
+    "!tsup.config.ts",
+    "!**/__tests__/**",
+    "!**/*.test.*"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "chatcmpl-Fixture3",
+  "object": "chat.completion",
+  "created": 1794000002,
+  "model": "gpt-fixture-1",
+  "choices": [
+    { "index": 0, "finish_reason": "content_filter", "logprobs": null, "message": { "role": "assistant", "content": "", "refusal": null } }
+  ],
+  "usage": { "prompt_tokens": 40, "completion_tokens": 0, "total_tokens": 40 }
+}
