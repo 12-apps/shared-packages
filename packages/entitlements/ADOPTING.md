@@ -403,11 +403,22 @@ openPlanCompare({ feature: 'chat.assistant', keys: CHAT_KEYS, plan: 'max' });
 | `feature` | the feature that prompted the ask, sent with `POST /plan/request` |
 
 The ask is the upsell prompt's own: without `canRequestPlanChange` the dialog
-names the plan and says who can ask, with no button. `plansPath` adds the "all
-plans" link. Below the theme's `sm` breakpoint it is the library's inset bottom
-sheet with a compact matrix: three tiers fit 320 px with no sideways scroll.
+names the plan and says who can ask, with no button. With no `plan`, a tenant
+whose own tier already includes every compared row is told so and offered
+nothing. `plansPath` adds the "all plans" link (a 40 px target). The footer
+sits in the dialog's actions slot, pinned under the rows.
 
-Copy: `copy.planCompare` (`title`, `currentBadge`, `empty`, `closeLabel`) —
+Layout is chosen by the width the dialog MEASURES, not by a breakpoint: a
+table (160 px label floor, 88 px per tier) where it fits — three tiers from
+~426 px of frame, four from ~514 — and otherwise stacked rows, each label on
+its own line with the tiers' marks and names on the line under it, which
+fits five tiers at 320 px. The frame scrolls sideways rather than clip.
+Below the theme's `sm` breakpoint the dialog itself is the library's inset
+bottom sheet. Tiers are read cheapest first, in the payload's order
+(`TenantPlanPayload.comparison`).
+
+Copy: `copy.planCompare` (`title`, `currentBadge`, `offeredBadge`, `empty`,
+`alreadyIncluded`, `retry`, `closeLabel`) —
 both packs carry it. It is OPTIONAL, so a hand-written `EntitlementsWebCopy`
 from before it keeps compiling: a missing block falls back to the en-US pack's
 (the package resolves no active locale; the host picks its pack by hand), so a

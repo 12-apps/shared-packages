@@ -56,43 +56,57 @@ function tier(
   };
 }
 
-const PAYLOAD: TenantPlanPayload = {
-  planKey: 'free',
-  name: 'Gratuito',
-  priceCents: 0,
-  price: null,
-  features: [],
-  comparison: [
-    tier('free', 'Gratuito', [false, false, false], { current: true, upgrade: false }),
-    tier('pro', 'Pro', [true, false, false]),
-    tier('max', 'Max', [true, true, true], { recommended: true }),
-  ],
-};
+const FREE = tier('free', 'Gratuito', [false, false, false], { current: true, upgrade: false });
+// The owner's spec: Pro has rows 1-2, Max all three.
+const PRO = tier('pro', 'Pro', [true, true, false]);
+const MAX = tier('max', 'Max', [true, true, true], { recommended: true });
 
-const fakeFetch: typeof fetch = async (input, init) => {
-  const url = String(input);
-  if (url.endsWith('/plan') && (init?.method ?? 'GET') === 'GET') {
-    return Response.json({ data: { plan: PAYLOAD } });
-  }
-  if (url.endsWith('/plan/request')) {
-    return Response.json({ data: { request: { id: 'r1', status: 'open' }, created: true } });
-  }
-  return Response.json({ error: 'not found' }, { status: 404 });
-};
+const THREE_TIERS = [FREE, PRO, MAX];
+const FOUR_TIERS = [FREE, tier('basic', 'Básico', [true, false, false]), PRO, MAX];
+const FIVE_TIERS = [
+  FREE,
+  tier('basic', 'Básico', [true, false, false]),
+  PRO,
+  tier('business', 'Empresarial', [true, true, false]),
+  MAX,
+];
+
+function fakeFetch(comparison: ComparisonTier[]): typeof fetch {
+  const plan: TenantPlanPayload = {
+    planKey: 'free',
+    name: 'Gratuito',
+    priceCents: 0,
+    price: null,
+    features: [],
+    comparison,
+  };
+  return async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/plan') && (init?.method ?? 'GET') === 'GET') {
+      return Response.json({ data: { plan } });
+    }
+    if (url.endsWith('/plan/request')) {
+      return Response.json({ data: { request: { id: 'r1', status: 'open' }, created: true } });
+    }
+    return Response.json({ error: 'not found' }, { status: 404 });
+  };
+}
 
 function Demo({
   keys = CHAT_KEYS,
   canRequestPlanChange = true,
   copy = PT_BR_ENTITLEMENTS_WEB_COPY,
+  tiers = THREE_TIERS,
 }: {
   keys?: string[];
+  tiers?: ComparisonTier[];
   canRequestPlanChange?: boolean;
   copy?: EntitlementsWebCopy;
 }): JSX.Element {
   const [{ PlanCompare }] = useState(() =>
     createWebEntitlements({
       apiBase: '/api/demo',
-      fetchImpl: fakeFetch,
+      fetchImpl: fakeFetch(tiers),
       canRequestPlanChange,
       copy,
       plansPath: '#plans',
@@ -118,6 +132,12 @@ export default meta;
 
 /** The first caller's shape: three chat rows, the top tier offered. */
 export const ChatRows: StoryObj = { render: () => <Demo /> };
+
+/** Four tiers on sale — a table from ~514 px of frame, stacked below it. */
+export const ChatRowsFourTiers: StoryObj = { render: () => <Demo tiers={FOUR_TIERS} /> };
+
+/** Five tiers — stacked in the dialog at every width. */
+export const ChatRowsFiveTiers: StoryObj = { render: () => <Demo tiers={FIVE_TIERS} /> };
 
 /** No `plan:request`: the plan is named, and there is no request button. */
 export const WithoutRequestPermission: StoryObj = {
