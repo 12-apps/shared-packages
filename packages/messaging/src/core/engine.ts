@@ -46,11 +46,9 @@ export function createMessagingEngine(config: MessagingEngineConfig) {
      * is the contact's alone, both ways: an opted-out conversation is not
      * moved (null), and only the contact's next message re-opens it.
      */
-    setState: async (tenantId: string, conversationId: string, state: Exclude<ConversationState, "OPTED_OUT">) => {
-      const current = await store.getConversation(tenantId, conversationId);
-      if (!current || current.state === "OPTED_OUT") return null;
-      return store.updateConversation(tenantId, conversationId, { state });
-    },
+    setState: (tenantId: string, conversationId: string, state: Exclude<ConversationState, "OPTED_OUT">) =>
+      // ONE guarded write: an opt-out landing between a read and this write cannot be overwritten.
+      store.updateConversation(tenantId, conversationId, { state }, { stateNot: "OPTED_OUT" }),
     /** Replace the structured summary that outlives the text. */
     setSummary: (tenantId: string, conversationId: string, summary: ConversationSummary) =>
       store.updateConversation(tenantId, conversationId, { summary, summaryUpdatedAt: clock.now() }),

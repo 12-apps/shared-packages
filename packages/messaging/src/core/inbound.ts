@@ -61,6 +61,9 @@ function columnsOf(content: InboundContent): { kind: InboundContent["kind"]; bod
 
 const later = (a: Date | null, b: Date): Date => (a && a > b ? a : b);
 
+/** How many times a conversation write is re-decided after losing a compare-and-set. */
+const MAX_WRITE_ATTEMPTS = 6;
+
 async function handleMessage(
   ctx: EngineContext,
   connection: StoredConnection,
@@ -85,13 +88,22 @@ async function handleMessage(
     createdAt: event.sentAt,
   });
   if (!inserted.created) return { kind: "duplicate" };
-  if (event.optOut) return { kind: "opted-out", conversationId: conversation.id };
+  // Stored, but nothing may be said: the contact opted out with this message,
+  // or this one was sent BEFORE their opt-out and only now got processed.
+  if (event.optOut || conversation.state === "OPTED_OUT") return { kind: "opted-out", conversationId: conversation.id };
 
   await notifyHost(ctx, conversation, inserted.message);
   return { kind: "message", conversationId: conversation.id, messageId: inserted.message.id };
 }
 
-/** Create the conversation, or bring an existing one up to this message. */
+/**
+ * Create the conversation, or bring an existing one up to this message.
+ *
+ * Every write to an existing row is a compare-and-set on what was read (its
+ * state and its two timestamps): a worker that lost the race re-reads and
+ * decides again, so a stale read can never put back a state another worker
+ * just changed — an opt-out above all.
+ */
 async function openConversation(
   ctx: EngineContext,
   connection: StoredConnection,
@@ -99,36 +111,62 @@ async function openConversation(
   carriesText: boolean,
 ): Promise<ConversationView> {
   const { store } = ctx.config;
-  const existing = await store.findConversation(connection.tenantId, connection.channel, event.contactId);
-  if (!existing) {
-    return store.createConversation({
-      tenantId: connection.tenantId,
-      channel: connection.channel,
-      contactId: event.contactId,
-      contactName: event.contactName,
-      connectionId: connection.id,
-      state: event.optOut ? "OPTED_OUT" : "AGENT",
-      lastInboundAt: event.sentAt,
-      lastMessageAt: event.sentAt,
-      hasText: carriesText,
-    });
+  for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
+    const existing = await store.findConversation(connection.tenantId, connection.channel, event.contactId);
+    if (!existing) {
+      const state = event.optOut ? "OPTED_OUT" : "AGENT";
+      const created = await store.createConversation({
+        tenantId: connection.tenantId,
+        channel: connection.channel,
+        contactId: event.contactId,
+        contactName: event.contactName,
+        connectionId: connection.id,
+        state,
+        lastInboundAt: event.sentAt,
+        lastMessageAt: event.sentAt,
+        optedOutAt: event.optOut ? event.sentAt : null,
+        hasText: carriesText,
+      });
+      // A lost insert race answers with the winner's row: take it as `existing` and go again.
+      if (created.state === state && created.lastInboundAt?.getTime() === event.sentAt.getTime()) return created;
+      continue;
+    }
+    const state = await nextState(ctx, existing, event);
+    const updated = await store.updateConversation(
+      connection.tenantId,
+      existing.id,
+      {
+        // Left out when unchanged: the write never carries a state it did not decide.
+        ...(state !== existing.state ? { state } : {}),
+        ...(event.optOut ? { optedOutAt: later(existing.optedOutAt, event.sentAt) } : {}),
+        ...(connection.id !== existing.connectionId ? { connectionId: connection.id } : {}),
+        lastInboundAt: later(existing.lastInboundAt, event.sentAt),
+        lastMessageAt: later(existing.lastMessageAt, event.sentAt),
+        ...(event.contactName ? { contactName: event.contactName } : {}),
+        ...(carriesText ? { hasText: true } : {}),
+      },
+      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt },
+    );
+    if (updated) return updated;
   }
-  const updated = await store.updateConversation(connection.tenantId, existing.id, {
-    state: await nextState(ctx, existing, event.optOut),
-    connectionId: connection.id,
-    lastInboundAt: later(existing.lastInboundAt, event.sentAt),
-    lastMessageAt: later(existing.lastMessageAt, event.sentAt),
-    ...(event.contactName ? { contactName: event.contactName } : {}),
-    ...(carriesText ? { hasText: true } : {}),
-  });
-  return updated ?? existing;
+  throw new Error(`conversation ${event.contactId} kept changing under this message; retry`);
 }
 
-/** An opt-out wins; any other message re-opens a closed or opted-out conversation. */
-async function nextState(ctx: EngineContext, conversation: ConversationView, optOut: boolean): Promise<ConversationState> {
-  if (optOut) return "OPTED_OUT";
-  if (conversation.state !== "OPTED_OUT" && conversation.state !== "CLOSED") return conversation.state;
-  return (await ctx.config.hooks?.reopenState?.(conversation)) ?? "AGENT";
+/**
+ * An opt-out wins. A message re-opens a CLOSED conversation, and an OPTED_OUT
+ * one only when it was sent AFTER the opt-out (the message's own time, so a
+ * delivery processed late, out of order, never undoes it).
+ */
+async function nextState(ctx: EngineContext, conversation: ConversationView, event: InboundMessageEvent): Promise<ConversationState> {
+  if (event.optOut) return "OPTED_OUT";
+  if (conversation.state === "OPTED_OUT") {
+    if (conversation.optedOutAt && event.sentAt <= conversation.optedOutAt) return "OPTED_OUT";
+  } else if (conversation.state !== "CLOSED") {
+    return conversation.state;
+  }
+  // The type refuses OPTED_OUT; a JavaScript host that returns it anyway is read as the default.
+  const chosen = (await ctx.config.hooks?.reopenState?.(conversation)) as ConversationState | undefined;
+  return chosen && chosen !== "OPTED_OUT" ? chosen : "AGENT";
 }
 
 async function notifyHost(
@@ -143,28 +181,41 @@ async function notifyHost(
   } catch (error) {
     // The message is stored; a retry of the delivery would be a no-op, so the
     // hook's failure is the host's to log and recover from, never a re-run.
-    ctx.config.logger.error(`messaging.inbound: onInboundMessage failed for ${conversation.id}: ${errorText(error)}`);
+    ctx.config.logger.error(`messaging.inbound: onInboundMessage failed for ${conversation.id}: ${errorText(error)}`, { error });
   }
 }
 
 async function handleOptOut(ctx: EngineContext, connection: StoredConnection, event: OptOutEvent): Promise<EventOutcome> {
   const { store } = ctx.config;
-  const existing = await store.findConversation(connection.tenantId, connection.channel, event.contactId);
-  if (existing) {
-    await store.updateConversation(connection.tenantId, existing.id, { state: "OPTED_OUT" });
-    return { kind: "opted-out", conversationId: existing.id };
+  for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
+    const existing = await store.findConversation(connection.tenantId, connection.channel, event.contactId);
+    if (!existing) {
+      // No conversation yet: one is opened in OPTED_OUT, so a later send is refused.
+      const created = await store.createConversation({
+        tenantId: connection.tenantId,
+        channel: connection.channel,
+        contactId: event.contactId,
+        contactName: null,
+        connectionId: connection.id,
+        state: "OPTED_OUT",
+        lastInboundAt: null,
+        lastMessageAt: null,
+        optedOutAt: event.at,
+        hasText: false,
+      });
+      if (created.state === "OPTED_OUT") return { kind: "opted-out", conversationId: created.id };
+      continue;
+    }
+    const updated = await store.updateConversation(
+      connection.tenantId,
+      existing.id,
+      {
+        ...(existing.state !== "OPTED_OUT" ? { state: "OPTED_OUT" as const } : {}),
+        optedOutAt: later(existing.optedOutAt, event.at),
+      },
+      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt },
+    );
+    if (updated) return { kind: "opted-out", conversationId: existing.id };
   }
-  // No conversation yet: one is opened in OPTED_OUT, so a later send is refused.
-  const created = await store.createConversation({
-    tenantId: connection.tenantId,
-    channel: connection.channel,
-    contactId: event.contactId,
-    contactName: null,
-    connectionId: connection.id,
-    state: "OPTED_OUT",
-    lastInboundAt: null,
-    lastMessageAt: null,
-    hasText: false,
-  });
-  return { kind: "opted-out", conversationId: created.id };
+  throw new Error(`conversation ${event.contactId} kept changing under this opt-out; retry`);
 }

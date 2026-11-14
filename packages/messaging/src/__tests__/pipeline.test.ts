@@ -1,6 +1,9 @@
+import { createHmac } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  APP_SECRET,
   CONTACT,
   NOW,
   OTHER_PHONE_NUMBER_ID,
@@ -72,6 +75,31 @@ describe("the webhook edge", () => {
     expect(h.dump().deliveries).toHaveLength(2);
     expect(h.dump().messages).toHaveLength(1);
     expect(outcomes[0]).toEqual({ kind: "processed", events: [{ kind: "duplicate" }] });
+  });
+
+  it("verifies the signature over the bytes as received, not over a decoded copy", async () => {
+    const h = createHarness();
+    await h.connect();
+    // A raw 0xFF byte inside a JSON string is not UTF-8: decoding it first would change the bytes the HMAC covers.
+    const head = new TextEncoder().encode('{"object":"whatsapp_business_account","entry":[],"note":"');
+    const bytes = new Uint8Array([...head, 0xff, ...new TextEncoder().encode('"}')]);
+    const signature = `sha256=${createHmac("sha256", APP_SECRET).update(bytes).digest("hex")}`;
+    const post = (body: Uint8Array, header: string) =>
+      h.route("POST").handle({
+        actor: null,
+        params: { channel: "whatsapp" },
+        query: {},
+        request: new Request("https://host.test/api/webhooks/messaging/whatsapp", {
+          method: "POST",
+          headers: { "x-hub-signature-256": header },
+          body: new Blob([body.buffer as ArrayBuffer]),
+        }),
+      }) as Promise<{ status: number }>;
+
+    expect((await post(bytes, signature)).status).toBe(200);
+    // A signature over the decoded text is not the signature of the bytes.
+    const decoded = new TextDecoder().decode(bytes);
+    expect((await post(bytes, sign(decoded))).status).toBe(401);
   });
 
   it("answers 404 for a channel no adapter serves", async () => {
@@ -243,16 +271,27 @@ describe("receipts", () => {
     });
   });
 
-  it("ignore a receipt for a message this tenant never sent", async () => {
+  it("settle a receipt that found no message FAILED, and apply it once the sender stored its id", async () => {
     const h = createHarness();
     await h.connect();
-    const { outcomes } = await h.deliver(statusUpdate("wamid.SENT-FROM-THE-PHONE", "read"));
+    const { outcomes } = await h.deliver(statusUpdate("wamid.OUT-1", "read", at(3000)));
     expect(outcomes[0]).toEqual({ kind: "processed", events: [{ kind: "receipt", applied: false }] });
+    expect(h.dump().deliveries[0]).toMatchObject({ state: "FAILED", attempts: 1, error: expect.stringMatching(/not stored yet/u) });
+
+    // The sender's own write of the channel id lands; the sweep re-runs the receipt.
+    await h.deliver(textMessage("Oi"));
+    const conversation = h.dump().conversations[0]!;
+    const message = await h.engine.send({ tenantId: TENANT, conversationId: conversation.id, content: { kind: "TEXT", text: "Olá!" }, author: { kind: "AGENT" } });
+    expect(message.externalId).toBe("wamid.OUT-1");
+    h.clock.current = at(5 * 60 * 1000);
+    expect(await h.engine.reconcile()).toEqual({ retried: 1, failed: 0 });
+    expect(h.dump().deliveries[0]).toMatchObject({ state: "PROCESSED", attempts: 2, error: null });
+    expect(h.dump().messages.find((row) => row.id === message.id)).toMatchObject({ deliveryStatus: "READ", readAt: at(3000) });
   });
 });
 
 describe("the opt-out keywords", () => {
-  it.each(["PARAR", "parar", "Párar", "  Stop ", "sair", "CANCELAR"])("%j sets the conversation OPTED_OUT", async (word) => {
+  it.each(["PARAR", "parar", "Párar", "  Stop ", "sair", "CANCELAR", "PARAR.", "Parar!", "🛑 parar"])("%j sets the conversation OPTED_OUT", async (word) => {
     const onInboundMessage = vi.fn();
     const typed = createHarness({ hooks: { onInboundMessage } });
     await typed.connect();
@@ -296,6 +335,27 @@ describe("the opt-out signal and re-opening", () => {
     await hooked.deliver(textMessage("voltei", { id: "wamid.back", at: at(HOUR) }));
     expect(hooked.dump().conversations[0]).toMatchObject({ state: "HUMAN" });
     expect(reopenState).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads an OPTED_OUT answer from the hook as the default, never as a way to stay opted out", async () => {
+    const reopenState = vi.fn(() => "OPTED_OUT" as never);
+    const h = createHarness({ hooks: { reopenState } });
+    await h.connect();
+    await h.deliver(textMessage("PARAR", { id: "wamid.stop" }));
+    await h.deliver(textMessage("voltei", { id: "wamid.back", at: at(HOUR) }));
+    expect(h.dump().conversations[0]).toMatchObject({ state: "AGENT" });
+  });
+
+  it("hands a throwing onInboundMessage's error to the logger's meta", async () => {
+    const error = vi.fn();
+    const failure = new Error("agent queue down");
+    const h = createHarness({
+      hooks: { onInboundMessage: () => Promise.reject(failure) },
+      logger: { info: () => undefined, warn: () => undefined, error },
+    });
+    await h.connect();
+    await h.deliver(textMessage("Oi"));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("agent queue down"), { error: failure });
   });
 
   it("cannot be undone by a staff state change", async () => {

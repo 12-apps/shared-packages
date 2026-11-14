@@ -7,7 +7,8 @@ CREATE TABLE "messaging_connections" (
     "external_parent_id" TEXT,
     "display_address" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'CONNECTED',
-    "credential_sealed" TEXT NOT NULL,
+    -- The sealed credential; NULL once the connection is revoked (disconnecting removes the token).
+    "credential_sealed" TEXT,
     "status_reason" TEXT,
     "connected_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "revoked_at" TIMESTAMP(3),
@@ -31,6 +32,7 @@ CREATE TABLE "messaging_inbox_deliveries" (
     "processed_at" TIMESTAMP(3),
 
     CONSTRAINT "messaging_inbox_deliveries_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "messaging_inbox_deliveries_channel_check" CHECK ("channel" ~ '^[a-z][a-z0-9-]*$'),
     CONSTRAINT "messaging_inbox_deliveries_state_check" CHECK ("state" IN ('PENDING', 'PROCESSED', 'FAILED'))
 );
 
@@ -44,6 +46,8 @@ CREATE TABLE "messaging_conversations" (
     "state" TEXT NOT NULL DEFAULT 'AGENT',
     "last_inbound_at" TIMESTAMP(3),
     "last_message_at" TIMESTAMP(3),
+    -- When the contact last opted out (the message's own time): an older message never re-opens the conversation.
+    "opted_out_at" TIMESTAMP(3),
     "has_text" BOOLEAN NOT NULL DEFAULT false,
     "summary" JSONB,
     "summary_updated_at" TIMESTAMP(3),
@@ -51,6 +55,7 @@ CREATE TABLE "messaging_conversations" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "messaging_conversations_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "messaging_conversations_channel_check" CHECK ("channel" ~ '^[a-z][a-z0-9-]*$'),
     CONSTRAINT "messaging_conversations_state_check" CHECK ("state" IN ('AGENT', 'HUMAN', 'CLOSED', 'OPTED_OUT'))
 );
 
@@ -77,6 +82,7 @@ CREATE TABLE "messaging_messages" (
     "failed_at" TIMESTAMP(3),
 
     CONSTRAINT "messaging_messages_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "messaging_messages_channel_check" CHECK ("channel" ~ '^[a-z][a-z0-9-]*$'),
     CONSTRAINT "messaging_messages_direction_check" CHECK ("direction" IN ('INBOUND', 'OUTBOUND')),
     CONSTRAINT "messaging_messages_kind_check" CHECK ("kind" IN ('TEXT', 'INTERACTIVE', 'AUDIO', 'OTHER')),
     CONSTRAINT "messaging_messages_delivery_status_check" CHECK ("delivery_status" IN ('RECEIVED', 'PENDING', 'ACCEPTED', 'SENT', 'DELIVERED', 'READ', 'FAILED')),
@@ -101,3 +107,4 @@ CREATE UNIQUE INDEX "messaging_messages_channel_external_id_key" ON "messaging_m
 CREATE INDEX "messaging_messages_conversation_id_created_at_idx" ON "messaging_messages"("conversation_id", "created_at");
 
 ALTER TABLE "messaging_messages" ADD CONSTRAINT "messaging_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "messaging_conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "messaging_conversations" ADD CONSTRAINT "messaging_conversations_connection_id_fkey" FOREIGN KEY ("connection_id") REFERENCES "messaging_connections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

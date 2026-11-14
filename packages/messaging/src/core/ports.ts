@@ -50,6 +50,9 @@ export interface InboundMessageNotice {
   message: MessageView;
 }
 
+/** What a re-opened conversation may become. */
+export type ReopenState = Exclude<ConversationState, "OPTED_OUT">;
+
 /** The host's answers to what only it knows about a conversation. All optional. */
 export interface MessagingHooks {
   /**
@@ -62,9 +65,11 @@ export interface MessagingHooks {
   onInboundMessage?(notice: InboundMessageNotice): Promise<void> | void;
   /**
    * The state a CLOSED or OPTED_OUT conversation re-opens into when its
-   * contact writes again. Default: `AGENT`.
+   * contact writes again. Default: `AGENT`. A host never returns `OPTED_OUT`
+   * (only the contact's own words put a conversation there): the type refuses
+   * it, and an answer that slips through anyway is read as `AGENT`.
    */
-  reopenState?(conversation: ConversationView): ConversationState | Promise<ConversationState>;
+  reopenState?(conversation: ConversationView): ReopenState | Promise<ReopenState>;
 }
 
 /** Everything a host hands `createMessagingEngine`. */

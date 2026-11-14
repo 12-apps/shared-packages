@@ -46,12 +46,18 @@ export interface MessagingStore {
   findConnectionByAccount(channel: ChannelKind, externalAccountId: string): Promise<StoredConnection | null>;
   getConnection(tenantId: string, id: string): Promise<StoredConnection | null>;
   listConnections(tenantId: string): Promise<ConnectionView[]>;
-  /** Insert, or overwrite the row keyed by `(channel, externalAccountId)`. The engine decides whether it may. */
-  saveConnection(input: NewConnection): Promise<ConnectionView>;
+  /**
+   * Insert, or overwrite the row keyed by `(channel, externalAccountId)` — but
+   * only the same tenant's, or one that is REVOKED: the write itself is
+   * conditional, so two connects racing for one account cannot both win.
+   * `null` when the account is held by another tenant (the engine answers
+   * `ACCOUNT_TAKEN`).
+   */
+  saveConnection(input: NewConnection): Promise<ConnectionView | null>;
   setConnectionStatus(
     tenantId: string,
     id: string,
-    patch: { status: ConnectionStatus; statusReason: string | null; revokedAt: Date | null },
+    patch: { status: ConnectionStatus; statusReason: string | null; revokedAt: Date | null; credentialSealed?: null },
   ): Promise<boolean>;
 
   // ── Conversations ──────────────────────────────────────────────────────────
@@ -59,7 +65,19 @@ export interface MessagingStore {
   getConversation(tenantId: string, id: string): Promise<ConversationView | null>;
   /** Create one; on a lost race for `(tenant, channel, contact)` the existing row is returned. */
   createConversation(input: NewConversation): Promise<ConversationView>;
-  updateConversation(tenantId: string, id: string, patch: ConversationPatch): Promise<ConversationView | null>;
+  /**
+   * Apply `patch` to the tenant's conversation. With a `guard` it is a
+   * COMPARE-AND-SET: the write happens only while the row still matches every
+   * guarded field (one `updateMany`), and `null` comes back when it does not —
+   * the caller re-reads and decides again. Without a guard, `null` only means
+   * "no such conversation".
+   */
+  updateConversation(
+    tenantId: string,
+    id: string,
+    patch: ConversationPatch,
+    guard?: ConversationGuard,
+  ): Promise<ConversationView | null>;
 
   // ── Messages ───────────────────────────────────────────────────────────────
   findMessageByExternalId(channel: ChannelKind, externalId: string): Promise<MessageView | null>;
@@ -84,6 +102,14 @@ export interface MessagingStore {
 
   // ── Retention ──────────────────────────────────────────────────────────────
   /**
+   * Delete raw inbox rows past `cutoff`: the PROCESSED ones, and the FAILED
+   * ones that reached `maxAttempts` (nothing will retry them). One batch of up
+   * to `take` per state, found through the `(state, received_at)` index.
+   * Returns how many were deleted. Dedupe survives: a redelivered message
+   * still meets `(channel, external_id)` on its message row.
+   */
+  purgeExpiredDeliveries(input: { cutoff: Date; maxAttempts: number; take: number }): Promise<number>;
+  /**
    * Delete the text of conversations whose last message is older than
    * `cutoff`: ONE indexed query finds up to `take` of them across every tenant
    * (`has_text`, `last_message_at`), then their messages created at or before
@@ -95,7 +121,8 @@ export interface MessagingStore {
 
 /** A connection with its sealed credential: only the engine sees this shape. */
 export interface StoredConnection extends ConnectionView {
-  credentialSealed: string;
+  /** Null once the connection was revoked: disconnecting removes the token. */
+  credentialSealed: string | null;
 }
 
 export interface NewConnection {
@@ -117,7 +144,20 @@ export interface NewConversation {
   state: ConversationState;
   lastInboundAt: Date | null;
   lastMessageAt: Date | null;
+  optedOutAt?: Date | null;
   hasText: boolean;
+}
+
+/**
+ * What a compare-and-set update requires of the row it writes: every field
+ * given must equal the row's current value (`null` matches a null column),
+ * and `stateNot` that the state differs.
+ */
+export interface ConversationGuard {
+  state?: ConversationState;
+  stateNot?: ConversationState;
+  lastInboundAt?: Date | null;
+  lastMessageAt?: Date | null;
 }
 
 export interface ConversationPatch {
@@ -126,6 +166,7 @@ export interface ConversationPatch {
   state?: ConversationState;
   lastInboundAt?: Date | null;
   lastMessageAt?: Date | null;
+  optedOutAt?: Date | null;
   hasText?: boolean;
   summary?: ConversationSummary;
   summaryUpdatedAt?: Date;

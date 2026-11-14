@@ -139,6 +139,8 @@ export interface ConversationView {
   state: ConversationState;
   lastInboundAt: Date | null;
   lastMessageAt: Date | null;
+  /** When the contact last opted out (the message's own time, not the processing time). Kept after a re-open. */
+  optedOutAt: Date | null;
   hasText: boolean;
   summary: ConversationSummary | null;
   summaryUpdatedAt: Date | null;

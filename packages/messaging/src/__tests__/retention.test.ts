@@ -29,10 +29,10 @@ describe("the retention sweep", () => {
 
     // 12 h after the last message, to the millisecond: not yet.
     h.clock.current = at(1000 + 12 * HOUR);
-    expect(await h.engine.sweepRetention()).toEqual({ conversations: 0, messages: 0, more: false });
+    expect(await h.engine.sweepRetention()).toEqual({ conversations: 0, messages: 0, deliveries: 2, more: false });
 
     h.clock.current = at(1000 + 12 * HOUR + 1);
-    expect(await h.engine.sweepRetention()).toEqual({ conversations: 1, messages: 2, more: false });
+    expect(await h.engine.sweepRetention()).toEqual({ conversations: 1, messages: 2, deliveries: 0, more: false });
 
     expect(h.dump().messages.map(({ body, transcript, options }) => ({ body, transcript, options }))).toEqual([
       { body: null, transcript: null, options: null },
@@ -71,9 +71,9 @@ describe("the retention sweep", () => {
     await h.deliver(textMessage("middle", { id: "wamid.c", phoneNumberId: "1003", at: at(HOUR) }));
 
     h.clock.current = at(20 * HOUR);
-    expect(await h.engine.sweepRetention()).toEqual({ conversations: 2, messages: 2, more: true });
+    expect(await h.engine.sweepRetention()).toEqual({ conversations: 2, messages: 2, deliveries: 2, more: true });
     expect(h.dump().messages.map((row) => row.body)).toEqual(["newest", null, null]);
-    expect(await h.engine.sweepRetention()).toEqual({ conversations: 1, messages: 1, more: false });
-    expect(await h.engine.sweepRetention()).toEqual({ conversations: 0, messages: 0, more: false });
+    expect(await h.engine.sweepRetention()).toEqual({ conversations: 1, messages: 1, deliveries: 1, more: false });
+    expect(await h.engine.sweepRetention()).toEqual({ conversations: 0, messages: 0, deliveries: 0, more: false });
   });
 });

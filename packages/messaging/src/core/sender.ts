@@ -53,6 +53,7 @@ export async function sendMessage(ctx: EngineContext, input: SendInput): Promise
 
   let externalId: string;
   try {
+    if (connection.credentialSealed === null) throw new Error("the connection holds no credential");
     const credential = await ctx.config.secrets.open(connection.credentialSealed);
     ({ externalId } = await adapter.send({
       credential,

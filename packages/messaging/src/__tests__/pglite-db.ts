@@ -54,6 +54,8 @@ const OPERATORS: Record<string, (sql: Sql, column: string, operand: unknown) => 
   in: (sql, column, operand) => `${column} IN (${(operand as unknown[]).map((item) => sql.bind(item)).join(", ") || "NULL"})`,
   lt: (sql, column, operand) => `${column} < ${sql.bind(operand)}`,
   lte: (sql, column, operand) => `${column} <= ${sql.bind(operand)}`,
+  gte: (sql, column, operand) => `${column} >= ${sql.bind(operand)}`,
+  not: (sql, column, operand) => (operand === null ? `${column} IS NOT NULL` : `${column} IS DISTINCT FROM ${sql.bind(operand)}`),
 };
 
 function conditionSql(sql: Sql, column: string, condition: unknown): string[] {
@@ -118,12 +120,18 @@ function delegate(pg: PGlite, table: string, updatedAt: boolean) {
       return uniqueViolation(error);
     }
   };
+  const deleteMany = async ({ where }: Args): Promise<{ count: number }> => {
+    const sql = new Sql();
+    const result = await pg.query(`DELETE FROM ${table} ${whereSql(sql, where)} RETURNING id`, sql.params);
+    return { count: result.rows.length };
+  };
   const first = async (args: Args = {}) => (await findMany({ ...args, take: 1 }))[0] ?? null;
   return {
     findMany: (args: unknown) => findMany(args as Args),
     findFirst: (args: unknown) => first(args as Args),
     findUnique: (args: unknown) => first(args as Args),
     updateMany: (args: unknown) => updateMany(args as Args),
+    deleteMany: (args: unknown) => deleteMany(args as Args),
     update: async (args: unknown) => {
       const { where, select } = args as Args;
       await updateMany(args as Args);

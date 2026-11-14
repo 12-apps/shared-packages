@@ -56,7 +56,8 @@ describe("the manifests", () => {
        a fixture and pass forever while the published file said anything. */
     const partial = readFileSync(new URL("../../../prisma/messaging.prisma", import.meta.url), "utf8");
     const relations = [...partial.matchAll(/@relation\(fields: \[(\w+)\], references: \[id\]/gu)].map((match) => match[1]);
-    expect(relations).toEqual(["conversationId"]);
+    // Both relations point at tables of this package: a message to its conversation, a conversation to its connection.
+    expect(relations).toEqual(["connectionId", "conversationId"]);
     expect(partial).not.toMatch(/model (Client|User|Tenant)\b/u);
   });
 

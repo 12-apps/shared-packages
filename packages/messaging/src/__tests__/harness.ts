@@ -1,6 +1,6 @@
 import { createMessagingEngine, type MessagingEngine } from "../core/engine";
 import { createMemoryMessagingStore } from "../core/memory-store";
-import type { MessagingHooks } from "../core/ports";
+import type { MessagingHooks, MessagingLogger } from "../core/ports";
 import type { MessagingStore } from "../core/store";
 import { createApiMessaging } from "../server";
 import { createWhatsAppAdapter, type FetchPort } from "../whatsapp";
@@ -31,6 +31,7 @@ export function createHarness(
     hooks?: MessagingHooks;
     answer?: (call: RecordedCall) => { status: number; body: unknown };
     retentionBatchSize?: number;
+    logger?: MessagingLogger;
   } = {},
 ) {
   const memory = createMemoryMessagingStore();
@@ -62,7 +63,7 @@ export function createHarness(
       },
     },
     clock,
-    logger: silent,
+    logger: options.logger ?? silent,
     ...(options.hooks ? { hooks: options.hooks } : {}),
     ...(options.retentionBatchSize ? { retentionBatchSize: options.retentionBatchSize } : {}),
   });
@@ -92,6 +93,9 @@ export function createHarness(
     return { response, outcomes };
   }
 
+  /** The ids of the deliveries waiting in the queue, in the order they were stored. */
+  const queuedIds = () => queued.map((job) => (job.payload as { deliveryId: string }).deliveryId);
+
   const connect = (tenantId = TENANT, phoneNumberId = PHONE_NUMBER_ID) =>
     engine.connect({
       tenantId,
@@ -105,6 +109,6 @@ export function createHarness(
   /** The memory store's rows (only meaningful when no store was handed in). */
   const dump = () => memory.dump();
 
-  return { engine, store, dump, clock, queued, calls, api, route, post, drain, deliver, connect };
+  return { engine, store, dump, clock, queued, queuedIds, calls, api, route, post, drain, deliver, connect };
 }
 

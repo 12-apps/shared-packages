@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { DELIVERY_RANK, RECEIPT_COLUMN, type MessagingStore, type StoredConnection } from "./store";
+import { DELIVERY_RANK, RECEIPT_COLUMN, type ConversationGuard, type MessagingStore, type StoredConnection } from "./store";
 import type { ConnectionView, ConversationView, InboxDeliveryView, MessageView } from "./types";
 
 /**
@@ -23,6 +23,7 @@ export function createMemoryMessagingStore(): MessagingStore & { readonly dump: 
     ...memoryConversations(tables),
     ...memoryMessages(tables),
     purgeExpiredText: async (input) => purge(tables, input),
+    purgeExpiredDeliveries: async (input) => purgeDeliveries(tables, input),
     dump: () => ({
       deliveries: [...tables.deliveries.values()].map(copy),
       connections: [...tables.connections.values()].map(copy),
@@ -101,7 +102,11 @@ function memoryConnections({ connections }: MemoryTables) {
       return [...connections.values()].filter((row) => row.tenantId === tenantId).map(connectionView);
     },
     async saveConnection(input) {
-      const existing = await findConnectionByAccount(input.channel, input.externalAccountId);
+      // Read and write with no await between them: the check-and-set is atomic, as the database's unique key makes it.
+      const existing = [...connections.values()].find(
+        (candidate) => candidate.channel === input.channel && candidate.externalAccountId === input.externalAccountId,
+      );
+      if (existing && existing.tenantId !== input.tenantId && existing.status !== "REVOKED") return null;
       const row: StoredConnection = {
         id: existing?.id ?? randomUUID(),
         ...input,
@@ -137,18 +142,37 @@ function memoryConversations({ conversations }: MemoryTables) {
     async createConversation(input) {
       const existing = await findConversation(input.tenantId, input.channel, input.contactId);
       if (existing) return existing;
-      const row: ConversationView = { id: randomUUID(), ...input, summary: null, summaryUpdatedAt: null, createdAt: new Date() };
+      const row: ConversationView = {
+        id: randomUUID(),
+        ...input,
+        optedOutAt: input.optedOutAt ?? null,
+        summary: null,
+        summaryUpdatedAt: null,
+        createdAt: new Date(),
+      };
       conversations.set(row.id, row);
       return copy(row);
     },
-    async updateConversation(tenantId, id, patch) {
+    async updateConversation(tenantId, id, patch, guard) {
       const row = conversations.get(id);
       if (!row || row.tenantId !== tenantId) return null;
+      // No await between this check and the write below: the compare-and-set is atomic.
+      if (guard && !matchesGuard(row, guard)) return null;
       const next = { ...row, ...patch };
       conversations.set(id, next);
       return copy(next);
     },
   } satisfies Partial<MessagingStore>;
+}
+
+const sameTime = (a: Date | null, b: Date | null): boolean => (a === null || b === null ? a === b : a.getTime() === b.getTime());
+
+function matchesGuard(row: ConversationView, guard: ConversationGuard): boolean {
+  if (guard.state !== undefined && row.state !== guard.state) return false;
+  if (guard.stateNot !== undefined && row.state === guard.stateNot) return false;
+  if (guard.lastInboundAt !== undefined && !sameTime(row.lastInboundAt, guard.lastInboundAt)) return false;
+  if (guard.lastMessageAt !== undefined && !sameTime(row.lastMessageAt, guard.lastMessageAt)) return false;
+  return true;
 }
 
 function memoryMessages({ messages }: MemoryTables) {
@@ -209,6 +233,20 @@ function memoryMessages({ messages }: MemoryTables) {
       return true;
     },
   } satisfies Partial<MessagingStore>;
+}
+
+function purgeDeliveries(
+  { deliveries }: MemoryTables,
+  { cutoff, maxAttempts, take }: { cutoff: Date; maxAttempts: number; take: number },
+): number {
+  const due = (match: (row: StoredDelivery) => boolean) =>
+    [...deliveries.values()]
+      .filter((row) => row.receivedAt < cutoff && match(row))
+      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())
+      .slice(0, take);
+  const rows = [...due((row) => row.state === "PROCESSED"), ...due((row) => row.state === "FAILED" && row.attempts >= maxAttempts)];
+  for (const row of rows) deliveries.delete(row.id);
+  return rows.length;
 }
 
 function purge({ conversations, messages }: MemoryTables, { cutoff, take }: { cutoff: Date; take: number }) {

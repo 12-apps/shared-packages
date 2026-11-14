@@ -30,7 +30,7 @@ export async function connect(ctx: EngineContext, input: ConnectInput): Promise<
   if (existing && existing.tenantId !== input.tenantId && existing.status !== "REVOKED") {
     throw new MessagingConnectError("ACCOUNT_TAKEN", `account ${input.externalAccountId} is held by another tenant`);
   }
-  return store.saveConnection({
+  const saved = await store.saveConnection({
     tenantId: input.tenantId,
     channel: input.channel,
     externalAccountId: input.externalAccountId,
@@ -39,14 +39,21 @@ export async function connect(ctx: EngineContext, input: ConnectInput): Promise<
     credentialSealed: await secrets.seal(input.credential),
     connectedAt: clock.now(),
   });
+  // The store's write is conditional, so a connect that lost a race for the account is refused here too.
+  if (!saved) throw new MessagingConnectError("ACCOUNT_TAKEN", `account ${input.externalAccountId} is held by another tenant`);
+  return saved;
 }
 
-/** Revoke a tenant's connection: inbound traffic for it is dropped and sends are refused. */
+/**
+ * Revoke a tenant's connection: inbound traffic for it is dropped, sends are
+ * refused, and the sealed credential is cleared — disconnecting removes the token.
+ */
 export async function revoke(ctx: EngineContext, tenantId: string, connectionId: string, reason: string | null = null) {
   return ctx.config.store.setConnectionStatus(tenantId, connectionId, {
     status: "REVOKED",
     statusReason: reason,
     revokedAt: ctx.config.clock.now(),
+    credentialSealed: null,
   });
 }
 

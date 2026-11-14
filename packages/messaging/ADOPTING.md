@@ -29,7 +29,7 @@ never in these.
 | `clock` | `{ now(): Date }` | What time it is. |
 | `logger` | `{ info, warn, error }` | The wiring `LoggerPort`; bind the `messaging` namespace's logger. Never handed a credential. |
 | `hooks.onInboundMessage` | OPTIONAL. `({ conversation, message }) => Promise<void>` | A contact's message was stored: hand it to the host's agent or a person's inbox. Once per message, never for a redelivery, never for an opt-out. Keep it short (enqueue the host's own job): a throw is logged and not retried. Default: nothing. |
-| `hooks.reopenState` | OPTIONAL. `(conversation) => "AGENT" \| "HUMAN" \| "CLOSED"` | The state a `CLOSED` or `OPTED_OUT` conversation re-opens into when its contact writes again. Default `AGENT`. |
+| `hooks.reopenState` | OPTIONAL. `(conversation) => "AGENT" \| "HUMAN" \| "CLOSED"` | The state a `CLOSED` or `OPTED_OUT` conversation re-opens into when its contact writes again (for `OPTED_OUT`, only a message sent AFTER the opt-out re-opens it). Default `AGENT`. The type refuses `OPTED_OUT`: only the contact's own words put a conversation there, and an answer of `OPTED_OUT` from a JavaScript host is read as `AGENT`. |
 | `retentionMs` | OPTIONAL, default 12 h | How long text is kept after a conversation's last message. |
 | `retentionBatchSize`, `reconcileBatchSize`, `maxDeliveryAttempts`, `reconcileAfterMs` | OPTIONAL | 500, 50, 5, 2 minutes. |
 
@@ -56,7 +56,10 @@ host.adoptServer({
   the tenant is resolved from the event's account, not the path — state that
   routing exception wherever the host documents its webhook layout. The host's
   adapter must populate `request.request` (the raw fetch `Request`): the
-  signature is over the raw bytes.
+  signature is over the raw bytes, which the route reads as bytes and checks
+  before decoding. The package puts NO cap on the body it reads before the
+  signature is checked, so the host's framework must (a body-size limit in front
+  of the route; Meta's payloads are far below 1 MB).
 - **`jobs`** — `messaging.process-delivery` (on demand, 5 attempts),
   `messaging.reconcile-inbox` (every 5 minutes) and `messaging.retention`
   (every 10 minutes), the two sweeps on the single-flight `sweeps` queue with
@@ -101,12 +104,12 @@ token the channel rejects.
 
 | call | when |
 |---|---|
-| `send({ tenantId, conversationId, content, author })` | The agent's or a person's reply. Catch `MessagingSendError` and read `code`: `OPTED_OUT`, `WINDOW_CLOSED`, `NOT_CONNECTED`, `NOT_FOUND`, `UNKNOWN_CHANNEL`, `CHANNEL_FAILED` (the row is `FAILED`; `messageId` names it). The sentence a person reads is the host's copy. |
+| `send({ tenantId, conversationId, content, author })` | The agent's or a person's reply. Catch `MessagingSendError` and read `code`: `OPTED_OUT`, `WINDOW_CLOSED`, `NOT_CONNECTED`, `NOT_FOUND`, `UNKNOWN_CHANNEL`, `CHANNEL_FAILED` (the row is `FAILED`; `messageId` names it). A `FAILED` row is NOT proof the message never reached the contact (a timeout, or a reply with no message id, can follow a send Meta made): retrying it can double-send, so a host that retries should say so to the person. An opt-out that lands while a send is in flight cannot recall it. The sentence a person reads is the host's copy. |
 | `setState(tenantId, conversationId, "AGENT" \| "HUMAN" \| "CLOSED")` | A hand-off. Returns null for an opted-out conversation: only the contact re-opens it. |
 | `setSummary(tenantId, conversationId, summary)` | Replace the structured summary that outlives the text. Structured fields only, never free text. |
 | `setTranscript(tenantId, messageId, text)` | An audio message's transcript. Deleted with the text. |
 | `getConversation`, `listMessages`, `listConnections` | The host's own screens. No call returns a credential. |
-| `revoke`, `markError` | Disconnecting a number, or recording a token Meta rejects. |
+| `revoke`, `markError` | Disconnecting a number (the sealed credential is cleared), or recording a token Meta rejects. |
 
 ## 6. What stays the host's
 

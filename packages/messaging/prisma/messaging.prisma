@@ -31,12 +31,14 @@ model MessagingConnection {
   status            String    @default("CONNECTED")
   // The channel credential, SEALED by the host's encryption port. The package
   // never holds the key, never returns this column and never logs it.
-  credentialSealed  String    @map("credential_sealed")
+  // NULL once revoked: disconnecting removes the token.
+  credentialSealed  String?   @map("credential_sealed")
   statusReason      String?   @map("status_reason")
   connectedAt       DateTime  @default(now()) @map("connected_at")
   revokedAt         DateTime? @map("revoked_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
+  conversations     MessagingConversation[]
 
   @@unique([channel, externalAccountId])
   @@index([tenantId, channel])
@@ -46,6 +48,10 @@ model MessagingConnection {
 // One raw delivery, exactly as the channel posted it, stored BEFORE the
 // acknowledgement. A channel that carries no per-delivery id (WhatsApp) is
 // deduplicated on the hash of the raw body: a redelivery is the same bytes.
+// The raw body is the channel's whole payload (message text, phone number,
+// profile name), so the retention sweep DELETES the row past the retention
+// window once it is PROCESSED or out of attempts; message-level dedupe lives on
+// `messaging_messages (channel, external_id)`.
 model MessagingInboxDelivery {
   id          String    @id @default(uuid())
   channel     String
@@ -78,6 +84,10 @@ model MessagingConversation {
   state             String             @default("AGENT")
   lastInboundAt     DateTime?          @map("last_inbound_at")
   lastMessageAt     DateTime?          @map("last_message_at")
+  // When the contact last opted out, by the message's own time: a message
+  // sent before it never re-opens the conversation, whatever order the
+  // deliveries are processed in.
+  optedOutAt        DateTime?          @map("opted_out_at")
   // Whether any message still carries text: the retention sweep's index.
   hasText           Boolean            @default(false) @map("has_text")
   // Structured, never free text (items discussed, a mode, an area), written by
@@ -87,6 +97,7 @@ model MessagingConversation {
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   messages          MessagingMessage[]
+  connection        MessagingConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, channel, contactId])
   @@index([tenantId, lastMessageAt])

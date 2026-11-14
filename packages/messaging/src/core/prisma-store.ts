@@ -1,4 +1,4 @@
-import { DELIVERY_RANK, RECEIPT_COLUMN, type MessagingStore, type StoredConnection } from "./store";
+import { DELIVERY_RANK, RECEIPT_COLUMN, type ConversationGuard, type MessagingStore, type StoredConnection } from "./store";
 import type {
   ConnectionView,
   ConversationView,
@@ -14,7 +14,7 @@ import type {
  * Structural rather than a `PrismaClient` import: the package must not depend
  * on the host's generated client, and this shape is what any client generated
  * from the shipped partial satisfies. Only the query subset below is used —
- * equality, `in`, `lt`, `lte`, `not: null`, compound unique keys, `increment`,
+ * equality, `in`, `lt`, `lte`, `gte`, `not`, compound unique keys, `increment`,
  * `orderBy`, `take` — which is also what the package's Postgres suite
  * translates, so the suite runs the exact queries a host runs.
  */
@@ -32,6 +32,7 @@ interface Delegate {
   create(args: unknown): Promise<unknown>;
   update(args: unknown): Promise<unknown>;
   updateMany(args: unknown): Promise<{ count: number }>;
+  deleteMany(args: unknown): Promise<{ count: number }>;
 }
 
 /** Prisma's unique-violation code. */
@@ -72,6 +73,7 @@ const pickConversation = (row: ConversationView): ConversationView => ({
   state: row.state,
   lastInboundAt: row.lastInboundAt,
   lastMessageAt: row.lastMessageAt,
+  optedOutAt: row.optedOutAt,
   hasText: row.hasText,
   summary: row.summary,
   summaryUpdatedAt: row.summaryUpdatedAt,
@@ -89,6 +91,7 @@ export function createPrismaMessagingStore(db: MessagingPrismaDb | (() => Promis
     ...conversationOperations(client),
     ...messageOperations(client),
     purgeExpiredText: (input) => purgeExpiredText(client, input),
+    purgeExpiredDeliveries: (input) => purgeExpiredDeliveries(client, input),
   };
 }
 
@@ -166,11 +169,24 @@ function connectionOperations(client: Client): ConnectionOperations {
     async saveConnection(input) {
       const delegate = (await client()).messagingConnection;
       const data = { ...input, status: "CONNECTED", statusReason: null, revokedAt: null };
-      const existing = await findConnectionByAccount(input.channel, input.externalAccountId);
-      const row = existing
-        ? await delegate.update({ where: { id: existing.id }, data, select: CONNECTION_VIEW })
-        : await delegate.create({ data, select: CONNECTION_VIEW });
-      return row as ConnectionView;
+      // Twice at most: a lost insert race turns into an update of the winner's row.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const existing = await findConnectionByAccount(input.channel, input.externalAccountId);
+        if (!existing) {
+          try {
+            return (await delegate.create({ data, select: CONNECTION_VIEW })) as ConnectionView;
+          } catch (error) {
+            if (!isUniqueViolation(error)) throw error;
+            continue;
+          }
+        }
+        // The takeover is conditional in the write itself: the tenant's own row, or a REVOKED one.
+        const where = existing.tenantId === input.tenantId ? { id: existing.id, tenantId: input.tenantId } : { id: existing.id, status: "REVOKED" };
+        const updated = await delegate.updateMany({ where, data });
+        if (updated.count === 0) return null;
+        return (await delegate.findUnique({ where: { id: existing.id }, select: CONNECTION_VIEW })) as ConnectionView;
+      }
+      return null;
     },
     async setConnectionStatus(tenantId, id, patch) {
       const result = await (await client()).messagingConnection.updateMany({ where: { id, tenantId }, data: patch });
@@ -207,12 +223,24 @@ function conversationOperations(client: Client): ConversationOperations {
         return raced;
       }
     },
-    async updateConversation(tenantId, id, patch) {
+    async updateConversation(tenantId, id, patch, guard) {
       const delegate = (await client()).messagingConversation;
-      const result = await delegate.updateMany({ where: { id, tenantId }, data: patch });
+      const result = await delegate.updateMany({ where: { id, tenantId, ...guardWhere(guard) }, data: patch });
       if (result.count === 0) return null;
       return pickConversation((await delegate.findUnique({ where: { id } })) as ConversationView);
     },
+  };
+}
+
+/** A guard as the `where` clause of the one `updateMany` that makes the write a compare-and-set. */
+function guardWhere(guard: ConversationGuard | undefined): Record<string, unknown> {
+  if (!guard) return {};
+  const { state, stateNot, lastInboundAt, lastMessageAt } = guard;
+  return {
+    ...(state !== undefined ? { state } : {}),
+    ...(stateNot !== undefined ? { state: { not: stateNot } } : {}),
+    ...(lastInboundAt !== undefined ? { lastInboundAt } : {}),
+    ...(lastMessageAt !== undefined ? { lastMessageAt } : {}),
   };
 }
 
@@ -299,6 +327,24 @@ async function purgeExpiredText(
     data: { hasText: false },
   });
   return { conversations: due.length, messages: purged.count };
+}
+
+async function purgeExpiredDeliveries(
+  client: Client,
+  { cutoff, maxAttempts, take }: { cutoff: Date; maxAttempts: number; take: number },
+): Promise<number> {
+  const delegate = (await client()).messagingInboxDelivery;
+  const batches = [
+    { state: "PROCESSED", receivedAt: { lt: cutoff } },
+    { state: "FAILED", receivedAt: { lt: cutoff }, attempts: { gte: maxAttempts } },
+  ];
+  let deleted = 0;
+  for (const where of batches) {
+    const due = (await delegate.findMany({ where, orderBy: { receivedAt: "asc" }, take, select: { id: true } })) as { id: string }[];
+    if (due.length === 0) continue;
+    deleted += (await delegate.deleteMany({ where: { id: { in: due.map((row) => row.id) } } })).count;
+  }
+  return deleted;
 }
 
 /** Every status a receipt may move a message forward from. */

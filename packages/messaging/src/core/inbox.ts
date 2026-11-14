@@ -10,7 +10,8 @@ import type { NormalizedEvent } from "./types";
  * Nothing is resolved before the row is written — not the tenant, not even
  * whether the body parses — because the one thing a webhook must never do is
  * lose a delivery to a bug in the code that reads it. The raw bytes are kept
- * so a mapping bug can be replayed once fixed.
+ * so a mapping bug can be replayed once fixed — until the retention sweep
+ * deletes them, with the conversation's text, past the retention window.
  */
 
 /** The job the engine enqueues per fresh delivery, by wire name. */
@@ -47,7 +48,8 @@ export type DeliveryOutcome =
  * Process one stored delivery. Every event handler is idempotent (messages
  * dedupe on their channel id, receipts on their column), so a retry after a
  * partial failure redoes nothing. A throw settles the row FAILED and is
- * rethrown, so the job's own retry runs it again.
+ * rethrown, so the job's own retry runs it again; a receipt that found no
+ * message to land on settles it FAILED too, left to the reconciliation sweep.
  */
 export async function processDelivery(ctx: EngineContext, deliveryId: string): Promise<DeliveryOutcome> {
   const { store, clock, logger } = ctx.config;
@@ -62,7 +64,7 @@ export async function processDelivery(ctx: EngineContext, deliveryId: string): P
     events = adapter.parse(row.rawBody);
   } catch (error) {
     // The same bytes will never read differently: settle it, with the reason,
-    // rather than retry. The raw body stays for a replay once the code is fixed.
+    // rather than retry. The raw body stays for a replay until retention deletes it.
     const reason = errorText(error);
     logger.warn(`messaging.inbox: delivery ${deliveryId} unreadable: ${reason}`);
     await store.settleDelivery(deliveryId, { state: "PROCESSED", error: `unreadable: ${reason}`, at: clock.now() });
@@ -72,7 +74,17 @@ export async function processDelivery(ctx: EngineContext, deliveryId: string): P
   try {
     const outcomes: EventOutcome[] = [];
     for (const event of events) outcomes.push(await handleEvent(ctx, row.channel, event));
-    await store.settleDelivery(deliveryId, { state: "PROCESSED", error: null, at: clock.now() });
+    // A receipt for a message nobody stored yet (it raced the sender's own
+    // write of the channel id) changed nothing: settle FAILED, not PROCESSED,
+    // so the reconciliation sweep applies it once the id exists.
+    const unapplied = outcomes.filter((outcome) => outcome.kind === "receipt" && !outcome.applied).length;
+    if (unapplied > 0) {
+      const error = `${unapplied} receipt(s) for a message not stored yet`;
+      logger.warn(`messaging.inbox: delivery ${deliveryId}: ${error}`);
+      await store.settleDelivery(deliveryId, { state: "FAILED", error, at: clock.now() });
+    } else {
+      await store.settleDelivery(deliveryId, { state: "PROCESSED", error: null, at: clock.now() });
+    }
     return { kind: "processed", events: outcomes };
   } catch (error) {
     await store.settleDelivery(deliveryId, { state: "FAILED", error: errorText(error), at: clock.now() });
