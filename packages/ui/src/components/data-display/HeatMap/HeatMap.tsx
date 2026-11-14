@@ -34,17 +34,16 @@ function useFit(transpose: HeatMapProps['transpose'], width: number, rows: numbe
   const narrow = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
   const fixed = transpose === true || transpose === false;
   const prefer = fixed ? transpose : narrow;
-  const px = (value: number): number => remPx(theme, value);
   return heatMapFit(
     width,
     rows,
     columns,
     {
-      labelColumn: px(M.labelColumn),
-      labelColumnTransposed: px(M.labelColumnTransposed),
-      gap: px(M.gap),
-      minCell: px(M.minCell),
-      compactMinCell: px(M.compactMinCell),
+      labelPx: remPx(theme, M.labelColumn),
+      labelTransposedPx: remPx(theme, M.labelColumnTransposed),
+      spacingPx: remPx(theme, M.gap),
+      minCellPx: remPx(theme, M.minCell),
+      compactMinCellPx: remPx(theme, M.compactMinCell),
     },
     prefer,
     fixed,

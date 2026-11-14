@@ -427,25 +427,16 @@ describe('a built-in that derives what it needs (FUT-4063)', () => {
   });
 
   it("hands derive and build the reader's locale", async () => {
-    const seen: Array<string | undefined> = [];
-    const localed: SystemReportDef = {
-      ...derived,
-      key: 'idioma',
-      derive: ({ locale }) => {
-        seen.push(locale);
-        return Promise.resolve({});
-      },
-      build: (options) => {
-        seen.push(options.locale);
-        return derived.build(options);
-      },
-    };
+    const deriveSpy = vi.fn(() => Promise.resolve({}));
+    const buildSpy = vi.fn(() => ORDERS_SPEC as never);
+    const localed: SystemReportDef = { ...derived, key: 'idioma', derive: deriveSpy, build: buildSpy };
     const { call } = setup({ systemReports: [...SYSTEM, localed] });
 
     await call('GET', '/reports/system/:key', { params: { key: 'idioma' }, query: { preset: 'today' }, locale: 'en-US' });
 
+    expect(deriveSpy).toHaveBeenCalledWith(expect.objectContaining({ locale: 'en-US' }));
     // The first build is assembly's own check, which has no reader.
-    expect(seen.slice(-2)).toEqual(['en-US', 'en-US']);
+    expect(buildSpy).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'en-US' }));
   });
 
   it('runs a grain the report does not offer as its first offered grain', async () => {

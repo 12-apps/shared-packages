@@ -37,7 +37,7 @@ export function headerCellSx(compact: boolean) {
 export function rowHeaderSx(compact: boolean) {
   return {
     p: 0,
-    pr: 0.5,
+    pr: sxRem(4),
     fontSize: figureSize(compact),
     fontWeight: 'fontWeightMedium',
     color: 'text.secondary',

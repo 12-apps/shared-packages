@@ -158,7 +158,7 @@ describe("HeatMap", () => {
 });
 
 describe("heatMapFit", () => {
-  const metrics = { labelColumn: 44, labelColumnTransposed: 36, gap: 3, minCell: 32, compactMinCell: 28 };
+  const metrics = { labelPx: 44, labelTransposedPx: 36, spacingPx: 3, minCellPx: 32, compactMinCellPx: 28 };
 
   it("keeps the asked orientation at the regular step when every figure fits", () => {
     expect(heatMapFit(560, 7, 14, metrics, false)).toEqual({ transposed: false, compact: false });

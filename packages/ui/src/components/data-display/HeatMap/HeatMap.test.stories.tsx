@@ -39,6 +39,7 @@ type Story = StoryObj<typeof meta>;
 async function expectNoClippedFigure(canvasElement: HTMLElement): Promise<void> {
   const cells = [...canvasElement.querySelectorAll<HTMLTableCellElement>('td[data-tone]')];
   await expect(cells.length).toBeGreaterThan(0);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the cell's own overflow: each story pins its frame's width, not the viewport's
   const clipped = cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent);
   await expect(clipped).toEqual([]);
 }

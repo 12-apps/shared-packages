@@ -59,15 +59,15 @@ export interface HeatMapFit {
 
 /** The widths `heatMapFit` weighs, in px. */
 export interface HeatMapFitMetrics {
-  labelColumn: number;
-  labelColumnTransposed: number;
-  gap: number;
-  minCell: number;
-  compactMinCell: number;
+  labelPx: number;
+  labelTransposedPx: number;
+  spacingPx: number;
+  minCellPx: number;
+  compactMinCellPx: number;
 }
 
-function needs(columns: number, label: number, cell: number, gap: number): number {
-  return label + columns * (cell + gap) + gap;
+function needs(columns: number, label: number, cell: number, spacing: number): number {
+  return label + columns * (cell + spacing) + spacing;
 }
 
 /**
@@ -97,9 +97,9 @@ export function heatMapFit(
   const fits = tries.find(({ transposed, compact }) =>
     needs(
       transposed ? rowCount : columnCount,
-      transposed ? metrics.labelColumnTransposed : metrics.labelColumn,
-      compact ? metrics.compactMinCell : metrics.minCell,
-      metrics.gap,
+      transposed ? metrics.labelTransposedPx : metrics.labelPx,
+      compact ? metrics.compactMinCellPx : metrics.minCellPx,
+      metrics.spacingPx,
     ) <= width,
   );
   return fits ?? { transposed: fixed ? preferTransposed : rowCount <= columnCount, compact: true };

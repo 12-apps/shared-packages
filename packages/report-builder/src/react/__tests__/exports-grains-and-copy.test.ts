@@ -44,12 +44,14 @@ describe("a cell's text", () => {
   });
 });
 
-describe("the CSV", () => {
-  const columns = exportColumnsFor(BY_DAY, VALUES, weekdayDay);
-  const csv = toCsv(BY_DAY.rows, columns);
+/** The flagged table's CSV, built fresh for each case. */
+function byDayCsv(): string {
+  return toCsv(BY_DAY.rows, exportColumnsFor(BY_DAY, VALUES, weekdayDay));
+}
 
+describe("the CSV", () => {
   it("adds the flag's words as a column, on the flagged rows only", () => {
-    expect(csv.split("\n")).toEqual([
+    expect(byDayCsv().split("\n")).toEqual([
       "Dia,Área,Custo / vendas,acima da meta",
       "Seg 09/11,Cozinha,25%,acima da meta",
       "Seg 10/11,'=HYPERLINK(1),-12%,",
@@ -57,6 +59,7 @@ describe("the CSV", () => {
   });
 
   it("guards TEXT cells against formulas and leaves a negative figure alone", () => {
+    const csv = byDayCsv();
     expect(csv).toContain("'=HYPERLINK(1)");
     expect(csv).toContain(",-12%,");
     expect(csvTrailer(["+33 note"])).toBe("\n\n'+33 note");
