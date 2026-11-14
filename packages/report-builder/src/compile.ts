@@ -1,5 +1,10 @@
 import { invalidSpecError, unknownEntityError, unknownFieldError } from './errors';
-import { assertChartShape, assertKpiShape } from './presentation-shape';
+import {
+  assertChartShape,
+  assertHeatmapShape,
+  assertKpiShape,
+  assertRowFlagShape,
+} from './presentation-shape';
 import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from './spec';
 import { isValidTimeZone } from './time';
 import { PERCENTILE_AGGREGATIONS } from './types';
@@ -341,6 +346,8 @@ export function compileReport(
   assertUniqueAliases(dimensions, measures);
   assertChartShape(spec, dimensions);
   assertKpiShape(spec, dimensions);
+  assertHeatmapShape(spec, dimensions);
+  assertRowFlagShape(spec, measures);
   const filters = spec.filters.map((filter) => compileFilter(spec.entity, entityDef, filter));
   assertIdentitySuppression(
     entityDef,

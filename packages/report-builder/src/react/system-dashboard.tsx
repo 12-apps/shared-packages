@@ -29,9 +29,10 @@ import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
+import { ReportNotes } from "./report-notes";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
-import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import { REPORT_GRAINS, useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
 import { useReportCopy, useReportSurface } from "./transport-context";
 
 interface BlockProps {
@@ -104,13 +105,18 @@ function DashboardBlock({
             {copy.blockFailed}
           </Alert>
         ) : report ? (
-          <ReportRenderView
-            render={report.render}
-            dataTestId={`${testId}-render`}
-            onWidenRange={widenAction(range, onRangeChange, ranges)}
-            asTable={tableView.asTable}
-            bounded
-          />
+          <Stack spacing={1.5}>
+            <ReportRenderView
+              render={report.render}
+              dataTestId={`${testId}-render`}
+              onWidenRange={widenAction(range, onRangeChange, ranges)}
+              asTable={tableView.asTable}
+              bounded
+              notes={report.notes}
+              caption={title}
+            />
+            <ReportNotes notes={report.notes} tenantSlug={tenantSlug} dataTestId={testId} />
+          </Stack>
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
@@ -127,6 +133,8 @@ function DashboardBlock({
             render={report.render}
             dataTestId={`${testId}-expanded-render`}
             asTable={tableView.asTable}
+            notes={report.notes}
+            caption={title}
           />
         </BlockExpandDialog>
       ) : null}
@@ -154,9 +162,14 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
 
   // The toggle applies when ANY block buckets by date: it then moves those
   // blocks and leaves the rest untouched.
-  const supportsGrain = dashboard.blocks.some(
-    (block) =>
-      surface.systemReports.find((entry) => entry.key === block.reportKey)?.supportsGrain ?? false,
+  const grained = dashboard.blocks
+    .map((block) => surface.systemReports.find((entry) => entry.key === block.reportKey))
+    .filter((entry) => entry?.supportsGrain === true);
+  const supportsGrain = grained.length > 0;
+  // The toggle offers what ANY grained block can draw (FUT-4063): the union, in
+  // the canonical order. A block that names none offers all three.
+  const grains = REPORT_GRAINS.filter((grain) =>
+    grained.some((entry) => (entry?.grains ?? REPORT_GRAINS).includes(grain)),
   );
 
   return (
@@ -176,6 +189,7 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
         grain={grain}
         onGrainChange={setGrain}
         showGrain={supportsGrain}
+        grains={grains}
         printTitle={dashboard.title}
       />
 

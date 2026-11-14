@@ -121,6 +121,8 @@ export interface SystemReportSummary {
   description: string;
   presentation: "chart" | "table";
   supportsGrain: boolean;
+  /** The grains its toggle offers (FUT-4063); absent means all three. */
+  grains?: ReportGrain[];
 }
 
 type ReportRowValue = string | number | boolean | null;
@@ -137,8 +139,39 @@ export interface ReportTableColumn {
 }
 
 /** Rendered report: a table model or a `@12-apps/ui` chart spec, plus rows. */
+/** A table's flagged rows (FUT-4063): the judged column, the flag's words, row indices. */
+export interface ReportTableFlag {
+  column: string;
+  label: string;
+  rows: number[];
+}
+
+/** The heat map's render model (FUT-4063), as the server ships it. */
+export interface ReportHeatmapRender {
+  kind: "heatmap";
+  rowAxis: Array<{ key: string; label: string }>;
+  columnAxis: Array<{ key: string; label: string }>;
+  cells: Array<{ row: string; column: string; value: number | null }>;
+  scale: { target: number; strongAbove?: number; strongBelow?: number };
+  labels: { above: string; below: string; empty: string };
+  valueFormat: ReportTableColumn["format"];
+  /** The long form — the dimensions, then the measure — for CSV and the table view. */
+  tableColumns: ReportTableColumn[];
+  rows: ReportRow[];
+}
+
+/** One thing a built-in says about its own data (FUT-4063); see the server's `ReportNote`. */
+export interface ReportNoteView {
+  key: string;
+  text: string;
+  items?: string[];
+  figure?: number;
+  action?: { label: string; href: string };
+}
+
 export type ReportRender =
-  | { kind: "table"; columns: ReportTableColumn[]; rows: ReportRow[] }
+  | { kind: "table"; columns: ReportTableColumn[]; rows: ReportRow[]; flag?: ReportTableFlag }
+  | ReportHeatmapRender
   | {
       kind: "chart";
       chartSpec: ChartSpec;
@@ -182,9 +215,12 @@ interface SystemReportResult {
   title: string;
   description: string;
   supportsGrain: boolean;
+  grains?: ReportGrain[];
   range: { preset: string; from: string; toExclusive: string };
   grain: ReportGrain;
   render: ReportRender;
+  /** What the report says about its data (FUT-4063); absent before that. */
+  notes?: ReportNoteView[];
 }
 
 function adminPath(tenantSlug: string, path: string): string {

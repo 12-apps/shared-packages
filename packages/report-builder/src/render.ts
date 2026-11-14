@@ -3,6 +3,8 @@ import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/
 import { requireEntityForRender } from './catalog';
 import { isOrderedDimension } from './compatibility';
 import { pivotSplit } from './pivot';
+import { tableFlag, type ReportTableFlag } from './render-flag';
+import { toHeatmapModel, type ReportHeatmapModel } from './render-heatmap';
 import { toKpiModel, type ReportKpiFigure } from './render-kpi';
 import type { RenderLabelCopy } from './copy';
 import { dimensionLabel, measureLabel } from './render-labels';
@@ -24,7 +26,14 @@ export interface ReportTableColumn {
 }
 
 export type ReportRenderModel =
-  | { kind: 'table'; columns: ReportTableColumn[]; rows: ReportRow[] }
+  | {
+      kind: 'table';
+      columns: ReportTableColumn[];
+      rows: ReportRow[];
+      /** The rows the presentation's `flag` marks (FUT-4063); absent without one. */
+      flag?: ReportTableFlag;
+    }
+  | ReportHeatmapModel
   | {
       kind: 'chart';
       chartSpec: ChartSpec;
@@ -312,7 +321,14 @@ export function renderReport(
   if (presentation.kind === 'kpi') {
     return toKpiModel(query, presentation, catalog, rows, copy);
   }
-  return { kind: 'table', columns: tableColumnsFor(query, catalog, copy), rows };
+  if (presentation.kind === 'heatmap') {
+    return toHeatmapModel(query, presentation, catalog, rows, tableColumnsFor(query, catalog, copy));
+  }
+  const columns = tableColumnsFor(query, catalog, copy);
+  if (presentation.flag) {
+    return { kind: 'table', columns, rows, flag: tableFlag(rows, presentation.flag) };
+  }
+  return { kind: 'table', columns, rows };
 }
 
 /**

@@ -129,6 +129,26 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     kind: z.literal('table'),
     columns: z.array(reportTableColumnSchema),
     rows: z.array(reportRowSchema),
+    /** The rows the presentation's flag marks (FUT-4063): the judged column, its words, row indices. */
+    flag: z
+      .object({ column: z.string(), label: z.string(), rows: z.array(z.number().int().min(0)) })
+      .optional(),
+  }),
+  /** A grid of one measure over two dimensions, judged against a target (FUT-4063). */
+  z.object({
+    kind: z.literal('heatmap'),
+    rowAxis: z.array(z.object({ key: z.string(), label: z.string() })),
+    columnAxis: z.array(z.object({ key: z.string(), label: z.string() })),
+    cells: z.array(z.object({ row: z.string(), column: z.string(), value: z.number().nullable() })),
+    scale: z.object({
+      target: z.number(),
+      strongAbove: z.number().optional(),
+      strongBelow: z.number().optional(),
+    }),
+    labels: z.object({ above: z.string(), below: z.string(), empty: z.string() }),
+    valueFormat: reportTableColumnSchema.shape.format,
+    tableColumns: z.array(reportTableColumnSchema),
+    rows: z.array(reportRowSchema),
   }),
   z.object({
     kind: z.literal('chart'),
@@ -179,6 +199,17 @@ export const systemReportSummarySchema = z.object({
   description: z.string(),
   presentation: z.enum(['chart', 'table']),
   supportsGrain: z.boolean(),
+  /** The grains the toggle offers (FUT-4063); absent means all three. */
+  grains: z.array(z.enum(REPORT_GRAINS)).optional(),
+});
+
+/** One thing a built-in says about its own data (FUT-4063) — see `ReportNote`. */
+export const reportNoteSchema = z.object({
+  key: z.string(),
+  text: z.string(),
+  items: z.array(z.string()).optional(),
+  figure: z.number().int().min(0).optional(),
+  action: z.object({ label: z.string(), href: z.string() }).optional(),
 });
 
 export const systemReportResultSchema = z.object({
@@ -186,9 +217,12 @@ export const systemReportResultSchema = z.object({
   title: z.string(),
   description: z.string(),
   supportsGrain: z.boolean(),
+  grains: z.array(z.enum(REPORT_GRAINS)).optional(),
   range: reportRangeViewSchema,
   grain: z.enum(REPORT_GRAINS),
   render: reportRenderSchema,
+  /** Optional only for a payload produced before FUT-4063. */
+  notes: z.array(reportNoteSchema).optional(),
 });
 
 export const savedReportSummarySchema = z.object({

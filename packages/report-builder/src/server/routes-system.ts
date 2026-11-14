@@ -39,6 +39,7 @@ function toSystemSummary(report: SystemReportDef): {
   description: string;
   presentation: 'chart' | 'table';
   supportsGrain: boolean;
+  grains?: readonly TimeGrain[];
 } {
   return {
     key: report.key,
@@ -46,6 +47,7 @@ function toSystemSummary(report: SystemReportDef): {
     description: report.description,
     presentation: report.presentation,
     supportsGrain: report.supportsGrain,
+    ...(report.grains ? { grains: report.grains } : {}),
   };
 }
 
@@ -86,8 +88,12 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
       const grain = grainOf(query);
       try {
         const range = windowOfQuery(config, { query, locale });
+        const window = { from: range.from, toExclusive: range.toExclusive };
+        // Before the run: the tenant's own numbers are what the spec is BUILT
+        // with (FUT-4063), so they have to exist before `build` does.
+        const derived = report.derive ? await report.derive({ actor, window, grain }) : {};
         const result = await runReport(
-          report.build({ grain }),
+          report.build({ grain, params: derived.params ?? {} }),
           await runOptions(config, actor, range, locale),
         );
         return ok({
@@ -95,9 +101,11 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
           title: report.title,
           description: report.description,
           supportsGrain: report.supportsGrain,
+          ...(report.grains ? { grains: report.grains } : {}),
           range: toReportRangeView(range),
           grain,
           render: result.render,
+          notes: derived.notes ?? [],
         });
       } catch (error) {
         return foldSpecError(error);

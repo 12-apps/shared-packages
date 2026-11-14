@@ -104,9 +104,19 @@ export interface ReportSpecWire {
   sort: Array<{ by: string; direction: "asc" | "desc" }>;
   limit?: number;
   presentation:
-    | { kind: "table" }
+    | {
+        kind: "table";
+        flag?: { measure: string; above: number; label: string; whenEmpty?: { measure: string } };
+      }
     | { kind: "chart"; chartType: "line" | "bar" | "area" | "pie" | "donut"; stacked?: boolean }
-    | { kind: "kpi"; label?: string; numberFormat?: string };
+    | { kind: "kpi"; label?: string; numberFormat?: string }
+    | {
+        kind: "heatmap";
+        target: number;
+        strongAbove?: number;
+        strongBelow?: number;
+        labels: { above: string; below: string; empty: string };
+      };
 }
 
 /** One dashboard block: a regular spec plus layout metadata (FUT-306). */

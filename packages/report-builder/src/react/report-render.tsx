@@ -15,7 +15,6 @@ import type { JSX } from "react";
 import { SpecChart, type ChartDataPoint } from "@12-apps/ui/charts";
 import { EmptyState } from "@12-apps/ui/data-display/EmptyState";
 import { StatCard } from "@12-apps/ui/data-display/StatCard";
-import { Table } from "@12-apps/ui/data-display/Table";
 import { Box } from "@12-apps/ui/mui/Box";
 
 import type { ValueFormatCopy } from "../copy";
@@ -29,124 +28,17 @@ import {
   type ReportKpiFigure,
   type ReportKpiFormat,
 } from "./lib/kpi-figures";
-import { BOUNDED_TABLE_SX } from "./lib/bounded-table";
 import { CHART_BOX_SX, TABULAR_FIGURES } from "./lib/render-sx";
-import { reportTableColumns } from "./lib/report-table-columns";
-import { GRID_GAP_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
-import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
-
-/**
- * The product's table, restated over the design system's own defaults.
- *
- * `variant="striped"` was the divergence (FUT-755): it paints a zebra and
- * NOTHING else — the striped variant has no header treatment at all — so a
- * report table read as a bare grid beside every other list in the product.
- * Three independent sources agree on what the product's table IS, and not one
- * of them stripes:
- *
- *  - `apps/admin` renders every list through `DataViewsTableBase` →
- *    `@12-apps/ui` `DataGrid`: a header on `background.paper` with a
- *    `1px solid divider` rule beneath it, rows separated by the same rule,
- *    `palette.action.hover` on hover, and 36px rows (`DataViews` wires
- *    `density="compact" rowHeight={36} headerHeight={36}`).
- *  - `apps/super-admin/src/lib/table.tsx` — the `Th`/`Td` every platform list
- *    page is built from: a divider rule under the header AND under every row,
- *    the header label at caption size, weight 600, `text.secondary`.
- *  - `docs/reports-builder/prototype.html`, this redesign's own specification:
- *    `th{text-transform:uppercase;border-bottom:1px solid var(--line)}`,
- *    `td{border-bottom:1px solid var(--line-2)}`, `tbody tr:hover{…}`.
- *
- * The design system cannot express that through a variant. `default` tints the
- * header band `alpha(primary.main, 0.1)`, which nothing in the product does,
- * and the header's rule + weight are reachable only via `stickyHeader` — which
- * a block sized to its content cannot use, and which would also pin the header
- * at `zIndex: 100`. So the house style is restated here rather than changed
- * there: `packages/ui`'s `Table` is a shared component.
- *
- * Framing is deliberately NOT added. `ReportBlockFrame` already wraps every
- * rendering in an outlined `Card` on a tinted canvas, so a second border here
- * would double-frame it — the same reason `super-admin`'s `TableShell` and the
- * prototype's `.tbl-scroll` carry no border either. Horizontal overflow is
- * already handled: the DS renders its table inside a MUI `TableContainer`.
- *
- * Every selector is prefixed with `.MuiTable-root` on purpose. Without it the
- * head-background rule TIES the DS's own `.css-x .MuiTableHead-root` on
- * specificity and loses on insertion order — the parent `Box`'s class is
- * serialized first — so the primary tint would come back.
- */
-const REPORT_TABLE_SX = {
-  // Restated rather than inherited, so the table carries its own guarantee
-  // wherever it is mounted. See TABULAR_FIGURES: a reporting requirement.
-  ...TABULAR_FIGURES,
-  "& .MuiTable-root .MuiTableHead-root": { backgroundColor: "transparent" },
-  "& .MuiTable-root .MuiTableHead-root .MuiTableCell-root": {
-    // The reports area already HAS one small-label treatment — the same one
-    // "AGRUPAR POR" / "MEDIDAS" use. A column header is that kind of label, so
-    // it reuses it instead of inventing a fifth step in the type ladder.
-    ...SECTION_LABEL_STYLE,
-    color: "text.secondary",
-    borderBottom: "1px solid",
-    borderBottomColor: "divider",
-    // A wrapped column header re-flows the whole grid; the prototype's `th` is
-    // `white-space:nowrap` for the same reason.
-    whiteSpace: "nowrap",
-  },
-  "& .MuiTable-root .MuiTableBody-root .MuiTableCell-root": {
-    borderBottom: "1px solid",
-    borderBottomColor: "divider",
-  },
-  // Written out rather than passed as `hoverable`, which is the DS's own
-  // hover: it tints with `alpha(primary.main, 0.08)` AND sets
-  // `cursor: pointer`. A report row is not clickable, so a pointer cursor
-  // promises an interaction that does not exist. `action.hover` is what
-  // `DataGrid` uses on every admin list.
-  "& .MuiTable-root .MuiTableBody-root .MuiTableRow-root:hover": {
-    backgroundColor: "action.hover",
-  },
-} as const;
-
-/**
- * One report table, in the product's style — rendered by BOTH call sites.
- *
- * A chart's "Ver como tabela" fallback showing a different table from a real
- * table block is the original bug one level down, so there is exactly one
- * component and the two callers cannot drift apart.
- */
-function ReportTable({
-  columns,
-  rows,
-  dataTestId,
-  bounded = false,
-}: {
-  columns: readonly ReportTableColumn[];
-  rows: ReportRow[];
-  dataTestId: string;
-  bounded?: boolean;
-}): JSX.Element {
-  const copy = useReportEngineCopy();
-  return (
-    <Box sx={bounded ? [REPORT_TABLE_SX, BOUNDED_TABLE_SX] : REPORT_TABLE_SX}>
-      <Table
-        emptyText={copy.labels.emptyTable}
-        // The design system's own documented default (`TABLE_DEFAULTS.variant`),
-        // and the only variant that paints `background.paper`. That matters:
-        // `SystemReportPage` renders a rendering with NO block card around it,
-        // so a transparent table (`minimal`) would have no surface of its own
-        // there. Inside a block card it is a no-op — the card is already paper.
-        variant="default"
-        // 36px rows — exactly what `DataViews` wires into every admin list.
-        // It replaces `size="small"`, which did nothing at all: the DS sets
-        // cell padding at `.css-x .MuiTableCell-root`, which outranks MUI's
-        // own `.MuiTableCell-sizeSmall`, so the rows measured the 52px of
-        // `density="normal"` however small the `size` said they were.
-        density="compact"
-        columns={reportTableColumns(columns, copy.values)}
-        data={rows}
-        data-testid={`${dataTestId}-table`}
-      />
-    </Box>
-  );
-}
+import { figureHints } from "./lib/report-notes";
+import { ReportHeatmapView } from "./report-heatmap";
+import { ReportTable } from "./report-table";
+import { GRID_GAP_PX } from "./lib/report-surface";
+import type {
+  ReportNoteView,
+  ReportRender,
+  ReportRow,
+  ReportTableColumn,
+} from "./reports-api";
 
 /** Format one cell for display/export; `brl` values are integer centavos. */
 function formatReportCell(
@@ -188,9 +80,12 @@ const KPI_FIGURE_MIN_PX = 132;
 function KpiFigures({
   figures,
   dataTestId,
+  hints,
 }: {
   figures: ReportKpiFigure[];
   dataTestId: string;
+  /** A figure's hint line, by index (FUT-4063) — e.g. "meta 30% · 2 dias acima". */
+  hints?: ReadonlyMap<number, string>;
 }): JSX.Element {
   return (
     <Box
@@ -205,6 +100,7 @@ function KpiFigures({
           <StatCard
             label={figure.label}
             value={formatKpiValue(figure.value, figure.format)}
+            hint={hints?.get(index)}
             dataTestId={index === 0 ? `${dataTestId}-kpi` : `${dataTestId}-kpi-${index}`}
           />
         </Box>
@@ -222,6 +118,13 @@ export function exportColumnsFor(
     return render.columns.map((column) => ({
       header: column.label,
       value: (row) => formatReportCell(row[column.key] ?? null, column.format, copy),
+    }));
+  }
+  if (render.kind === "heatmap") {
+    // The long form the grid was folded from — one line per cell.
+    return render.tableColumns.map((column) => ({
+      header: column.label,
+      value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format, copy),
     }));
   }
   if (render.kind === "kpi") {
@@ -271,6 +174,10 @@ interface ReportRenderViewProps {
   fill?: boolean;
   /** Cap a table at ~10 rows and scroll it in place — see `lib/bounded-table`. */
   bounded?: boolean;
+  /** A built-in's notes (FUT-4063); here only the KPI hints are read — `ReportNotes` draws the rest. */
+  notes?: readonly ReportNoteView[];
+  /** The heat map's accessible name (FUT-4063), usually the block's title. */
+  caption?: string;
 }
 
 /**
@@ -336,12 +243,16 @@ export function ReportRenderView({
   asTable = false,
   fill = false,
   bounded = false,
+  notes,
+  caption,
 }: ReportRenderViewProps): JSX.Element {
-  const rangeCopy = useReportCopy().screens.ranges;
+  const { ranges: rangeCopy, system: systemCopy } = useReportCopy().screens;
   if (render.kind === "kpi") {
     // A KPI over an empty period renders its tiles with "—", not EmptyState —
     // in a dashboard grid the metric's absence should still say which metric.
-    return <KpiFigures figures={kpiFigures(render)} dataTestId={dataTestId} />;
+    return (
+      <KpiFigures figures={kpiFigures(render)} dataTestId={dataTestId} hints={figureHints(notes, systemCopy)} />
+    );
   }
   if (render.rows.length === 0) {
     return (
@@ -354,6 +265,13 @@ export function ReportRenderView({
       />
     );
   }
+  if (render.kind === "heatmap") {
+    return (
+      <Box data-testid={dataTestId}>
+        <ReportHeatmapView render={render} caption={caption} dataTestId={dataTestId} />
+      </Box>
+    );
+  }
   if (render.kind === "chart") {
     return (
       <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} fill={fill} bounded={bounded} />
@@ -361,7 +279,13 @@ export function ReportRenderView({
   }
   return (
     <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>
-      <ReportTable columns={render.columns} rows={render.rows} dataTestId={dataTestId} bounded={bounded} />
+      <ReportTable
+        columns={render.columns}
+        rows={render.rows}
+        dataTestId={dataTestId}
+        bounded={bounded}
+        flag={render.flag}
+      />
     </Box>
   );
 }

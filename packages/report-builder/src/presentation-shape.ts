@@ -1,6 +1,6 @@
 import { invalidSpecError } from './errors';
 import type { ReportSpec } from './spec';
-import type { CompiledDimension } from './types';
+import type { CompiledDimension, CompiledMeasure } from './types';
 
 /**
  * What each PRESENTATION demands of a spec's shape — the compiler half of the
@@ -101,5 +101,42 @@ export function assertKpiShape(spec: ReportSpec, dimensions: CompiledDimension[]
     throw invalidSpecError(
       `KPI presentation aggregates the whole period and takes no dimensions, got ${dimensions.length}. Remove the dimensions or use a chart/table.`,
     );
+  }
+}
+
+/**
+ * The heat map rule (FUT-4063): TWO dimensions — the rows, then the columns —
+ * and ONE measure, the figure each cell holds. A third axis has nowhere to go,
+ * and a second measure would need a second colour scale.
+ */
+export function assertHeatmapShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
+  if (spec.presentation.kind !== 'heatmap') return;
+  if (dimensions.length !== 2) {
+    throw invalidSpecError(
+      `Heatmap presentation takes exactly 2 dimensions (rows, then columns), got ${dimensions.length}.`,
+    );
+  }
+  if (spec.measures.length !== 1) {
+    throw invalidSpecError(
+      `Heatmap presentation draws exactly 1 measure per cell, got ${spec.measures.length}.`,
+    );
+  }
+}
+
+/**
+ * The row-flag rule (FUT-4063): the measure a table's flag judges, and the one
+ * its `whenEmpty` reads, must be measures OF THIS SPEC — named by alias, the
+ * key a row carries them under. A typo would otherwise flag nothing, silently.
+ */
+export function assertRowFlagShape(spec: ReportSpec, measures: CompiledMeasure[]): void {
+  if (spec.presentation.kind !== 'table' || !spec.presentation.flag) return;
+  const { flag } = spec.presentation;
+  const aliases = measures.map((measure) => measure.alias);
+  for (const alias of [flag.measure, flag.whenEmpty?.measure]) {
+    if (alias !== undefined && !aliases.includes(alias)) {
+      throw invalidSpecError(
+        `presentation.flag names measure "${alias}", which this spec does not select. Use one of: ${aliases.join(', ')}.`,
+      );
+    }
   }
 }

@@ -159,6 +159,8 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     reportFailedTitle: "Não foi possível carregar o relatório",
     reportFailedBody: "Verifique sua permissão ou tente novamente em instantes.",
     retry: "Tentar novamente",
+    noteSeparator: "; ",
+    noteMore: (count) => ` e mais ${count}`,
   },
   builder: {
     emptySelection: "Selecione um bloco para editar",

@@ -94,6 +94,13 @@ export {
 export { createMemoryDataSource, executeCompiledQuery } from './memory';
 export { renderReport, type ReportRenderModel, type ReportTableColumn } from './render';
 export type { ReportKpiFigure } from './render-kpi';
+export { isRowFlagged, type ReportTableFlag } from './render-flag';
+export {
+  heatmapAxis,
+  type ReportHeatmapAxisItem,
+  type ReportHeatmapCell,
+  type ReportHeatmapModel,
+} from './render-heatmap';
 export {
   parseReportDocument,
   parseReportSpec,
@@ -129,6 +136,7 @@ export {
   type ReportFilter,
   type ReportMeasure,
   type ReportPresentation,
+  type ReportRowFlag,
   type ReportSpec,
   type ReportSpecInput,
 } from './spec';

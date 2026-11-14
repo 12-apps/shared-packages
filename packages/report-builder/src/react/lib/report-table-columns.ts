@@ -2,6 +2,8 @@
  * A report table's columns, as `@12-apps/ui`'s `Table` takes them — split out
  * of `report-render.tsx` (its 400-line gate) with the label floor (FUT-3167).
  */
+import type { ReactNode } from "react";
+
 import type { ColumnConfig } from "@12-apps/ui/data-display/Table";
 
 import type { ValueFormatCopy } from "../../copy";
@@ -25,9 +27,22 @@ function labelColumnKey(columns: readonly ReportTableColumn[]): string | undefin
   return columns.find((column) => column.format === "text")?.key;
 }
 
+/**
+ * The key a FLAGGED row carries on the client (FUT-4063). Never a column, so the
+ * table never draws it; the judged column's cell reads it to draw the mark.
+ */
+export const FLAGGED_ROW_KEY = "__reportRowFlagged";
+
+/** How the judged column draws a flagged row's cell, given its formatted figure. */
+export interface FlaggedColumn {
+  column: string;
+  render: (text: string) => ReactNode;
+}
+
 export function reportTableColumns(
   columns: readonly ReportTableColumn[],
   copy: ValueFormatCopy,
+  flagged?: FlaggedColumn,
 ): ColumnConfig[] {
   const labelKey = labelColumnKey(columns);
   return columns.map((column) => ({
@@ -38,6 +53,9 @@ export function reportTableColumns(
     // compare magnitudes down a column at a glance.
     align: column.format === "text" ? ("left" as const) : ("right" as const),
     ...(column.key === labelKey ? { minWidth: LABEL_COLUMN_MIN_WIDTH } : {}),
-    render: (value: unknown) => formatReportValue((value ?? null) as ReportRow[string], column.format, copy),
+    render: (value: unknown, row: Record<string, unknown>) => {
+      const text = formatReportValue((value ?? null) as ReportRow[string], column.format, copy);
+      return flagged?.column === column.key && row[FLAGGED_ROW_KEY] === true ? flagged.render(text) : text;
+    },
   }));
 }

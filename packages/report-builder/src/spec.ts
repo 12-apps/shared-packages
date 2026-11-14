@@ -75,8 +75,46 @@ export const reportMeasureSchema = z.strictObject({
   format: valueFormatSchema.optional(),
 });
 
+/**
+ * A table's per-row flag (FUT-4063): the row whose `measure` is above `above`
+ * is marked with `label` and an icon — never colour alone. `whenEmpty` also
+ * flags a row whose judged value is EMPTY (a ratio over a zero denominator)
+ * while that other measure is above zero: cost with no sales is over any
+ * target. Aliases name measures of the same spec (checked at compile).
+ */
+export const reportRowFlagSchema = z.strictObject({
+  measure: z.string().min(1),
+  /** In the measure's own units: a `percent` measure is a 0-1 ratio. */
+  above: z.number(),
+  /** The flag's words, e.g. "acima da meta" — the host's, in its language. */
+  label: z.string().min(1).max(40),
+  whenEmpty: z.strictObject({ measure: z.string().min(1) }).optional(),
+});
+
+/** The heat map's words (FUT-4063), the host's: its two sides and what a no-figure cell means. */
+const heatmapLabelsSchema = z.strictObject({
+  above: z.string().min(1).max(60),
+  below: z.string().min(1).max(60),
+  empty: z.string().min(1).max(60),
+});
+
 export const reportPresentationSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('table') }),
+  z.strictObject({ kind: z.literal('table'), flag: reportRowFlagSchema.optional() }),
+  /**
+   * A grid of ONE measure over TWO dimensions — rows by the first, columns by
+   * the second — tinted by which side of `target` each cell sits on
+   * (FUT-4063). Not offered by the builder's picker: built-ins and MCP specs.
+   */
+  z.strictObject({
+    kind: z.literal('heatmap'),
+    /** In the measure's own units (a `percent` measure: a 0-1 ratio). */
+    target: z.number(),
+    /** Above this, the deeper attention tint. */
+    strongAbove: z.number().optional(),
+    /** Below this, the deeper calm tint. */
+    strongBelow: z.number().optional(),
+    labels: heatmapLabelsSchema,
+  }),
   z.strictObject({
     kind: z.literal('chart'),
     chartType: z.enum(['line', 'bar', 'area', 'pie', 'donut']),
@@ -130,6 +168,7 @@ export type ReportFilter = z.infer<typeof reportFilterSchema>;
 export type ReportDimension = z.infer<typeof reportDimensionSchema>;
 export type ReportMeasure = z.infer<typeof reportMeasureSchema>;
 export type ReportPresentation = z.infer<typeof reportPresentationSchema>;
+export type ReportRowFlag = z.infer<typeof reportRowFlagSchema>;
 export type ReportSpec = z.infer<typeof reportSpecSchema>;
 export type ReportSpecInput = z.input<typeof reportSpecSchema>;
 

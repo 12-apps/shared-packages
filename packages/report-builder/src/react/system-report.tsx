@@ -23,6 +23,7 @@ import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import { ReportNotes } from "./report-notes";
 import { exportColumnsFor, ReportRenderView } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
 import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
@@ -75,6 +76,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         grain={grain}
         onGrainChange={setGrain}
         showGrain={report.supportsGrain}
+        grains={report.grains}
         printTitle={report.title}
         onExport={() =>
           exportRows(
@@ -101,7 +103,13 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
             />
           </Stack>
         ) : null}
-        <ReportRenderView render={report.render} asTable={tableView.asTable} />
+        <ReportRenderView
+          render={report.render}
+          asTable={tableView.asTable}
+          notes={report.notes}
+          caption={report.title}
+        />
+        <ReportNotes notes={report.notes} tenantSlug={tenantSlug} dataTestId="report-render" />
       </Stack>
     </Stack>
   );

@@ -171,6 +171,8 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
     reportFailedTitle: "Could not load the report",
     reportFailedBody: "Check your permission, or try again in a moment.",
     retry: "Try again",
+    noteSeparator: "; ",
+    noteMore: (count) => ` and ${count} more`,
   },
   builder: {
     emptySelection: "Select a block to edit",

@@ -195,6 +195,10 @@ export interface ReportSystemCopy {
   reportFailedBody: string;
   /** The retry beside a failed system report. */
   retry: string;
+  /** Joins the names a report note lists (FUT-4063), e.g. "; ". */
+  noteSeparator: string;
+  /** Closes a note's list past its first three names: ", e mais 2". */
+  noteMore(count: number): string;
 }
 
 /**

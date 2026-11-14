@@ -48,8 +48,11 @@ function rangeOptions(copy: ReportRangeCopy): Array<{ value: ReportRange; label:
   }));
 }
 
-function grainOptions(copy: ReportRangeCopy): Array<{ value: ReportGrain; label: string }> {
-  return REPORT_GRAINS.map((grain) => ({
+function grainOptions(
+  copy: ReportRangeCopy,
+  grains: readonly ReportGrain[] = REPORT_GRAINS,
+): Array<{ value: ReportGrain; label: string }> {
+  return REPORT_GRAINS.filter((grain) => grains.includes(grain)).map((grain) => ({
     value: grain,
     label: reportGrainLabel(grain, copy),
   }));
@@ -61,6 +64,8 @@ interface ReportControlsProps {
   grain: ReportGrain;
   onGrainChange: (grain: ReportGrain) => void;
   showGrain: boolean;
+  /** The grains the toggle offers (FUT-4063); absent means all three. */
+  grains?: readonly ReportGrain[];
   printTitle: string;
   /**
    * CSV of the whole surface. A dashboard has one file per block instead, so
@@ -76,6 +81,7 @@ export function ReportControls({
   grain,
   onGrainChange,
   showGrain,
+  grains,
   printTitle,
   onExport,
 }: ReportControlsProps): JSX.Element {
@@ -103,7 +109,7 @@ export function ReportControls({
         <ToggleGroup
           variant="exclusive"
           size="sm"
-          options={grainOptions(ranges)}
+          options={grainOptions(ranges, grains)}
           value={grain}
           onChange={(_event, next) => {
             if (typeof next === "string") onGrainChange(next as ReportGrain);
