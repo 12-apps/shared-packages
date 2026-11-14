@@ -19,6 +19,7 @@ import {
 } from './model';
 import type { CapturePatch, SaleDirectory, TerminalCaptureStore, TerminalCaptureStoreFor, TerminalDirectory } from './ports';
 import type { DeviceCaptureReport } from './readers';
+import { awaitsItsReport, fillLegacyTrace } from './legacy-journal';
 
 /**
  * The terminal capture ledger: one record per card or Pix capture a paired
@@ -234,6 +235,9 @@ async function record<TTx>(
   });
   const row = await store.find(input.clientId, input.transactionCode);
   if (!row) throw new CaptureError('NOT_FOUND', input.transactionCode, 'The capture vanished after its insert.');
+  if (!inserted && awaitsItsReport(row)) {
+    return { capture: await fillLegacyTrace(store, input, engine.clock()), created: false };
+  }
   if (!inserted && (row.amountCents !== input.amountCents || row.kind !== input.kind)) {
     throw new CaptureError('CONFLICT', input.transactionCode, 'This transaction code was already recorded with another amount or kind.');
   }

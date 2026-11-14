@@ -52,7 +52,9 @@ function matches(row: Row, seen: CaptureVersion): boolean {
     row.state === seen.state &&
     row.orderId === seen.orderId &&
     sameTime(row.refundFlaggedAt, seen.refundFlaggedAt) &&
-    sameTime(row.refundClearedAt, seen.refundClearedAt)
+    sameTime(row.refundClearedAt, seen.refundClearedAt) &&
+    (!seen.awaitingReport ||
+      (row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null))
   );
 }
 

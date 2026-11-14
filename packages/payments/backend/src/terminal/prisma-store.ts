@@ -48,6 +48,9 @@ export interface CaptureRow extends Omit<TerminalCaptureRecord, 'kind' | 'state'
   source: string;
 }
 
+/** A legacy `JOURNAL` row still awaiting its terminal report (see `CaptureVersion.awaitingReport`). */
+const AWAITING_REPORT = { source: 'JOURNAL', transactionId: null, authorizationCode: null, terminalSerial: null } as const;
+
 const NOT_LIVE = [{ refundFlaggedAt: null }, { refundClearedAt: { not: null } }] as const;
 
 /** Not owed back: never flagged, cleared, or flagged for the timeout a bind clears. */
@@ -137,9 +140,9 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
       return rows.map(toRecord);
     },
     async writeIfUnchanged(seen, patch) {
-      const { id, state, orderId, refundFlaggedAt, refundClearedAt } = seen;
+      const { id, state, orderId, refundFlaggedAt, refundClearedAt, awaitingReport } = seen;
       const written = await (await client()).terminalCapture.updateMany({
-        where: { id, state, orderId, refundFlaggedAt, refundClearedAt },
+        where: { id, state, orderId, refundFlaggedAt, refundClearedAt, ...(awaitingReport ? AWAITING_REPORT : {}) },
         data: patch,
       });
       return written.count === 1;
