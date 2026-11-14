@@ -172,6 +172,7 @@ function matchesGuard(row: ConversationView, guard: ConversationGuard): boolean 
   if (guard.stateNot !== undefined && row.state === guard.stateNot) return false;
   if (guard.lastInboundAt !== undefined && !sameTime(row.lastInboundAt, guard.lastInboundAt)) return false;
   if (guard.lastMessageAt !== undefined && !sameTime(row.lastMessageAt, guard.lastMessageAt)) return false;
+  if (guard.optedOutAt !== undefined && !sameTime(row.optedOutAt, guard.optedOutAt)) return false;
   return true;
 }
 

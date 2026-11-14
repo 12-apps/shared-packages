@@ -61,7 +61,7 @@ was processed: a message sent before the opt-out and processed after it (a
 retried job, the reconciliation sweep) is stored but does not re-open the
 conversation and does not reach the host's hook. Every state change is a
 compare-and-set against what was read, so two workers, or a staff hand-off,
-racing an opt-out cannot undo it. No staff action can move a conversation out
+racing an opt-out (or a later stop signal) cannot undo it. No staff action can move a conversation out
 of `OPTED_OUT`.
 
 **Sending.** `engine.send` refuses (typed `MessagingSendError`, nothing

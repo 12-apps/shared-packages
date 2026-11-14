@@ -235,12 +235,13 @@ function conversationOperations(client: Client): ConversationOperations {
 /** A guard as the `where` clause of the one `updateMany` that makes the write a compare-and-set. */
 function guardWhere(guard: ConversationGuard | undefined): Record<string, unknown> {
   if (!guard) return {};
-  const { state, stateNot, lastInboundAt, lastMessageAt } = guard;
+  const { state, stateNot, lastInboundAt, lastMessageAt, optedOutAt } = guard;
   return {
     ...(state !== undefined ? { state } : {}),
     ...(stateNot !== undefined ? { state: { not: stateNot } } : {}),
     ...(lastInboundAt !== undefined ? { lastInboundAt } : {}),
     ...(lastMessageAt !== undefined ? { lastMessageAt } : {}),
+    ...(optedOutAt !== undefined ? { optedOutAt } : {}),
   };
 }
 

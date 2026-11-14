@@ -145,7 +145,7 @@ async function openConversation(
         ...(event.contactName ? { contactName: event.contactName } : {}),
         ...(carriesText ? { hasText: true } : {}),
       },
-      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt },
+      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt, optedOutAt: existing.optedOutAt },
     );
     if (updated) return updated;
   }
@@ -213,7 +213,7 @@ async function handleOptOut(ctx: EngineContext, connection: StoredConnection, ev
         ...(existing.state !== "OPTED_OUT" ? { state: "OPTED_OUT" as const } : {}),
         optedOutAt: later(existing.optedOutAt, event.at),
       },
-      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt },
+      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt, optedOutAt: existing.optedOutAt },
     );
     if (updated) return { kind: "opted-out", conversationId: existing.id };
   }

@@ -158,6 +158,7 @@ export interface ConversationGuard {
   stateNot?: ConversationState;
   lastInboundAt?: Date | null;
   lastMessageAt?: Date | null;
+  optedOutAt?: Date | null;
 }
 
 export interface ConversationPatch {

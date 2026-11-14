@@ -409,4 +409,13 @@ describe("the migration's CHECKs", () => {
       pg.exec("INSERT INTO messaging_inbox_deliveries (id, channel, body_hash, raw_body, received_at) VALUES ('d1', 'Bad Channel', 'h', '{}', now())"),
     ).rejects.toThrow(/channel_check/u);
   });
+
+  it("refuse a message whose channel is not a key", async () => {
+    const pg = await migratedPglite();
+    await expect(
+      pg.exec(
+        "INSERT INTO messaging_messages (id, conversation_id, tenant_id, channel, direction, kind, delivery_status, author_kind) VALUES ('m1', 'c1', 't', 'WhatsApp!', 'OUTBOUND', 'TEXT', 'PENDING', 'AGENT')",
+      ),
+    ).rejects.toThrow(/messaging_messages_channel_check/u);
+  });
 });
