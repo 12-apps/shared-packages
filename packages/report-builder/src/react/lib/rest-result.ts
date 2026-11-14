@@ -2,7 +2,12 @@
  * Tiny REST helper for the page ports' action adapters: same-origin JSON
  * fetch against the `{ data }` envelope, folded into the `Result` shape the
  * ported client components were written against.
+ *
+ * It words nothing itself (FUT-4070): a refusal with no sentence in its body
+ * and a call nothing answered both read in the host's words, handed in as
+ * `errors` from `ReportScreensCopy.errors`.
  */
+import type { ReportTransportErrorCopy } from "../screens-copy";
 
 /** Mirror of `@12-apps/shared-helpers/forms` Result — the shape callers branch on. */
 export type Result<T> =
@@ -46,19 +51,25 @@ function fieldErrorsOf(payload: ErrorEnvelope | null): Record<string, string> | 
   return Object.keys(byPath).length > 0 ? byPath : payload?.issues;
 }
 
-function foldError<T>(status: number, payload: ErrorEnvelope | null): Result<T> {
+function foldError<T>(
+  status: number,
+  payload: ErrorEnvelope | null,
+  errors: ReportTransportErrorCopy,
+): Result<T> {
   const fieldErrors = fieldErrorsOf(payload);
   return {
     ok: false,
-    error: payload?.error ?? `HTTP ${status}`,
+    // The server's own sentence wins; with none, the status is the only fact.
+    error: payload?.error ?? errors.status(status),
     ...(fieldErrors ? { fieldErrors } : {}),
   };
 }
 
 export async function restResult<T>(
   path: string,
-  method = "GET",
-  body?: unknown,
+  method: string,
+  body: unknown,
+  errors: ReportTransportErrorCopy,
 ): Promise<Result<T>> {
   const hasBody = body !== undefined;
   try {
@@ -74,9 +85,12 @@ export async function restResult<T>(
     const payload = (await response.json().catch(() => null)) as
       | ({ data?: T } & ErrorEnvelope)
       | null;
-    if (!response.ok) return foldError(response.status, payload);
+    if (!response.ok) return foldError(response.status, payload, errors);
     return { ok: true, data: (payload?.data ?? null) as T };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "network error" };
+  } catch {
+    // Whatever was thrown, the reader is told nothing answered, in the host's
+    // words. fetch rejects with a TypeError whose message is the browser's own
+    // English ("Failed to fetch"), never a sentence for this screen.
+    return { ok: false, error: errors.network };
   }
 }

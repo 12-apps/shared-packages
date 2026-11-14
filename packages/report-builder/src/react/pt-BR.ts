@@ -7,6 +7,7 @@
  * the components used to render, so a host adopting it sees no change on
  * screen — what changes is that the words are chosen in a diff.
  */
+import { PT_BR_REPORT_TRANSPORT_ERROR_COPY } from "./pt-BR.transport";
 import type { ReportScreensCopy } from "./screens-copy";
 import { PT_BR_BREADCRUMB_COPY } from "@12-apps/ui/pt-BR";
 
@@ -324,4 +325,5 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     visibilityLabel: "Quem pode ver",
     close: "Fechar",
   },
+  errors: PT_BR_REPORT_TRANSPORT_ERROR_COPY,
 };

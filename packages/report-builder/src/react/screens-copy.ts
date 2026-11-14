@@ -368,6 +368,23 @@ export interface ReportSettingsCopy {
   close: string;
 }
 
+/**
+ * What a failed call says when the server gave no sentence of its own
+ * (FUT-4070).
+ *
+ * The default transport folds every refusal and every dropped connection into
+ * a line the screen paints, and it used to word both itself, in English:
+ * `HTTP 503`, and for a thrown `fetch` the browser's own message ("Failed to
+ * fetch"). A sentence the server sent still wins; these are only what is left
+ * when it sent none, or when nothing answered at all.
+ */
+export interface ReportTransportErrorCopy {
+  /** The server refused with no sentence in the body: name the status. */
+  status(status: number): string;
+  /** Nothing answered — the connection dropped or never opened. */
+  network: string;
+}
+
 /** Everything these screens render, in one object a host passes once. */
 export interface ReportScreensCopy {
   list: ReportListCopy;
@@ -378,4 +395,6 @@ export interface ReportScreensCopy {
   system: ReportSystemCopy;
   builder: ReportBuilderPanelCopy;
   settings: ReportSettingsCopy;
+  /** What a failed call reads as when the server sent no sentence. */
+  errors: ReportTransportErrorCopy;
 }

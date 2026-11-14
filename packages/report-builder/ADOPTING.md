@@ -18,6 +18,28 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Migrating 5.20.x → 5.21.0 — a failed call reads in the host's words (FUT-4070)
+
+The default transport worded its own failures in English: a refusal with no
+sentence in its body read `HTTP 503`, a read threw `HTTP 503 for <path>`, and a
+dropped connection showed the browser's own message ("Failed to fetch"). Those
+words are now `ReportScreensCopy.errors` (`ReportTransportErrorCopy`),
+REQUIRED, and both `PT_BR_REPORT_SCREENS_COPY` and `EN_US_REPORT_SCREENS_COPY`
+fill them. `createWebReportBuilder` hands them to the default transport; a
+sentence the server sends still wins. A host passing a shipped pack changes
+nothing; a hand-written pack adds:
+
+| key | what it says | en-US | pt-BR |
+|---|---|---|---|
+| `errors.status(n)` | the server refused and sent no sentence | `` `HTTP ${n}` `` | `` `Erro ${n}` `` |
+| `errors.network` | nothing answered | `network error` | `Falha de conexão` |
+
+A host that builds the default transport by hand passes the same words:
+`httpTransport({ errors })`. With none it reads in English, as
+`@12-apps/app-shell`'s `restResult` does. The built-in reports
+(`useSystemReport`) now read through the transport in scope too, so a host's
+own transport sees that read.
+
 ## Migrating 5.18.x → 5.19.0 — seven more builder words (FUT-3860)
 
 The block builder still compiled a few labels in. They are now keys of
