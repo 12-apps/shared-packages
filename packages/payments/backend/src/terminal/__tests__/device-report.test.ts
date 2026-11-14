@@ -3,11 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { NOW, OTHER_TENANT, TENANT, refusal, world } from './world';
 
 /**
- * The terminal's own report (`recordFromDevice`) and the journal row it
- * completes. Ported from the origin host's device-route and offline-capture
- * suites: the tenant and the terminal come from the device's credential, the
- * source is DEVICE, a future capture time is now, a replay answers the stored
- * capture, and a report never loses itself against a journal row.
+ * The terminal's own report (`recordFromDevice`). Ported from the origin
+ * host's device-route suite: the tenant and the terminal come from the
+ * device's credential, the source is DEVICE, a future capture time is now,
+ * and a replay answers the stored capture.
  */
 
 const report = { transactionCode: 'TC-0001', kind: 'CREDIT' as const, amountCents: 2500, transactionId: 'TID-0001', terminalSerial: 'PAX-1' };

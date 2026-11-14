@@ -9,9 +9,11 @@ import type { TerminalEvent } from "./terminal-contract";
  * The captures the station's LAN link heard, for its offline journal.
  *
  * While the server is away the station keeps charging card and Pix on its
- * paired terminal. The journal entry carries each capture on its leg, so the
- * sync records it and binds it to the sale in the entry's own transaction
- * (`../terminal`'s non-refusing binder). Only the station journals a station
+ * paired terminal. The journal entry carries each capture the terminal
+ * reported on its leg, so the sync records it and binds it to the sale in the
+ * entry's own transaction (`../terminal`'s non-refusing binder). A code the
+ * terminal never reported here is refused (`UNHEARD`): only the terminal's
+ * word pays a sale. Only the station journals a station
  * sale, so a sale is never created twice; the terminal only reports the
  * capture itself.
  *
