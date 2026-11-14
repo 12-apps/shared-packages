@@ -17,8 +17,8 @@ const LINKED: ChargeLink = { known: true, terminals: 1 };
 function begin(split: ChargedSplit, link: ChargeLink = LINKED, port: FakeTerminal = fakeTerminal()) {
   const onReady = vi.fn<(split: ChargedSplit) => void>();
   const onNotice = vi.fn<(notice: FlowNotice) => void>();
-  const run = startChargeRun({ port, split, totalCents: TOTAL, link, saleRef: 'Sale 1', operator: 'Ana', onReady, onNotice });
-  return { port, run, onReady, onNotice };
+  // Built in the return, so no helper-level binding is shared between tests.
+  return { port, run: startChargeRun({ port, split, totalCents: TOTAL, link, saleRef: 'Sale 1', operator: 'Ana', onReady, onNotice }), onReady, onNotice };
 }
 
 const statusOf = (run: ChargeRun, index = 0) => run.current().legs[index]?.status;

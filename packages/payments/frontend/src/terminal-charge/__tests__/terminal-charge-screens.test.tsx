@@ -138,10 +138,10 @@ describe('State 4: received twice', () => {
 });
 
 describe('State 5: over the total', () => {
-  it('R23: offers store credit only with a buyer; change is the primary act', () => {
+  it('R23: offers store credit only with a buyer; change is the primary act', async () => {
     const props = { excess: '$2.00', refund: '$34.00', charge: '$32.00', copy: OVER, confirmCopy: CONFIRM, onAct: vi.fn(), onDone: vi.fn() };
     const { rerender } = render(<OverCaptureChoice {...props} buyer={null} />);
-    expect(screen.queryByTestId('terminal-over-capture-credit')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('terminal-over-capture-credit')).toBeNull());
     expect(screen.getByTestId('terminal-over-capture-change').textContent).toBe('Give $2.00 change');
 
     rerender(<OverCaptureChoice {...props} buyer="Ana" />);
@@ -157,16 +157,15 @@ describe('State 6: the terminal is down', () => {
     const port = fakeTerminal();
     port.pushAnswers = answers;
     const onReady = vi.fn();
-    const run = startChargeRun({ port, split: { legs: [{ tender: 'DEBIT' }], changeCents: 0 }, totalCents: 4600, link: linkUp, saleRef: 's', operator: 'o', onReady, onNotice: vi.fn() });
-    return { run, onReady };
+    return { run: startChargeRun({ port, split: { legs: [{ tender: 'DEBIT' }], changeCents: 0 }, totalCents: 4600, link: linkUp, saleRef: 's', operator: 'o', onReady, onNotice: vi.fn() }), onReady };
   }
 
-  it('R04: another machine keeps the method preselected, says the leg is manual, the reference optional, and asks no PIN', () => {
+  it('R04: another machine keeps the method preselected, says the leg is manual, the reference optional, and asks no PIN', async () => {
     const onConfirm = vi.fn();
     render(<ElsewhereForm via="OTHER_MACHINE" money="$46.00" preselected="DEBIT" methodName={tenderName} copy={ELSEWHERE} onConfirm={onConfirm} onBack={vi.fn()} />);
     expect(screen.getByTestId('terminal-elsewhere-method-DEBIT').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('terminal-elsewhere-manual-note').textContent).toBe('Recorded as manual');
-    expect(screen.queryByTestId('terminal-act-pin')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('terminal-act-pin')).toBeNull());
 
     fireEvent.click(screen.getByTestId('terminal-elsewhere-confirm'));
 
@@ -201,7 +200,7 @@ describe('State 6: the terminal is down', () => {
     await settle();
     render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[]} tenderName={tenderName} money={money} copy={WAIT} elsewhereCopy={ELSEWHERE} />);
     expect(screen.getByTestId('terminal-wait-cancel')).toBeTruthy();
-    expect(screen.queryByTestId('terminal-wait-manual-exits')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('terminal-wait-manual-exits')).toBeNull());
   });
 });
 
@@ -224,7 +223,7 @@ describe('State 3: recovered on load', () => {
       />,
     );
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(['A']));
-    expect(screen.queryByTestId('terminal-recovered-TYPED')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('terminal-recovered-TYPED')).toBeNull());
     expect(screen.getByText('credit $18.50 14:31')).toBeTruthy();
   });
 });
