@@ -84,15 +84,6 @@ describe('the Prisma capture store', () => {
     expect(delegate.updateMany).toHaveBeenCalledWith({ where: seen, data: { state: 'BOUND' } });
   });
 
-  it('completes only a JOURNAL row still awaiting its report', async () => {
-    const { client, delegate } = fake();
-    await createPrismaTerminalCaptureStore(client).completeJournalTrace('c1', { hostNsu: 'n' });
-    expect(delegate.updateMany).toHaveBeenCalledWith({
-      where: { id: 'c1', source: 'JOURNAL', transactionId: null, authorizationCode: null, terminalSerial: null },
-      data: { hostNsu: 'n' },
-    });
-  });
-
   it('flags once: never over a live flag, UNBOUND only when asked, resetting the clear', async () => {
     const { client, delegate } = fake();
     const store = createPrismaTerminalCaptureStore(client);

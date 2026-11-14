@@ -62,11 +62,6 @@ export interface TerminalCaptureStore {
   find(clientId: string, transactionCode: string): Promise<TerminalCaptureRecord | null>;
   /** The tenant's captures under these codes, in no particular order. */
   findMany(clientId: string, transactionCodes: readonly string[]): Promise<TerminalCaptureRecord[]>;
-  /**
-   * Write `patch` on `id` only while it is still a JOURNAL row awaiting its
-   * report: no transaction id, no authorization code, no terminal serial.
-   */
-  completeJournalTrace(id: string, patch: CapturePatch): Promise<void>;
   /** Write `patch` only on the row exactly as `seen`. True when it landed. */
   writeIfUnchanged(seen: CaptureVersion, patch: CapturePatch): Promise<boolean>;
   /**

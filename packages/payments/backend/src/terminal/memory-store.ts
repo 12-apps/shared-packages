@@ -118,11 +118,6 @@ function memoryStore(table: Table): TerminalCaptureStore {
       const codes = new Set(transactionCodes);
       return rows().filter((row) => row.clientId === clientId && codes.has(row.transactionCode)).map(answer);
     },
-    async completeJournalTrace(id, patch) {
-      const row = byId(table, id);
-      if (!row || row.source !== 'JOURNAL' || row.transactionId !== null || row.authorizationCode !== null || row.terminalSerial !== null) return;
-      Object.assign(row, definedOnly(patch));
-    },
     async writeIfUnchanged(seen, patch) {
       const row = byId(table, seen.id);
       if (!row || !matches(row, seen)) return false;

@@ -172,7 +172,7 @@ describe("a late answer for a released charge (B3)", () => {
     t.send(t.peer.seal({ type: "status", chargeId: cancelled, state: "cancelled" }));
     await s.event((event) => event.kind === "status" && event.chargeId === cancelled);
 
-    // PlugPag answered after the terminal said so: the buyer paid.
+    // The acquirer answered after the terminal said so: the buyer paid.
     t.send(t.peer.seal({ type: "status", chargeId: cashed, state: "approved", capture: CAPTURE }));
     t.send(t.peer.seal({ type: "status", chargeId: cancelled, state: "approved", capture: CAPTURE }));
     await s.event((event) => event.kind === "orphan-capture" && event.chargeId === cancelled);

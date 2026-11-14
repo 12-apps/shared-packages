@@ -1,4 +1,4 @@
-import { refundLive, type BindTarget, type CaptureErrorCode, type RecordCaptureInput, type TerminalCaptureRecord } from './model';
+import { refundLive, type BindTarget, type CaptureErrorCode, type TerminalCaptureRecord } from './model';
 import type { CaptureVersion } from './ports';
 
 /**
@@ -34,17 +34,6 @@ export function versionOf(current: TerminalCaptureRecord): CaptureVersion {
     refundFlaggedAt: current.refundFlaggedAt,
     refundClearedAt: current.refundClearedAt,
   };
-}
-
-/** A capture the journal recorded from its leg alone, still without the trace a terminal or station report brings. */
-export function awaitsItsReport(row: TerminalCaptureRecord, input: RecordCaptureInput): boolean {
-  return (
-    row.source === 'JOURNAL' &&
-    input.source !== 'JOURNAL' &&
-    row.transactionId === null &&
-    row.authorizationCode === null &&
-    row.terminalSerial === null
-  );
 }
 
 /** Flagged and not cleared for a reason a bind refuses: the money is owed back. */

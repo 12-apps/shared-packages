@@ -1,7 +1,6 @@
 import {
   MOVE_ATTEMPTS,
   REFUSALS,
-  awaitsItsReport,
   bindDecision,
   markDecision,
   versionOf,
@@ -46,7 +45,12 @@ export interface TerminalCaptureLedgerConfig<TTx = unknown> {
   store: TerminalCaptureStoreFor<TTx>;
   directory: TerminalDirectory<TTx>;
   sales: SaleDirectory<TTx>;
-  /** The most one capture may carry, in cents. Required: it is the host's own ceiling. */
+  /**
+   * The most one capture may carry, in cents. Required: it is the host's own
+   * ceiling. The ledger does not enforce it on `record`; it carries it for the
+   * readers ({@link TerminalCaptureLedger.maxAmountCents}), which refuse a
+   * larger amount before anything is recorded.
+   */
   maxAmountCents: number;
   /**
    * How long a capture may wait for its sale before the sweep flags its money
@@ -199,35 +203,6 @@ async function landOn(
   return store.find(current.clientId, current.transactionCode);
 }
 
-/**
- * A capture the offline journal recorded from its leg alone given the trace
- * when the terminal, or a station that heard it, reports it.
- *
- * The report is the truth. When it names another kind or amount than the leg
- * the cashier kept, it is never thrown away as a conflict (the terminal's
- * outbox would drop it, and an overcharge would vanish): the row takes the
- * report's kind and amount too, and is flagged `JOURNAL_CONFLICT` — once — so
- * a person reconciles the sale with what the terminal charged. Otherwise its
- * state, sale and refund flag stay as they are.
- */
-async function withReportedTrace(
-  store: TerminalCaptureStore,
-  row: TerminalCaptureRecord,
-  input: RecordCaptureInput,
-  now: Date,
-): Promise<TerminalCaptureRecord> {
-  const contradicts = row.kind !== input.kind || row.amountCents !== input.amountCents;
-  const conflict: CapturePatch = contradicts
-    ? { kind: input.kind, amountCents: input.amountCents, refundFlaggedAt: now, refundReason: 'JOURNAL_CONFLICT', refundClearedAt: null }
-    : {};
-  await store.completeJournalTrace(row.id, {
-    ...traceColumns(input),
-    ...(input.deviceId ? { deviceId: input.deviceId } : {}),
-    ...conflict,
-  });
-  return (await store.find(input.clientId, input.transactionCode)) ?? row;
-}
-
 /** What every move reads its ports and clock from. */
 interface Engine<TTx> {
   storeFor: TerminalCaptureStoreFor<TTx>;
@@ -259,9 +234,6 @@ async function record<TTx>(
   });
   const row = await store.find(input.clientId, input.transactionCode);
   if (!row) throw new CaptureError('NOT_FOUND', input.transactionCode, 'The capture vanished after its insert.');
-  if (!inserted && awaitsItsReport(row, input)) {
-    return { capture: await withReportedTrace(store, row, input, engine.clock()), created: false };
-  }
   if (!inserted && (row.amountCents !== input.amountCents || row.kind !== input.kind)) {
     throw new CaptureError('CONFLICT', input.transactionCode, 'This transaction code was already recorded with another amount or kind.');
   }

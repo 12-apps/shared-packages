@@ -93,7 +93,8 @@ describe("the LAN capture book", () => {
     await book.settled();
 
     expect(files.writes).toEqual([]);
-    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: true, wire: null });
+    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: false, reason: "UNHEARD" });
+    expect(files.writes).toEqual([]);
   });
 });
 
@@ -103,7 +104,7 @@ describe("one capture, one sale", () => {
     book.observe(approved());
 
     expect(await book.claim("PAG-0001", "entry-a")).toMatchObject({ ok: true });
-    expect(await book.claim("PAG-0001", "entry-b")).toEqual({ ok: false });
+    expect(await book.claim("PAG-0001", "entry-b")).toEqual({ ok: false, reason: "TAKEN" });
     expect(await book.claim("PAG-0001", "entry-a")).toMatchObject({ ok: true, wire: { transactionCode: "PAG-0001" } });
   });
 
@@ -126,13 +127,13 @@ describe("one capture, one sale", () => {
     expect(await book.claim("PAG-0001", "entry-b")).toMatchObject({ ok: true, wire: { transactionCode: "PAG-0001" } });
   });
 
-  it("keeps a claim on a capture heard after it was claimed", async () => {
+  it("never claims a code the terminal did not report, and holds nothing for it", async () => {
     const book = bookOn(memoryFiles());
-    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: true, wire: null });
+    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: false, reason: "UNHEARD" });
     book.observe(approved());
     await book.settled();
 
-    expect(await book.claim("PAG-0001", "entry-b")).toEqual({ ok: false });
+    expect(await book.claim("PAG-0001", "entry-b")).toMatchObject({ ok: true, wire: { transactionCode: "PAG-0001" } });
   });
 });
 
@@ -148,7 +149,7 @@ describe("the capture book across a restart", () => {
     const reopened = bookOn(files);
 
     expect(await reopened.claim("PAG-0001", "entry-b")).toMatchObject({ ok: true, wire: { transactionCode: "PAG-0001" } });
-    expect(await reopened.claim("PAG-0002", "entry-b")).toEqual({ ok: false });
+    expect(await reopened.claim("PAG-0002", "entry-b")).toEqual({ ok: false, reason: "TAKEN" });
     expect([...files.disk.keys()]).toEqual(["/data/terminal-captures.json"]);
   });
 
@@ -158,13 +159,13 @@ describe("the capture book across a restart", () => {
     for (let index = 0; index < MAX_KEPT; index += 1) book.observe(approved({ ...TRACE, transactionCode: `PAG-N${index}` }));
     await book.settled();
 
-    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: true, wire: null });
+    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: false, reason: "UNHEARD" });
     expect(await book.claim(`PAG-N${MAX_KEPT - 1}`, "entry-a")).toMatchObject({ ok: true, wire: { transactionCode: `PAG-N${MAX_KEPT - 1}` } });
   });
 
   it("reads a garbled file as empty", async () => {
     const book = bookOn(memoryFiles({ "/data/terminal-captures.json": "{not json" }));
-    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: true, wire: null });
+    expect(await book.claim("PAG-0001", "entry-a")).toEqual({ ok: false, reason: "UNHEARD" });
   });
 
   it("logs a write that failed and keeps serving", async () => {
