@@ -60,8 +60,9 @@ export interface ChargeRun {
    */
   refused(code: string | number, detail?: { transactionCode?: string; excessCents?: number }): void;
   /**
-   * "Try again" after a refusal: settles the same split once more, only when
-   * the refusal allows the same body (`flow.retry`) and every leg is covered.
+   * "Try again" after a refusal: settles the same split once more, only when a
+   * transient refusal is pending (`flow.retry`) and every leg is covered. It
+   * consumes that refusal: a second call without a new refusal settles nothing.
    * Answers whether it settled.
    */
   retry(): boolean;
@@ -122,8 +123,8 @@ class Run implements ChargeRun {
   }
 
   cashReceived(): void {
-    this.ready = false;
-    this.move(cashReceived(this.flow));
+    // Through `decide`: a call that changes nothing settles nothing again.
+    this.decide(cashReceived);
   }
 
   elsewhere(index: number, elsewhere: Elsewhere, method?: TerminalMethod): void {
@@ -165,6 +166,8 @@ class Run implements ChargeRun {
 
   retry(): boolean {
     if (this.disposed || !this.flow.retry || readiness(this.flow) !== 'ready') return false;
+    // Consumed: one settle per transient refusal, so a double tap never sends the body twice.
+    this.flow = { ...this.flow, retry: false };
     this.input.onReady(chargedSplit(this.flow));
     return true;
   }

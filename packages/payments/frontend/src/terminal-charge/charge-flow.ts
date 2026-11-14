@@ -79,7 +79,6 @@ const OWN_EXITS: Partial<Record<LegStatus, readonly LegExit[]>> = {
   conflict: OTHER_TENDER_ONLY,
   cash: OTHER_TENDER_ONLY,
   cancelling: OTHER_TENDER_ONLY,
-  pushing: OTHER_TENDER_ONLY,
 };
 
 function ownExitsOf(status: LegStatus, canPush: boolean): readonly LegExit[] {
@@ -198,7 +197,7 @@ export function startFlow(split: ChargedSplit, totalCents: number, link: ChargeL
     link,
     excessCents: 0,
     refusedAs: null,
-    retry: true,
+    retry: false,
     pending,
   };
   return hasCapture(flow) ? rebalanced(flow) : advance(flow);

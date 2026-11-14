@@ -75,14 +75,16 @@ export function resend(flow: ChargeFlow): ChargeFlow {
  * the store's tenders — so there is always a way out (invariant 7). A charge
  * it has on the terminal is the run's to cancel first, and stays the leg's
  * (`history`), so a late approval of it reads as received twice. A
- * disagreeing capture is never offered again. The one leg it refuses is an
- * approval with no capture: money moved there, and another tender would take
- * it twice.
+ * disagreeing capture is never offered again. It refuses two legs: an
+ * approval with no capture (money moved there, and another tender would take
+ * it twice), and a push still out with no charge id yet (its answer could be
+ * taken as the next push's charge); that one gets the exit back as soon as the
+ * push answers.
  */
 export function otherTender(flow: ChargeFlow, tender: string): ChargeFlow {
   const index = currentIndex(flow);
   const leg = flow.legs[index];
-  if (leg === undefined || leg.status === 'unbound') return flow;
+  if (leg === undefined || leg.status === 'unbound' || leg.status === 'pushing') return flow;
   return takeWith(flow, index, leg, tender);
 }
 

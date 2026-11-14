@@ -100,7 +100,10 @@ export interface ChargeFlow {
   readonly excessCents: number;
   /** The server refused the body as malformed: the operator decides; it is never resent as is. */
   readonly refusedAs: string | null;
-  /** Whether the same body may be sent again: false after a refusal that would refuse it again. */
+  /**
+   * A transient refusal is pending: the same body may be sent again, once. False
+   * from the start, set only by a transient refusal, cleared by the retry.
+   */
   readonly retry: boolean;
   readonly pending: FlowPending | null;
 }

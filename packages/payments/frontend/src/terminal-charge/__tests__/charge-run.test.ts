@@ -146,6 +146,51 @@ describe('the operator and the station', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
+  it('B3: retry before any refusal settles nothing', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    port.status('approved', { capture: trace(TOTAL) });
+    expect(onReady).toHaveBeenCalledTimes(1);
+
+    expect(run.retry()).toBe(false);
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('B3: two retries after one NETWORK refusal settle exactly once more', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    port.status('approved', { capture: trace(TOTAL) });
+    run.refused('NETWORK');
+
+    expect(run.retry()).toBe(true);
+    expect(run.retry()).toBe(false);
+
+    expect(onReady).toHaveBeenCalledTimes(2);
+  });
+
+  it('B3: after a cash-only split, retry settles nothing', async () => {
+    const { run, onReady } = begin({ legs: [{ tender: 'CASH', amountCents: TOTAL }], changeCents: 0 });
+    await settle();
+    expect(run.retry()).toBe(false);
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('N7: a cashReceived that changes nothing never settles again, before or after a refusal', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    port.status('method_changed', { method: 'CASH' });
+    run.cashReceived();
+    run.cashReceived();
+    run.cashReceived();
+    expect(onReady).toHaveBeenCalledTimes(1);
+
+    run.refused('NETWORK');
+    run.cashReceived();
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
   it('R16 (B2): retry never resends a body the server refused as not fitting', async () => {
     const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
     await settle();
@@ -200,14 +245,19 @@ describe('Outra forma is a way out wherever it is offered (B1, invariant 7)', ()
     expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'CASH', amountCents: TOTAL }], changeCents: 0 });
   });
 
-  it('B1: another tender while the push is still out cancels the charge the push answers with', async () => {
+  it('N8: no Outra forma while the push is still out; it comes back once the push answers', async () => {
     const { port, run } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
     await Promise.resolve();
-    expect(run.current().legs[0]?.status).toBe('pushing');
-    run.other('CASH');
+    expect(run.current().legs[0]).toMatchObject({ status: 'pushing' });
+    expect(run.current().legs[0]?.exits).not.toContain('other-tender');
+    run.other('DEBIT');
+    expect(run.current().legs[0]).toMatchObject({ status: 'pushing', tender: 'CREDIT' });
+
     await settle();
-    expect(port.cancels).toEqual(['ch-1']);
-    expect(run.current().legs[0]).toMatchObject({ status: 'local', history: ['ch-1'] });
+
+    expect(run.current().legs[0]).toMatchObject({ status: 'waiting', chargeId: 'ch-1', tender: 'CREDIT' });
+    expect(run.current().legs[0]?.exits).toContain('other-tender');
+    expect(port.charges.map((charge) => charge.method)).toEqual(['CREDIT']);
   });
 });
 
