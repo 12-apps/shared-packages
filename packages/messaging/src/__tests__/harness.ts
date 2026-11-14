@@ -108,4 +108,3 @@ export function createHarness(
   return { engine, store, dump, clock, queued, calls, api, route, post, drain, deliver, connect };
 }
 
-export type Harness = ReturnType<typeof createHarness>;

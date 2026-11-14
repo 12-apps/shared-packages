@@ -17,7 +17,7 @@ export const CONTACT = "5511987654321";
 /** 2026-11-14T12:00:00Z, the suites' "now". */
 export const NOW = new Date("2026-11-14T12:00:00.000Z");
 /** Unix seconds, as Meta sends them. */
-export const seconds = (date: Date): string => String(Math.floor(date.getTime() / 1000));
+const seconds = (date: Date): string => String(Math.floor(date.getTime() / 1000));
 
 /** `sha256=<hex>` over the raw body with the app secret. */
 export function sign(rawBody: string, secret = APP_SECRET): string {
