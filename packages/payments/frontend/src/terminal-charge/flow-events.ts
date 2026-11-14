@@ -12,9 +12,10 @@ import { captureWireOf, type TerminalCaptureTrace, type TerminalEvent } from './
  * - A second, distinct capture for a leg already approved, or one for a charge
  *   no leg pushed, is an `orphan`: never applied, so it reaches the host's
  *   list of money with no sale and its refund rule.
- * - An approval for a leg already received in cash at the counter is
- *   `received-twice`: the leg stays cash, and the operator chooses which
- *   payment goes back (FUT-4996 K2). It is never applied silently.
+ * - An approval for a leg already received another way (cash at the
+ *   counter, or a manual leg) is `received-twice`: the leg stays as it was
+ *   received, and the operator chooses which payment goes back (FUT-4996 K2).
+ *   It is never applied silently.
  * - A cancel in flight wins the screen; a later approval of that same charge,
  *   with nothing else received for the leg, is the leg's.
  */
@@ -34,8 +35,8 @@ const MAY_APPROVE: ReadonlySet<LegStatus> = new Set([
   'refused',
   'cash',
 ]);
-/** A leg the operator already received at the counter: an approval for it is money taken twice. */
-const RECEIVED_ANOTHER_WAY: ReadonlySet<LegStatus> = new Set(['local']);
+/** A leg the operator already received another way: an approval for it is money taken twice. */
+const RECEIVED_ANOTHER_WAY: ReadonlySet<LegStatus> = new Set(['local', 'manual']);
 
 const BUSY_CANCELLING = (flow: ChargeFlow, index: number): boolean => flow.legs[index]?.status === 'cancelling';
 

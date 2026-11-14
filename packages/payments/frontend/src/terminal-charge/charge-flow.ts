@@ -8,10 +8,12 @@ import { terminalMethodOf, type ChargeLink } from './port';
  *   ("part 1 of 2"); cash and any other tender are received at the counter.
  * - While the link state is unknown nothing is emitted: a card leg waits for
  *   the link. It never degrades to a plain leg (FUT-4996 K1).
- * - The terminal is the only source of payment truth (owner rule,
- *   2026-11-14): with a terminal linked, a card or Pix leg settles only with
- *   a capture the terminal reported, never on a code or a claim typed at the
- *   station.
+ * - The terminal is the only source of payment truth (owner rules,
+ *   2026-11-14): while it can be used, a card or Pix leg settles only with a
+ *   capture the terminal reported, never on a code typed at the station.
+ *   Only while it cannot be used (no link answer, no terminal connected, the
+ *   station refusing the push as not connected, a charge released with its
+ *   end unknown) may the operator record a MANUAL leg (State 6).
  * - A leg's amount is its capture's: an approval for another amount takes the
  *   captured one and the open legs are re-balanced to the total (K5). What the
  *   captures take above the total is the operator's decision, never absorbed.
@@ -27,17 +29,36 @@ const LIVE: ReadonlySet<LegStatus> = new Set(['send', 'pushing', 'waiting', 'pro
 /** A leg the operator must answer: send it again, or take it another way. */
 const STOPPED: ReadonlySet<LegStatus> = new Set(['declined', 'cancelled', 'unknown', 'refused']);
 /** A leg whose money is accounted for. */
-const DONE: ReadonlySet<LegStatus> = new Set(['local', 'approved']);
+const DONE: ReadonlySet<LegStatus> = new Set(['local', 'approved', 'manual']);
 
 const STOPPED_EXITS: readonly LegExit[] = ['resend', 'other-tender'];
 const ON_TERMINAL_EXITS: readonly LegExit[] = ['cancel', 'other-tender'];
+const MANUAL_EXITS: readonly LegExit[] = ['other-machine', 'manual-pix'];
+/** The station's push refusals that say the terminal itself cannot be used. */
+const TERMINAL_UNUSABLE: ReadonlySet<string> = new Set(['NOT_CONNECTED', 'NO_TERMINAL']);
 
 export const isLive = (leg: FlowLeg): boolean => LIVE.has(leg.status);
 export const isStopped = (leg: FlowLeg): boolean => STOPPED.has(leg.status);
 export const isDone = (leg: FlowLeg): boolean => DONE.has(leg.status);
 
-/** The ways out of a leg, by where it stands and whether the link is known. */
-function exitsOf(status: LegStatus, linkKnown: boolean): readonly LegExit[] {
+type BareLeg = Omit<FlowLeg, 'exits' | 'preselected' | 'charged'>;
+
+/** The terminal cannot be used: no link answer, or linked terminals none of which is connected. */
+export const linkDown = (link: ChargeLink): boolean => !link.known || link.down === true;
+
+/**
+ * Whether a manual leg may be recorded for this leg: a card or Pix leg not yet
+ * accounted for, while the terminal cannot be used — by the link the flow
+ * holds, or by the station's own answer for this leg. Never the operator's call.
+ */
+export function manualAllowed(leg: BareLeg, link: ChargeLink): boolean {
+  if (terminalMethodOf(leg.tender) === null || DONE.has(leg.status) || leg.status === 'cash' || leg.status === 'unbound') return false;
+  if (linkDown(link)) return true;
+  return leg.status === 'unknown' || (leg.status === 'refused' && TERMINAL_UNUSABLE.has(leg.refusal ?? ''));
+}
+
+/** The ways out of a leg that do not depend on the terminal being down. */
+function ownExitsOf(status: LegStatus, linkKnown: boolean): readonly LegExit[] {
   if (STOPPED.has(status)) return STOPPED_EXITS;
   if (status === 'waiting' || status === 'processing') return ON_TERMINAL_EXITS;
   if (status === 'conflict' || status === 'cash') return ['other-tender'];
@@ -46,18 +67,24 @@ function exitsOf(status: LegStatus, linkKnown: boolean): readonly LegExit[] {
   return [];
 }
 
+/** The ways out of a leg: its own, then the two manual ones while the terminal cannot be used. */
+function exitsOf(leg: BareLeg, link: ChargeLink): readonly LegExit[] {
+  const own = ownExitsOf(leg.status, link.known);
+  return manualAllowed(leg, link) ? [...own, ...MANUAL_EXITS] : own;
+}
+
 /** A leg with its derived fields filled from where it stands. */
-export function settled(leg: Omit<FlowLeg, 'exits' | 'preselected' | 'charged'>, linkKnown: boolean): FlowLeg {
+export function settled(leg: BareLeg, link: ChargeLink): FlowLeg {
   return {
     ...leg,
-    exits: exitsOf(leg.status, linkKnown),
+    exits: exitsOf(leg, link),
     preselected: terminalMethodOf(leg.tender),
     charged: leg.status === 'approved' || leg.status === 'conflict',
   };
 }
 
 export function withLeg(flow: ChargeFlow, index: number, patch: Partial<FlowLeg>): ChargeFlow {
-  return { ...flow, legs: flow.legs.map((leg, at) => (at === index ? settled({ ...leg, ...patch }, flow.link.known) : leg)) };
+  return { ...flow, legs: flow.legs.map((leg, at) => (at === index ? settled({ ...leg, ...patch }, flow.link) : leg)) };
 }
 
 /** A terminal link with at least one terminal on it. */
@@ -112,8 +139,8 @@ export function advance(flow: ChargeFlow): ChargeFlow {
 
 function newLeg(tender: string, amountCents: number, status: LegStatus, link: ChargeLink): FlowLeg {
   return settled(
-    { tender, amountCents, status, chargeId: null, history: [], deviceId: null, capture: null, refusal: null },
-    link.known,
+    { tender, amountCents, status, chargeId: null, history: [], deviceId: null, capture: null, elsewhere: null, refusal: null },
+    link,
   );
 }
 
@@ -125,6 +152,7 @@ function amountsOf(split: ChargedSplit, totalCents: number): number[] {
 
 /** A leg as the split carries it, before anything was pushed. */
 function legOf(leg: ChargedLeg, amountCents: number, link: ChargeLink): FlowLeg {
+  if (leg.elsewhere !== undefined) return { ...newLeg(leg.tender, amountCents, 'manual', link), elsewhere: leg.elsewhere };
   if (leg.capture !== undefined) {
     const base = newLeg(leg.capture.kind, leg.capture.amountCents, 'approved', link);
     return { ...base, capture: leg.capture, deviceId: leg.capture.deviceId ?? null };
@@ -163,7 +191,7 @@ export function withLink(flow: ChargeFlow, link: ChargeLink): ChargeFlow {
   const none = link.known && link.terminals === 0;
   const legs = flow.legs.map((leg) => {
     const unpushed = (leg.status === 'send' || leg.status === 'queued') && leg.chargeId === null;
-    return settled(unpushed && none ? { ...leg, status: 'local' } : leg, link.known);
+    return settled(unpushed && none ? { ...leg, status: 'local' } : leg, link);
   });
   const pending = link.known && link.pending ? { ...link.pending, cancellable: true } : flow.pending;
   return advance({ ...flow, legs, link, pending });
@@ -175,9 +203,10 @@ export function readiness(flow: ChargeFlow): Readiness {
   return flow.link.known ? 'charging' : 'waiting-link';
 }
 
-/** The leg as the server receives it, or a throw: a terminal leg without its capture never leaves the flow. */
+/** The leg as the server receives it, or a throw: a terminal leg with neither its capture nor a manual marker never leaves the flow. */
 function chargedLeg(leg: FlowLeg, link: ChargeLink): ChargedLeg {
   if (leg.status === 'approved' && leg.capture !== null) return { tender: leg.tender, amountCents: leg.amountCents, capture: leg.capture };
+  if (leg.status === 'manual' && leg.elsewhere !== null) return { tender: leg.tender, amountCents: leg.amountCents, elsewhere: leg.elsewhere };
   if (leg.status === 'local' && (terminalMethodOf(leg.tender) === null || !linked(link))) return { tender: leg.tender, amountCents: leg.amountCents };
   throw new Error(`A ${leg.tender} leg in status ${leg.status} carries no proof of payment.`);
 }

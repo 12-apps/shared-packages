@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { startChargeRun } from '../charge-run';
-import type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from '../copy';
+import type { ActConfirmCopy, ElsewhereCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from '../copy';
+import { ElsewhereForm } from '../elsewhere-form';
 import type { HeldCapture } from '../held-captures';
 import { OverCaptureChoice, ReceivedTwiceBand } from '../money-choices';
 import { RecoveredCaptures } from '../recovered-captures';
@@ -44,6 +45,17 @@ const OVER: OverCaptureCopy = {
   credit: (amount, buyer) => `Keep ${amount} for ${buyer}`,
   refundAndCharge: (refund, charge) => `Refund ${refund}, charge ${charge}`,
 };
+const ELSEWHERE: ElsewhereCopy = {
+  otherMachineTitle: 'Charged on another machine',
+  manualPixTitle: 'Manual Pix',
+  manualNote: 'Recorded as manual',
+  methodLabel: 'Method',
+  referenceLabel: 'Reference',
+  referenceHint: 'Optional',
+  fiscalNoteLine: 'The fiscal note is issued when the Pix is recorded',
+  confirm: (amount) => `Record ${amount}`,
+  back: 'Back',
+};
 const RECOVERED: RecoveredCopy = { title: 'Received, no sale', line: (method, amount, at) => `${method} ${amount} ${at}`, count: (count) => `${count} with no sale` };
 const WAIT: TerminalWaitCopy = {
   where: (provider, method) => `${provider} · ${method}`,
@@ -81,6 +93,9 @@ const WAIT: TerminalWaitCopy = {
   other: 'Another tender',
   otherLabel: 'Tenders',
   cancel: 'Cancel on the terminal',
+  otherMachine: 'Another machine',
+  manualPix: 'Manual Pix',
+  manualLine: (label) => `${label} · manual`,
   cashReceived: (amount) => `Received ${amount}`,
   cancelPending: (amount) => `Cancel ${amount}`,
   settling: 'Settling',
@@ -135,22 +150,58 @@ describe('State 5: over the total', () => {
   });
 });
 
-describe('the terminal is down', () => {
-  it('R44: offers send again and another tender, and another tender settles the leg at the counter', async () => {
+describe('State 6: the terminal is down', () => {
+  const linkUp = { known: true as const, terminals: 1 };
+
+  function runWith(answers: { ok: false; code: 'NOT_CONNECTED' }[]) {
     const port = fakeTerminal();
-    port.pushAnswers = [{ ok: false, code: 'NOT_CONNECTED' }];
+    port.pushAnswers = answers;
     const onReady = vi.fn();
-    const run = startChargeRun({ port, split: { legs: [{ tender: 'DEBIT' }], changeCents: 0 }, totalCents: 4600, link: { known: true, terminals: 1 }, saleRef: 's', operator: 'o', onReady, onNotice: vi.fn() });
+    const run = startChargeRun({ port, split: { legs: [{ tender: 'DEBIT' }], changeCents: 0 }, totalCents: 4600, link: linkUp, saleRef: 's', operator: 'o', onReady, onNotice: vi.fn() });
+    return { run, onReady };
+  }
+
+  it('R04: another machine keeps the method preselected, says the leg is manual, the reference optional, and asks no PIN', () => {
+    const onConfirm = vi.fn();
+    render(<ElsewhereForm via="OTHER_MACHINE" money="$46.00" preselected="DEBIT" methodName={tenderName} copy={ELSEWHERE} onConfirm={onConfirm} onBack={vi.fn()} />);
+    expect(screen.getByTestId('terminal-elsewhere-method-DEBIT').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('terminal-elsewhere-manual-note').textContent).toBe('Recorded as manual');
+    expect(screen.queryByTestId('terminal-act-pin')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('terminal-elsewhere-confirm'));
+
+    expect(onConfirm).toHaveBeenCalledWith({ via: 'OTHER_MACHINE' }, 'DEBIT');
+  });
+
+  it('R05: a manual Pix says the fiscal note line in a store that issues one', () => {
+    const onConfirm = vi.fn();
+    render(<ElsewhereForm via="MANUAL_PIX" money="$46.00" preselected="CREDIT" methodName={tenderName} issuesFiscalNote copy={ELSEWHERE} onConfirm={onConfirm} onBack={vi.fn()} />);
+    expect(screen.getByTestId('terminal-elsewhere-fiscal-note').textContent).toContain('fiscal note');
+    fireEvent.click(screen.getByTestId('terminal-elsewhere-confirm'));
+    expect(onConfirm).toHaveBeenCalledWith({ via: 'MANUAL_PIX' });
+  });
+
+  it('R44: refused as not connected, the wait offers send again and another tender, the two manual exits under them, and records a manual leg', async () => {
+    const { run, onReady } = runWith([{ ok: false, code: 'NOT_CONNECTED' }]);
     await settle();
-    render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[{ id: 'CASH', name: 'cash' }]} tenderName={tenderName} money={money} copy={WAIT} />);
+    render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[{ id: 'CASH', name: 'cash' }]} tenderName={tenderName} money={money} copy={WAIT} elsewhereCopy={ELSEWHERE} />);
     expect(screen.getByTestId('terminal-wait-title').textContent).toBe('The terminal is down');
     expect(screen.getByTestId('terminal-wait-resend')).toBeTruthy();
-    expect(screen.queryByTestId('terminal-wait-other-machine')).toBeNull();
+    expect(screen.getByTestId('terminal-wait-other')).toBeTruthy();
+    expect(screen.getByTestId('terminal-wait-manual-exits').textContent).toBe('Another machineManual Pix');
 
-    fireEvent.click(screen.getByTestId('terminal-wait-other'));
-    fireEvent.click(screen.getByTestId('terminal-wait-other-CASH'));
+    fireEvent.click(screen.getByTestId('terminal-wait-other-machine'));
+    fireEvent.click(screen.getByTestId('terminal-wait-elsewhere-confirm'));
 
-    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'CASH', amountCents: 4600 }], changeCents: 0 });
+    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'DEBIT', amountCents: 4600, elsewhere: { via: 'OTHER_MACHINE' } }], changeCents: 0 });
+  });
+
+  it('R44 (owner rule): with the terminal usable the wait shows no manual exit', async () => {
+    const { run } = runWith([]);
+    await settle();
+    render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[]} tenderName={tenderName} money={money} copy={WAIT} elsewhereCopy={ELSEWHERE} />);
+    expect(screen.getByTestId('terminal-wait-cancel')).toBeTruthy();
+    expect(screen.queryByTestId('terminal-wait-manual-exits')).toBeNull();
   });
 });
 

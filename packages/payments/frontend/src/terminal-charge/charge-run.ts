@@ -1,8 +1,8 @@
-import { chargedSplit, currentIndex, linked, partOf, readiness, remainingAfter, startFlow, withLink } from './charge-flow';
+import { chargedSplit, currentIndex, linkDown, linked, partOf, readiness, remainingAfter, startFlow, withLink } from './charge-flow';
 import { holdCharge, noteTaken, releaseCharges } from './charge-claims';
 import { onEvent } from './flow-events';
-import { cancelAnswered, cancelRequested, cashReceived, otherTender, pendingCancelled, pushed, pushing, resend, serverRefused } from './flow-moves';
-import type { ChargedSplit, ChargeFlow, FlowLeg, FlowNotice } from './flow-types';
+import { cancelAnswered, cancelRequested, cashReceived, chargedElsewhere, otherTender, pendingCancelled, pushed, pushing, resend, serverRefused } from './flow-moves';
+import type { ChargedSplit, ChargeFlow, Elsewhere, FlowLeg, FlowNotice } from './flow-types';
 import {
   terminalMethodOf,
   type ChargeLink,
@@ -10,6 +10,7 @@ import {
   type TerminalChargeAnswer,
   type TerminalChargeRequest,
   type TerminalEvent,
+  type TerminalMethod,
   type TerminalPort,
 } from './port';
 
@@ -45,6 +46,8 @@ export interface ChargeRun {
   resend(): void;
   other(tender: string): void;
   cashReceived(): void;
+  /** State 6, only while the terminal cannot be used: record the leg as a manual one. Throws otherwise. */
+  elsewhere(index: number, elsewhere: Elsewhere, method?: TerminalMethod): void;
   /** Cancel the live leg's charge on the terminal. */
   cancel(): void;
   /** Cancel the charge a reload left on the terminal. */
@@ -111,6 +114,12 @@ class Run implements ChargeRun {
 
   cashReceived(): void {
     this.move(cashReceived(this.flow));
+  }
+
+  elsewhere(index: number, elsewhere: Elsewhere, method?: TerminalMethod): void {
+    const left = outThere(this.flow.legs[index]);
+    this.move(chargedElsewhere(this.flow, index, elsewhere, method));
+    if (left !== null) this.quietCancel(left);
   }
 
   cancel(): void {
@@ -196,7 +205,7 @@ class Run implements ChargeRun {
     const index = currentIndex(this.flow);
     const leg = this.flow.legs[index];
     const method = leg === undefined ? null : terminalMethodOf(leg.tender);
-    if (leg?.status !== 'send' || method === null || !this.flow.link.known || !linked(this.flow.link)) return;
+    if (leg?.status !== 'send' || method === null || linkDown(this.flow.link) || !linked(this.flow.link)) return;
     const { part, parts } = partOf(this.flow, index);
     this.flow = pushing(this.flow, index);
     const { deviceId, saleRef, operator } = this.input;

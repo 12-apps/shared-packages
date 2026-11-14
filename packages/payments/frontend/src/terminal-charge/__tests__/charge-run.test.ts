@@ -79,10 +79,33 @@ describe('the operator and the station', () => {
     port.pushAnswers = [{ ok: false, code: 'NOT_CONNECTED' }];
     const { run } = begin({ legs: [{ tender: 'DEBIT' }], changeCents: 0 }, LINKED, port);
     await settle();
-    expect(run.current().legs[0]).toMatchObject({ status: 'refused', exits: ['resend', 'other-tender'] });
+    expect(run.current().legs[0]).toMatchObject({ status: 'refused', exits: ['resend', 'other-tender', 'other-machine', 'manual-pix'] });
     run.resend();
     await settle();
     expect(statusOf(run)).toBe('waiting');
+  });
+
+  it('R04: charged on another machine, offered after the station refused the push as not connected, settles a manual leg', async () => {
+    const port = fakeTerminal();
+    port.pushAnswers = [{ ok: false, code: 'NOT_CONNECTED' }];
+    const { run, onReady } = begin({ legs: [{ tender: 'DEBIT' }], changeCents: 0 }, LINKED, port);
+    await settle();
+    run.elsewhere(0, { via: 'OTHER_MACHINE', reference: '004512' });
+    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'DEBIT', amountCents: TOTAL, elsewhere: { via: 'OTHER_MACHINE', reference: '004512' } }], changeCents: 0 });
+  });
+
+  it('R04 (owner rule): with the terminal usable, a manual leg is refused and nothing settles', async () => {
+    const { run, onReady } = begin({ legs: [{ tender: 'DEBIT' }], changeCents: 0 });
+    await settle();
+    expect(() => run.elsewhere(0, { via: 'OTHER_MACHINE' })).toThrow();
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it('R04: no push goes out while the link says no terminal is connected; the manual exits are offered', async () => {
+    const { port, run } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 }, { known: true, terminals: 1, down: true });
+    await settle();
+    expect(port.charges).toEqual([]);
+    expect(run.current().legs[0]?.exits).toEqual(expect.arrayContaining(['other-machine', 'manual-pix']));
   });
 
   it('R07: moved to cash on the terminal and received, a late approval is received-twice, never applied', async () => {

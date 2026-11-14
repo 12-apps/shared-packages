@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   cancelRequested,
   cashReceived,
+  chargedElsewhere,
   chargedSplit,
   confirmLabelOf,
   createConfirmedAct,
@@ -31,9 +32,11 @@ import {
  *
  * Amended in this PR: R11 follows the owner's decision T2 (2026-11-14): State
  * 4 has no undo window, so `createUndoableAct` became `createConfirmedAct`,
- * which sends at once. The State 6 rows (R04, R05, the elsewhere half of R02
- * and the State 6 exits of R06, R28 and R44) are todo: the owner put State 6
- * on hold (2026-11-14, the terminal is the only source of payment truth).
+ * which sends at once. State 6 follows the owner's rules of 2026-11-14 (the
+ * terminal is the only source of payment truth): R02, R04, R05 and R44 record a
+ * manual leg only while the terminal cannot be used, so their flows start from
+ * a push refused as NOT_CONNECTED, and a new case pins that a usable terminal
+ * offers no manual exit. R06 and R28 assert the exits of a usable terminal.
  * R01's title and R36's fixture copy are in English so the
  * A5b grep over this directory prints nothing, and `status` takes the station's
  * state union rather than a string; the assertions are unchanged.
@@ -65,6 +68,15 @@ function waiting(cents = 3200, tender = "CREDIT"): ChargeFlow {
   return pushed(pushing(flow, 0), 0, { ok: true, chargeId: "ch-1", deviceId: "dev-1" });
 }
 
+/**
+ * A one-leg split the station refused to push because the terminal is not
+ * connected: the terminal cannot be used, so the manual exits are offered.
+ */
+function terminalDown(cents = 3200, tender = "CREDIT"): ChargeFlow {
+  const flow = startFlow({ legs: [{ tender, amountCents: cents }], changeCents: 0 }, cents, LINKED);
+  return pushed(pushing(flow, 0), 0, { ok: false, code: "NOT_CONNECTED" });
+}
+
 const status = (state: Extract<TerminalEvent, { kind: "status" }>["state"], capture?: TerminalCaptureTrace, chargeId = "ch-1") =>
   ({ kind: "status", deviceId: "dev-1", chargeId, state, ...(capture ? { capture } : {}) }) as const;
 
@@ -77,10 +89,12 @@ describe("K1 · A1: no card or Pix leg settles without its proof", () => {
     expect(() => chargedSplit(flow as ChargeFlow)).toThrow();
   });
 
-  it("R02: with a terminal linked, every card or Pix leg of the split carries the capture the terminal reported, never none", () => {
+  it("R02: with a terminal linked, every card or Pix leg of the split carries a capture or a manual `elsewhere`, never neither", () => {
     const approved = onEvent(waiting(), status("approved", trace())).flow;
+    const elsewhere = chargedElsewhere(terminalDown(), 0, { via: "OTHER_MACHINE", reference: "004512" });
 
     expect(chargedSplit(approved).legs).toEqual([expect.objectContaining({ tender: "CREDIT", amountCents: 3200, capture: expect.objectContaining({ transactionCode: "PAG-0001" }) })]);
+    expect(chargedSplit(elsewhere).legs).toEqual([{ tender: "CREDIT", amountCents: 3200, elsewhere: { via: "OTHER_MACHINE", reference: "004512" } }]);
     expect(() => chargedSplit(waiting())).toThrow();
   });
 
@@ -92,12 +106,44 @@ describe("K1 · A1: no card or Pix leg settles without its proof", () => {
   });
 });
 
-describe("A10: the terminal is down, the counter never freezes", () => {
-  it("R44: NOT_CONNECTED leaves the leg refused, offering Mandar de novo and Outra forma, its method preselected", () => {
+describe("State 6 · A10: the terminal is down, the counter never freezes", () => {
+  it("R44: NOT_CONNECTED leaves the leg refused, offering Mandar de novo, Outra forma and the two State 6 exits, its method preselected", () => {
     const flow = startFlow({ legs: [{ tender: "DEBIT", amountCents: 4600 }], changeCents: 0 }, 4600, LINKED) as ChargeFlow;
     const refused = pushed(pushing(flow, 0), 0, { ok: false, code: "NOT_CONNECTED" });
 
-    expect(refused.legs[0]).toMatchObject({ status: "refused", exits: ["resend", "other-tender"], preselected: "DEBIT" });
+    expect(refused.legs[0]).toMatchObject({ status: "refused", exits: ["resend", "other-tender", "other-machine", "manual-pix"], preselected: "DEBIT" });
+  });
+
+  it("R04: 'Cobrei em outra máquina', only while the terminal cannot be used, records a manual OTHER_MACHINE leg with an optional NSU", () => {
+    const flow = chargedElsewhere(terminalDown(4600, "DEBIT"), 0, { via: "OTHER_MACHINE" });
+
+    expect(readiness(flow)).toBe("ready");
+    expect(flow.legs[0]).toMatchObject({ status: "manual", capture: null });
+    expect(chargedSplit(flow).legs).toEqual([{ tender: "DEBIT", amountCents: 4600, elsewhere: { via: "OTHER_MACHINE" } }]);
+  });
+
+  it("R05: 'Recebi por Pix manual', only while the terminal cannot be used, turns the leg into a manual PIX marked MANUAL_PIX", () => {
+    const flow = chargedElsewhere(terminalDown(4600, "CREDIT"), 0, { via: "MANUAL_PIX" });
+
+    expect(chargedSplit(flow).legs).toEqual([{ tender: "PIX", amountCents: 4600, elsewhere: { via: "MANUAL_PIX" } }]);
+  });
+
+  it("R04/R05 (owner rule): while the terminal can be used its word is the only one — no manual exit, and a manual leg is refused", () => {
+    const declined = onEvent(waiting(), status("declined")).flow;
+
+    expect(waiting().legs[0]?.exits).not.toContain("other-machine");
+    expect(declined.legs[0]?.exits).toEqual(["resend", "other-tender"]);
+    expect(() => chargedElsewhere(waiting(), 0, { via: "OTHER_MACHINE" })).toThrow();
+    expect(() => chargedElsewhere(declined, 0, { via: "MANUAL_PIX" })).toThrow();
+  });
+
+  it("R01/R04: the link the flow holds decides — unknown or with no terminal connected, the manual exits are offered", () => {
+    const unknown = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, UNKNOWN);
+    const down = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, { known: true, terminals: 1, down: true });
+
+    expect(unknown.legs[0]?.exits).toEqual(expect.arrayContaining(["other-machine", "manual-pix"]));
+    expect(down.legs[0]?.exits).toEqual(expect.arrayContaining(["other-machine", "manual-pix"]));
+    expect(readiness(chargedElsewhere(unknown, 0, { via: "MANUAL_PIX" }))).toBe("ready");
   });
 
   it("R06: a waiting leg has no clock: hours of silence leave it waiting, with its exits", () => {
@@ -264,17 +310,3 @@ describe("A11: the confirm", () => {
   });
 });
 
-/**
- * State 6 ("charged on another machine", "received by a manual Pix") records
- * a card or Pix payment that no terminal reported. The owner ruled on
- * 2026-11-14 that the terminal is the only source of payment truth and put
- * State 6 on hold, so none of it is built. Its rows wait here.
- */
-const PENDING_STATE_6 = "pending owner decision on FUT-4996 State 6 (a payment no terminal reported)";
-
-describe("State 6 · A10: charged elsewhere", () => {
-  it.todo(`R02 (elsewhere half): a leg recorded OTHER_MACHINE settles with its \`elsewhere\` marker — ${PENDING_STATE_6}`);
-  it.todo(`R04: 'Cobrei em outra máquina' records the leg OTHER_MACHINE with an optional NSU — ${PENDING_STATE_6}`);
-  it.todo(`R05: 'Recebi por Pix manual' turns the leg into PIX marked MANUAL_PIX — ${PENDING_STATE_6}`);
-  it.todo(`R01/R06/R28/R44 (State 6 exits): the other-machine and manual-pix exits beside the others — ${PENDING_STATE_6}`);
-});

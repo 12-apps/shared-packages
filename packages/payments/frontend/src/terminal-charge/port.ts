@@ -61,12 +61,19 @@ export interface TerminalPort {
  *   then WAITS: it never degrades to a plain leg.
  * - `known: true, terminals: 0`: no terminal linked (or no port at all): card
  *   legs are plain tenders, as before.
+ * - `down`: terminals are linked but none is connected now: the terminal
+ *   cannot be used, and a manual leg may be recorded (State 6).
  * - `pending`: a charge the station still holds on the terminal after a
  *   reload, which the screen shows and may cancel.
  */
 export type ChargeLink =
   | { readonly known: false }
-  | { readonly known: true; readonly terminals: number; readonly pending?: TerminalPendingCharge | null };
+  | {
+      readonly known: true;
+      readonly terminals: number;
+      readonly down?: boolean;
+      readonly pending?: TerminalPendingCharge | null;
+    };
 
 /** The tenders a terminal can take: the registry ids that ARE terminal methods. */
 export function terminalMethodOf(tender: string): TerminalMethod | null {
@@ -77,7 +84,8 @@ export function terminalMethodOf(tender: string): TerminalMethod | null {
 export function linkOf(state: TerminalState | null, failed = false): ChargeLink {
   if (state === null || failed) return { known: false };
   const pending = state.terminals.find((terminal) => terminal.pending !== null)?.pending ?? null;
-  return { known: true, terminals: state.terminals.length, pending };
+  const down = state.terminals.length > 0 && state.terminals.every((terminal) => terminal.status !== 'connected');
+  return { known: true, terminals: state.terminals.length, down, pending };
 }
 
 /** The trace a terminal reported, as the wire a sale's leg carries, with the terminal that took it. */

@@ -33,18 +33,35 @@ export type LegStatus =
   | 'unbound'
   /** The server refused its capture as disagreeing with the one it holds: charged, and never offered again. */
   | 'conflict'
+  /**
+   * Recorded by hand while the terminal could not be used (State 6): charged
+   * on another machine, or a Pix checked by hand. A manual leg, never a capture.
+   */
+  | 'manual'
   | 'approved';
 
 /**
  * A way out of the current leg the operator may take:
  * - `resend`: push it again;
  * - `other-tender`: take it with another of the store's tenders;
- * - `cancel`: cancel the charge on the terminal.
+ * - `cancel`: cancel the charge on the terminal;
+ * - `other-machine`: record it as charged on another machine (a manual leg);
+ * - `manual-pix`: record it as a Pix checked by hand (a manual leg).
  *
- * The terminal is the only source of payment truth (owner rule, 2026-11-14):
- * no way out records a card or Pix payment the terminal did not report.
+ * The terminal is the only source of payment truth (owner rules of
+ * 2026-11-14): while it can be used, its report is the only word, and the two
+ * manual exits are offered ONLY while it cannot be — decided from the link
+ * the flow holds and the station's own answers, never from a choice the
+ * operator makes.
  */
-export type LegExit = 'resend' | 'other-tender' | 'cancel';
+export type LegExit = 'resend' | 'other-tender' | 'cancel' | 'other-machine' | 'manual-pix';
+
+/** How a manual leg was charged, recorded while the terminal could not be used. */
+export interface Elsewhere {
+  readonly via: 'OTHER_MACHINE' | 'MANUAL_PIX';
+  /** The other machine's NSU or authorization, when the operator typed it. At most 64 characters. Never bound to a capture. */
+  readonly reference?: string;
+}
 
 export interface FlowLeg {
   /** The registry tender this leg settles as — the captured kind once approved. */
@@ -57,6 +74,8 @@ export interface FlowLeg {
   readonly history: readonly string[];
   readonly deviceId: string | null;
   readonly capture: CaptureWire | null;
+  /** How a manual leg was charged; null for every other leg. */
+  readonly elsewhere: Elsewhere | null;
   /** Why the push was refused. */
   readonly refusal: Extract<TerminalChargeAnswer, { ok: false }>['code'] | null;
   /** The ways out the operator may take from where the leg stands. */
@@ -86,11 +105,16 @@ export interface ChargeFlow {
   readonly pending: FlowPending | null;
 }
 
-/** A leg as the host's server receives it: a terminal leg carries the capture the terminal reported. */
+/**
+ * A leg as the host's server receives it: a terminal leg carries the capture
+ * the terminal reported, and a manual leg (State 6) its `elsewhere` marker —
+ * stored as manual, never as a capture.
+ */
 export interface ChargedLeg {
   readonly tender: string;
   readonly amountCents?: number;
   readonly capture?: CaptureWire;
+  readonly elsewhere?: Elsewhere;
 }
 
 /** The split the host settles, with each terminal leg's proof. */
@@ -110,7 +134,7 @@ export type Readiness = 'ready' | 'waiting-link' | 'charging' | 'decide';
 
 /** What a terminal answer means to the screen, beside the new flow. */
 export type FlowNotice =
-  /** The terminal approved a leg already received in cash: the buyer paid twice; the operator chooses which goes back. */
+  /** The terminal approved a leg already received another way (cash, a manual leg): the buyer paid twice; the operator chooses which goes back. */
   | { readonly kind: 'received-twice'; readonly index: number; readonly capture: CaptureWire }
   /** A capture no leg of this flow takes: money for no sale, kept for recovery. Never applied. */
   | { readonly kind: 'orphan'; readonly capture: CaptureWire }

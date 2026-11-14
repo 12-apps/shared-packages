@@ -5,7 +5,8 @@
  * double money (a late approval after the leg was paid in cash, a capture
  * above the total, a terminal that is down, a reload mid-charge). The
  * terminal is the only source of payment truth: nothing here settles a card
- * or Pix leg on a code or a claim typed at the station.
+ * or Pix leg on a code typed at the station, and a manual leg is offered only
+ * while the terminal cannot be used.
  *
  * Headless at its core (`startFlow` and the moves are pure; `startChargeRun`
  * drives them over the host's {@link TerminalPort}), with generic screens on
@@ -20,6 +21,8 @@ export {
   isDone,
   isLive,
   isStopped,
+  linkDown,
+  manualAllowed,
   partOf,
   readiness,
   remainingAfter,
@@ -28,9 +31,11 @@ export {
   type ConfirmWords,
 } from './charge-flow';
 export {
+  ELSEWHERE_REFERENCE_MAX,
   cancelAnswered,
   cancelRequested,
   cashReceived,
+  chargedElsewhere,
   otherTender,
   pendingCancelled,
   pushed,
@@ -43,6 +48,7 @@ export type {
   ChargedLeg,
   ChargedSplit,
   ChargeFlow,
+  Elsewhere,
   FlowLeg,
   FlowMove,
   FlowNotice,
@@ -92,8 +98,9 @@ export {
   type TerminalView,
 } from './port';
 export { useChargeFlow, useTerminalLink } from './hooks';
-export type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from './copy';
+export type { ActConfirmCopy, ElsewhereCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from './copy';
 export { ActConfirm, type ActConfirmProps } from './act-confirm';
+export { ElsewhereForm, type ElsewhereFormProps } from './elsewhere-form';
 export {
   OverCaptureChoice,
   ReceivedTwiceBand,

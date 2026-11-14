@@ -1,6 +1,6 @@
-import { advance, currentIndex, isLive, isStopped, withLeg } from './charge-flow';
-import type { ChargeFlow, FlowLeg, FlowMove } from './flow-types';
-import { terminalMethodOf, type TerminalCancelAnswer, type TerminalChargeAnswer } from './port';
+import { advance, currentIndex, isLive, isStopped, manualAllowed, withLeg } from './charge-flow';
+import type { ChargeFlow, Elsewhere, FlowLeg, FlowMove } from './flow-types';
+import { terminalMethodOf, type TerminalCancelAnswer, type TerminalChargeAnswer, type TerminalMethod } from './port';
 
 /**
  * The moves the operator and the station's answers make on a flow. Pure, and
@@ -54,7 +54,7 @@ export function cancelAnswered(flow: ChargeFlow, chargeId: string, answer: Termi
  */
 function takeWith(flow: ChargeFlow, index: number, leg: FlowLeg, tender: string): ChargeFlow {
   const method = terminalMethodOf(tender);
-  const base = { chargeId: null, history: historyOf(leg), refusal: null, capture: null };
+  const base = { chargeId: null, history: historyOf(leg), refusal: null, capture: null, elsewhere: null };
   if (method === null) return advance(withLeg(flow, index, { ...base, status: 'local', tender }));
   return withLeg(flow, index, { ...base, status: 'send', tender: method });
 }
@@ -84,6 +84,33 @@ export function cashReceived(flow: ChargeFlow): ChargeFlow {
   const index = currentIndex(flow);
   if (flow.legs[index]?.status !== 'cash') return flow;
   return advance(withLeg(flow, index, { status: 'local', tender: 'CASH' }));
+}
+
+/** The longest reference a manual leg may carry. */
+export const ELSEWHERE_REFERENCE_MAX = 64;
+
+/**
+ * State 6, while the terminal cannot be used: the leg is recorded as a MANUAL
+ * leg — "charged on another machine" (the leg's card method, or the one the
+ * operator names) or "received by a manual Pix" (a PIX leg). It is never a
+ * capture and binds none. Offered only while {@link manualAllowed}: anywhere
+ * else this throws, since the terminal's report is then the only word. Any
+ * charge the leg left on the terminal stays its own, so a late approval of it
+ * reads as received twice, never as the leg's.
+ */
+export function chargedElsewhere(flow: ChargeFlow, index: number, elsewhere: Elsewhere, method?: TerminalMethod): ChargeFlow {
+  const leg = flow.legs[index];
+  if (leg === undefined || !manualAllowed(leg, flow.link)) {
+    throw new Error('A manual leg is recorded only while the terminal cannot be used.');
+  }
+  const reference = elsewhere.reference?.trim();
+  if (reference !== undefined && reference.length > ELSEWHERE_REFERENCE_MAX) {
+    throw new RangeError(`A reference is at most ${ELSEWHERE_REFERENCE_MAX} characters.`);
+  }
+  const tender = elsewhere.via === 'MANUAL_PIX' ? 'PIX' : (method ?? terminalMethodOf(leg.tender) ?? leg.tender);
+  const recorded: Elsewhere = reference ? { via: elsewhere.via, reference } : { via: elsewhere.via };
+  const patch = { status: 'manual' as const, tender, elsewhere: recorded, chargeId: null, history: historyOf(leg), capture: null, refusal: null };
+  return advance(withLeg(flow, index, patch));
 }
 
 /** The charge a reload left on the terminal was cancelled (or ended): nothing is left to show. */

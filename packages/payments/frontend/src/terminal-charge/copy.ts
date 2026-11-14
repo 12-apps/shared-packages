@@ -57,10 +57,32 @@ export interface TerminalWaitCopy {
   readonly other: string;
   readonly otherLabel: string;
   readonly cancel: string;
+  /** State 6, shown only while the terminal cannot be used. */
+  readonly otherMachine: string;
+  readonly manualPix: string;
+  /** A manual leg in the list, visibly marked as manual. */
+  readonly manualLine: (label: string) => string;
   readonly cashReceived: (money: string) => string;
   /** Cancel the charge a reload left on the terminal. */
   readonly cancelPending: (money: string) => string;
   readonly settling: string;
+}
+
+/** State 6: a manual leg, recorded while the terminal cannot be used. */
+export interface ElsewhereCopy {
+  readonly otherMachineTitle: string;
+  readonly manualPixTitle: string;
+  /** Says the leg is recorded as manual, not as a terminal payment. */
+  readonly manualNote: string;
+  /** Names the method question (credit or debit). */
+  readonly methodLabel: string;
+  /** The optional reference field: the other machine's NSU or authorization. */
+  readonly referenceLabel: string;
+  readonly referenceHint: string;
+  /** Said under a manual Pix when the store issues a fiscal note for it. */
+  readonly fiscalNoteLine: string;
+  readonly confirm: (money: string) => string;
+  readonly back: string;
 }
 
 /** The reason and PIN that confirm a dangerous act. */
@@ -76,7 +98,7 @@ export interface ActConfirmCopy {
   readonly refused: Readonly<Record<string, string>> & { readonly fallback: string };
 }
 
-/** The terminal approved a leg already received in cash: the buyer paid twice. */
+/** The terminal approved a leg already received another way: the buyer paid twice. */
 export interface ReceivedTwiceCopy {
   readonly title: (money: string) => string;
   readonly lede: string;
