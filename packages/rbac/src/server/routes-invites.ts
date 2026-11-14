@@ -1,5 +1,5 @@
 import { fencedAudit, foldApiError, gatesOf, messagesOf, ok, type RbacRoute } from './context';
-import { requireAdminTier, requirePermission, type TeamRouteDeps } from './routes-team';
+import { requirePermission, type TeamRouteDeps } from './routes-team';
 import { requireParam } from './wire';
 
 /**
@@ -10,10 +10,10 @@ import { requireParam } from './wire';
  * mounted after `teamRoutes`, which is safe because no team route shares its
  * four-segment POST shape.
  *
- * Same guard as cancel — admin tier plus `manageTeam` — because it acts on the
- * same row. The WRITE is the host's (`RbacInvitesPort.resend`): only the host
- * knows where the credential lives and whether the mail left, and the contract
- * on the port says it must write nothing when it did not.
+ * Same guard as cancel — `manageTeam` — because it acts on the same row. The
+ * WRITE is the host's (`RbacInvitesPort.resend`): only the host knows where the
+ * credential lives and whether the mail left, and the contract on the port says
+ * it must write nothing when it did not.
  *
  * `not_sent` answers 502: the request was sound and an upstream (the mail
  * vendor, or the absence of one) failed it. The sentence says the previous link
@@ -25,8 +25,7 @@ function resendInviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/invites/:inviteId/resend',
     async handle({ actor, params, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
-        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam, locale);
         const messages = messagesOf(deps.config, locale);
         if (!deps.config.invites?.resend) {
           return { status: 501, body: { error: messages.invitesNotConfigured } };

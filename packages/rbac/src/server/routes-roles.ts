@@ -1,4 +1,5 @@
 import {
+  RbacApiError,
   foldApiError,
   gatesOf,
   messagesOf,
@@ -12,6 +13,7 @@ import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { MyPermissionsPayload } from './payloads';
 import type { RolesStore } from './roles-store';
+import { platformActorOf } from './roster-policy';
 import {
   parseBody,
   parseRoleListQuery,
@@ -37,11 +39,6 @@ interface RoleRouteDeps<P extends string> {
   governance: GrantGovernance;
   roles: RolesStore;
   wire: RoleWireSchemas;
-  /**
-   * The staff tier `GET /permissions` sits behind (any non-customer
-   * membership, or a platform admin) — the shell's entry gate.
-   */
-  requireStaffTier: (actor: RbacActor) => Promise<void>;
 }
 
 /** The `roles:manage` gate every route in this file sits behind. */
@@ -240,12 +237,11 @@ function permissionsRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'GET',
     path: '/permissions',
-    async handle({ actor }) {
+    async handle({ actor, locale }) {
       try {
         // The caller's OWN resolved set — an actor may always learn what THEY
         // can do (never another actor's set); the set itself does the fine
-        // gating. Staff-gated (any non-customer membership), the shell's tier.
-        await deps.requireStaffTier(actor);
+        // gating.
         const permissions = await deps.guards.getActorPermissions(
           {
             userId: actor.userId,
@@ -254,6 +250,15 @@ function permissionsRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
           },
           actor.tenantId,
         );
+        // The shell's entry gate: a platform admin, or a caller who holds at
+        // least one permission here. It used to be "any non-customer
+        // membership", a TIER question, so a member whose roles grant nothing
+        // was let into a shell with nothing in it. A customer whose role grants
+        // nothing, an unresolved caller and a soft-disabled membership (which
+        // resolves no permissions) are refused exactly as before.
+        if (!platformActorOf(actor) && permissions.size === 0) {
+          throw new RbacApiError(403, messagesOf(deps.config, locale).forbidden);
+        }
         const extras = (await deps.config.permissionsExtras?.(actor)) ?? {};
         // Sorted for a stable wire shape (Set iteration is insertion-defined).
         //
