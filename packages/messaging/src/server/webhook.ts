@@ -56,11 +56,14 @@ async function deliver(config: MessagingApiConfig, request: WireRequest<unknown>
   const raw = request.request;
   if (!raw) return refuse(400, "raw_request_required");
 
-  const rawBody = await raw.text();
-  if (!adapter.verify({ rawBody, header: (name) => raw.headers.get(name) })) {
+  // The signature is over the bytes as received, so it is checked on the bytes;
+  // only then are they decoded (the body size limit is the host framework's).
+  const rawBytes = new Uint8Array(await raw.arrayBuffer());
+  if (!adapter.verify({ rawBody: rawBytes, header: (name) => raw.headers.get(name) })) {
     config.logger.warn(`messaging.webhook: ${channel} signature rejected`);
     return refuse(401, "unauthorized");
   }
+  const rawBody = new TextDecoder().decode(rawBytes);
   try {
     const { fresh } = await config.engine.receive(channel, rawBody);
     return { status: 200, body: { received: true, duplicate: !fresh } };

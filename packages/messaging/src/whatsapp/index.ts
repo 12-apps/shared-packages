@@ -5,6 +5,11 @@
  * are exported on their own too: the signature check and the receipt parser
  * serve any WhatsApp webhook (a platform notification number), and the
  * Embedded Signup helpers serve the host's connect flow.
+ *
+ * `@12-apps/notifications` has its own WhatsApp transport, for one-way
+ * notification messages. It is deliberately NOT reused here: this adapter
+ * carries a conversation (inbound, the service window, opt-out, receipts),
+ * which that transport has no model for.
  */
 
 import { serviceWindowPolicy, type ChannelAdapter } from "../core/channel";

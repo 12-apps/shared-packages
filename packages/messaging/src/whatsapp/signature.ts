@@ -15,15 +15,16 @@ const SIGNATURE = /^sha256=([0-9a-f]{64})$/i;
  * Does `signatureHeader` prove `rawBody` was signed with `appSecret`?
  *
  * HMAC-SHA256 over the RAW body bytes exactly as received (a re-serialized
- * JSON body never matches), compared in constant time. Fails CLOSED: an empty
+ * JSON body never matches; hand the bytes, not a decoded string, where the
+ * framework gives them), compared in constant time. Fails CLOSED: an empty
  * secret, a missing header, a header in any other shape, or a digest of the
  * wrong length is `false` — never an exception, never `true`.
  */
-export function verifyMetaSignature(rawBody: string, signatureHeader: string | null | undefined, appSecret: string): boolean {
+export function verifyMetaSignature(rawBody: string | Uint8Array, signatureHeader: string | null | undefined, appSecret: string): boolean {
   if (!appSecret || !signatureHeader) return false;
   const match = SIGNATURE.exec(signatureHeader.trim());
   if (!match) return false;
-  const expected = createHmac("sha256", appSecret).update(rawBody, "utf8").digest();
+  const expected = createHmac("sha256", appSecret).update(rawBody).digest();
   const given = Buffer.from(match[1]!, "hex");
   return given.length === expected.length && timingSafeEqual(given, expected);
 }

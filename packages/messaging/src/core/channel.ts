@@ -27,7 +27,7 @@ export interface ChannelAdapter {
    * bytes, exactly as received. MUST fail closed: a missing secret, a missing
    * header or a malformed one is `false`, never an exception and never `true`.
    */
-  verify(delivery: { rawBody: string; header(name: string): string | null }): boolean;
+  verify(delivery: { rawBody: Uint8Array; header(name: string): string | null }): boolean;
 
   /**
    * Turn a raw body into normalized events, in the order the channel listed

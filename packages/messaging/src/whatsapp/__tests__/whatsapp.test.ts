@@ -143,7 +143,11 @@ describe("the opt-out keywords", () => {
     ["Stop", true],
     ["cancelar", true],
     ["parar de enviar", false],
-    ["PARAR!", false],
+    ["PARAR.", true],
+    ["Parar!", true],
+    ["...stop?!", true],
+    ["🛑 parar 🛑", true],
+    ["parar!!! de enviar", false],
     ["", false],
     ["quero cancelar", false],
   ])("%j is an opt-out: %s", (text, expected) => {
