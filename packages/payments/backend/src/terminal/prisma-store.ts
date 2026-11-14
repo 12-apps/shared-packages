@@ -1,4 +1,4 @@
-import type { CaptureKind, CaptureSource, CaptureState, TerminalCaptureRecord } from './model';
+import type { CaptureKind, CaptureState, StoredCaptureSource, TerminalCaptureRecord } from './model';
 import type { CapturePatch, CaptureVersion, NewTerminalCapture, TerminalCaptureStore, TerminalCaptureStoreFor } from './ports';
 
 /**
@@ -56,7 +56,6 @@ type CaptureFindManyWhere =
 
 type CaptureUpdateWhere =
   | CaptureVersion
-  | { id: string; source: 'JOURNAL'; transactionId: null; authorizationCode: null; terminalSerial: null }
   | { clientId: string; transactionCode: string; state?: 'UNBOUND'; OR: typeof NOT_LIVE }
   | { clientId: string; orderId: string; OR: typeof NOT_LIVE };
 
@@ -78,7 +77,7 @@ export interface PrismaTerminalCaptureClient {
 
 /** The columns are TEXT held to these sets by the table's CHECKs, so the narrowing is the schema's, not a guess. */
 function toRecord(row: CaptureRow): TerminalCaptureRecord {
-  return { ...row, kind: row.kind as CaptureKind, state: row.state as CaptureState, source: row.source as CaptureSource };
+  return { ...row, kind: row.kind as CaptureKind, state: row.state as CaptureState, source: row.source as StoredCaptureSource };
 }
 
 /**
@@ -128,12 +127,6 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
         select: CAPTURE_SELECT,
       });
       return rows.map(toRecord);
-    },
-    async completeJournalTrace(id, patch) {
-      await (await client()).terminalCapture.updateMany({
-        where: { id, source: 'JOURNAL', transactionId: null, authorizationCode: null, terminalSerial: null },
-        data: patch,
-      });
     },
     async writeIfUnchanged(seen, patch) {
       const { id, state, orderId, refundFlaggedAt, refundClearedAt } = seen;

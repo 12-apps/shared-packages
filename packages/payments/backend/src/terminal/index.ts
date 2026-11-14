@@ -4,8 +4,8 @@
  * A paired payment terminal takes a card or Pix capture; this subpath keeps
  * one record per capture, before or apart from any sale, and moves it from
  * UNBOUND to BOUND to the sale's payment row exactly once, whichever transport
- * (the terminal's own report, the station's sale request, an offline journal)
- * brings it first.
+ * (the terminal's own report, or the station relaying it) brings it first.
+ * Only the terminal's word records a capture.
  *
  * Server-safe and dependency-free: no `node:` import, no database client. The
  * host binds the ports (`./ports`) over its own tables. Deliberately NOT on the
@@ -28,6 +28,7 @@ export {
   type CaptureNotBoundReason,
   type CaptureSource,
   type CaptureState,
+  type StoredCaptureSource,
   type CaptureTrace,
   type PackageRefundReason,
   type RecordCaptureInput,

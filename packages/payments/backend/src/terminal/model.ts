@@ -16,11 +16,19 @@ export const CAPTURE_KINDS = ['CREDIT', 'DEBIT', 'PIX'] as const;
 export type CaptureKind = (typeof CAPTURE_KINDS)[number];
 
 /**
- * Who reported the capture: the terminal itself (`DEVICE`), the station that
- * drove it (`STATION`), or the station's offline journal from the leg alone,
- * having lost the trace (`JOURNAL`).
+ * Who reported the capture: the terminal itself (`DEVICE`), or the station
+ * relaying what the terminal told it over the signed link (`STATION`). Both
+ * are the terminal's word: nothing else may record a capture, so a sale is
+ * never paid by a capture the terminal did not report.
  */
-export type CaptureSource = 'DEVICE' | 'STATION' | 'JOURNAL';
+export type CaptureSource = 'DEVICE' | 'STATION';
+
+/**
+ * The source a stored row may carry. `JOURNAL` is a legacy value a host may
+ * still hold from before this package (a capture kept from a cashier-typed
+ * code); the package reads it but never writes it.
+ */
+export type StoredCaptureSource = CaptureSource | 'JOURNAL';
 
 export type CaptureState = 'UNBOUND' | 'ORDER_CREATED' | 'BOUND';
 
@@ -34,15 +42,12 @@ export type CaptureState = 'UNBOUND' | 'ORDER_CREATED' | 'BOUND';
  * - `SALE_NOT_CREATED`: the sale the capture was taken for was never written.
  * - `SALE_CANCELLED`: the sale holding the capture was cancelled.
  * - `PAYMENT_UNDONE`: the payment holding the capture was undone.
- * - `JOURNAL_CONFLICT`: the terminal reported another kind or amount than the
- *   offline leg the journal recorded the capture from; a person reviews the sale.
  */
 export const PACKAGE_REFUND_REASONS = [
   'UNBOUND_TIMEOUT',
   'SALE_NOT_CREATED',
   'SALE_CANCELLED',
   'PAYMENT_UNDONE',
-  'JOURNAL_CONFLICT',
 ] as const;
 export type PackageRefundReason = (typeof PACKAGE_REFUND_REASONS)[number];
 
@@ -82,7 +87,7 @@ export interface TerminalCaptureRecord extends Required<CaptureTrace> {
   kind: CaptureKind;
   amountCents: number;
   state: CaptureState;
-  source: CaptureSource;
+  source: StoredCaptureSource;
   deviceId: string | null;
   /** The sale (the host's order row) that holds the capture, once one does. */
   orderId: string | null;

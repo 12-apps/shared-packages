@@ -70,21 +70,27 @@ function heardOf(event: TerminalEvent): TerminalCaptureWire | null {
   return captureWireOf(event.deviceId, event.capture);
 }
 
-/** One code the book knows: what was heard under it (null when only claimed), and the entry it was journaled under. */
+/** One code the book knows: what was heard under it (null only in a book written before claims required a report), and the entry it was journaled under. */
 interface Kept {
   wire: TerminalCaptureWire | null;
   entryId: string | null;
 }
 
-/** What a claim answered: the heard capture (null when never heard), or `TAKEN` by another entry. */
-export type Claim = { readonly ok: true; readonly wire: TerminalCaptureWire | null } | { readonly ok: false };
+/**
+ * What a claim answered: the heard capture; `TAKEN` when another entry holds
+ * it; `UNHEARD` when the terminal never reported it here. An unheard code is
+ * never claimed: only the terminal's word pays a sale.
+ */
+export type Claim =
+  | { readonly ok: true; readonly wire: TerminalCaptureWire }
+  | { readonly ok: false; readonly reason: "TAKEN" | "UNHEARD" };
 
 export interface LanCaptureBook {
   /** Every event the LAN link emits: an approval's capture is kept. */
   observe(event: TerminalEvent): void;
   /** `send`, observing every event on its way: the terminal wiring's `broadcast`. */
   tap<C>(send: (channel: C, event: TerminalEvent) => void): (channel: C, event: TerminalEvent) => void;
-  /** Claim `code` for `entryId` now, before any other sale can: refused when another entry holds it. */
+  /** Claim a heard `code` for `entryId` now, before any other sale can: refused when another entry holds it or it was never heard. */
   claim(code: string, entryId: string): Promise<Claim>;
   /** The claims of `entryId` let go: its sale was not journaled. */
   release(entryId: string): Promise<void>;
@@ -150,10 +156,11 @@ export function createLanCaptureBook(deps: BookDeps): LanCaptureBook {
     claim: (code, entryId) =>
       serial(async (book) => {
         const row = book.get(code);
-        if (row?.entryId != null && row.entryId !== entryId) return { ok: false as const };
-        book.set(code, { wire: row?.wire ?? null, entryId });
+        if (row?.wire == null) return { ok: false as const, reason: "UNHEARD" as const };
+        if (row.entryId != null && row.entryId !== entryId) return { ok: false as const, reason: "TAKEN" as const };
+        book.set(code, { wire: row.wire, entryId });
         await save(book);
-        return { ok: true as const, wire: row?.wire ?? null };
+        return { ok: true as const, wire: row.wire };
       }),
     release: (entryId) =>
       serial(async (book) => {

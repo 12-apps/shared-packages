@@ -13,25 +13,22 @@ import { NOW, OTHER_TENANT, TENANT, wire, world, type World } from './world';
  * sale is refused.
  */
 
-const SOLD_AT = '2026-11-03T14:30:00.000Z';
-
 function binderOf(w: World, savepoint: Savepoint = w.captures.savepoint) {
   const legs = createTerminalLegs({ ledger: w.ledger, directory: w.directory, now: () => NOW });
-  return createNonRefusingCaptureBinder({ ledger: w.ledger, legs, savepoint, now: () => NOW });
+  return createNonRefusingCaptureBinder({ legs, savepoint });
 }
 
 const traced = (code: string, overrides: Partial<ReturnType<typeof wire>> = {}): SaleCapture => ({
   code,
   wire: wire({ transactionCode: code, ...overrides }),
 });
-const kept = (code: string, tender = 'DEBIT', amountCents = 2500): SaleCapture => ({ code, leg: { tender, amountCents } });
 
 /** Step 1 then step 2, as a sync books one sale. */
 async function book(w: World, captures: SaleCapture[]) {
   const subject = binderOf(w);
   const target = w.sale();
-  const notBound = await subject.recordEach(TENANT, captures, SOLD_AT);
-  const missed = await w.captures.transaction(() => subject.bindEach(null, TENANT, captures, SOLD_AT, target, notBound));
+  const notBound = await subject.recordEach(TENANT, captures);
+  const missed = await w.captures.transaction(() => subject.bindEach(null, TENANT, captures, target, notBound));
   return { target, missed };
 }
 
@@ -39,6 +36,7 @@ const terminalReports = (w: World, code: string, overrides: Partial<ReturnType<t
   w.ledger.record({ ...wire({ transactionCode: code, ...overrides }), clientId: TENANT, source: 'DEVICE', capturedAt: NOW });
 
 describe("a sale's terminal capture at its booking", () => {
+
   it('records the capture and binds it to the sale’s one payment row, with its trace', async () => {
     const w = world();
     const { target, missed } = await book(w, [traced('T1')]);
@@ -129,46 +127,6 @@ describe("a sale's terminal capture at its booking", () => {
   });
 });
 
-describe('a leg kept by its code alone (the trace lost)', () => {
-  it('records the capture from the leg, source JOURNAL, dated by the sale, binds it, and takes the trace when the terminal reports it', async () => {
-    const w = world();
-    const { target } = await book(w, [kept('T1')]);
-
-    expect(w.row('T1')).toMatchObject({ state: 'BOUND', orderId: target.orderId, source: 'JOURNAL', kind: 'DEBIT', amountCents: 2500, transactionId: null, capturedAt: new Date(SOLD_AT) });
-
-    await terminalReports(w, 'T1', { kind: 'DEBIT', terminalSerial: 'PAX-0001' });
-
-    expect(w.row('T1')).toMatchObject({ state: 'BOUND', source: 'JOURNAL', transactionId: 'TID-0001', terminalSerial: 'PAX-0001' });
-  });
-
-  it('dates a leg sold in the future at now', async () => {
-    const w = world();
-    const binder = binderOf(w);
-    await binder.recordEach(TENANT, [kept('T1')], '2026-12-01T00:00:00.000Z');
-    expect(w.row('T1').capturedAt).toEqual(NOW);
-  });
-
-  it('binds the record the terminal reported first', async () => {
-    const w = world();
-    await terminalReports(w, 'T1', { kind: 'PIX' });
-    const reported = w.row('T1');
-
-    const { target } = await book(w, [kept('T1', 'PIX')]);
-
-    expect(w.row('T1')).toMatchObject({ id: reported.id, source: 'DEVICE', state: 'BOUND', orderId: target.orderId, transactionId: 'TID-0001' });
-  });
-
-  it('answers a kept leg the record contradicts as CONFLICT and binds nothing', async () => {
-    const w = world();
-    await terminalReports(w, 'T1', { kind: 'CREDIT' });
-
-    const { missed } = await book(w, [kept('T1', 'DEBIT')]);
-
-    expect(missed).toEqual([{ transactionCode: 'T1', reason: 'CONFLICT' }]);
-    expect(w.row('T1')).toMatchObject({ state: 'UNBOUND' });
-  });
-});
-
 describe('the savepoint per capture', () => {
   it('rolls back only the capture that will not bind; the rest of the sale’s writes stand', async () => {
     const w = world();
@@ -177,10 +135,10 @@ describe('the savepoint per capture', () => {
     const other = w.sale();
     // Recorded fine before the transaction, then taken by another sale before the bind.
     const captures = [traced('OK'), traced('TAKEN')];
-    const notBound = await binder.recordEach(TENANT, captures, SOLD_AT);
+    const notBound = await binder.recordEach(TENANT, captures);
     await w.ledger.markSaleCreated(null, { clientId: TENANT, transactionCode: 'TAKEN' }, other.orderId);
 
-    const missed = await binder.bindEach(null, TENANT, captures, SOLD_AT, target, notBound);
+    const missed = await binder.bindEach(null, TENANT, captures, target, notBound);
 
     expect(missed).toEqual([{ transactionCode: 'TAKEN', reason: 'BOUND_ELSEWHERE' }]);
     expect(w.row('OK')).toMatchObject({ state: 'BOUND', paymentId: target.paymentId });
@@ -199,10 +157,10 @@ describe('the savepoint per capture', () => {
     const target = w.sale();
     await terminalReports(w, 'CONFLICTED', { amountCents: 1 });
     const captures = [traced('GOOD'), traced('CONFLICTED'), traced('LATE')];
-    const notBound = await binder.recordEach(TENANT, captures, SOLD_AT);
+    const notBound = await binder.recordEach(TENANT, captures);
     await w.ledger.flag({ clientId: TENANT, transactionCode: 'LATE' }, 'SALE_CANCELLED', NOW);
 
-    const missed = await binder.bindEach('tx-1', TENANT, captures, SOLD_AT, target, notBound);
+    const missed = await binder.bindEach('tx-1', TENANT, captures, target, notBound);
 
     expect(missed).toEqual([
       { transactionCode: 'CONFLICTED', reason: 'CONFLICT' },
@@ -219,12 +177,15 @@ describe('the savepoint per capture', () => {
       release: async () => void calls.push('release'),
       rollBack: async () => void calls.push('rollBack'),
     };
-    const legs = createTerminalLegs({ ledger: w.ledger, directory: w.directory });
     const broken = { ...w.ledger, bind: () => Promise.reject(new Error('connection lost')) };
-    const binder = createNonRefusingCaptureBinder({ ledger: broken, legs, savepoint });
+    const legs = createTerminalLegs({ ledger: broken, directory: w.directory, now: () => NOW });
+    const binder = createNonRefusingCaptureBinder({ legs, savepoint });
+    const target = w.sale();
+    await w.ledger.record({ ...wire({ transactionCode: 'T1' }), clientId: TENANT, source: 'DEVICE', capturedAt: NOW });
+    await w.ledger.markSaleCreated(null, { clientId: TENANT, transactionCode: 'T1' }, target.orderId);
 
-    await expect(binder.bindEach(null, TENANT, [kept('T1')], SOLD_AT, w.sale(), new Map())).rejects.toThrow('connection lost');
+    await expect(binder.bindEach(null, TENANT, [traced('T1')], target, new Map())).rejects.toThrow('connection lost');
     expect(calls).toEqual(['open']);
-    await expect(binder.recordEach(TENANT, [kept('T2')], SOLD_AT)).resolves.toEqual(new Map());
+    await expect(binder.recordEach(TENANT, [traced('T2')])).resolves.toEqual(new Map());
   });
 });

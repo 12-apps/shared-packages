@@ -191,10 +191,10 @@ describe("a charge", () => {
     expect(await s.event((event) => event.kind === "typed-captures")).toEqual({ kind: "typed-captures", deviceId: "pos-1", captures: [CAPTURE] });
   });
 
-  it("is refused with nothing linked, to a device not linked, and with the terminal away; a second link of one provider is dropped (O4)", async () => {
+  it("is refused with nothing linked, to a device not linked, and with the terminal away; a second link of one provider is dropped", async () => {
     expect((await station([])).server.charge(LEG)).toEqual({ ok: false, code: "NO_TERMINAL" });
     const two = await station([POS, { ...link("pos-2"), provider: "PAGBANK" }]);
-    // One link per provider (O4): the second PAGBANK link is dropped as it is read.
+    // One link per provider: the second PAGBANK link is dropped as it is read.
     expect(two.server.state().terminals.map((entry) => entry.deviceId)).toEqual(["pos-1"]);
     const s = await station([POS]);
     expect(s.server.charge(LEG)).toEqual({ ok: false, code: "NOT_CONNECTED" });
