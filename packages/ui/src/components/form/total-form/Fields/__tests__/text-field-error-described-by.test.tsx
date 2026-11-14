@@ -16,8 +16,8 @@ import { TextField, type TextFieldProps } from '../TextField';
 
 const REQUIRED = 'Informe o documento.';
 
-function renderField(props: Partial<TextFieldProps> = {}) {
-  render(
+function documentForm(props: Partial<TextFieldProps> = {}) {
+  return (
     <FormContainer<{ documentId: string }>
       initialValues={{ documentId: '' }}
       schema={{ documentId: [(value) => (String(value ?? '').length > 0 ? undefined : REQUIRED)] }}
@@ -25,8 +25,12 @@ function renderField(props: Partial<TextFieldProps> = {}) {
     >
       <TextField name="documentId" label="Documento" {...props} />
       <SubmitButton>Enviar</SubmitButton>
-    </FormContainer>,
+    </FormContainer>
   );
+}
+
+function renderField(props: Partial<TextFieldProps> = {}) {
+  render(documentForm(props));
   return screen.getByTestId('total-form-field-documentId');
 }
 
@@ -50,8 +54,8 @@ describe('Fields.TextField: the error describes the input', () => {
 
     const message = await submitAndSeeError();
 
-    expect(message).toHaveAttribute('id', 'documentId-message');
-    expect(input).toHaveAttribute('aria-describedby', 'documentId-message');
+    expect(message.id).not.toBe('');
+    expect(input).toHaveAttribute('aria-describedby', message.id);
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('textbox', { name: 'Documento', description: REQUIRED })).toBe(input);
   });
@@ -60,9 +64,28 @@ describe('Fields.TextField: the error describes the input', () => {
     const input = renderField({ inputProps: { 'aria-describedby': 'documento-dica' } });
     expect(input).toHaveAttribute('aria-describedby', 'documento-dica');
 
-    await submitAndSeeError();
+    const message = await submitAndSeeError();
 
-    expect(input).toHaveAttribute('aria-describedby', 'documento-dica documentId-message');
+    expect(input).toHaveAttribute('aria-describedby', `documento-dica ${message.id}`);
+  });
+
+  it('gives two same-named fields on one page different message ids', async () => {
+    render(
+      <>
+        {documentForm()}
+        {documentForm()}
+      </>,
+    );
+
+    for (const button of screen.getAllByText('Enviar')) fireEvent.click(button);
+    const messages = await screen.findAllByTestId('total-form-field-documentId-message');
+    const inputs = screen.getAllByTestId('total-form-field-documentId');
+
+    expect(messages).toHaveLength(2);
+    expect(new Set(messages.map((message) => message.id)).size).toBe(2);
+    expect(inputs.map((input) => input.getAttribute('aria-describedby'))).toEqual(
+      messages.map((message) => message.id),
+    );
   });
 
   it('drops the link when the error goes away', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import type { InputHTMLAttributes } from 'react';
-import React from 'react';
+import React, { useId } from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { Input } from '../../Input';
@@ -98,8 +98,11 @@ function describedByWith(callerIds: unknown, messageId: string | undefined): str
  * reading its value/error from context and writing changes back through it.
  *
  * Renders its error via `total-form-field-<name>-message` and the input via
- * `total-form-field-<name>`. While it shows an error, the message carries the
- * id `<name>-message` and the input's `aria-describedby` points at it.
+ * `total-form-field-<name>`. While it shows an error, the input's
+ * `aria-describedby` points at the message, by an id from `useId()`: unique on
+ * the page, so two forms with a field of the same name never cross-link. The id
+ * is not part of the contract; find the message by its test id or by the
+ * input's accessible description.
  */
 export function TextField({
   name,
@@ -114,7 +117,8 @@ export function TextField({
   const busy = useFormBusy();
   const error = errors[name];
   const testId = `total-form-field-${name}`;
-  const messageId = error ? `${name}-message` : undefined;
+  const generatedId = useId();
+  const messageId = error ? `${generatedId}-message` : undefined;
 
   return (
     <FormControl fullWidth>
