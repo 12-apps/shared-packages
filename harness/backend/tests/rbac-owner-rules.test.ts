@@ -56,6 +56,10 @@ async function json<T>(response: Response): Promise<T> {
 
 async function permissionsOf(userId: string): Promise<string[]> {
   const response = await asUser(userId).get('/permissions');
+  // FUT-3661: a member holding no permission at the store is refused the read,
+  // so an emptied set answers 403 instead of an empty list.
+  if (response.status === 403) return [];
+  expect(response.status).toBe(200);
   return (await json<{ data: { permissions: string[] } }>(response)).data.permissions;
 }
 
