@@ -122,8 +122,53 @@ function LegList({ flow, current, copy, tenderName, money }: { flow: ChargeFlow;
   );
 }
 
+/** The words above the amount: the part ("Part 1 of 2 · $10.00 after"), or null with one part. */
+function partLine(flow: ChargeFlow, index: number, copy: TerminalWaitCopy, money: (cents: number) => string): string | null {
+  const { part, parts } = partOf(flow, index);
+  if (parts <= 1) return null;
+  const remaining = remainingAfter(flow, index);
+  return remaining > 0 ? `${copy.part(part, parts)} · ${copy.after(money(remaining))}` : copy.part(part, parts);
+}
+
+function borderOf(leg: FlowLeg, said: Said): string {
+  if (isLive(leg)) return 'primary.main';
+  return said.warn ? 'warning.main' : 'divider';
+}
+
+/** The leg on the terminal now: its part, where, the amount, and where it stands. */
+function LegCard({ flow, index, leg, props }: { flow: ChargeFlow; index: number; leg: FlowLeg; props: TerminalWaitProps }): JSX.Element {
+  const { provider, tenderName, money, away = false, copy, dataTestId = 'terminal-wait' } = props;
+  const said = saidOf(flow, leg, copy, money(leg.amountCents), away);
+  const part = partLine(flow, index, copy, money);
+  return (
+    <Stack spacing={0.75} sx={{ p: 2, borderRadius: 3, border: 1.5, borderColor: borderOf(leg, said) }}>
+      {part === null ? null : (
+        <Typography variant="caption" component="p" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-part`}>
+          {part}
+        </Typography>
+      )}
+      <Typography variant="body2" component="p" color="text.secondary">
+        {copy.where(provider, tenderName(leg.tender))}
+      </Typography>
+      <Typography component="p" sx={{ fontSize: '2.25rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }} data-testid={`${dataTestId}-amount`}>
+        {money(leg.amountCents)}
+      </Typography>
+      <Box role="status" aria-live="polite">
+        <Typography component="p" sx={{ fontSize: '1.25rem', fontWeight: 700, color: said.warn ? 'warning.dark' : 'text.primary' }} data-testid={`${dataTestId}-title`}>
+          {said.title}
+        </Typography>
+        {said.sub === null ? null : (
+          <Typography variant="body2" component="p" color="text.secondary">
+            {said.sub}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
 export function TerminalWait(props: TerminalWaitProps): JSX.Element {
-  const { flow, run, provider, tenderName, money, away = false, copy, dataTestId = 'terminal-wait' } = props;
+  const { flow, run, tenderName, money, copy, dataTestId = 'terminal-wait' } = props;
   const index = currentIndex(flow);
   const leg = flow.legs[index];
   if (leg === undefined) {
@@ -136,40 +181,16 @@ export function TerminalWait(props: TerminalWaitProps): JSX.Element {
       </Stack>
     );
   }
-  const said = saidOf(flow, leg, copy, money(leg.amountCents), away);
-  const { part, parts } = partOf(flow, index);
-  const remaining = remainingAfter(flow, index);
+  const pending = flow.pending?.cancellable ? flow.pending : null;
   return (
     <Stack spacing={1.5} data-testid={dataTestId} data-state={leg.status}>
-      <Stack spacing={0.75} sx={{ p: 2, borderRadius: 3, border: 1.5, borderColor: isLive(leg) ? 'primary.main' : said.warn ? 'warning.main' : 'divider' }}>
-        {parts > 1 ? (
-          <Typography variant="caption" component="p" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-part`}>
-            {remaining > 0 ? `${copy.part(part, parts)} · ${copy.after(money(remaining))}` : copy.part(part, parts)}
-          </Typography>
-        ) : null}
-        <Typography variant="body2" component="p" color="text.secondary">
-          {copy.where(provider, tenderName(leg.tender))}
-        </Typography>
-        <Typography component="p" sx={{ fontSize: '2.25rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }} data-testid={`${dataTestId}-amount`}>
-          {money(leg.amountCents)}
-        </Typography>
-        <Box role="status" aria-live="polite">
-          <Typography component="p" sx={{ fontSize: '1.25rem', fontWeight: 700, color: said.warn ? 'warning.dark' : 'text.primary' }} data-testid={`${dataTestId}-title`}>
-            {said.title}
-          </Typography>
-          {said.sub === null ? null : (
-            <Typography variant="body2" component="p" color="text.secondary">
-              {said.sub}
-            </Typography>
-          )}
-        </Box>
-      </Stack>
+      <LegCard flow={flow} index={index} leg={leg} props={props} />
       <LegExits key={`${index}:${leg.status}`} {...props} leg={leg} />
-      {flow.pending !== null && flow.pending.cancellable ? (
+      {pending === null ? null : (
         <Button variant="outlined" onClick={() => run.cancelPending()} data-testid={`${dataTestId}-cancel-pending`} sx={BUTTON_SX}>
-          {copy.cancelPending(money(flow.pending.amountCents))}
+          {copy.cancelPending(money(pending.amountCents))}
         </Button>
-      ) : null}
+      )}
       <LegList flow={flow} current={index} copy={copy} tenderName={tenderName} money={money} />
     </Stack>
   );

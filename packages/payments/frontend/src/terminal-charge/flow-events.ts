@@ -84,44 +84,50 @@ function approve(flow: ChargeFlow, index: number, chargeId: string, trace: Termi
   return { flow: next, notice, ...(cancel === undefined ? {} : { cancel }) };
 }
 
+/**
+ * An approval no leg may take as its own: the same capture again (nothing), a
+ * leg received at the counter (`received-twice`), or money for no leg
+ * (`orphan`). With no capture it is nothing to say.
+ */
+function notApplied(flow: ChargeFlow, index: number, leg: FlowLeg | undefined, deviceId: string, trace: TerminalCaptureTrace | undefined): FlowMove {
+  if (trace === undefined) return moved(flow);
+  const capture = captureWireOf(trace, deviceId);
+  if (leg !== undefined && RECEIVED_ANOTHER_WAY.has(leg.status)) return { flow, notice: { kind: 'received-twice', index, capture } };
+  if (leg?.capture?.transactionCode === trace.transactionCode) return moved(flow);
+  return { flow, notice: { kind: 'orphan', capture } };
+}
+
 function onApproved(flow: ChargeFlow, chargeId: string, deviceId: string, trace: TerminalCaptureTrace | undefined): FlowMove {
   const index = ownerOf(flow, chargeId);
   const leg = flow.legs[index];
-  const orphan = (): FlowMove => (trace === undefined ? moved(flow) : { flow, notice: { kind: 'orphan', capture: captureWireOf(trace, deviceId) } });
-  if (leg === undefined) return orphan();
-  if (leg.status === 'approved' || leg.status === 'conflict') {
-    return trace === undefined || leg.capture?.transactionCode === trace.transactionCode ? moved(flow) : orphan();
-  }
-  if (RECEIVED_ANOTHER_WAY.has(leg.status)) {
-    if (trace === undefined) return moved(flow);
-    return { flow, notice: { kind: 'received-twice', index, capture: captureWireOf(trace, deviceId) } };
-  }
-  if (!MAY_APPROVE.has(leg.status)) return orphan();
+  if (leg === undefined || !MAY_APPROVE.has(leg.status)) return notApplied(flow, index, leg, deviceId, trace);
   if (trace === undefined) {
     return { flow: withLeg(flow, index, { status: 'unbound', chargeId }), notice: { kind: 'unbound', amountCents: leg.amountCents } };
   }
   return approve(flow, index, chargeId, trace, deviceId);
 }
 
+/** A released charge's end is unknown: the leg waiting on it says so. */
+function onReleased(flow: ChargeFlow, chargeId: string): FlowMove {
+  const index = currentOn(flow, chargeId);
+  const leg = index === null ? undefined : flow.legs[index];
+  const live = leg !== undefined && ['waiting', 'processing', 'cancelling', 'declined'].includes(leg.status);
+  return moved(index !== null && live ? withLeg(flow, index, { status: 'unknown' }) : flow);
+}
+
+/** Moved to cash on a released charge: nothing was taken there. Ours: the leg follows it. */
+function onReleasedToCash(flow: ChargeFlow, chargeId: string, method: string | undefined): FlowMove {
+  const index = currentOn(flow, chargeId);
+  const toCash = (method ?? 'CASH') === 'CASH';
+  return moved(index !== null && toCash && flow.legs[index]?.status !== 'cash' ? changedTo(flow, index, 'CASH') : flow);
+}
+
 /** One station event applied to the flow. */
 export function onEvent(flow: ChargeFlow, event: TerminalEvent): FlowMove {
-  if (event.kind === 'status') {
-    if (event.state === 'approved') return onApproved(flow, event.chargeId, event.deviceId, event.capture);
-    const index = currentOn(flow, event.chargeId);
-    return moved(index === null ? flow : ON_STATUS[event.state](flow, index, event));
-  }
-  if (event.kind === 'charge-released') {
-    const index = currentOn(flow, event.chargeId);
-    const leg = index === null ? undefined : flow.legs[index];
-    const live = leg !== undefined && ['waiting', 'processing', 'cancelling', 'declined'].includes(leg.status);
-    return moved(index !== null && live ? withLeg(flow, index, { status: 'unknown' }) : flow);
-  }
-  if (event.kind === 'orphan-capture') {
-    if (event.state === 'approved') return onApproved(flow, event.chargeId, event.deviceId, event.capture);
-    // Moved to cash on a released charge: nothing was taken there. Ours: the leg follows it.
-    const index = currentOn(flow, event.chargeId);
-    const toCash = (event.method ?? 'CASH') === 'CASH';
-    return moved(index !== null && toCash && flow.legs[index]?.status !== 'cash' ? changedTo(flow, index, 'CASH') : flow);
-  }
-  return moved(flow);
+  if (event.kind === 'charge-released') return onReleased(flow, event.chargeId);
+  if (event.kind !== 'status' && event.kind !== 'orphan-capture') return moved(flow);
+  if (event.state === 'approved') return onApproved(flow, event.chargeId, event.deviceId, event.capture);
+  if (event.kind === 'orphan-capture') return onReleasedToCash(flow, event.chargeId, event.method);
+  const index = currentOn(flow, event.chargeId);
+  return moved(index === null ? flow : ON_STATUS[event.state](flow, index, event));
 }

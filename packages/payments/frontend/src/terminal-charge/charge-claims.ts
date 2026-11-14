@@ -55,17 +55,30 @@ export function noteTaken(port: TerminalPort, codes: Iterable<string>): void {
   for (const code of codes) setOf(taken, port).add(code);
 }
 
+type ChargeStatus = Extract<TerminalEvent, { kind: "status" | "orphan-capture" }>;
+
+/** Ended there — approved, cancelled, moved to cash. A decline stays pending: the terminal may retry it. */
+function endedThere(event: ChargeStatus): boolean {
+  if (event.state === "method_changed") return (event.method ?? "CASH") === "CASH";
+  return event.state === "approved" || event.state === "cancelled";
+}
+
+/** The watched charges of this port that no open run holds, when `event` names one. */
+function watchedFor(port: TerminalPort, chargeId: string): Set<string> | null {
+  if (held.get(port)?.has(chargeId) ?? false) return null;
+  const mine = watched.get(port);
+  return mine !== undefined && mine.has(chargeId) ? mine : null;
+}
+
 /**
- * The amount of an approval no open Cobrar of this page holds, for a charge
- * this page answers for — or `null` for anything else.
+ * The amount of an approval no open run of this page holds, for a charge this
+ * page answers for — or `null` for anything else.
  */
 export function strayApproval(port: TerminalPort, event: TerminalEvent): number | null {
   if (event.kind !== "status" && event.kind !== "orphan-capture") return null;
-  if (held.get(port)?.has(event.chargeId) ?? false) return null;
-  const mine = watched.get(port);
-  if (mine === undefined || !mine.has(event.chargeId)) return null;
-  // Ended there — approved, cancelled, moved to cash — it is forgotten. A decline stays pending: the terminal may retry it.
-  if (event.state === "approved" || event.state === "cancelled" || (event.state === "method_changed" && (event.method ?? "CASH") === "CASH")) mine.delete(event.chargeId);
+  const mine = watchedFor(port, event.chargeId);
+  if (mine === null) return null;
+  if (endedThere(event)) mine.delete(event.chargeId);
   if (event.state !== "approved" || !event.capture) return null;
   return taken.get(port)?.has(event.capture.transactionCode) ? null : event.capture.amountCents;
 }
