@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @12-apps/marketplace — CANONICAL Prisma model partial.
 //
-// The six tables the marketplace engine owns. A host does NOT copy these
+// The seven tables the marketplace engine owns. A host does NOT copy these
 // models by hand: it composes this file into its multi-file schema folder from
 // the `db` capability (`package.json` "wiring.db"), and discovers the
 // migrations beside it.
@@ -340,4 +340,70 @@ model MarketplaceCatalogueCategory {
 
   @@unique([clientId, provider, name])
   @@map("marketplace_catalogue_categories")
+}
+
+/// One store's pause on one marketplace (FUT-4851): the engine's memory of
+/// what it asked the marketplace to close, and of what it holds there.
+///
+/// The owner's rule this row exists to keep: "never reopen a store the owner
+/// closed by hand on the marketplace, and never close one beyond what the
+/// kitchen's pause asked". The engine deletes only what it recorded here
+/// (`externalId`, `retiredExternalIds`, or a closure found under `attemptKey`);
+/// a closure the owner made by hand is in none of them.
+///
+/// `wanted` is the host's LAST ask (PAUSED | OPEN), and the last ask wins;
+/// `state` is where the marketplace stands as far as the engine knows
+/// (OPEN | PAUSING | PAUSED | RESUMING | FAILED), with `failureCode` a machine
+/// code and `failureDetail` the marketplace's own words. CHECKs in the
+/// migration. By-value `clientId`, no foreign key, as every table here.
+model MarketplaceStorePause {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  provider String
+
+  state  String @default("OPEN")
+  wanted String @default("OPEN")
+
+  /// The end the host asked for: the kitchen's estimated reopening time.
+  until    DateTime?
+  /// The host's words for the closure, sent where the marketplace shows one.
+  reason   String?
+  /// The store's IANA time zone, for a marketplace that reads its clock.
+  timeZone String?   @map("time_zone")
+
+  /// The marketplace's id for the closure the engine holds (an interruption).
+  externalId        String?   @map("external_id")
+  /// The end the marketplace was given and took. For a switch, the only proof
+  /// the engine turned the store off.
+  sentUntil         DateTime? @map("sent_until")
+  /// The key a create went out under, written BEFORE the call and kept while
+  /// its answer is in doubt.
+  attemptKey         String?   @map("attempt_key")
+  /// The end that create carried: how a closure the marketplace named with
+  /// its own id is still recognised as ours.
+  attemptUntil       DateTime? @map("attempt_until")
+  /// The closures a renewal replaced, still to be deleted, oldest first, each
+  /// with its end (`id:<id>@<end>` or `key:<key>@<end>`, space-separated). One
+  /// leaves once its delete answers, its delete is refused for good, or its
+  /// own end passes; at most ten are kept (`src/core/pause-retired.ts`).
+  retiredExternalIds String?   @map("retired_external_ids")
+
+  failureCode   String? @map("failure_code")
+  failureDetail String? @map("failure_detail")
+
+  /// When the last ask was recorded: what the sweep ages it by.
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  /// A run's hold on the row, so two runs never call one marketplace at once.
+  leaseUntil  DateTime? @map("lease_until")
+  pausedAt    DateTime? @map("paused_at")
+  resumedAt   DateTime? @map("resumed_at")
+  failedAt    DateTime? @map("failed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider])
+  @@index([state, requestedAt])
+  @@index([wanted, until])
+  @@map("marketplace_store_pauses")
 }

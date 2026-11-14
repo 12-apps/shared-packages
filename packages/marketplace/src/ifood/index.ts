@@ -3,6 +3,7 @@ import { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from 
 import { IFOOD_CATALOGUE } from "./catalogue";
 import { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodRequestCancellation } from "./outbound";
+import { IFOOD_AVAILABILITY } from "./pause";
 
 /**
  * `@12-apps/marketplace/ifood` — iFood, as one adapter on the engine.
@@ -67,6 +68,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
     catalogue: IFOOD_CATALOGUE,
     confirm: (ctx, order) => ifoodConfirm(ctx, order),
     requestCancellation: ifoodRequestCancellation,
+    // The Merchant API's interruptions: an id and an end per closure (FUT-4851).
+    availability: IFOOD_AVAILABILITY,
     // No per-order deep link is known, so the portal, where a live order is
     // on the first screen.
     appLink: () => IFOOD_PORTAL_URL,
@@ -76,3 +79,4 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
 export { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from "./copy";
 export { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 export { IFOOD_CATALOGUE, ifoodItemBody, ifoodItemId, ifoodProductId } from "./catalogue";
+export { IFOOD_AVAILABILITY, ifoodLocalTime, ifoodPause, ifoodResume } from "./pause";

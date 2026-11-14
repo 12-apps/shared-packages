@@ -1,4 +1,5 @@
 import type { MarketplaceCatalogue } from "./catalogue-port";
+import type { MarketplaceAvailability } from "./pause-port";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 /**
@@ -42,8 +43,11 @@ export interface MarketplaceCredentials {
 
 /** What the host's HTTP client takes. */
 export interface MarketplaceHttpRequest {
-  /** `PATCH` since FUT-4768: iFood's catalogue sets an item's status with it. */
-  method: "GET" | "POST" | "PUT" | "PATCH";
+  /**
+   * `PATCH` since FUT-4768: iFood's catalogue sets an item's status with it.
+   * `DELETE` since FUT-4851: iFood removes an interruption with it.
+   */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
   headers: Record<string, string>;
   body?: string;
@@ -180,6 +184,12 @@ export interface MarketplaceAdapter {
    * marketplace cannot be published to, and the host says so.
    */
   readonly catalogue?: MarketplaceCatalogue;
+  /**
+   * OPTIONAL. Closing the store on this marketplace for a while, and opening
+   * it again (FUT-4851). Absent: the marketplace cannot be paused through an
+   * API, and the host says so.
+   */
+  readonly availability?: MarketplaceAvailability;
   /** Where "open it on the marketplace" goes: the order when `perOrderAppLink`, else the portal. Always https. */
   appLink(order: Pick<OutboundOrderRef, "externalOrderId" | "externalDisplayId">): string;
 }

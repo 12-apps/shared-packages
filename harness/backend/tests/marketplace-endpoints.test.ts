@@ -95,6 +95,8 @@ describe('the adoption', () => {
     expect(unclaimedRoutes(marketplace.routes, claimed), renderWiringReport(marketplace.report)).toEqual([]);
     expect(marketplace.routes).toHaveLength(7);
     expect(marketplace.jobs.map((job) => job.name).sort()).toEqual([
+      'marketplace.availability',
+      'marketplace.availability-sweep',
       'marketplace.catalogue',
       'marketplace.expire-acceptances',
       'marketplace.fetch-order',

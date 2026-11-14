@@ -8,6 +8,7 @@ import {
   type RappiAmountUnit,
 } from "./normalize";
 import { rappiReject, rappiTake, type RappiBaseUrls } from "./outbound";
+import { rappiAvailability } from "./pause";
 
 /**
  * `@12-apps/marketplace/rappi` — Rappi, as one adapter on the engine.
@@ -86,6 +87,14 @@ export interface RappiAdapterConfig {
   portalUrl: string;
   /** How Rappi states money for this host's country (see {@link RappiAmountUnit}). Required: ESTIMATED for Brazil. */
   amountUnit: RappiAmountUnit;
+  /**
+   * OPTIONAL, off by default. Offer the store pause (FUT-4851) through Rappi's
+   * store on/off switch. A switch has no id, so the engine cannot tell its own
+   * closure from one the owner made by hand meanwhile: a store the owner also
+   * turned off on Rappi during the kitchen's pause is turned on with it. A
+   * host turns this on knowing that.
+   */
+  pauseByStoreSwitch?: boolean;
 }
 
 function assertHttps(name: string, url: string): void {
@@ -147,6 +156,7 @@ export function createRappiAdapter(config: RappiAdapterConfig): MarketplaceAdapt
     confirm: (ctx, order, input) => rappiTake(ctx, hosts, order, input),
     requestCancellation: (ctx, order, input) => rappiReject(ctx, hosts, order, input),
     appLink: () => config.portalUrl,
+    ...(config.pauseByStoreSwitch ? { availability: rappiAvailability(hosts) } : {}),
   };
 }
 
@@ -159,3 +169,4 @@ export {
   type RappiNormalizeOptions,
 } from "./normalize";
 export type { RappiBaseUrls, RappiHosts } from "./outbound";
+export { rappiAvailability, rappiSetStoreEnabled } from "./pause";

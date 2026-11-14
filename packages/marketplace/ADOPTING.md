@@ -227,3 +227,50 @@ The stock draw at the acceptance, the settlement effects, the board's and the
 order screen's UI, the cancel route itself, the HTTP client's timeout and CA,
 the jobs runtime and its leases, which roles hold the two permissions, and
 every sentence a person reads.
+
+## 7. Pausing a store
+
+The store pause (FUT-4851) closes the store on every connected marketplace
+while the host's kitchen is paused. Everything the host owns about it:
+
+**When to call.** The host decides when its kitchen is paused and runs the
+debounce (a store setting beside the cap, 3 minutes by default: pause at once
+when the cap is passed, reopen only after the queue stayed under it that long).
+The engine never debounces.
+
+| call | who calls it, and when |
+|---|---|
+| `pauseStore({ clientId, until, reason, timeZone })` | The kitchen enters its pause, and again on every renewal while it stays paused (each time its estimated reopening time moves, later OR earlier: an earlier end is honoured too, so the store is never closed longer than the kitchen's pause; a renewal every few minutes is fine). `until` is the kitchen's ESTIMATED reopening time and must be in the future (else `{ kind: "invalid", code: "UNTIL_NOT_FUTURE" }`). `reason` is the host's own words (its copy, in the store's language), sent where the marketplace shows one. `timeZone` is the store's IANA zone (one the runtime does not know answers `{ kind: "invalid", code: "TIME_ZONE_INVALID" }`). Answers per live connection: `queued`, `unchanged` (a pause with exactly this end already stands or is on its way), `unsupported` (the adapter has no `availability`), `not-connected` (no credentials or no merchant id). |
+| `resumeStore({ clientId })` | The moment the kitchen's pause is over (after the host's debounce). Deletes only what the engine created; answers `queued`, `open` (nothing of ours stood there: nobody is called) or `unchanged`. |
+| `availabilityState(clientId)` | The screen: per live connection `{ provider, supported, kind, connected, state, wanted, until, sentUntil, failureCode, failureDetail, pausedAt, resumedAt, updatedAt }`. `state` is `OPEN`, `PAUSING`, `PAUSED`, `RESUMING` or `FAILED`; draw `supported: false` as "this marketplace cannot be paused from here". `failureCode` is a code for the host's copy; `failureDetail` is the marketplace's own words, never copy. |
+
+If the host stops renewing (it died, or never called `resumeStore`), the
+availability sweep resumes the store on its own once `until` has passed: the
+store is never closed on a marketplace longer than the kitchen's own pause.
+
+**The jobs.** Bind the two new blueprints with the rest of `MARKETPLACE_JOBS`
+(`{ engine }`): `marketplace.availability` (on demand, three attempts, short
+backoff) and `marketplace.availability-sweep` (every five minutes, on the
+single-flight `sweeps` queue). A host that adopts the wiring manifest gets
+them with the others. A host that declines `jobs` gets no pause at all: every
+ask stays `PAUSING`, so it must not call `pauseStore`.
+
+**The outbound gate.** No path that answers a request calls a marketplace:
+`pauseStore` and `resumeStore` record the ask and queue the job, and the job
+calls the adapter through the host's `http` port, as `confirm` does. A host
+that gates outbound calls (an environment where nothing may reach a real
+marketplace) gates the `http` port, and every pause call goes through it.
+
+**The switches.** Rappi and 99Food can only switch a whole store on or off,
+with no id and no end, so the engine cannot tell its own closure from one the
+owner ALSO made by hand on the marketplace during the kitchen's pause (that
+one would be reopened with it). Their adapters offer the capability only with
+`pauseByStoreSwitch: true`; leave it off to keep them `unsupported`.
+
+**The database.** Migration `20261113230000_marketplace_store_pause` adds
+`marketplace_store_pauses` (one row per store and marketplace, CHECKed
+vocabularies, no foreign key; add `client_id → <tenants>(id) ON DELETE CASCADE`
+if you want one). The `MarketplaceDb.marketplaceStorePause` delegate is
+OPTIONAL in the type, so a 1.x host compiles before it migrates; `pauseStore`
+and `resumeStore` throw naming the migration until it does, and
+`availabilityState` reads every marketplace OPEN.

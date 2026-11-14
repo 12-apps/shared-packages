@@ -12,6 +12,7 @@ import {
   openDeliveryRequestCancellation,
   type NinetyNineFoodApiBaseUrls,
 } from "./outbound";
+import { openDeliveryAvailability } from "./pause";
 
 /**
  * `@12-apps/marketplace/99food` — 99Food, as one adapter on the engine.
@@ -61,6 +62,13 @@ export interface NinetyNineFoodAdapterConfig {
    * per-order deep link, so the link is the portal. Required; https only.
    */
   portalUrl: string;
+  /**
+   * OPTIONAL, off by default. Offer the store pause (FUT-4851) through Open
+   * Delivery's `merchantStatus`, a store-wide switch with no id: a store the
+   * owner also closed by hand on 99Food during the kitchen's pause is opened
+   * with it. A host turns this on knowing that.
+   */
+  pauseByStoreSwitch?: boolean;
 }
 
 function assertHttps(name: string, url: string): void {
@@ -112,6 +120,7 @@ export function createNinetyNineFoodAdapter(config: NinetyNineFoodAdapterConfig)
     confirm: (ctx, order, input) => openDeliveryConfirm(ctx, bases, order, input),
     requestCancellation: (ctx, order, input) => openDeliveryRequestCancellation(ctx, bases, order, input),
     appLink: () => config.portalUrl,
+    ...(config.pauseByStoreSwitch ? { availability: openDeliveryAvailability(bases) } : {}),
   };
 }
 
@@ -123,3 +132,4 @@ export {
 export { normalizeOpenDeliveryEvent, normalizeOpenDeliveryOrder, verifyOpenDeliverySignature } from "./normalize";
 export type { NinetyNineFoodApiBaseUrls } from "./outbound";
 export { openDeliveryCatalogue, openDeliveryMenuDocument } from "./catalogue";
+export { openDeliveryAvailability, openDeliverySetMerchantStatus } from "./pause";
