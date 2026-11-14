@@ -13,6 +13,7 @@
     "./manifest": "./src/manifest/index.ts",
     "./manifest/web": "./src/manifest/web.ts",
     "./tender-split": "./src/tender-split/index.ts",
+    "./terminal-charge": "./src/terminal-charge/index.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
