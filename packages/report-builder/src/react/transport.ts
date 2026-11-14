@@ -1,4 +1,4 @@
-import { EN_US_REPORT_TRANSPORT_ERROR_COPY } from "./en-US";
+import { EN_US_REPORT_TRANSPORT_ERROR_COPY } from "./en-US.transport";
 import type { Result } from "./lib/rest-result";
 import type { ReportTransportErrorCopy } from "./screens-copy";
 

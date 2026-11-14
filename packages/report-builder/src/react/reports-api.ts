@@ -6,9 +6,9 @@
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { apiFetch } from "./lib/api";
 import type { ChartSpec } from "@12-apps/ui/charts";
 import type { ReportRangeCopy } from "./screens-copy";
+import { useTransport } from "./transport-context";
 
 /**
  * The presets that resolve against the CLOCK, narrow → wide-ish.
@@ -187,23 +187,18 @@ interface SystemReportResult {
   render: ReportRender;
 }
 
-/** Success envelope shared by the whole `/api/admin/**` surface. */
-interface ApiEnvelope<T> {
-  data: T;
-}
-
 function adminPath(tenantSlug: string, path: string): string {
   return `/api/admin/${encodeURIComponent(tenantSlug)}${path}`;
-}
-
-async function adminFetch<T>(path: string): Promise<T> {
-  const { data } = await apiFetch<ApiEnvelope<T>>(path);
-  return data;
 }
 
 /**
  * Run one built-in report. Range and grain are part of the query key, so
  * switching either re-queries while previously loaded frames stay cached.
+ *
+ * Read through the transport in scope, like every other call this surface
+ * makes, so a failure reads in the host's words (FUT-4070) and a host's own
+ * transport sees this read too. It used to call a private `fetch` that threw
+ * `HTTP <status> for <path>` in English.
  */
 export function useSystemReport(
   tenantSlug: string,
@@ -211,10 +206,11 @@ export function useSystemReport(
   range: ReportRange,
   grain: ReportGrain,
 ): UseQueryResult<SystemReportResult> {
+  const transport = useTransport();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "system", reportKey, range, grain],
     queryFn: () =>
-      adminFetch<SystemReportResult>(
+      transport.get<SystemReportResult>(
         adminPath(
           tenantSlug,
           `/reports/system/${encodeURIComponent(reportKey)}?preset=${range}&grain=${grain}`,
