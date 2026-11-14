@@ -29,7 +29,7 @@ import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
-import { ReportNotes } from "./report-notes";
+import { ReportBodyWithNotes } from "./report-notes";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
 import { REPORT_GRAINS, useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
@@ -105,18 +105,14 @@ function DashboardBlock({
             {copy.blockFailed}
           </Alert>
         ) : report ? (
-          <Stack spacing={1.5}>
-            <ReportRenderView
-              render={report.render}
-              dataTestId={`${testId}-render`}
-              onWidenRange={widenAction(range, onRangeChange, ranges)}
-              asTable={tableView.asTable}
-              bounded
-              notes={report.notes}
-              caption={title}
-            />
-            <ReportNotes notes={report.notes} tenantSlug={tenantSlug} dataTestId={testId} />
-          </Stack>
+          <ReportBodyWithNotes
+            report={report}
+            title={title}
+            tenantSlug={tenantSlug}
+            dataTestId={`${testId}-render`}
+            onWidenRange={widenAction(range, onRangeChange, ranges)}
+            asTable={tableView.asTable} bounded
+          />
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />
         )}

@@ -11,7 +11,8 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { blockNotes, noteText } from "./lib/report-notes";
-import type { ReportNoteView } from "./reports-api";
+import { ReportRenderView } from "./report-render";
+import type { ReportNoteView, ReportRender } from "./reports-api";
 import { useReportCopy } from "./transport-context";
 
 export function ReportNotes({
@@ -48,6 +49,30 @@ export function ReportNotes({
           ) : null}
         </Stack>
       ))}
+    </Stack>
+  );
+}
+
+/**
+ * A built-in's rendering with its notes under it — what the single-report page
+ * and every dashboard block draw, so the two cannot place the notes apart. The
+ * notes' test ids follow the rendering's: `<dataTestId>-notes`.
+ */
+export function ReportBodyWithNotes({
+  report,
+  tenantSlug,
+  title,
+  dataTestId = "report-render",
+  ...view
+}: Omit<Parameters<typeof ReportRenderView>[0], "render" | "notes" | "caption"> & {
+  report: { render: ReportRender; notes?: readonly ReportNoteView[] };
+  tenantSlug: string;
+  title: string;
+}): JSX.Element {
+  return (
+    <Stack spacing={1.5}>
+      <ReportRenderView {...view} dataTestId={dataTestId} render={report.render} notes={report.notes} caption={title} />
+      <ReportNotes notes={report.notes} tenantSlug={tenantSlug} dataTestId={dataTestId} />
     </Stack>
   );
 }

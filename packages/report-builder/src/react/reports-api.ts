@@ -139,6 +139,23 @@ export interface ReportTableColumn {
 }
 
 /** Rendered report: a table model or a `@12-apps/ui` chart spec, plus rows. */
+/** A table presentation's row flag, as a spec carries it (FUT-4063). */
+export interface ReportRowFlagWire {
+  measure: string;
+  above: number;
+  label: string;
+  whenEmpty?: { measure: string };
+}
+
+/** The heat map presentation, as a spec carries it (FUT-4063). */
+export interface ReportHeatmapPresentationWire {
+  kind: "heatmap";
+  target: number;
+  strongAbove?: number;
+  strongBelow?: number;
+  labels: { above: string; below: string; empty: string };
+}
+
 /** A table's flagged rows (FUT-4063): the judged column, the flag's words, row indices. */
 export interface ReportTableFlag {
   column: string;

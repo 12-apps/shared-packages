@@ -23,10 +23,18 @@ import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
-import { ReportNotes } from "./report-notes";
-import { exportColumnsFor, ReportRenderView } from "./report-render";
+import { ReportBodyWithNotes } from "./report-notes";
+import { exportColumnsFor } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
 import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
+
+/** The page's CSV: exactly the rows on screen, in the columns on screen. */
+function exportReportCsv(
+  report: { key: string; render: Parameters<typeof exportColumnsFor>[0] },
+  values: Parameters<typeof exportColumnsFor>[1],
+): void {
+  exportRows("csv", report.render.rows, exportColumnsFor(report.render, values), `relatorio-${report.key}`);
+}
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { system: systemCopy, builder: builderCopy } = useReportCopy().screens;
@@ -78,14 +86,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         showGrain={report.supportsGrain}
         grains={report.grains}
         printTitle={report.title}
-        onExport={() =>
-          exportRows(
-            "csv",
-            report.render.rows,
-            exportColumnsFor(report.render, copy.values),
-            `relatorio-${report.key}`,
-          )
-        }
+        onExport={() => exportReportCsv(report, copy.values)}
       />
 
       {/* The same toggle every block on a canvas gets — one implementation, so
@@ -103,13 +104,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
             />
           </Stack>
         ) : null}
-        <ReportRenderView
-          render={report.render}
-          asTable={tableView.asTable}
-          notes={report.notes}
-          caption={report.title}
-        />
-        <ReportNotes notes={report.notes} tenantSlug={tenantSlug} dataTestId="report-render" />
+        <ReportBodyWithNotes report={report} title={report.title} tenantSlug={tenantSlug} asTable={tableView.asTable} />
       </Stack>
     </Stack>
   );

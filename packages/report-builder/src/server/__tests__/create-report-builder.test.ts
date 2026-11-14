@@ -343,6 +343,77 @@ describe('the built-in reports', () => {
   });
 });
 
+describe('a built-in that derives what it needs (FUT-4063)', () => {
+  const derived: SystemReportDef = {
+    key: 'meta',
+    title: 'Meta',
+    description: 'Receita por forma, marcada acima do alvo da loja.',
+    permission: 'sales:read',
+    section: 'orders',
+    supportsGrain: true,
+    grains: ['day', 'week'],
+    presentation: 'table',
+    derive: ({ actor: who, window, grain }) =>
+      Promise.resolve({
+        params: { target: who.clientId === 'tenant-1' ? 100 : 0 },
+        notes: [
+          { key: 'grain', text: `${grain} desde ${window.from.toISOString().slice(0, 10)}` },
+          { key: 'names', text: 'Sem custo: {items}', items: ['A', 'B'] },
+        ],
+      }),
+    build: ({ params }) =>
+      ({
+        ...ORDERS_SPEC,
+        measures: [{ field: 'totalCents', alias: 'revenue' }],
+        presentation: {
+          kind: 'table',
+          flag: { measure: 'revenue', above: params.target ?? 1_000_000, label: 'acima' },
+        },
+      }) as never,
+  };
+
+  it('builds the spec with the params it derived, and returns its notes', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const response = await call('GET', '/reports/system/:key', {
+      params: { key: 'meta' },
+      query: { preset: 'today', grain: 'week' },
+    });
+
+    expect(response.status).toBe(200);
+    const result = data<{
+      grains: string[];
+      render: { kind: string; flag?: { label: string; rows: number[] } };
+      notes: Array<{ key: string; text: string }>;
+    }>(response);
+    expect(result.grains).toEqual(['day', 'week']);
+    // The tenant's target (100 centavos) reached the flag, so rows are marked.
+    expect(result.render.flag?.label).toBe('acima');
+    expect(result.render.flag?.rows.length).toBeGreaterThan(0);
+    expect(result.notes.map((note) => note.key)).toEqual(['grain', 'names']);
+    expect(result.notes[0]?.text).toBe('week desde 2026-07-14');
+  });
+
+  it('lists its grains on the hub, and an empty notes list for a report without derive', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const list = data<{ reports: Array<{ key: string; grains?: string[] }> }>(
+      await call('GET', '/reports/system', {}),
+    );
+    expect(list.reports.find((report) => report.key === 'meta')?.grains).toEqual(['day', 'week']);
+    expect(list.reports.find((report) => report.key === 'vendas')).not.toHaveProperty('grains');
+
+    const plain = data<{ notes: unknown[] }>(
+      await call('GET', '/reports/system/:key', { params: { key: 'vendas' }, query: { preset: 'today' } }),
+    );
+    expect(plain.notes).toEqual([]);
+  });
+
+  it('is validated at assembly with no params, so a build must default them', () => {
+    expect(() => setup({ systemReports: [derived] })).not.toThrow();
+  });
+});
+
 describe('listing saved documents narrows twice', () => {
   it('drops documents the lifecycle hides', async () => {
     const { call } = setup({

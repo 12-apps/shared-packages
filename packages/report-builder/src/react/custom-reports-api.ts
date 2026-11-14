@@ -16,10 +16,12 @@ import type { Result } from "./lib/rest-result";
 import type { ReportBuilderTransport } from "./transport";
 import type {
   ReportGrain,
+  ReportHeatmapPresentationWire,
   ReportRange,
   ReportRangeSelection,
   ReportRender,
   ReportRollingRange,
+  ReportRowFlagWire,
 } from "./reports-api";
 
 /** A period as any caller may hold it — a bare rolling preset, or the object. */
@@ -104,19 +106,10 @@ export interface ReportSpecWire {
   sort: Array<{ by: string; direction: "asc" | "desc" }>;
   limit?: number;
   presentation:
-    | {
-        kind: "table";
-        flag?: { measure: string; above: number; label: string; whenEmpty?: { measure: string } };
-      }
+    | { kind: "table"; flag?: ReportRowFlagWire }
     | { kind: "chart"; chartType: "line" | "bar" | "area" | "pie" | "donut"; stacked?: boolean }
     | { kind: "kpi"; label?: string; numberFormat?: string }
-    | {
-        kind: "heatmap";
-        target: number;
-        strongAbove?: number;
-        strongBelow?: number;
-        labels: { above: string; below: string; empty: string };
-      };
+    | ReportHeatmapPresentationWire;
 }
 
 /** One dashboard block: a regular spec plus layout metadata (FUT-306). */

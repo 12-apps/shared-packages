@@ -20,6 +20,10 @@
 
 import type { BreadcrumbCopy } from "@12-apps/ui/copy";
 
+import type { ReportSystemCopy } from "./system-copy";
+
+export type { ReportSystemCopy };
+
 /** The relative age a card's footer opens with. */
 export interface ReportRelativeTimeCopy {
   /** Under a minute old. */
@@ -184,21 +188,6 @@ export interface ReportRangeCopy {
   emptyBody: string;
   /** The empty state's offer to widen — "Ver 30 dias", given the period. */
   widen(rangeLabel: string): string;
-}
-
-/** The host's built-in reports and dashboards. */
-export interface ReportSystemCopy {
-  blockFailed: string;
-  dashboardMissingTitle: string;
-  dashboardMissingBody: string;
-  reportFailedTitle: string;
-  reportFailedBody: string;
-  /** The retry beside a failed system report. */
-  retry: string;
-  /** Joins the names a report note lists (FUT-4063), e.g. "; ". */
-  noteSeparator: string;
-  /** Closes a note's list past its first three names: ", e mais 2". */
-  noteMore(count: number): string;
 }
 
 /**
