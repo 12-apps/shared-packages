@@ -13,30 +13,46 @@ import Typography from '@mui/material/Typography/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import React from 'react';
 
-import { sxRem } from '../../../tokens/relative';
-import { heatMapGrid, heatMapTone, isAboveTone } from './heat-map-model';
-import {
-  headerCellSx,
-  rowHeaderSx,
-  SR_ONLY_SX,
-  swatchSx,
-  tableSx,
-  toneSx,
-  valueCellSx,
-} from './HeatMap.styles';
+import { remPx, sxRem } from '../../../tokens/relative';
+import { useMeasuredWidth } from '../../utility/Overflow/overflow';
+import { heatMapToneColors } from './heat-map-colors';
+import { heatMapFit, heatMapGrid, heatMapTone, isAboveTone, type HeatMapFit } from './heat-map-model';
+import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
+import { headerCellSx, rowHeaderSx, SR_ONLY_SX, swatchSx, tableSx, valueCellSx } from './HeatMap.styles';
 import type { HeatMapCell, HeatMapLabels, HeatMapProps, HeatMapScale } from './HeatMap.types';
 
 const EM_DASH = '—';
 
-/** Whether the grid is drawn transposed: a fixed answer, or the theme's `md` for `'auto'`. */
-function useTransposed(transpose: HeatMapProps['transpose']): boolean {
+/**
+ * How the grid is drawn: which way round and at which type step. `'auto'`
+ * prefers the transposed grid below the theme's `md`; at any width the fit
+ * moves to the compact step, then to the other way round, before it would clip
+ * a figure.
+ */
+function useFit(transpose: HeatMapProps['transpose'], width: number, rows: number, columns: number): HeatMapFit {
   const theme = useTheme();
   const narrow = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
-  if (transpose === undefined || transpose === 'auto') return narrow;
-  return transpose;
+  const fixed = transpose === true || transpose === false;
+  const prefer = fixed ? transpose : narrow;
+  const px = (value: number): number => remPx(theme, value);
+  return heatMapFit(
+    width,
+    rows,
+    columns,
+    {
+      labelColumn: px(M.labelColumn),
+      labelColumnTransposed: px(M.labelColumnTransposed),
+      gap: px(M.gap),
+      minCell: px(M.minCell),
+      compactMinCell: px(M.compactMinCell),
+    },
+    prefer,
+    fixed,
+  );
 }
 
 interface ValueCellProps {
+  fit: HeatMapFit;
   cell: HeatMapCell | undefined;
   scale: HeatMapScale;
   labels: HeatMapLabels;
@@ -45,10 +61,11 @@ interface ValueCellProps {
 }
 
 /** One figure cell: blank, "—", or the figure on its side's tint. */
-function ValueCell({ cell, scale, labels, formatValue, testId }: ValueCellProps): React.JSX.Element {
+function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellProps): React.JSX.Element {
   const theme = useTheme();
+  const cellSx = valueCellSx(fit.compact, fit.transposed);
   if (!cell) {
-    return <Box component="td" sx={valueCellSx} data-testid={testId} data-tone="blank" />;
+    return <Box component="td" sx={cellSx} data-testid={testId} data-tone="blank" />;
   }
   const tone = heatMapTone(cell.value, scale);
   const above = isAboveTone(tone);
@@ -56,7 +73,7 @@ function ValueCell({ cell, scale, labels, formatValue, testId }: ValueCellProps)
   return (
     <Box
       component="td"
-      sx={[valueCellSx, toneSx(tone, theme), above ? { fontWeight: 'fontWeightBold' } : {}]}
+      sx={{ ...cellSx, ...heatMapToneColors(tone, theme), ...(above ? { fontWeight: 'fontWeightBold' } : {}) }}
       data-testid={testId}
       data-tone={tone}
     >
@@ -79,8 +96,8 @@ function ValueCell({ cell, scale, labels, formatValue, testId }: ValueCellProps)
 function Legend({ labels, testId }: { labels: HeatMapLabels; testId: string }): React.JSX.Element {
   const theme = useTheme();
   const items = [
-    { key: 'below', swatch: toneSx('below', theme), text: labels.below, bold: false },
-    { key: 'above', swatch: toneSx('above', theme), text: labels.above, bold: true },
+    { key: 'below', swatch: heatMapToneColors('below', theme), text: labels.below, bold: false },
+    { key: 'above', swatch: heatMapToneColors('above', theme), text: labels.above, bold: true },
   ];
   return (
     <Box
@@ -119,10 +136,18 @@ export function HeatMap({
   className,
   dataTestId = 'heat-map',
 }: HeatMapProps): React.JSX.Element {
-  const transposed = useTransposed(transpose);
+  const { ref, width } = useMeasuredWidth<HTMLDivElement>();
+  const fit = useFit(transpose, width, rows.length, columns.length);
+  const { transposed, compact } = fit;
   const grid = heatMapGrid(rows, columns, cells, transposed);
   return (
-    <Box className={className} data-testid={dataTestId} data-transposed={transposed ? 'true' : 'false'}>
+    <Box
+      ref={ref}
+      className={className}
+      data-testid={dataTestId}
+      data-transposed={transposed ? 'true' : 'false'}
+      data-compact={compact ? 'true' : 'false'}
+    >
       <Box component="table" sx={tableSx} data-testid={`${dataTestId}-table`}>
         {caption ? (
           <Box component="caption" sx={SR_ONLY_SX}>
@@ -130,13 +155,13 @@ export function HeatMap({
           </Box>
         ) : null}
         <colgroup>
-          <Box component="col" sx={{ width: sxRem(transposed ? 36 : 44) }} />
+          <Box component="col" sx={{ width: sxRem(transposed ? M.labelColumnTransposed : M.labelColumn) }} />
         </colgroup>
         <thead>
           <tr>
-            <Box component="td" sx={headerCellSx} />
+            <Box component="td" sx={headerCellSx(compact)} />
             {grid.columns.map((column) => (
-              <Box component="th" scope="col" key={column.key} sx={headerCellSx}>
+              <Box component="th" scope="col" key={column.key} sx={headerCellSx(compact)}>
                 {column.label}
               </Box>
             ))}
@@ -145,12 +170,13 @@ export function HeatMap({
         <tbody>
           {grid.rows.map((row) => (
             <tr key={row.key}>
-              <Box component="th" scope="row" sx={rowHeaderSx}>
+              <Box component="th" scope="row" sx={rowHeaderSx(compact)}>
                 {row.label}
               </Box>
               {grid.columns.map((column) => (
                 <ValueCell
                   key={column.key}
+                  fit={fit}
                   cell={grid.cellAt(row.key, column.key)}
                   scale={scale}
                   labels={labels}

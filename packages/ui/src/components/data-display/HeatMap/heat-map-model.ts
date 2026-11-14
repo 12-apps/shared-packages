@@ -50,3 +50,57 @@ export function heatMapGrid(
     cellAt: (row, column) => byKey.get(cellKey(column, row)),
   };
 }
+
+/** How the grid is drawn at a width: which way round, and at which type step. */
+export interface HeatMapFit {
+  transposed: boolean;
+  compact: boolean;
+}
+
+/** The widths `heatMapFit` weighs, in px. */
+export interface HeatMapFitMetrics {
+  labelColumn: number;
+  labelColumnTransposed: number;
+  gap: number;
+  minCell: number;
+  compactMinCell: number;
+}
+
+function needs(columns: number, label: number, cell: number, gap: number): number {
+  return label + columns * (cell + gap) + gap;
+}
+
+/**
+ * The first arrangement in which EVERY figure shows whole (FUT-4063), so the
+ * grid never clips a number and never scrolls sideways.
+ *
+ * Tried in order: as asked at the regular step, as asked at the compact step,
+ * then the other way round at each step. `orientation` is `'rows'` or
+ * `'columns'` when the host fixed it (only the step can change then), else the
+ * preferred way round (the phone prefers transposed). A width of 0 (not yet
+ * measured, or no layout at all) keeps the preference at the regular step.
+ */
+export function heatMapFit(
+  width: number,
+  rowCount: number,
+  columnCount: number,
+  metrics: HeatMapFitMetrics,
+  preferTransposed: boolean,
+  fixed = false,
+): HeatMapFit {
+  if (width <= 0) return { transposed: preferTransposed, compact: false };
+  const ways = fixed ? [preferTransposed] : [preferTransposed, !preferTransposed];
+  const tries: HeatMapFit[] = ways.flatMap((transposed) => [
+    { transposed, compact: false },
+    { transposed, compact: true },
+  ]);
+  const fits = tries.find(({ transposed, compact }) =>
+    needs(
+      transposed ? rowCount : columnCount,
+      transposed ? metrics.labelColumnTransposed : metrics.labelColumn,
+      compact ? metrics.compactMinCell : metrics.minCell,
+      metrics.gap,
+    ) <= width,
+  );
+  return fits ?? { transposed: fixed ? preferTransposed : rowCount <= columnCount, compact: true };
+}

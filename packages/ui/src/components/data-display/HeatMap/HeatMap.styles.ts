@@ -1,75 +1,63 @@
-import { alpha, type Theme } from '@mui/material/styles/index.js';
-import type { SxProps } from '@mui/material/styles/index.js';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
 
 import { sxRem } from '../../../tokens/relative';
-import type { HeatMapTone } from './HeatMap.types';
-
-/**
- * Each tone as ROLES, never values (a component reads a role). The attention
- * side is `warning` (amber): "getting late", not "failed". The calm side is
- * `info`, deliberately not `primary`: a host whose brand is red would paint
- * every good cell the colour of a fault. No-figure cells take the disabled
- * surface, so they read as "nothing to judge" rather than as either side.
- */
-export function toneSx(tone: HeatMapTone, theme: Theme): { backgroundColor: string; color: string } {
-  switch (tone) {
-    case 'above-strong':
-      return { backgroundColor: alpha(theme.palette.warning.main, 0.45), color: theme.palette.warning.dark };
-    case 'above':
-      return { backgroundColor: alpha(theme.palette.warning.main, 0.22), color: theme.palette.warning.dark };
-    case 'below-strong':
-      return { backgroundColor: alpha(theme.palette.info.main, 0.24), color: theme.palette.info.dark };
-    case 'below':
-      return { backgroundColor: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.dark };
-    default:
-      return { backgroundColor: theme.palette.action.disabledBackground, color: theme.palette.text.disabled };
-  }
-}
+import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
 
 /**
  * `table-layout: fixed` over the full width is what keeps the grid INSIDE its
  * container at every width: the columns share what there is, so the grid never
- * scrolls sideways (a heat map read through a sideways scroll loses its rows'
- * names).
+ * scrolls sideways. That alone could clip a figure, so `heatMapFit` picks the
+ * orientation and type step at which every figure fits whole.
  */
 export const tableSx = {
   width: '100%',
   tableLayout: 'fixed',
   borderCollapse: 'separate',
-  borderSpacing: sxRem(3),
+  borderSpacing: sxRem(M.gap),
   fontVariantNumeric: 'tabular-nums',
 } satisfies SxProps<Theme>;
 
-export const headerCellSx = {
-  p: 0,
-  fontSize: sxRem(11),
-  fontWeight: 'fontWeightMedium',
-  color: 'text.secondary',
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-} satisfies SxProps<Theme>;
+/** The figures' type step: regular, or compact where the regular cannot fit. */
+export function figureSize(compact: boolean): (theme: Theme) => string {
+  return sxRem(compact ? M.compactFontSize : M.fontSize);
+}
 
-export const rowHeaderSx = {
-  p: 0,
-  pr: 0.5,
-  fontSize: sxRem(11),
-  fontWeight: 'fontWeightMedium',
-  color: 'text.secondary',
-  textAlign: 'left',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-} satisfies SxProps<Theme>;
+export function headerCellSx(compact: boolean) {
+  return {
+    p: 0,
+    fontSize: figureSize(compact),
+    fontWeight: 'fontWeightMedium',
+    color: 'text.secondary',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+  };
+}
 
-export const valueCellSx = {
-  p: 0,
-  height: sxRem(30),
-  borderRadius: sxRem(4),
-  fontSize: sxRem(11),
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-} satisfies SxProps<Theme>;
+export function rowHeaderSx(compact: boolean) {
+  return {
+    p: 0,
+    pr: 0.5,
+    fontSize: figureSize(compact),
+    fontWeight: 'fontWeightMedium',
+    color: 'text.secondary',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+  };
+}
+
+export function valueCellSx(compact: boolean, transposed: boolean) {
+  return {
+    p: 0,
+    height: sxRem(transposed ? M.cellHeightTransposed : M.cellHeight),
+    borderRadius: sxRem(M.radius),
+    fontSize: figureSize(compact),
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+  };
+}
 
 export const SR_ONLY_SX = {
   position: 'absolute',
@@ -85,8 +73,8 @@ export const SR_ONLY_SX = {
 
 export const swatchSx = {
   display: 'inline-block',
-  width: sxRem(12),
-  height: sxRem(12),
-  borderRadius: sxRem(3),
+  width: sxRem(M.swatch),
+  height: sxRem(M.swatch),
+  borderRadius: sxRem(M.swatchRadius),
   flexShrink: 0,
 } satisfies SxProps<Theme>;

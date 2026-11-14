@@ -35,11 +35,19 @@ const meta: Meta<typeof HeatMap> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Every figure cell shows its whole text: nothing clipped by the cell's width. */
+async function expectNoClippedFigure(canvasElement: HTMLElement): Promise<void> {
+  const cells = [...canvasElement.querySelectorAll<HTMLTableCellElement>('td[data-tone]')];
+  await expect(cells.length).toBeGreaterThan(0);
+  const clipped = cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent);
+  await expect(clipped).toEqual([]);
+}
+
 export const FitsItsContainer: Story = {
-  name: '🧪 Twenty-four columns fit a narrow card with no sideways scroll',
+  name: '🧪 Twenty-four columns fit a narrow card with no sideways scroll and no clipped figure',
   render: (args) => (
     <Box sx={{ width: '37.5rem' }} data-testid="frame">
-      <HeatMap {...args} />
+      <HeatMap {...args} transpose="auto" />
     </Box>
   ),
   play: async ({ canvasElement, step }) => {
@@ -51,8 +59,38 @@ export const FitsItsContainer: Story = {
         frame.getBoundingClientRect().width + 0.5,
       );
     });
+    await step('No figure is clipped', async () => {
+      await expectNoClippedFigure(canvasElement);
+    });
     await step('An attention cell is named with its side', async () => {
       await expect(canvas.getByRole('cell', { name: '58% acima da meta' })).toBeInTheDocument();
+    });
+  },
+};
+
+export const PhoneWidth: Story = {
+  name: '🧪 At a 320 phone, a week of hours with a 123% cell shows every figure whole',
+  args: {
+    rows: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((label, index) => ({ key: `${index}`, label })),
+    columns: Array.from({ length: 14 }, (_, index) => ({ key: `${index + 10}`, label: `${index + 10}h` })),
+    cells: Array.from({ length: 7 * 14 }, (_, index) => ({
+      row: `${index % 7}`,
+      column: `${10 + Math.floor(index / 7)}`,
+      value: index === 0 ? 1.23 : 0.2 + (index % 5) / 20,
+    })),
+  },
+  render: (args) => (
+    <Box sx={{ width: '17.5rem' }} data-testid="frame">
+      <HeatMap {...args} transpose />
+    </Box>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step('The 123% figure is drawn whole', async () => {
+      await expect(canvas.getByRole('cell', { name: '123% acima da meta' })).toBeInTheDocument();
+    });
+    await step('No figure is clipped', async () => {
+      await expectNoClippedFigure(canvasElement);
     });
   },
 };

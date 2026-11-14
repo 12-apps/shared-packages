@@ -5,8 +5,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createTheme } from "@mui/material/styles/index.js";
+
+import { blend, decomposeColor, getContrastRatio, recomposeColor } from "../../../../tokens/color";
+import { heatMapToneColors } from "../heat-map-colors";
 import { HeatMap } from "../HeatMap";
-import { heatMapGrid, heatMapTone } from "../heat-map-model";
+import { heatMapFit, heatMapGrid, heatMapTone } from "../heat-map-model";
 import type { HeatMapProps } from "../HeatMap.types";
 
 afterEach(() => {
@@ -150,5 +154,60 @@ describe("HeatMap", () => {
       "12h",
     ]);
     expect(screen.getByTestId("hm-cell-1-seg-10")).toHaveTextContent("58%");
+  });
+});
+
+describe("heatMapFit", () => {
+  const metrics = { labelColumn: 44, labelColumnTransposed: 36, gap: 3, minCell: 32, compactMinCell: 28 };
+
+  it("keeps the asked orientation at the regular step when every figure fits", () => {
+    expect(heatMapFit(560, 7, 14, metrics, false)).toEqual({ transposed: false, compact: false });
+  });
+
+  it("takes the compact step before turning the grid round", () => {
+    // 14 hours in ~480px: 44 + 14 × 35 + 3 = 537 does not fit, 44 + 14 × 31 + 3 = 481 does.
+    expect(heatMapFit(482, 7, 14, metrics, false)).toEqual({ transposed: false, compact: true });
+  });
+
+  it("turns 24 hours round at the owner's 1280-with-menu width rather than clip them", () => {
+    expect(heatMapFit(546, 7, 24, metrics, false)).toEqual({ transposed: true, compact: false });
+  });
+
+  it("goes compact at 320 transposed, and keeps a fixed orientation", () => {
+    expect(heatMapFit(250, 7, 14, metrics, true)).toEqual({ transposed: true, compact: true });
+    expect(heatMapFit(546, 7, 24, metrics, false, true)).toEqual({ transposed: false, compact: true });
+  });
+
+  it("keeps the preference until the width is measured", () => {
+    expect(heatMapFit(0, 7, 24, metrics, true)).toEqual({ transposed: true, compact: false });
+  });
+});
+
+describe("heatMapToneColors reads at 4.5:1 in every palette and mode", () => {
+  const palettes = {
+    "MUI default light": createTheme({ palette: { mode: "light" } }),
+    "MUI default dark": createTheme({ palette: { mode: "dark" } }),
+    "host light": createTheme({ palette: { mode: "light", warning: { main: "#8C5908" }, primary: { main: "#C0392B" } } }),
+    "host dark": createTheme({ palette: { mode: "dark", warning: { main: "#F5A623" }, primary: { main: "#C0392B" } } }),
+  };
+  const tones = ["above-strong", "above", "below-strong", "below", "empty"] as const;
+
+  for (const [name, theme] of Object.entries(palettes)) {
+    for (const tone of tones) {
+      it(`${name}: ${tone}`, () => {
+        const { backgroundColor, color } = heatMapToneColors(tone, theme);
+        const ink = decomposeColor(color);
+        // An ink with alpha is read where it sits: flattened onto its fill.
+        const flat = ink.type.endsWith("a")
+          ? blend(backgroundColor, recomposeColor({ type: "rgb", values: ink.values.slice(0, 3) }), ink.values[3] ?? 1)
+          : color;
+        expect(getContrastRatio(flat, backgroundColor)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+
+  it("picks the role's light shade in a dark theme, never its dark one", () => {
+    const theme = palettes["MUI default dark"];
+    expect(heatMapToneColors("below", theme).color).not.toBe(theme.palette.info.dark);
   });
 });
