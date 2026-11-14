@@ -7,8 +7,19 @@
  * the components used to render, so a host adopting it sees no change on
  * screen — what changes is that the words are chosen in a diff.
  */
-import type { ReportScreensCopy } from "./screens-copy";
+import type { ReportScreensCopy, ReportTransportErrorCopy } from "./screens-copy";
 import { PT_BR_BREADCRUMB_COPY } from "@12-apps/ui/pt-BR";
+
+/**
+ * What a failed call reads as when the server sent no sentence — worded as
+ * `@12-apps/app-shell`'s own `restResult` pack words it, so a host on both
+ * reads one failure one way. Its own constant because the default transport
+ * names it on its own (`httpTransport({ errors })`).
+ */
+const PT_BR_REPORT_TRANSPORT_ERROR_COPY: ReportTransportErrorCopy = {
+  status: (status) => `Erro ${status}`,
+  network: "Falha de conexão",
+};
 
 export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
   list: {
@@ -324,4 +335,5 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     visibilityLabel: "Quem pode ver",
     close: "Fechar",
   },
+  errors: PT_BR_REPORT_TRANSPORT_ERROR_COPY,
 };

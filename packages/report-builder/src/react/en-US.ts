@@ -9,8 +9,19 @@
  * and `heights` are the package's own ids — the surface matches on them — so
  * they stay exactly as they are. Only the labels beside them are words.
  */
-import type { ReportScreensCopy } from "./screens-copy";
+import type { ReportScreensCopy, ReportTransportErrorCopy } from "./screens-copy";
 import { EN_US_BREADCRUMB_COPY } from "@12-apps/ui/en-US";
+
+/**
+ * What a failed call reads as when the server sent no sentence — worded as
+ * `@12-apps/app-shell`'s own `restResult` pack words it, so a host on both
+ * reads one failure one way. Its own constant because the default transport
+ * names it on its own (`httpTransport({ errors })`).
+ */
+export const EN_US_REPORT_TRANSPORT_ERROR_COPY: ReportTransportErrorCopy = {
+  status: (status) => `HTTP ${status}`,
+  network: "network error",
+};
 
 export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
   list: {
@@ -342,4 +353,5 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
     visibilityLabel: "Who can see it",
     close: "Close",
   },
+  errors: EN_US_REPORT_TRANSPORT_ERROR_COPY,
 };
