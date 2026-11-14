@@ -14,5 +14,9 @@ export default defineConfig({
     environment: 'node',
     env: { TZ: 'UTC' },
     include: ['src/**/*.test.ts'],
+    // The Postgres suites boot and migrate their own PGlite inside a test;
+    // under the whole package's load on main that took more than vitest's
+    // default 5 s (opt-out-race, FUT-3735). Same budget as auth/notifications.
+    testTimeout: 20_000,
   },
 });
