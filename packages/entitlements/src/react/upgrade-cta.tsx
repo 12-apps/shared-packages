@@ -18,7 +18,7 @@ import { createPlanApi } from './plan-api';
 import type { ResolvedWebConfig } from './web-config';
 
 /** What the ask is for: the tier, and the feature that prompted it, if any. */
-export interface UpgradeTarget {
+interface UpgradeTarget {
   /** The tier to request — null renders nothing: there is nothing to sell. */
   requiredPlan: string | null;
   /** Filed beside the ask so a human knows which lock led to it. */

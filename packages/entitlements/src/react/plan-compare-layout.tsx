@@ -72,7 +72,7 @@ export function compareOffer(
   };
 }
 
-export type CompareLayout = 'table' | 'stacked';
+type CompareLayout = 'table' | 'stacked';
 
 /**
  * The table where its floors fit, else stacked. An UNMEASURED width (null:

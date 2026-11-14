@@ -43,7 +43,7 @@ import type { MatrixSection } from './comparison-rows';
 import type { ComparisonTableCopy } from './copy';
 import { IncludedMark } from './marks';
 
-export type MatrixDensity = 'full' | 'compact';
+type MatrixDensity = 'full' | 'compact';
 
 interface MatrixStyle {
   cellPx: number;
@@ -120,10 +120,10 @@ export interface TierBadges {
   offeredLabel: string | null;
 }
 
-export const NO_BADGES: TierBadges = { currentLabel: null, offeredKey: null, offeredLabel: null };
+const NO_BADGES: TierBadges = { currentLabel: null, offeredKey: null, offeredLabel: null };
 
 /** The badge a tier wears, if any — its own tier wins over being offered. */
-export function badgeFor(tier: ComparisonTier, badges: TierBadges): string | null {
+function badgeFor(tier: ComparisonTier, badges: TierBadges): string | null {
   if (tier.current) return badges.currentLabel;
   return tier.key === badges.offeredKey ? badges.offeredLabel : null;
 }
@@ -205,7 +205,7 @@ function TierHead({
  * primary on the shaded column measured 4.49:1, under AA, and a brand colour
  * is the host's to pick, so it cannot be what the reading depends on.
  */
-export function TierBadge({ tier, text }: { tier: ComparisonTier; text: string }): JSX.Element {
+function TierBadge({ tier, text }: { tier: ComparisonTier; text: string }): JSX.Element {
   return (
     <Text
       as="div"
@@ -348,7 +348,7 @@ function MatrixBody({
   );
 }
 
-export interface ComparisonMatrixProps {
+interface ComparisonMatrixProps {
   tiers: ComparisonTier[];
   /** Built by the caller (`buildMatrix`) so it can decide on emptiness first. */
   sections: MatrixSection[];
