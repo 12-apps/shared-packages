@@ -55,6 +55,18 @@ export interface TenantPlanView {
 
 /** One line on a pricing card. */
 export interface ComparisonLine {
+  /**
+   * The row's STABLE identity — typically the feature key the line describes
+   * (`chat.assistant`), the same in every tier and in every language.
+   *
+   * Optional, so a host that predates it keeps compiling and rendering. It is
+   * what a screen names when it opens the plan comparison for its own rows
+   * (`PlanCompareDialog`'s `keys`): filtering by the translated `label` would
+   * break the first time the copy changed or a second language shipped, so a
+   * line WITHOUT a key simply cannot be picked that way. It also joins a row
+   * across tiers that word the label differently.
+   */
+  key?: string;
   label: string;
   included: boolean;
   /** `"até 100"` / `"ilimitado"`, or null for a plain on/off capability. */
@@ -148,6 +160,13 @@ export interface UpsellPrompt {
   reason: UpsellReason;
   /** Present for `quota-exceeded` only. */
   quota?: { used: number; limit: number | 'unlimited' | null };
+  /**
+   * The comparison rows a SCREEN wants shown side by side, by
+   * {@link ComparisonLine.key}. When present on a plan-gap prompt, the host
+   * opens the per-screen plan comparison instead of the plain prompt. Never
+   * set from a 402 body — a screen raises it (`openPlanCompare`).
+   */
+  compareKeys?: readonly string[];
 }
 
 /** The machine half of the 402 body (see `server/wire.ts`, the producer). */

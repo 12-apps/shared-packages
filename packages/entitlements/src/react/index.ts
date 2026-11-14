@@ -44,10 +44,17 @@ export { createWithEntitlement, type EntitlementGate } from './with-entitlement'
  */
 export { ComparisonTable } from './comparison-table';
 export { tierHighlights, type TierHighlights } from './tier-highlights';
+export {
+  openPlanCompare,
+  type PlanCompareProps,
+  type PlanCompareRequest,
+} from './plan-compare-dialog';
+export { selectComparisonRows } from './comparison-rows';
 export type {
   ComparisonTableCopy,
   EntitlementsWebCopy,
   PageLockCopy,
+  PlanCompareCopy,
   PlanPageCopy,
   ReasonCopy,
   TierCardsCopy,
