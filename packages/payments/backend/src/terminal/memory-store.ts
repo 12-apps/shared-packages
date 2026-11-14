@@ -145,6 +145,20 @@ function memoryStore(table: Table): TerminalCaptureStore {
       for (const row of stale) Object.assign(row, { refundFlaggedAt: now, refundReason: 'UNBOUND_TIMEOUT' });
       return stale.length;
     },
+    async findUnclaimed(clientId, deviceIds) {
+      const devices = new Set(deviceIds);
+      return rows()
+        .filter(
+          (row) =>
+            row.clientId === clientId &&
+            row.state === 'UNBOUND' &&
+            row.deviceId !== null &&
+            devices.has(row.deviceId) &&
+            (!refundLive(row) || row.refundReason === 'UNBOUND_TIMEOUT'),
+        )
+        .sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime() || a.id.localeCompare(b.id))
+        .map(answer);
+    },
     async findCreatedFor(clientId, orderIds) {
       const orders = new Set(orderIds);
       return rows()

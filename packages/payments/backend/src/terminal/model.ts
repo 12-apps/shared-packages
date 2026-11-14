@@ -36,6 +36,10 @@ export type CaptureState = 'UNBOUND' | 'ORDER_CREATED' | 'BOUND';
  * - `PAYMENT_UNDONE`: the payment holding the capture was undone.
  * - `JOURNAL_CONFLICT`: the terminal reported another kind or amount than the
  *   offline leg the journal recorded the capture from; a person reviews the sale.
+ * - `RECEIVED_TWICE`: the terminal approved a leg the sale had already received
+ *   another way (in cash), and the operator chose to give the card capture
+ *   back (FUT-4996, Decision 3). Only a capture no sale holds: money a sale
+ *   holds is the sale's, never owed back too.
  */
 export const PACKAGE_REFUND_REASONS = [
   'UNBOUND_TIMEOUT',
@@ -43,6 +47,7 @@ export const PACKAGE_REFUND_REASONS = [
   'SALE_CANCELLED',
   'PAYMENT_UNDONE',
   'JOURNAL_CONFLICT',
+  'RECEIVED_TWICE',
 ] as const;
 export type PackageRefundReason = (typeof PACKAGE_REFUND_REASONS)[number];
 
@@ -50,6 +55,7 @@ export type PackageRefundReason = (typeof PACKAGE_REFUND_REASONS)[number];
 export const UNBOUND_ONLY_REASONS: ReadonlySet<string> = new Set<PackageRefundReason>([
   'UNBOUND_TIMEOUT',
   'SALE_NOT_CREATED',
+  'RECEIVED_TWICE',
 ]);
 
 /** What the terminal reported beside the code and the amount. Every field may be missing. */
@@ -117,8 +123,9 @@ export interface CaptureKey {
  *   payment row is not the sale's.
  * - `DEVICE_MISMATCH`: the terminal named is not this tenant's.
  * - `FLAGGED`: the capture was flagged for a refund for a reason a bind cannot undo.
- * - `NOT_UNBOUND`: the refund reason (`SALE_NOT_CREATED`, `UNBOUND_TIMEOUT`)
- *   only fits a capture no sale holds, and this one is held by a sale.
+ * - `NOT_UNBOUND`: the refund reason (`SALE_NOT_CREATED`, `UNBOUND_TIMEOUT`,
+ *   `RECEIVED_TWICE`, or one the host named unbound-only) only fits a capture
+ *   no sale holds, and this one is held by a sale.
  * - `CONTENDED`: the row kept changing under the move; nothing was written.
  */
 export type CaptureErrorCode =
@@ -145,16 +152,22 @@ export class CaptureError extends Error {
 
 /**
  * Why a capture could not be taken by a sale, as a sale-path answers it: the
- * same four outcomes whether a look-up found it before anything was written
- * or a move refused it mid-request.
+ * same outcomes whether a look-up found it before anything was written or a
+ * move refused it mid-request.
+ *
+ * `CONTENDED` is the one transient answer: the row kept changing under the
+ * move (another request was moving the same capture), nothing was written, and
+ * the same request may be sent again. It is never `BOUND_ELSEWHERE`, which
+ * would say another sale holds money that is only busy (FUT-4996, R43).
  */
-export type CaptureNotBoundReason = 'BOUND_ELSEWHERE' | 'FLAGGED' | 'CONFLICT' | 'DEVICE_UNKNOWN';
+export type CaptureNotBoundReason = 'BOUND_ELSEWHERE' | 'FLAGGED' | 'CONFLICT' | 'DEVICE_UNKNOWN' | 'CONTENDED';
 
 /** A move's refusal as the reason a sale-path names it. */
 export function notBoundReasonOf(error: CaptureError): CaptureNotBoundReason {
   if (error.code === 'CONFLICT') return 'CONFLICT';
   if (error.code === 'DEVICE_MISMATCH') return 'DEVICE_UNKNOWN';
   if (error.code === 'FLAGGED') return 'FLAGGED';
+  if (error.code === 'CONTENDED') return 'CONTENDED';
   return 'BOUND_ELSEWHERE';
 }
 
