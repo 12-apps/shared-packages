@@ -136,7 +136,14 @@ export function HeatMap({
   dataTestId = 'heat-map',
 }: HeatMapProps): React.JSX.Element {
   const { ref, width } = useMeasuredWidth<HTMLDivElement>();
-  const fit = useFit(transpose, width, rows.length, columns.length);
+  // The first measurement is read in a LAYOUT effect, before the browser
+  // paints, so the grid never flashes its unmeasured (wide) arrangement for a
+  // frame; the observer above keeps it current after that.
+  const [firstWidth, setFirstWidth] = React.useState(0);
+  React.useLayoutEffect(() => {
+    if (ref.current) setFirstWidth(ref.current.getBoundingClientRect().width);
+  }, [ref]);
+  const fit = useFit(transpose, width || firstWidth, rows.length, columns.length);
   const { transposed, compact } = fit;
   const grid = heatMapGrid(rows, columns, cells, transposed);
   return (
