@@ -391,6 +391,10 @@
     "kind": "exempt",
     "why": "a worker runtime has no screens; the closest thing — queue introspection — is host tooling over the host's own Redis"
   },
+  "@12-apps/llm": {
+    "kind": "exempt",
+    "why": "a model connector a host calls in-process with credentials it supplies per call; it mounts no route, schedules no job, owns no table and reads no environment, so it has no capability a manifest could inventory"
+  },
   "@12-apps/marketplace :: areas": {
     "kind": "exempt",
     "why": "suggests no nav rows: it ships no web surface to place"

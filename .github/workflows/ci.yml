@@ -36,6 +36,7 @@ env:
     packages/thermal-printing
     packages/qr
     packages/fiscal
+    packages/llm
     packages/desktop-shell
     packages/feature-flags
     packages/request-scope
