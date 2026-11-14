@@ -58,6 +58,15 @@ describe("base64", () => {
     expect(decodeBase64("+_8")).toBeNull();
   });
 
+  it("refuses a long run of padding in linear time", () => {
+    // `/=+$/` backtracked polynomially on this input (CodeQL js/polynomial-redos).
+    const hostile = `A${"=".repeat(200_000)}x`;
+    const started = performance.now();
+    expect(decodeBase64(hostile)).toBeNull();
+    expect(decodeBase64("=".repeat(200_000))).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("refuses what is not base64", () => {
     expect(decodeBase64("a")).toBeNull();
     expect(decodeBase64("ab$d")).toBeNull();

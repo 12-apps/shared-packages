@@ -9,7 +9,11 @@ const INDEX = new Map([...ALPHABET].map((char, index) => [char, index]));
 
 /** `text` without its padding, when its length and padding are well formed; else null. */
 function unpadded(text: string): string | null {
-  const body = text.replace(/=+$/, "");
+  // A bounded walk from the end, not `/=+$/`: that regex is polynomial on a
+  // long run of `=` (CodeQL js/polynomial-redos), and `text` is untrusted.
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 61 /* "=" */) end -= 1;
+  const body = text.slice(0, end);
   const padding = text.length - body.length;
   if (body.length === 0 || body.length % 4 === 1 || padding > 2) return null;
   return padding > 0 && text.length % 4 !== 0 ? null : body;
