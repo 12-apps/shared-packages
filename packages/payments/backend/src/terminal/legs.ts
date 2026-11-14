@@ -272,9 +272,6 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
       }
       return byOrder;
     },
-    // TODO(FUT-4996 7b): leave out a capture with an open conflict once the
-    // ledger keeps a disagreeing report; that waits on the owner's decision on
-    // state 7b and trade-off T1.
     unclaimed: async (clientId, deviceIds) => (await ledger.findUnclaimed(clientId, deviceIds)).map(wireOf),
     refusalCodeOf: notBoundReasonOf,
   };
