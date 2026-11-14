@@ -39,9 +39,16 @@ interface GraphCall {
   body?: unknown;
 }
 
+/** Drops trailing "/" characters in one linear pass (a regex here backtracks quadratically on library input). */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return end === value.length ? value : value.slice(0, end);
+}
+
 /** The URL and the request init of one call. The token travels in a header, never in the URL. */
 function requestOf(graph: GraphConfig, call: GraphCall) {
-  const base = graph.baseUrl.replace(/\/+$/u, "");
+  const base = trimTrailingSlashes(graph.baseUrl);
   const query = call.query ? `?${new URLSearchParams(call.query).toString()}` : "";
   const headers: Record<string, string> = { accept: "application/json" };
   if (call.token) headers.authorization = `Bearer ${call.token}`;

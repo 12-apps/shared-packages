@@ -145,19 +145,19 @@ type Harness = ReturnType<typeof createHarness>;
 
 /** A store whose Nth call to `operation` first runs `before`, to play the other worker that wins a race. */
 function racing(store: MessagingStore, operation: "findConversation" | "updateConversation") {
-  let before: (() => Promise<unknown>) | null = null;
+  // The pending race lives in a queue the helper owns; the wrapper only shifts from it.
+  const pending: (() => Promise<unknown>)[] = [];
   const wrapped = {
     ...store,
     [operation]: async (...args: never[]) => {
-      const run = before;
-      before = null;
+      const run = pending.shift();
       // `findConversation` reads first, THEN the other worker writes; `updateConversation` is preceded by it.
       const result = operation === "findConversation" ? await (store.findConversation as (...a: never[]) => Promise<unknown>)(...args) : null;
       if (run) await run();
       return operation === "findConversation" ? result : (store.updateConversation as (...a: never[]) => Promise<unknown>)(...args);
     },
   } as MessagingStore;
-  return { store: wrapped, nextCallRaces: (run: () => Promise<unknown>) => (before = run) };
+  return { store: wrapped, nextCallRaces: (run: () => Promise<unknown>) => void pending.push(run) };
 }
 
 describe.each(STORES)("an opt-out on the %s store", (_name, makeStore) => {

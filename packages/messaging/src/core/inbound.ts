@@ -113,43 +113,62 @@ async function openConversation(
   const { store } = ctx.config;
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt += 1) {
     const existing = await store.findConversation(connection.tenantId, connection.channel, event.contactId);
-    if (!existing) {
-      const state = event.optOut ? "OPTED_OUT" : "AGENT";
-      const created = await store.createConversation({
-        tenantId: connection.tenantId,
-        channel: connection.channel,
-        contactId: event.contactId,
-        contactName: event.contactName,
-        connectionId: connection.id,
-        state,
-        lastInboundAt: event.sentAt,
-        lastMessageAt: event.sentAt,
-        optedOutAt: event.optOut ? event.sentAt : null,
-        hasText: carriesText,
-      });
-      // A lost insert race answers with the winner's row: take it as `existing` and go again.
-      if (created.state === state && created.lastInboundAt?.getTime() === event.sentAt.getTime()) return created;
-      continue;
-    }
-    const state = await nextState(ctx, existing, event);
-    const updated = await store.updateConversation(
-      connection.tenantId,
-      existing.id,
-      {
-        // Left out when unchanged: the write never carries a state it did not decide.
-        ...(state !== existing.state ? { state } : {}),
-        ...(event.optOut ? { optedOutAt: later(existing.optedOutAt, event.sentAt) } : {}),
-        ...(connection.id !== existing.connectionId ? { connectionId: connection.id } : {}),
-        lastInboundAt: later(existing.lastInboundAt, event.sentAt),
-        lastMessageAt: later(existing.lastMessageAt, event.sentAt),
-        ...(event.contactName ? { contactName: event.contactName } : {}),
-        ...(carriesText ? { hasText: true } : {}),
-      },
-      { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt, optedOutAt: existing.optedOutAt },
-    );
-    if (updated) return updated;
+    // A lost insert race answers a null: go again, and the winner's row is `existing`.
+    const result = existing
+      ? await updateExisting(ctx, connection, existing, event, carriesText)
+      : await createFirst(ctx, connection, event, carriesText);
+    if (result) return result;
   }
   throw new Error(`conversation ${event.contactId} kept changing under this message; retry`);
+}
+
+/** The first message of a contact opens the conversation; null when another worker's insert won. */
+async function createFirst(
+  ctx: EngineContext,
+  connection: StoredConnection,
+  event: InboundMessageEvent,
+  carriesText: boolean,
+): Promise<ConversationView | null> {
+  const state = event.optOut ? "OPTED_OUT" : "AGENT";
+  const created = await ctx.config.store.createConversation({
+    tenantId: connection.tenantId,
+    channel: connection.channel,
+    contactId: event.contactId,
+    contactName: event.contactName,
+    connectionId: connection.id,
+    state,
+    lastInboundAt: event.sentAt,
+    lastMessageAt: event.sentAt,
+    optedOutAt: event.optOut ? event.sentAt : null,
+    hasText: carriesText,
+  });
+  return created.state === state && created.lastInboundAt?.getTime() === event.sentAt.getTime() ? created : null;
+}
+
+/** Bring an existing conversation up to this message; null when the compare-and-set lost. */
+async function updateExisting(
+  ctx: EngineContext,
+  connection: StoredConnection,
+  existing: ConversationView,
+  event: InboundMessageEvent,
+  carriesText: boolean,
+): Promise<ConversationView | null> {
+  const state = await nextState(ctx, existing, event);
+  return ctx.config.store.updateConversation(
+    connection.tenantId,
+    existing.id,
+    {
+      // Left out when unchanged: the write never carries a state it did not decide.
+      ...(state !== existing.state ? { state } : {}),
+      ...(event.optOut ? { optedOutAt: later(existing.optedOutAt, event.sentAt) } : {}),
+      ...(connection.id !== existing.connectionId ? { connectionId: connection.id } : {}),
+      lastInboundAt: later(existing.lastInboundAt, event.sentAt),
+      lastMessageAt: later(existing.lastMessageAt, event.sentAt),
+      ...(event.contactName ? { contactName: event.contactName } : {}),
+      ...(carriesText ? { hasText: true } : {}),
+    },
+    { state: existing.state, lastInboundAt: existing.lastInboundAt, lastMessageAt: existing.lastMessageAt, optedOutAt: existing.optedOutAt },
+  );
 }
 
 /**

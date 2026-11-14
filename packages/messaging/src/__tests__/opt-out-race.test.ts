@@ -14,18 +14,18 @@ const STORES: [string, () => Promise<MessagingStore>][] = [
 ];
 
 function racingFind(store: MessagingStore) {
-  let before: (() => Promise<unknown>) | null = null;
+  // The pending race lives in a queue the helper owns; the wrapper only shifts from it.
+  const pending: (() => Promise<unknown>)[] = [];
   const wrapped = {
     ...store,
     findConversation: async (...args: Parameters<MessagingStore["findConversation"]>) => {
-      const run = before;
-      before = null;
+      const run = pending.shift();
       const result = await store.findConversation(...args);
       if (run) await run();
       return result;
     },
   } as MessagingStore;
-  return { store: wrapped, nextCallRaces: (run: () => Promise<unknown>) => (before = run) };
+  return { store: wrapped, nextCallRaces: (run: () => Promise<unknown>) => void pending.push(run) };
 }
 
 describe.each(STORES)("probe on %s", (_name, makeStore) => {

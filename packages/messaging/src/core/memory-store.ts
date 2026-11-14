@@ -167,13 +167,15 @@ function memoryConversations({ conversations }: MemoryTables) {
 
 const sameTime = (a: Date | null, b: Date | null): boolean => (a === null || b === null ? a === b : a.getTime() === b.getTime());
 
+const GUARDED_TIMES = ["lastInboundAt", "lastMessageAt", "optedOutAt"] as const;
+
 function matchesGuard(row: ConversationView, guard: ConversationGuard): boolean {
   if (guard.state !== undefined && row.state !== guard.state) return false;
   if (guard.stateNot !== undefined && row.state === guard.stateNot) return false;
-  if (guard.lastInboundAt !== undefined && !sameTime(row.lastInboundAt, guard.lastInboundAt)) return false;
-  if (guard.lastMessageAt !== undefined && !sameTime(row.lastMessageAt, guard.lastMessageAt)) return false;
-  if (guard.optedOutAt !== undefined && !sameTime(row.optedOutAt, guard.optedOutAt)) return false;
-  return true;
+  return GUARDED_TIMES.every((key) => {
+    const wanted = guard[key];
+    return wanted === undefined || sameTime(row[key], wanted);
+  });
 }
 
 function memoryMessages({ messages }: MemoryTables) {
