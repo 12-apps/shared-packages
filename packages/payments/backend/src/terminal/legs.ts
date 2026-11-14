@@ -111,6 +111,14 @@ export interface TerminalLegs<TTx = unknown> {
    * whole list; a sale with none is absent from the map.
    */
   createdCapturesFor(clientId: string, orderIds: readonly string[]): Promise<Map<string, StationCaptureWire[]>>;
+  /**
+   * The captures these terminals took that no sale holds and that are not owed
+   * back, as the wire a terminal leg sends, oldest first: money a counter
+   * already received and may still use for a sale ("received, no sale"), so a
+   * buyer is never charged again after a reload. Unused, they keep the sweep's
+   * window. One read; none for no terminal.
+   */
+  unclaimed(clientId: string, deviceIds: readonly string[]): Promise<StationCaptureWire[]>;
   /** A move the record refused mid-request, as its code. */
   refusalCodeOf(error: CaptureError): CaptureNotBoundReason;
 }
@@ -264,6 +272,7 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
       }
       return byOrder;
     },
+    unclaimed: async (clientId, deviceIds) => (await ledger.findUnclaimed(clientId, deviceIds)).map(wireOf),
     refusalCodeOf: notBoundReasonOf,
   };
 }

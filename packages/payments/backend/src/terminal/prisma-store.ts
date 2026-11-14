@@ -50,9 +50,13 @@ export interface CaptureRow extends Omit<TerminalCaptureRecord, 'kind' | 'state'
 
 const NOT_LIVE = [{ refundFlaggedAt: null }, { refundClearedAt: { not: null } }] as const;
 
+/** Not owed back: never flagged, cleared, or flagged for the timeout a bind clears. */
+const NOT_OWED_BACK = [...NOT_LIVE, { refundReason: 'UNBOUND_TIMEOUT' }] as const;
+
 type CaptureFindManyWhere =
   | { clientId: string; transactionCode: { in: string[] } }
-  | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' };
+  | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' }
+  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK };
 
 type CaptureUpdateWhere =
   | CaptureVersion
@@ -65,7 +69,11 @@ export interface TerminalCaptureDelegate {
     where: { clientId_transactionCode: { clientId: string; transactionCode: string } };
     select: typeof CAPTURE_SELECT;
   }): PromiseLike<CaptureRow | null>;
-  findMany(args: { where: CaptureFindManyWhere; orderBy?: { capturedAt: 'asc' }; select: typeof CAPTURE_SELECT }): PromiseLike<CaptureRow[]>;
+  findMany(args: {
+    where: CaptureFindManyWhere;
+    orderBy?: { capturedAt: 'asc' } | readonly [{ capturedAt: 'asc' }, { id: 'asc' }];
+    select: typeof CAPTURE_SELECT;
+  }): PromiseLike<CaptureRow[]>;
   updateMany(args: { where: CaptureUpdateWhere; data: CapturePatch }): PromiseLike<{ count: number }>;
 }
 
@@ -151,6 +159,14 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
       return flagged.count;
     },
     flagStaleUnbound: async (now, cutoff, limit) => flagStaleUnbound(await client(), now, cutoff, limit),
+    async findUnclaimed(clientId, deviceIds) {
+      const rows = await (await client()).terminalCapture.findMany({
+        where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', OR: NOT_OWED_BACK },
+        orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
+        select: CAPTURE_SELECT,
+      });
+      return rows.map(toRecord);
+    },
     async findCreatedFor(clientId, orderIds) {
       const rows = await (await client()).terminalCapture.findMany({
         where: { clientId, orderId: { in: [...orderIds] }, state: 'ORDER_CREATED' },

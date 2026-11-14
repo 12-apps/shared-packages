@@ -79,6 +79,12 @@ export interface TerminalCaptureStore {
   flagStaleUnbound(now: Date, cutoff: Date, limit: number): Promise<number>;
   /** The ORDER_CREATED captures of these sales, oldest capture first. */
   findCreatedFor(clientId: string, orderIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
+  /**
+   * The UNBOUND captures these terminals (never empty) took at this tenant
+   * that are not owed back: never flagged, flagged `UNBOUND_TIMEOUT` (a bind
+   * clears that one), or cleared. Oldest capture first.
+   */
+  findUnclaimed(clientId: string, deviceIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
 }
 
 /** The store on the host's transaction, or on its root handle when none is passed. */

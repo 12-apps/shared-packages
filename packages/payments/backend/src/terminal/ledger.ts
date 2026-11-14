@@ -59,6 +59,13 @@ export interface TerminalCaptureLedgerConfig<TTx = unknown> {
    * knows.
    */
   unboundRefundAfterMs: number;
+  /**
+   * Refund reasons of the host's own that, like {@link UNBOUND_ONLY_REASONS},
+   * only fit a capture no sale holds (a reduced total refunded before any sale
+   * took the capture). `flag` refuses them on a held capture as `NOT_UNBOUND`.
+   * Default: none.
+   */
+  unboundOnlyReasons?: readonly string[];
   /** The clock. Default: the system's. */
   now?: () => Date;
 }
@@ -110,6 +117,12 @@ export interface TerminalCaptureLedger<TTx = unknown> {
   /** The ORDER_CREATED captures of these sales, oldest first. */
   findCreatedFor(clientId: string, orderIds: readonly string[], tx?: TTx): Promise<TerminalCaptureRecord[]>;
   /**
+   * The captures these terminals took that no sale holds and that are not owed
+   * back (never flagged, flagged for the timeout a bind clears, or cleared),
+   * oldest first: the money a counter may still use. No read for no terminal.
+   */
+  findUnclaimed(clientId: string, deviceIds: readonly string[], tx?: TTx): Promise<TerminalCaptureRecord[]>;
+  /**
    * UNBOUND -> ORDER_CREATED: a creating path wrote the sale before settling
    * it. A replay naming the same sale is a no-op, and so is one that finds the
    * capture already BOUND to it. Another sale is `BOUND_ELSEWHERE`; a capture
@@ -130,8 +143,9 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * Flag a capture's money for a refund — at most once per real refund.
    * `flagged: false` when a flag is already live, so a caller never raises the
    * same refund twice. A flag a bind CLEARED is no refund any more, so the
-   * capture may be flagged again. `UNBOUND_TIMEOUT` and `SALE_NOT_CREATED` on a
-   * capture a sale holds are `NOT_UNBOUND`, and nothing is written.
+   * capture may be flagged again. An unbound-only reason (`UNBOUND_TIMEOUT`,
+   * `SALE_NOT_CREATED`, `RECEIVED_TWICE`, or the host's `unboundOnlyReasons`)
+   * on a capture a sale holds is `NOT_UNBOUND`, and nothing is written.
    */
   flag(key: CaptureKey, reason: string, now?: Date, tx?: TTx): Promise<{ flagged: boolean }>;
   /**
@@ -195,6 +209,8 @@ interface Engine<TTx> {
   directory: TerminalDirectory<TTx>;
   sales: SaleDirectory<TTx>;
   clock: () => Date;
+  /** The package's unbound-only reasons and the host's. */
+  unboundOnly: ReadonlySet<string>;
 }
 
 async function record<TTx>(
@@ -282,7 +298,7 @@ async function bind<TTx>(
 
 async function flag<TTx>(engine: Engine<TTx>, key: CaptureKey, reason: string, now: Date, tx?: TTx): Promise<{ flagged: boolean }> {
   const store = engine.storeFor(tx);
-  const unboundOnly = UNBOUND_ONLY_REASONS.has(reason);
+  const unboundOnly = engine.unboundOnly.has(reason);
   if (await store.flagIfNotLive(key.clientId, key.transactionCode, { at: now, reason }, unboundOnly)) return { flagged: true };
   const current = await readOrRefuse(store, key.clientId, key.transactionCode);
   if (unboundOnly && current.state !== 'UNBOUND') throw new CaptureError('NOT_UNBOUND', key.transactionCode, REFUSALS.NOT_UNBOUND);
@@ -292,7 +308,12 @@ async function flag<TTx>(engine: Engine<TTx>, key: CaptureKey, reason: string, n
 export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptureLedgerConfig<TTx>): TerminalCaptureLedger<TTx> {
   const maxAmountCents = positive('maxAmountCents', config.maxAmountCents);
   const unboundRefundAfterMs = positive('unboundRefundAfterMs', config.unboundRefundAfterMs);
-  const engine: Engine<TTx> = { ...config, storeFor: config.store, clock: config.now ?? (() => new Date()) };
+  const engine: Engine<TTx> = {
+    ...config,
+    storeFor: config.store,
+    clock: config.now ?? (() => new Date()),
+    unboundOnly: new Set([...UNBOUND_ONLY_REASONS, ...(config.unboundOnlyReasons ?? [])]),
+  };
   const { storeFor, clock } = engine;
 
   return {
@@ -317,6 +338,10 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
     async findCreatedFor(clientId, orderIds, tx) {
       if (orderIds.length === 0) return [];
       return storeFor(tx).findCreatedFor(clientId, orderIds);
+    },
+    async findUnclaimed(clientId, deviceIds, tx) {
+      if (deviceIds.length === 0) return [];
+      return storeFor(tx).findUnclaimed(clientId, [...new Set(deviceIds)]);
     },
     markSaleCreated: (tx, key, orderId) => markSaleCreated(engine, tx, key, orderId),
     bind: (tx, clientId, codes, target, now = clock()) => bind(engine, tx, clientId, codes, target, now),
