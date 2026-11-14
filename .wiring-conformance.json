@@ -447,6 +447,38 @@
     "kind": "exempt",
     "why": "./react ships AI-connect components a host renders where its settings live — no createWeb* factory exists, so there is nothing a web binder could build once and memoise"
   },
+  "@12-apps/messaging :: areas": {
+    "kind": "exempt",
+    "why": "suggests no nav rows: it ships no web surface to place, and where a conversation list sits in a back office is the host's layout"
+  },
+  "@12-apps/messaging :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: the pipeline is driven through its unit suites with recorded channel payloads and on real Postgres, and the screens a journey would cross are the host's"
+  },
+  "@12-apps/messaging :: email": {
+    "kind": "exempt",
+    "why": "sends no mail: the connector speaks on the channels its adapters serve, and telling a person that a message arrived is the host's call through onInboundMessage"
+  },
+  "@12-apps/messaging :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env: the app secret, the verify token, the Graph base URL and version, the retention window and every port arrive as config at mount"
+  },
+  "@12-apps/messaging :: mcp": {
+    "kind": "exempt",
+    "why": "conversations and contacts' addresses (phone numbers) are off the agent surface by design: a bearer tool could read a stranger's messages or write to them on the tenant's number, so no tool set is shipped"
+  },
+  "@12-apps/messaging :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as manifest data: who hears that a contact wrote, or that a conversation needs a person, is host vocabulary, told through the onInboundMessage hook"
+  },
+  "@12-apps/messaging :: permissions": {
+    "kind": "exempt",
+    "why": "ships no authenticated route yet, only the channel webhooks, which a channel calls without a session; the ids that gate connecting an account and replying arrive with the routes that need them"
+  },
+  "@12-apps/messaging :: surface": {
+    "kind": "exempt",
+    "why": "ships no web surface: the connect flow, the conversation list and the composer are the host's, drawn over the engine's reads"
+  },
   "@12-apps/notifications :: areas": {
     "kind": "exempt",
     "why": "suggests no routes: it ships no routed screens, so an area row would point at nothing"

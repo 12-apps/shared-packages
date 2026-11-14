@@ -77,3 +77,7 @@ packages/discounts
 # hono are optional peers), so its position is free. It sits last because it is
 # the newest, and a reader scanning for it finds it at the end.
 packages/marketplace
+# `@12-apps/messaging` needs nothing here at runtime (no dependencies; wiring
+# is an optional type-only peer), so its position is free. It sits last because
+# it is the newest.
+packages/messaging
