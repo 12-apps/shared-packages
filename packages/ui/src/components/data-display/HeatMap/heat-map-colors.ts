@@ -38,10 +38,16 @@ export function tintOver(theme: Theme, color: string, amount: number): string {
  * none does, the one that reads best. The palette's own contrast text is
  * always the last candidate, so there is always an answer.
  */
-export function readableInk(theme: Theme, background: string, candidates: readonly string[]): string {
+export function readableInk(
+  theme: Theme,
+  background: string,
+  candidates: readonly string[],
+  /** The contrast to reach: 4.5:1 for body text, 3:1 for LARGE text (a KPI figure). */
+  minimum = READABLE_CONTRAST,
+): string {
   const inks = [...candidates, theme.palette.getContrastText(background)];
   const scored = inks.map((ink) => ({ ink, ratio: getContrastRatio(flatten(ink, background), background) }));
-  const passing = scored.find((entry) => entry.ratio >= READABLE_CONTRAST);
+  const passing = scored.find((entry) => entry.ratio >= minimum);
   if (passing) return passing.ink;
   return scored.reduce((best, entry) => (entry.ratio > best.ratio ? entry : best)).ink;
 }

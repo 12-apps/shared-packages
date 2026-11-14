@@ -262,7 +262,8 @@ describe("the flag's ink reads at 4.5:1 on its tint in every palette and mode", 
   for (const [name, theme] of Object.entries(themes)) {
     it(name, () => {
       expect(getContrastRatio(flaggedRowInk(theme), flaggedRowTint(theme))).toBeGreaterThanOrEqual(4.5);
-      expect(getContrastRatio(flaggedFigureInk(theme), theme.palette.background.paper)).toBeGreaterThanOrEqual(4.5);
+      // A KPI figure is large text: 3:1 is its floor.
+      expect(getContrastRatio(flaggedFigureInk(theme), theme.palette.background.paper)).toBeGreaterThanOrEqual(3);
     });
   }
 });

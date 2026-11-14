@@ -48,9 +48,21 @@ export function flaggedRowInk(theme: Theme): string {
   return readableInk(theme, flaggedRowTint(theme), [roleInk(theme, "warning")]);
 }
 
-/** The flag's ink on the plain card (a KPI figure): the same rule, on the card's own ground. */
+/** WCAG's floor for LARGE text: a KPI figure is drawn at a heading size. */
+const LARGE_TEXT_CONTRAST = 3;
+
+/**
+ * The flag's ink on the plain card (a KPI figure): the same rule, on the card's
+ * own ground, held to the large-text floor — so MUI's own amber, 3.8:1 on
+ * white, stays amber on a figure where body text would have to turn black.
+ */
 export function flaggedFigureInk(theme: Theme): string {
-  return readableInk(theme, tintOver(theme, theme.palette.warning.main, 0), [roleInk(theme, "warning")]);
+  return readableInk(
+    theme,
+    tintOver(theme, theme.palette.warning.main, 0),
+    [roleInk(theme, "warning")],
+    LARGE_TEXT_CONTRAST,
+  );
 }
 
 export function FlaggedCell({ text, label }: { text: string; label: string }): JSX.Element {
