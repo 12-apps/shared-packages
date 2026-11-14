@@ -140,6 +140,7 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
       "7d": "7 dias",
       "30d": "30 dias",
       month: "Este mês",
+      week: "Esta semana",
       custom: "Personalizado…",
     },
     grains: {

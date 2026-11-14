@@ -39,8 +39,10 @@ export interface ReportHeatmapModel {
   labels: { above: string; below: string; empty: string };
   /** How a cell's figure renders (the measure's format). */
   valueFormat: ReportValueFormat;
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  valueDecimals?: number;
   /** The long form, for CSV and "Ver como tabela": the dimensions, then the measure. */
-  tableColumns: { key: string; label: string; format: ReportValueFormat }[];
+  tableColumns: { key: string; label: string; format: ReportValueFormat; decimals?: number }[];
   rows: ReportRow[];
 }
 
@@ -121,6 +123,7 @@ export function toHeatmapModel(
     },
     labels: presentation.labels,
     valueFormat: measure.format,
+    ...(measure.decimals !== undefined ? { valueDecimals: measure.decimals } : {}),
     tableColumns,
     rows,
   };

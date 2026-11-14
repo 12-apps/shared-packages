@@ -22,7 +22,17 @@ function escapeCsvCell(value: string): string {
   return value;
 }
 
-function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
+/**
+ * The notes a report says about its data (FUT-4063), after the rows: a blank
+ * line, then one note per line as a single cell, so a spreadsheet keeps them
+ * beside the figures they qualify without inventing a column for them.
+ */
+export function csvTrailer(notes: readonly string[]): string {
+  if (notes.length === 0) return "";
+  return `\n\n${notes.map(escapeCsvCell).join("\n")}`;
+}
+
+export function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
   const head = columns.map((column) => escapeCsvCell(column.header)).join(",");
   const body = rows
     .map((row) =>
@@ -75,10 +85,12 @@ export function exportRows<T>(
   rows: T[],
   columns: ExportColumn<T>[],
   baseName: string,
+  /** CSV only (FUT-4063): appended after the rows. JSON keeps its array shape. */
+  notes: readonly string[] = [],
 ): void {
   if (format === "json") {
     triggerDownload(toJson(rows, columns), `${baseName}.json`, "application/json");
     return;
   }
-  triggerDownload(toCsv(rows, columns), `${baseName}.csv`, "text/csv;charset=utf-8");
+  triggerDownload(`${toCsv(rows, columns)}${csvTrailer(notes)}`, `${baseName}.csv`, "text/csv;charset=utf-8");
 }

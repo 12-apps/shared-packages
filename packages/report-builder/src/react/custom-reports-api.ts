@@ -17,6 +17,7 @@ import type { ReportBuilderTransport } from "./transport";
 import type {
   ReportGrain,
   ReportHeatmapPresentationWire,
+  ReportPhoneCardsWire,
   ReportRange,
   ReportRangeSelection,
   ReportRender,
@@ -90,6 +91,7 @@ export interface ReportSpecWire {
     minSample?: number;
     /** Overrides the render format derived from the field. */
     format?: string;
+    decimals?: number;
   }>;
   filters: Array<{
     field: string;
@@ -106,9 +108,9 @@ export interface ReportSpecWire {
   sort: Array<{ by: string; direction: "asc" | "desc" }>;
   limit?: number;
   presentation:
-    | { kind: "table"; flag?: ReportRowFlagWire }
+    | { kind: "table"; flag?: ReportRowFlagWire; phone?: ReportPhoneCardsWire }
     | { kind: "chart"; chartType: "line" | "bar" | "area" | "pie" | "donut"; stacked?: boolean }
-    | { kind: "kpi"; label?: string; numberFormat?: string }
+    | { kind: "kpi"; label?: string; numberFormat?: string; flag?: ReportRowFlagWire }
     | ReportHeatmapPresentationWire;
 }
 

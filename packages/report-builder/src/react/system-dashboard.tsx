@@ -27,12 +27,19 @@ import { findSystemDashboard } from "../server/system-reports";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
-import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import { initialRange, ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
-import { ReportBodyWithNotes } from "./report-notes";
+import { NotesBelowCard, ReportBodyWithNotes } from "./report-notes";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
-import { REPORT_GRAINS, useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import {
+  REPORT_GRAINS,
+  useSystemReport,
+  type ReportGrain,
+  type ReportNoteView,
+  type ReportRange,
+  type ReportRender,
+} from "./reports-api";
 import { useReportCopy, useReportSurface } from "./transport-context";
 
 interface BlockProps {
@@ -91,11 +98,7 @@ function DashboardBlock({
             view={tableView}
             renderTestId={`${testId}-render`}
             menuTestId={`${testId}-menu`}
-            csv={
-              report
-                ? { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export` }
-                : undefined
-            }
+            csv={blockCsv(report, testId)}
             expandable
           />
         }
@@ -111,40 +114,70 @@ function DashboardBlock({
             tenantSlug={tenantSlug}
             dataTestId={`${testId}-render`}
             onWidenRange={widenAction(range, onRangeChange, ranges)}
-            asTable={tableView.asTable} bounded
+            asTable={tableView.asTable}
+            bounded
           />
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
       </ReportBlockFrame>
+      <NotesBelowCard notes={report?.notes} tenantSlug={tenantSlug} dataTestId={testId} />
       {report ? (
-        <BlockExpandDialog
-          open={tableView.expanded}
-          onClose={() => tableView.setExpanded(false)}
-          title={title}
-          description={navEntry?.description}
-          dataTestId={`${testId}-expanded`}
-        >
-          <ReportRenderView
-            render={report.render}
-            dataTestId={`${testId}-expanded-render`}
-            asTable={tableView.asTable}
-            notes={report.notes}
-            caption={title}
-          />
-        </BlockExpandDialog>
+        <ExpandedBlock report={report} view={tableView} title={title} description={navEntry?.description} testId={testId} />
       ) : null}
     </ReportGridItem>
+  );
+}
+
+/** A block's CSV tool, once its run has landed: its rows, then its notes. */
+function blockCsv(
+  report: { key: string; notes?: ReportNoteView[] } | undefined,
+  testId: string,
+): { filename: string; dataTestId: string; notes?: ReportNoteView[] } | undefined {
+  if (!report) return undefined;
+  return { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export`, notes: report.notes };
+}
+
+/** A bounded block's table, whole, in a dialog — the block's "expand" tool. */
+function ExpandedBlock({
+  report,
+  view,
+  title,
+  description,
+  testId,
+}: {
+  report: { render: ReportRender; notes?: ReportNoteView[] };
+  view: ReturnType<typeof useBlockTableView>;
+  title: string;
+  description?: string;
+  testId: string;
+}): JSX.Element {
+  return (
+    <BlockExpandDialog
+      open={view.expanded}
+      onClose={() => view.setExpanded(false)}
+      title={title}
+      description={description}
+      dataTestId={`${testId}-expanded`}
+    >
+      <ReportRenderView
+        render={report.render}
+        dataTestId={`${testId}-expanded-render`}
+        asTable={view.asTable}
+        notes={report.notes}
+        caption={title}
+      />
+    </BlockExpandDialog>
   );
 }
 
 export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { system: copy, builder: builderCopy } = useReportCopy().screens;
   const { dashboardKey = "" } = useParams();
-  const [range, setRange] = useState<ReportRange>("30d");
-  const [grain, setGrain] = useState<ReportGrain>("day");
   const surface = useReportSurface();
   const dashboard = findSystemDashboard(surface.systemDashboards, dashboardKey);
+  const [range, setRange] = useState<ReportRange>(() => initialRange(dashboard?.ranges));
+  const [grain, setGrain] = useState<ReportGrain>("day");
 
   if (!dashboard) {
     return (
@@ -186,6 +219,8 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
         onGrainChange={setGrain}
         showGrain={supportsGrain}
         grains={grains}
+        grainLabel={dashboard.grainLabel}
+        ranges={dashboard.ranges}
         printTitle={dashboard.title}
       />
 

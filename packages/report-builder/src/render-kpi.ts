@@ -15,7 +15,8 @@
 import { requireEntityForRender } from './catalog';
 import type { RenderLabelCopy } from './copy';
 import { measureLabel } from './render-labels';
-import type { ReportPresentation } from './spec';
+import { isRowFlagged } from './render-flag';
+import type { ReportPresentation, ReportRowFlag } from './spec';
 import {
   isSuppressed,
   type CompiledMeasure,
@@ -38,6 +39,10 @@ export interface ReportKpiFigure {
   value: number | null;
   suppressed: boolean;
   format: ReportKpiFormat;
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals?: number;
+  /** Present only when the presentation's target flag marks THIS figure (FUT-4063). */
+  flag?: { label: string };
 }
 
 /**
@@ -64,7 +69,23 @@ function toKpiFigure(
     value: typeof raw === 'number' ? raw : null,
     suppressed: isSuppressed(raw),
     format: overrides.numberFormat ?? (measure.format === 'text' ? 'decimal' : measure.format),
+    ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
   };
+}
+
+/**
+ * The whole-period target signal (FUT-4063): the figure of the flag's measure,
+ * marked when it is above the target — or empty while `whenEmpty` is positive.
+ */
+function withTargetFlag(
+  figures: ReportKpiFigure[],
+  measures: CompiledMeasure[],
+  flag: ReportRowFlag | undefined,
+  row: ReportRow | undefined,
+): ReportKpiFigure[] {
+  if (!flag || !row || !isRowFlagged(row, flag)) return figures;
+  const index = measures.findIndex((measure) => measure.alias === flag.measure);
+  return figures.map((figure, at) => (at === index ? { ...figure, flag: { label: flag.label } } : figure));
 }
 
 /**
@@ -93,8 +114,13 @@ export function toKpiModel(
 } {
   const entity = requireEntityForRender(catalog, query.entity);
   const row = rows[0];
-  const figures = query.measures.map((measure, index) =>
-    toKpiFigure(measure, index === 0 ? presentation : {}, entity.fields, row, copy),
+  const figures = withTargetFlag(
+    query.measures.map((measure, index) =>
+      toKpiFigure(measure, index === 0 ? presentation : {}, entity.fields, row, copy),
+    ),
+    query.measures,
+    presentation.flag,
+    row,
   );
   const first = figures[0];
   if (!first) {

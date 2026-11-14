@@ -265,6 +265,8 @@ export interface CompiledMeasure {
   minSample?: number;
   /** Resolved render format (catalog field default, or the spec's override). */
   format: ReportValueFormat;
+  /** The spec's fraction digits (FUT-4063); absent = the format's default. */
+  decimals?: number;
 }
 
 /**

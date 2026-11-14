@@ -28,8 +28,11 @@ export function ReportHeatmapView({
   dataTestId: string;
 }): JSX.Element {
   const copy = useReportEngineCopy();
+  // A declared precision wins (FUT-4063); without one, a percent is drawn whole.
   const formatValue = (value: number): string =>
-    render.valueFormat === "percent" ? WHOLE_PERCENT.format(value) : formatReportValue(value, render.valueFormat, copy.values);
+    render.valueDecimals === undefined && render.valueFormat === "percent"
+      ? WHOLE_PERCENT.format(value)
+      : formatReportValue(value, render.valueFormat, copy.values, render.valueDecimals);
   return (
     <HeatMap
       rows={render.rowAxis}

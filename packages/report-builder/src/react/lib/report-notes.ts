@@ -25,9 +25,32 @@ export function noteText(
   return note.text.includes("{items}") ? note.text.split("{items}").join(list) : `${note.text} ${list}`;
 }
 
-/** The notes drawn under a block: shown ones that are not a KPI figure's hint. */
-export function blockNotes(notes: readonly ReportNoteView[] | undefined): ReportNoteView[] {
-  return (notes ?? []).filter((note) => note.figure === undefined && isNoteShown(note));
+/**
+ * The notes drawn under a block's rendering: shown ones that are not a KPI
+ * figure's hint. On the phone, a note that asks to sit BELOW the card is left
+ * to {@link notesBelowCard} (FUT-4063).
+ */
+export function blockNotes(
+  notes: readonly ReportNoteView[] | undefined,
+  narrow = false,
+): ReportNoteView[] {
+  return (notes ?? []).filter(
+    (note) => note.figure === undefined && isNoteShown(note) && !(narrow && note.phone === "below"),
+  );
+}
+
+/** On the phone, the notes that sit below the block's card (FUT-4063). */
+export function notesBelowCard(notes: readonly ReportNoteView[] | undefined, narrow: boolean): ReportNoteView[] {
+  if (!narrow) return [];
+  return (notes ?? []).filter((note) => note.figure === undefined && isNoteShown(note) && note.phone === "below");
+}
+
+/** Every shown note as the CSV's trailing lines (FUT-4063), hints included. */
+export function noteCsvLines(
+  notes: readonly ReportNoteView[] | undefined,
+  copy: Pick<ReportSystemCopy, "noteSeparator" | "noteMore">,
+): string[] {
+  return (notes ?? []).filter(isNoteShown).map((note) => noteText(note, copy));
 }
 
 /** Each KPI figure's hint, by figure index; the first shown note for a figure wins. */

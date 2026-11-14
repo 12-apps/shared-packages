@@ -54,7 +54,7 @@ export function reportTableColumns(
     align: column.format === "text" ? ("left" as const) : ("right" as const),
     ...(column.key === labelKey ? { minWidth: LABEL_COLUMN_MIN_WIDTH } : {}),
     render: (value: unknown, row: Record<string, unknown>) => {
-      const text = formatReportValue((value ?? null) as ReportRow[string], column.format, copy);
+      const text = formatReportValue((value ?? null) as ReportRow[string], column.format, copy, column.decimals);
       return flagged?.column === column.key && row[FLAGGED_ROW_KEY] === true ? flagged.render(text) : text;
     },
   }));

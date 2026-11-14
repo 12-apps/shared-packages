@@ -8,7 +8,7 @@ import { toHeatmapModel, type ReportHeatmapModel } from './render-heatmap';
 import { toKpiModel, type ReportKpiFigure } from './render-kpi';
 import type { RenderLabelCopy } from './copy';
 import { dimensionLabel, measureLabel } from './render-labels';
-import type { ReportPresentation } from './spec';
+import type { ReportPhoneCards, ReportPresentation } from './spec';
 import {
   isSuppressed,
   type CompiledQuery,
@@ -23,6 +23,8 @@ export interface ReportTableColumn {
   key: string;
   label: string;
   format: ReportValueFormat;
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals?: number;
 }
 
 export type ReportRenderModel =
@@ -32,6 +34,8 @@ export type ReportRenderModel =
       rows: ReportRow[];
       /** The rows the presentation's `flag` marks (FUT-4063); absent without one. */
       flag?: ReportTableFlag;
+      /** The opt-in phone form (FUT-4063), passed through as the spec states it. */
+      phone?: ReportPhoneCards;
     }
   | ReportHeatmapModel
   | {
@@ -325,10 +329,13 @@ export function renderReport(
     return toHeatmapModel(query, presentation, catalog, rows, tableColumnsFor(query, catalog, copy));
   }
   const columns = tableColumnsFor(query, catalog, copy);
-  if (presentation.flag) {
-    return { kind: 'table', columns, rows, flag: tableFlag(rows, presentation.flag) };
-  }
-  return { kind: 'table', columns, rows };
+  return {
+    kind: 'table',
+    columns,
+    rows,
+    ...(presentation.flag ? { flag: tableFlag(rows, presentation.flag) } : {}),
+    ...(presentation.phone ? { phone: presentation.phone } : {}),
+  };
 }
 
 /**
@@ -352,6 +359,7 @@ function tableColumnsFor(
       key: measure.alias,
       label: measureLabel(entity.fields[measure.field], measure, copy),
       format: measure.format,
+      ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
     })),
   ];
 }

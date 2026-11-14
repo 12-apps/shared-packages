@@ -30,6 +30,7 @@ import {
 } from "./lib/kpi-figures";
 import { CHART_BOX_SX, TABULAR_FIGURES } from "./lib/render-sx";
 import { figureHints } from "./lib/report-notes";
+import { FlaggedFigure } from "./lib/row-flag";
 import { ReportHeatmapView } from "./report-heatmap";
 import { ReportTable } from "./report-table";
 import { GRID_GAP_PX } from "./lib/report-surface";
@@ -43,15 +44,15 @@ import type {
 /** Format one cell for display/export; `brl` values are integer centavos. */
 function formatReportCell(
   value: ReportRow[string],
-  format: ReportTableColumn["format"],
+  column: Pick<ReportTableColumn, "format" | "decimals">,
   copy: ValueFormatCopy,
 ): string {
-  return formatReportValue(value, format, copy);
+  return formatReportValue(value, column.format, copy, column.decimals);
 }
 
 /** The KPI tile figure (FUT-309); a suppressed tile shows the same em-dash. */
-function formatKpiValue(value: number | null, format: ReportKpiFormat): string {
-  return formatKpiFigure(value, format);
+function formatKpiValue(value: number | null, format: ReportKpiFormat, decimals?: number): string {
+  return formatKpiFigure(value, format, decimals);
 }
 
 /**
@@ -99,7 +100,13 @@ function KpiFigures({
         >
           <StatCard
             label={figure.label}
-            value={formatKpiValue(figure.value, figure.format)}
+            value={
+              figure.flag ? (
+                <FlaggedFigure text={formatKpiValue(figure.value, figure.format, figure.decimals)} label={figure.flag.label} />
+              ) : (
+                formatKpiValue(figure.value, figure.format, figure.decimals)
+              )
+            }
             hint={hints?.get(index)}
             dataTestId={index === 0 ? `${dataTestId}-kpi` : `${dataTestId}-kpi-${index}`}
           />
@@ -117,14 +124,14 @@ export function exportColumnsFor(
   if (render.kind === "table") {
     return render.columns.map((column) => ({
       header: column.label,
-      value: (row) => formatReportCell(row[column.key] ?? null, column.format, copy),
+      value: (row) => formatReportCell(row[column.key] ?? null, column, copy),
     }));
   }
   if (render.kind === "heatmap") {
     // The long form the grid was folded from — one line per cell.
     return render.tableColumns.map((column) => ({
       header: column.label,
-      value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format, copy),
+      value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column, copy),
     }));
   }
   if (render.kind === "kpi") {
@@ -132,14 +139,14 @@ export function exportColumnsFor(
     // which stopped being one column the moment a KPI could carry several.
     return kpiFigures(render).map((figure) => ({
       header: figure.label,
-      value: () => formatKpiValue(figure.value, figure.format),
+      value: () => formatKpiValue(figure.value, figure.format, figure.decimals),
     }));
   }
   // The SAME derivation "Ver como tabela" uses, so a column can never appear on
   // screen and be missing from the download.
   return chartColumnsOf(render).map((column) => ({
     header: column.label,
-    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column.format, copy),
+    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column, copy),
   }));
 }
 
@@ -285,6 +292,7 @@ export function ReportRenderView({
         dataTestId={dataTestId}
         bounded={bounded}
         flag={render.flag}
+        phone={render.phone}
       />
     </Box>
   );

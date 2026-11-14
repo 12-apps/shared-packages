@@ -103,6 +103,8 @@ const reportTableColumnSchema = z.object({
    * `percent` = a 0-1 ratio (FUT-454).
    */
   format: z.enum(['brl', 'integer', 'decimal', 'text', 'duration', 'percent']),
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals: z.number().int().optional(),
 });
 
 /** Serializable ChartSpec consumed by @12-apps/ui SpecChart. */
@@ -133,6 +135,16 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     flag: z
       .object({ column: z.string(), label: z.string(), rows: z.array(z.number().int().min(0)) })
       .optional(),
+    /** The opt-in phone cards (FUT-4063), as the spec states them. */
+    phone: z
+      .object({
+        layout: z.literal('cards'),
+        title: z.string().optional(),
+        figure: z.string().optional(),
+        figureCaption: z.object({ measure: z.string(), suffix: z.string().optional() }).optional(),
+        subtitle: z.array(z.object({ measure: z.string(), suffix: z.string().optional() })).optional(),
+      })
+      .optional(),
   }),
   /** A grid of one measure over two dimensions, judged against a target (FUT-4063). */
   z.object({
@@ -147,6 +159,7 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     }),
     labels: z.object({ above: z.string(), below: z.string(), empty: z.string() }),
     valueFormat: reportTableColumnSchema.shape.format,
+    valueDecimals: z.number().int().optional(),
     tableColumns: z.array(reportTableColumnSchema),
     rows: z.array(reportRowSchema),
   }),
@@ -179,6 +192,9 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
           value: z.number().nullable(),
           suppressed: z.boolean(),
           format: kpiFormatSchema,
+          decimals: z.number().int().optional(),
+          /** Present when the target flag marks this figure (FUT-4063). */
+          flag: z.object({ label: z.string() }).optional(),
         }),
       )
       .optional(),
@@ -210,6 +226,7 @@ export const reportNoteSchema = z.object({
   items: z.array(z.string()).optional(),
   figure: z.number().int().min(0).optional(),
   action: z.object({ label: z.string(), href: z.string() }).optional(),
+  phone: z.literal('below').optional(),
 });
 
 export const systemReportResultSchema = z.object({

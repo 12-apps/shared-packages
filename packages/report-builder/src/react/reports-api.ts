@@ -35,7 +35,13 @@ export type ReportRollingRange = (typeof REPORT_ROLLING_RANGES)[number];
  * a 400 from a control that looked fine.
  */
 export const REPORT_RANGES = [...REPORT_ROLLING_RANGES, "custom"] as const;
-export type ReportRange = (typeof REPORT_RANGES)[number];
+/**
+ * A period a screen may hold. `week` ("Esta semana", FUT-4063) is a rolling
+ * preset a BUILT-IN may offer through its `ranges`; it is kept out of
+ * {@link REPORT_ROLLING_RANGES} because a saved report's stored default is
+ * CHECK-constrained to those four.
+ */
+export type ReportRange = (typeof REPORT_RANGES)[number] | "week";
 
 /**
  * The period labels, from the host's own words.
@@ -123,6 +129,8 @@ export interface SystemReportSummary {
   supportsGrain: boolean;
   /** The grains its toggle offers (FUT-4063); absent means all three. */
   grains?: ReportGrain[];
+  grainLabel?: string;
+  ranges?: ReportRange[];
 }
 
 type ReportRowValue = string | number | boolean | null;
@@ -136,6 +144,23 @@ export interface ReportTableColumn {
    * values are seconds and `percent` values a 0-1 ratio (FUT-454).
    */
   format: "brl" | "integer" | "decimal" | "text" | "duration" | "percent";
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals?: number;
+}
+
+/** One measure on a phone card line, with the host's words after it (FUT-4063). */
+export interface ReportCardPart {
+  measure: string;
+  suffix?: string;
+}
+
+/** A table's opt-in phone form (FUT-4063): each row a stacked card below `md`. */
+export interface ReportPhoneCards {
+  layout: "cards";
+  title?: string;
+  figure?: string;
+  figureCaption?: ReportCardPart;
+  subtitle?: ReportCardPart[];
 }
 
 /** Rendered report: a table model or a `@12-apps/ui` chart spec, plus rows. */
@@ -148,6 +173,9 @@ export interface ReportRowFlagWire {
 }
 
 /** The heat map presentation, as a spec carries it (FUT-4063). */
+/** A table presentation's phone cards, as a spec carries them (FUT-4063). */
+export type ReportPhoneCardsWire = ReportPhoneCards;
+
 export interface ReportHeatmapPresentationWire {
   kind: "heatmap";
   target: number;
@@ -172,6 +200,7 @@ export interface ReportHeatmapRender {
   scale: { target: number; strongAbove?: number; strongBelow?: number };
   labels: { above: string; below: string; empty: string };
   valueFormat: ReportTableColumn["format"];
+  valueDecimals?: number;
   /** The long form — the dimensions, then the measure — for CSV and the table view. */
   tableColumns: ReportTableColumn[];
   rows: ReportRow[];
@@ -184,10 +213,18 @@ export interface ReportNoteView {
   items?: string[];
   figure?: number;
   action?: { label: string; href: string };
+  /** On the phone, the note sits below its block's card (FUT-4063). */
+  phone?: "below";
 }
 
 export type ReportRender =
-  | { kind: "table"; columns: ReportTableColumn[]; rows: ReportRow[]; flag?: ReportTableFlag }
+  | {
+      kind: "table";
+      columns: ReportTableColumn[];
+      rows: ReportRow[];
+      flag?: ReportTableFlag;
+      phone?: ReportPhoneCards;
+    }
   | ReportHeatmapRender
   | {
       kind: "chart";
@@ -222,6 +259,9 @@ export type ReportRender =
         value: number | null;
         suppressed?: boolean;
         format: "brl" | "percent" | "compact" | "integer" | "decimal" | "duration";
+        decimals?: number;
+        /** Present when the presentation's target flag marks this figure (FUT-4063). */
+        flag?: { label: string };
       }>;
       rows: ReportRow[];
     };

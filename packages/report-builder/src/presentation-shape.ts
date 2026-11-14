@@ -124,18 +124,35 @@ export function assertHeatmapShape(spec: ReportSpec, dimensions: CompiledDimensi
 }
 
 /**
- * The row-flag rule (FUT-4063): the measure a table's flag judges, and the one
- * its `whenEmpty` reads, must be measures OF THIS SPEC — named by alias, the
- * key a row carries them under. A typo would otherwise flag nothing, silently.
+ * The table and KPI aliases rule (FUT-4063): a flag, and a table's phone cards,
+ * name columns OF THIS SPEC by alias — the key a row carries them under. A
+ * typo would otherwise flag nothing, or draw an empty card, silently.
  */
-export function assertRowFlagShape(spec: ReportSpec, measures: CompiledMeasure[]): void {
-  if (spec.presentation.kind !== 'table' || !spec.presentation.flag) return;
-  const { flag } = spec.presentation;
-  const aliases = measures.map((measure) => measure.alias);
-  for (const alias of [flag.measure, flag.whenEmpty?.measure]) {
-    if (alias !== undefined && !aliases.includes(alias)) {
+export function assertRowFlagShape(
+  spec: ReportSpec,
+  dimensions: CompiledDimension[],
+  measures: CompiledMeasure[],
+): void {
+  const { presentation } = spec;
+  if (presentation.kind !== 'table' && presentation.kind !== 'kpi') return;
+  const measureAliases = measures.map((measure) => measure.alias);
+  const flag = presentation.flag;
+  assertAliases('presentation.flag', [flag?.measure, flag?.whenEmpty?.measure], measureAliases);
+  if (presentation.kind !== 'table' || !presentation.phone) return;
+  const { phone } = presentation;
+  const all = [...dimensions.map((dimension) => dimension.alias), ...measureAliases];
+  assertAliases(
+    'presentation.phone',
+    [phone.title, phone.figure, phone.figureCaption?.measure, ...(phone.subtitle ?? []).map((part) => part.measure)],
+    all,
+  );
+}
+
+function assertAliases(where: string, named: ReadonlyArray<string | undefined>, known: string[]): void {
+  for (const alias of named) {
+    if (alias !== undefined && !known.includes(alias)) {
       throw invalidSpecError(
-        `presentation.flag names measure "${alias}", which this spec does not select. Use one of: ${aliases.join(', ')}.`,
+        `${where} names "${alias}", which this spec does not select. Use one of: ${known.join(', ')}.`,
       );
     }
   }

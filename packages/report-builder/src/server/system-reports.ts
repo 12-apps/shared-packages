@@ -2,6 +2,7 @@ import type { ReportSpecInput, TimeGrain } from '../index';
 
 import type { ReportWindow } from './adapter-shared';
 import type { ReportActor } from './context';
+import type { ReportRangePreset } from './range';
 
 /**
  * BUILT-IN ("system") REPORTS — the SHAPE, which is this package's, over
@@ -50,6 +51,14 @@ export interface SystemReportDef {
    * toggle draws two options rather than a third that means nothing there.
    */
   grains?: readonly TimeGrain[];
+  /** The grain toggle's name (FUT-4063), e.g. "Agrupar por"; absent = the surface's own word. */
+  grainLabel?: string;
+  /**
+   * The periods the control offers, in order (FUT-4063), e.g. `['week', '7d',
+   * 'month', '30d']`. Absent: the rolling four. The first is the default when
+   * `30d` is not among them. Never `custom`.
+   */
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
   /** Presentation kind surfaced on the hub card. */
   presentation: 'chart' | 'table';
   /**
@@ -117,6 +126,8 @@ export interface ReportNote {
   items?: readonly string[];
   figure?: number;
   action?: { label: string; href: string };
+  /** On the phone, draw the note BELOW its block's card rather than inside it (FUT-4063). */
+  phone?: 'below';
 }
 
 /**
@@ -161,6 +172,9 @@ export interface SystemDashboardDef {
    */
   permission: string;
   section: string;
+  /** As on {@link SystemReportDef}: the grain toggle's name and the periods offered (FUT-4063). */
+  grainLabel?: string;
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
   /**
    * Canvas-level disclosures rendered above the blocks: the facts a reader
    * needs in order to read ANY figure on the page — what is excluded from the
@@ -186,6 +200,8 @@ export interface SystemReportNavEntry {
   supportsGrain: boolean;
   /** The grains it offers (FUT-4063); absent means all three. */
   grains?: readonly TimeGrain[];
+  grainLabel?: string;
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
 }
 
 /**
@@ -206,6 +222,8 @@ export function systemReportNav(
     section: report.section,
     supportsGrain: report.supportsGrain,
     ...(report.grains ? { grains: report.grains } : {}),
+    ...(report.grainLabel ? { grainLabel: report.grainLabel } : {}),
+    ...(report.ranges ? { ranges: report.ranges } : {}),
   }));
 }
 

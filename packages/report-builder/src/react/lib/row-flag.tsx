@@ -49,3 +49,32 @@ export function FlaggedCell({ text, label }: { text: string; label: string }): J
     </Box>
   );
 }
+
+/** Visually hidden, still read: the flag's words beside an icon-only mark. */
+const SR_ONLY = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+} as const;
+
+/**
+ * A KPI figure over its whole-period target (FUT-4063): amber, with the icon,
+ * and the flag's words for a screen reader. The visible sentence is the host's
+ * hint under the figure, so the words are not printed twice.
+ */
+export function FlaggedFigure({ text, label }: { text: string; label: string }): JSX.Element {
+  return (
+    <Box
+      component="span"
+      data-report-figure-flag=""
+      sx={{ display: "inline-flex", alignItems: "center", gap: 0.75, color: "warning.dark" }}
+    >
+      <Icon name="WarningAmber" size="md" />
+      {text}
+      <Box component="span" sx={SR_ONLY}>{` ${label}`}</Box>
+    </Box>
+  );
+}

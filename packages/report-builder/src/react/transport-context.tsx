@@ -11,6 +11,7 @@ import type {
 
 import type { BlockTemplateGroup } from "../server/block-templates";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
+import type { ReportRange } from "./reports-api";
 
 /**
  * What every screen in this package reads from: how to reach the API, whose
@@ -41,6 +42,13 @@ export interface ReportBuilderSurface {
   blockTemplates: readonly BlockTemplateGroup[];
   /** The tenant's IANA zone — the clock the period picker calls "hoje". */
   timeZone: string;
+  /**
+   * A built-in surface's period, as its trigger reads it (FUT-4063): given a
+   * preset, the host's whole label — "Esta semana · 03–09/11". When present,
+   * the period is a select whose trigger shows that label; absent, the preset
+   * toggle as before. The host formats the dates, on its own clock.
+   */
+  periodLabel?: (range: ReportRange) => string;
 }
 
 /**

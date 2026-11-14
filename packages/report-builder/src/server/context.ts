@@ -8,12 +8,7 @@ import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
 import { REPORT_RUN_MAX_ROWS } from './policy';
 import type { ReportServerMessages } from './messages';
 import type { SystemReportDef } from './system-reports';
-import {
-  rangeFromQuery,
-  resolveReportRange,
-  type ResolvedReportRange,
-  toReportRangeView,
-} from './range';
+import { rangeFromQuery, resolveReportRange, type ResolvedReportRange, toReportRangeView } from './range';
 import type { SavedReportDb } from './saved';
 
 /**
@@ -152,6 +147,8 @@ export interface ReportBuilderServerConfig {
    * for rather than guessed, and validated as an IANA name at assembly.
    */
   timeZone: string;
+  /** The `week` preset's first day (FUT-4063): 1 Monday (default), 0 Sunday. The week GRAIN stays ISO. */
+  weekStartsOn?: 0 | 1;
   /** Hard row cap for a single run. Defaults to {@link REPORT_RUN_MAX_ROWS}. */
   maxRows?: number;
   /**
@@ -351,6 +348,7 @@ export function windowOf(
     now,
     messagesOf(config, request.locale).range,
     config.timeZone,
+    config.weekStartsOn,
   );
 }
 

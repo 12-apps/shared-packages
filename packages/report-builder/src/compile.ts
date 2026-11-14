@@ -194,6 +194,7 @@ function compileMeasure(entity: string, def: EntityDef, measure: ReportMeasure):
     ...(denominatorField ? { denominatorField } : {}),
     ...(minSample !== undefined ? { minSample } : {}),
     format: resolveFormat(field, aggregation, measure.format),
+    ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
   };
 }
 
@@ -347,7 +348,7 @@ export function compileReport(
   assertChartShape(spec, dimensions);
   assertKpiShape(spec, dimensions);
   assertHeatmapShape(spec, dimensions);
-  assertRowFlagShape(spec, measures);
+  assertRowFlagShape(spec, dimensions, measures);
   const filters = spec.filters.map((filter) => compileFilter(spec.entity, entityDef, filter));
   assertIdentitySuppression(
     entityDef,

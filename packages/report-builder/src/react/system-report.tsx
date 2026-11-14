@@ -22,24 +22,27 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
-import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import { initialRange, ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import { noteCsvLines } from "./lib/report-notes";
 import { ReportBodyWithNotes } from "./report-notes";
 import { exportColumnsFor } from "./report-render";
-import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import { useSystemReport, type ReportGrain, type ReportNoteView, type ReportRange } from "./reports-api";
 import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
 
 /** The page's CSV: exactly the rows on screen, in the columns on screen. */
 function exportReportCsv(
-  report: { key: string; render: Parameters<typeof exportColumnsFor>[0] },
+  report: { key: string; render: Parameters<typeof exportColumnsFor>[0]; notes?: ReportNoteView[] },
   values: Parameters<typeof exportColumnsFor>[1],
+  notes: string[],
 ): void {
-  exportRows("csv", report.render.rows, exportColumnsFor(report.render, values), `relatorio-${report.key}`);
+  exportRows("csv", report.render.rows, exportColumnsFor(report.render, values), `relatorio-${report.key}`, notes);
 }
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { system: systemCopy, builder: builderCopy } = useReportCopy().screens;
   const { reportKey = "" } = useParams();
-  const [range, setRange] = useState<ReportRange>("30d");
+  const entry = useReportSurface().systemReports.find((candidate) => candidate.key === reportKey);
+  const [range, setRange] = useState<ReportRange>(() => initialRange(entry?.ranges));
   const [grain, setGrain] = useState<ReportGrain>("day");
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
   // Before the early returns below, so the hook order cannot depend on whether
@@ -66,7 +69,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   }
 
   const report = query.data;
-  const section = surface.systemReports.find((entry) => entry.key === reportKey)?.section;
+  const section = entry?.section;
   return (
     <Stack spacing={3} data-testid="page-system-report" {...{ [PRINT_REGION_ATTR]: "" }}>
       <PrintStyles />
@@ -85,8 +88,10 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         onGrainChange={setGrain}
         showGrain={report.supportsGrain}
         grains={report.grains}
+        grainLabel={entry?.grainLabel}
+        ranges={entry?.ranges}
         printTitle={report.title}
-        onExport={() => exportReportCsv(report, copy.values)}
+        onExport={() => exportReportCsv(report, copy.values, noteCsvLines(report.notes, systemCopy))}
       />
 
       {/* The same toggle every block on a canvas gets — one implementation, so
