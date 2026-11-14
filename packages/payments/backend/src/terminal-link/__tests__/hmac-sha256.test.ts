@@ -58,6 +58,13 @@ describe("base64", () => {
     expect(decodeBase64("+_8")).toBeNull();
   });
 
+  it("refuses a long run of padding in linear time", () => {
+    // `/=+$/` backtracked polynomially on this input (CodeQL js/polynomial-redos):
+    // 200 000 characters would outlast the test's own timeout, never a clock read.
+    expect(decodeBase64(`A${"=".repeat(200_000)}x`)).toBeNull();
+    expect(decodeBase64("=".repeat(200_000))).toBeNull();
+  }, 2_000);
+
   it("refuses what is not base64", () => {
     expect(decodeBase64("a")).toBeNull();
     expect(decodeBase64("ab$d")).toBeNull();
