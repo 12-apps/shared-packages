@@ -46,6 +46,9 @@ export type CaptureState = 'UNBOUND' | 'ORDER_CREATED' | 'BOUND';
  *   another way (in cash), and the operator chose to give the card capture
  *   back (FUT-4996, Decision 3). Only a capture no sale holds: money a sale
  *   holds is the sale's, never owed back too.
+ * - `JOURNAL_CONFLICT`: the terminal's report contradicted a legacy row a host
+ *   kept from a cashier-typed code (`JOURNAL`). The row took the report's kind
+ *   and amount, and a person reconciles the sale with what was charged.
  */
 export const PACKAGE_REFUND_REASONS = [
   'UNBOUND_TIMEOUT',
@@ -53,6 +56,7 @@ export const PACKAGE_REFUND_REASONS = [
   'SALE_CANCELLED',
   'PAYMENT_UNDONE',
   'RECEIVED_TWICE',
+  'JOURNAL_CONFLICT',
 ] as const;
 export type PackageRefundReason = (typeof PACKAGE_REFUND_REASONS)[number];
 
