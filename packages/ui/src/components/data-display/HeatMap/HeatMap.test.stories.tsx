@@ -15,7 +15,14 @@ const meta: Meta<typeof HeatMap> = {
       { key: '2', label: 'Ter' },
     ],
     columns: Array.from({ length: 24 }, (_, hour) => ({ key: `${hour}`, label: `${hour}h` })),
-    cells: Array.from({ length: 24 }, (_, hour) => ({ row: '1', column: `${hour}`, value: hour / 40 })),
+    // A rising row that ends at 58% in the last hour. Written out rather than
+    // `hour / 40`: 23 / 40 * 100 is 57.49999… in floating point, so that cell
+    // printed "57%" and the play test looked for a cell that was never drawn.
+    cells: Array.from({ length: 24 }, (_, hour) => ({
+      row: '1',
+      column: `${hour}`,
+      value: hour === 23 ? 0.58 : hour / 50,
+    })),
     scale: { target: 0.3 },
     formatValue: (value: number) => `${Math.round(value * 100)}%`,
     labels: { above: 'acima da meta', below: 'abaixo da meta', empty: 'sem venda na hora' },
