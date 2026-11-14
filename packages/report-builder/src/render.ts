@@ -11,7 +11,10 @@ import { dimensionLabel, measureLabel } from './render-labels';
 import type { ReportPhoneCards, ReportPresentation } from './spec';
 import {
   isSuppressed,
+  type CompiledDimension,
   type CompiledQuery,
+  type FieldDef,
+  type TimeGrain,
   type FieldCatalog,
   type ReportKpiFormat,
   type ReportRow,
@@ -25,6 +28,14 @@ export interface ReportTableColumn {
   format: ReportValueFormat;
   /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
   decimals?: number;
+  /**
+   * A dimension's closed set of values, labelled (FUT-4063): a cell shows
+   * "Cozinha", not `k`, in the table, its cards and the CSV.
+   */
+  valueLabels?: Record<string, string>;
+  /** The spec's host format key and the bucket's grain (FUT-4063); the surface formats. */
+  bucketFormat?: string;
+  grain?: TimeGrain;
 }
 
 export type ReportRenderModel =
@@ -338,6 +349,22 @@ export function renderReport(
   };
 }
 
+/** One dimension's column: heading, and how its values read (FUT-4063). */
+function dimensionColumn(dimension: CompiledDimension, field: FieldDef | undefined, copy: RenderLabelCopy): ReportTableColumn {
+  const values = field?.values;
+  return {
+    key: dimension.alias,
+    label: dimension.label ?? dimensionLabel(field, dimension.alias, copy, dimension.timeGrain),
+    format: 'text',
+    ...(values && values.length > 0
+      ? { valueLabels: Object.fromEntries(values.map((option) => [option.value, option.label])) }
+      : {}),
+    ...(dimension.bucketFormat !== undefined
+      ? { bucketFormat: dimension.bucketFormat, ...(dimension.timeGrain ? { grain: dimension.timeGrain } : {}) }
+      : {}),
+  };
+}
+
 /**
  * A query's columns: its dimensions, then its measures, in the order the query
  * asks for them. Shared by the table presentation and by a chart's table
@@ -350,11 +377,7 @@ function tableColumnsFor(
 ): ReportTableColumn[] {
   const entity = requireEntityForRender(catalog, query.entity);
   return [
-    ...query.dimensions.map((dimension) => ({
-      key: dimension.alias,
-      label: dimensionLabel(entity.fields[dimension.field], dimension.alias, copy, dimension.timeGrain),
-      format: 'text' as const,
-    })),
+    ...query.dimensions.map((dimension) => dimensionColumn(dimension, entity.fields[dimension.field], copy)),
     ...query.measures.map((measure) => ({
       key: measure.alias,
       label: measureLabel(entity.fields[measure.field], measure, copy),

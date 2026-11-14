@@ -12,8 +12,11 @@ export interface ReportSystemCopy {
   reportFailedBody: string;
   /** The retry beside a failed system report. */
   retry: string;
-  /** Joins the names a report note lists, e.g. "; ". */
-  noteSeparator: string;
-  /** Closes a note's list past its first three names: " e mais 2". */
-  noteMore(count: number): string;
+  /**
+   * Joins the names a report note lists, e.g. "; ". Optional (FUT-4063), so a
+   * pack written before the notes keeps type-checking; absent: "; ".
+   */
+  noteSeparator?: string;
+  /** Closes a note's list past its first three names: " e mais 2". Absent: " +2". */
+  noteMore?(count: number): string;
 }

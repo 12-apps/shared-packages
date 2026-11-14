@@ -51,6 +51,14 @@ export const reportDimensionSchema = z.strictObject({
   field: z.string().min(1),
   /** Only valid on date dimensions; buckets values by the grain. */
   timeGrain: timeGrainSchema.optional(),
+  /** The column's heading in the host's words (FUT-4063), e.g. "Dia"; absent: derived. */
+  label: z.string().min(1).max(80).optional(),
+  /**
+   * A HOST format key for this dimension's values (FUT-4063), e.g.
+   * `'weekday-day'` for "Seg 03/11". The surface's `formatBucket` reads it;
+   * a surface without one prints the value as it comes.
+   */
+  bucketFormat: z.string().min(1).max(40).optional(),
 });
 
 export const reportMeasureSchema = z.strictObject({
@@ -73,6 +81,8 @@ export const reportMeasureSchema = z.strictObject({
   minSample: z.number().int().min(1).max(MAX_MIN_SAMPLE).optional(),
   /** Overrides the render format derived from the field (duration, percent…). */
   format: valueFormatSchema.optional(),
+  /** The column's heading in the host's words (FUT-4063), e.g. "Custo / vendas"; absent: derived. */
+  label: z.string().min(1).max(80).optional(),
   /**
    * Fraction digits this measure renders with (FUT-4063): `0` prints whole reais
    * ("R$ 1.240"), whole percents ("25%"), and a `duration` as whole HOURS

@@ -146,6 +146,11 @@ export interface ReportTableColumn {
   format: "brl" | "integer" | "decimal" | "text" | "duration" | "percent";
   /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
   decimals?: number;
+  /** A dimension's closed set, labelled (FUT-4063): cells read the label, not the stored value. */
+  valueLabels?: Record<string, string>;
+  /** The spec's host format key for the values, and the bucket's grain (FUT-4063). */
+  bucketFormat?: string;
+  grain?: ReportGrain;
 }
 
 /** One measure on a phone card line, with the host's words after it (FUT-4063). */

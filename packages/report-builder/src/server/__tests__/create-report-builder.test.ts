@@ -2,7 +2,7 @@ import { EN_US_REPORT_SERVER_MESSAGES } from '../en-US';
 import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
 import { EN_US_REPORT_ENGINE_COPY } from '../../en-US';
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { defineCatalog } from '../../catalog';
 import { createMemoryDataSource } from '../../memory';
@@ -411,6 +411,52 @@ describe('a built-in that derives what it needs (FUT-4063)', () => {
 
   it('is validated at assembly with no params, so a build must default them', () => {
     expect(() => setup({ systemReports: [derived] })).not.toThrow();
+  });
+
+  it("draws the block without notes when the host's derive fails, and says so", async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing: SystemReportDef = { ...derived, key: 'falha', derive: () => Promise.reject(new Error('shifts down')) };
+    const { call } = setup({ systemReports: [...SYSTEM, failing] });
+
+    const response = await call('GET', '/reports/system/:key', { params: { key: 'falha' }, query: { preset: 'today' } });
+
+    expect(response.status).toBe(200);
+    expect(data<{ notes: unknown[] }>(response).notes).toEqual([]);
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it("hands derive and build the reader's locale", async () => {
+    const seen: Array<string | undefined> = [];
+    const localed: SystemReportDef = {
+      ...derived,
+      key: 'idioma',
+      derive: ({ locale }) => {
+        seen.push(locale);
+        return Promise.resolve({});
+      },
+      build: (options) => {
+        seen.push(options.locale);
+        return derived.build(options);
+      },
+    };
+    const { call } = setup({ systemReports: [...SYSTEM, localed] });
+
+    await call('GET', '/reports/system/:key', { params: { key: 'idioma' }, query: { preset: 'today' }, locale: 'en-US' });
+
+    // The first build is assembly's own check, which has no reader.
+    expect(seen.slice(-2)).toEqual(['en-US', 'en-US']);
+  });
+
+  it('runs a grain the report does not offer as its first offered grain', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const response = await call('GET', '/reports/system/:key', {
+      params: { key: 'meta' },
+      query: { preset: 'today', grain: 'month' },
+    });
+
+    expect(data<{ grain: string }>(response).grain).toBe('day');
   });
 });
 

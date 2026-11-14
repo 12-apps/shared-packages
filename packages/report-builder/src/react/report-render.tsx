@@ -18,7 +18,7 @@ import { StatCard } from "@12-apps/ui/data-display/StatCard";
 import { Box } from "@12-apps/ui/mui/Box";
 
 import type { ValueFormatCopy } from "../copy";
-import { formatKpiFigure, formatReportValue } from "../format";
+import { formatKpiFigure } from "../format";
 
 import { useReportCopy } from "./transport-context";
 import { chartColumnsOf } from "./chart-as-table";
@@ -30,6 +30,7 @@ import {
 } from "./lib/kpi-figures";
 import { CHART_BOX_SX, TABULAR_FIGURES } from "./lib/render-sx";
 import { figureHints } from "./lib/report-notes";
+import { columnText, type BucketFormatter } from "./lib/column-value";
 import { FlaggedFigure } from "./lib/row-flag";
 import { ReportHeatmapView } from "./report-heatmap";
 import { ReportTable } from "./report-table";
@@ -40,15 +41,6 @@ import type {
   ReportRow,
   ReportTableColumn,
 } from "./reports-api";
-
-/** Format one cell for display/export; `brl` values are integer centavos. */
-function formatReportCell(
-  value: ReportRow[string],
-  column: Pick<ReportTableColumn, "format" | "decimals">,
-  copy: ValueFormatCopy,
-): string {
-  return formatReportValue(value, column.format, copy, column.decimals);
-}
 
 /** The KPI tile figure (FUT-309); a suppressed tile shows the same em-dash. */
 function formatKpiValue(value: number | null, format: ReportKpiFormat, decimals?: number): string {
@@ -116,23 +108,43 @@ function KpiFigures({
   );
 }
 
+/** One export column per display column, the same text the screen shows (FUT-4063). */
+function displayColumns(
+  columns: readonly ReportTableColumn[],
+  copy: ValueFormatCopy,
+  formatBucket?: BucketFormatter,
+): ExportColumn<ReportRow>[] {
+  return columns.map((column) => ({
+    header: column.label,
+    value: (row: ReportRow) => columnText(row[column.key], column, copy, formatBucket),
+    // Only TEXT cells are guarded against formula injection: "-12%" is a figure.
+    text: column.format === "text",
+  }));
+}
+
+/**
+ * A flagged table's extra column (FUT-4063): the flag's words on the flagged
+ * rows, empty on the rest. Only when the presentation declares a flag.
+ */
+function flagColumn(render: Extract<ReportRender, { kind: "table" }>): ExportColumn<ReportRow>[] {
+  const { flag } = render;
+  if (!flag) return [];
+  const flagged = new Set(flag.rows.map((index) => render.rows[index]));
+  return [{ header: flag.label, value: (row: ReportRow) => (flagged.has(row) ? flag.label : ""), text: true }];
+}
+
 /** Export columns matching exactly what the render model displays. */
 export function exportColumnsFor(
   render: ReportRender,
   copy: ValueFormatCopy,
+  formatBucket?: BucketFormatter,
 ): ExportColumn<ReportRow>[] {
   if (render.kind === "table") {
-    return render.columns.map((column) => ({
-      header: column.label,
-      value: (row) => formatReportCell(row[column.key] ?? null, column, copy),
-    }));
+    return [...displayColumns(render.columns, copy, formatBucket), ...flagColumn(render)];
   }
   if (render.kind === "heatmap") {
     // The long form the grid was folded from — one line per cell.
-    return render.tableColumns.map((column) => ({
-      header: column.label,
-      value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column, copy),
-    }));
+    return displayColumns(render.tableColumns, copy, formatBucket);
   }
   if (render.kind === "kpi") {
     // One column per FIGURE — the download and the tile show the same numbers,
@@ -144,10 +156,7 @@ export function exportColumnsFor(
   }
   // The SAME derivation "Ver como tabela" uses, so a column can never appear on
   // screen and be missing from the download.
-  return chartColumnsOf(render).map((column) => ({
-    header: column.label,
-    value: (row: ReportRow) => formatReportCell(row[column.key] ?? null, column, copy),
-  }));
+  return displayColumns(chartColumnsOf(render), copy, formatBucket);
 }
 
 interface ReportRenderViewProps {

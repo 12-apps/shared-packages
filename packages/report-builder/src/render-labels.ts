@@ -45,6 +45,8 @@ export function measureLabel(
   measure: CompiledMeasure,
   copy: RenderLabelCopy,
 ): string {
+  // The spec's own heading wins whole: the host already said what it is.
+  if (measure.label !== undefined) return measure.label;
   const base = field?.label ?? measure.field;
   if (measure.aggregation === 'count' || measure.aggregation === 'count_distinct') {
     return copy.qualified(base, copy.qualifiers.count);

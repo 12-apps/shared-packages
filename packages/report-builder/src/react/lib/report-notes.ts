@@ -8,6 +8,13 @@ import type { ReportSystemCopy } from "../screens-copy";
 /** The most names a note lists before "e mais N". */
 const NOTE_ITEMS_SHOWN = 3;
 
+/**
+ * The defaults for a copy pack that predates the notes' two keys (FUT-4063):
+ * language-neutral, so an older pack keeps type-checking and still reads.
+ */
+const DEFAULT_NOTE_SEPARATOR = "; ";
+const defaultNoteMore = (count: number): string => ` +${count}`;
+
 /** Whether a note has anything to say: one that lists names and has none is hidden. */
 export function isNoteShown(note: ReportNoteView): boolean {
   return note.items === undefined || note.items.length > 0;
@@ -17,11 +24,15 @@ export function isNoteShown(note: ReportNoteView): boolean {
 export function noteText(
   note: ReportNoteView,
   copy: Pick<ReportSystemCopy, "noteSeparator" | "noteMore">,
+  /** How many names are listed before "e mais N"; the CSV lists them all. */
+  cap = NOTE_ITEMS_SHOWN,
 ): string {
   if (note.items === undefined) return note.text;
-  const shown = note.items.slice(0, NOTE_ITEMS_SHOWN).join(copy.noteSeparator);
-  const rest = note.items.length - NOTE_ITEMS_SHOWN;
-  const list = rest > 0 ? `${shown}${copy.noteMore(rest)}` : shown;
+  const separator = copy.noteSeparator ?? DEFAULT_NOTE_SEPARATOR;
+  const more = copy.noteMore ?? defaultNoteMore;
+  const shown = note.items.slice(0, cap).join(separator);
+  const rest = note.items.length - cap;
+  const list = rest > 0 ? `${shown}${more(rest)}` : shown;
   return note.text.includes("{items}") ? note.text.split("{items}").join(list) : `${note.text} ${list}`;
 }
 
@@ -50,7 +61,8 @@ export function noteCsvLines(
   notes: readonly ReportNoteView[] | undefined,
   copy: Pick<ReportSystemCopy, "noteSeparator" | "noteMore">,
 ): string[] {
-  return (notes ?? []).filter(isNoteShown).map((note) => noteText(note, copy));
+  // Every name: the export is where the precision the screen caps survives.
+  return (notes ?? []).filter(isNoteShown).map((note) => noteText(note, copy, Number.POSITIVE_INFINITY));
 }
 
 /** Each KPI figure's hint, by figure index; the first shown note for a figure wins. */

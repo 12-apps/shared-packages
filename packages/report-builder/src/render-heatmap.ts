@@ -65,7 +65,10 @@ export function heatmapAxis(field: FieldDef | undefined, present: ReadonlySet<st
   const indices = declared
     .map((option, index) => (present.has(option.value) ? index : -1))
     .filter((index) => index >= 0);
-  const undeclared = [...present].filter((value) => !declared.some((option) => option.value === value)).sort();
+  // Numeric-aware: an hour axis without declared values reads 9h before 10h.
+  const undeclared = [...present]
+    .filter((value) => !declared.some((option) => option.value === value))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   const first = indices[0];
   const last = indices[indices.length - 1];
   const contiguous =

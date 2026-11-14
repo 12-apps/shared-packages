@@ -18,7 +18,7 @@ import { FLAGGED_ROW_SX, FlaggedCell, withFlagMarks } from "./lib/row-flag";
 import { cardsApply } from "./lib/table-cards";
 import { ReportTableCards } from "./report-table-cards";
 import type { ReportPhoneCards, ReportRow, ReportTableColumn, ReportTableFlag } from "./reports-api";
-import { useReportEngineCopy } from "./transport-context";
+import { useReportEngineCopy, useReportSurface } from "./transport-context";
 
 /**
  * The product's table, restated over the design system's own defaults.
@@ -148,6 +148,7 @@ function ReportTableGrid({
   flag?: ReportTableFlag;
 }): JSX.Element {
   const copy = useReportEngineCopy();
+  const { formatBucket } = useReportSurface();
   const flagged = flag
     ? { column: flag.column, render: (text: string) => <FlaggedCell text={text} label={flag.label} /> }
     : undefined;
@@ -167,7 +168,7 @@ function ReportTableGrid({
         // own `.MuiTableCell-sizeSmall`, so the rows measured the 52px of
         // `density="normal"` however small the `size` said they were.
         density="compact"
-        columns={reportTableColumns(columns, copy.values, flagged)}
+        columns={reportTableColumns(columns, copy.values, flagged, formatBucket)}
         data={withFlagMarks(rows, flag)}
         data-testid={`${dataTestId}-table`}
       />

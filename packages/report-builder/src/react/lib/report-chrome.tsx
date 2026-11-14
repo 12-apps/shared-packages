@@ -60,6 +60,15 @@ export function initialRange(offered: readonly ReportRange[] | undefined): Repor
 }
 
 /**
+ * The grain a built-in OPENS on (FUT-4063): `day` where it is offered, else
+ * the first grain the report offers — never one its toggle does not show.
+ */
+export function initialGrain(offered: readonly ReportGrain[] | undefined): ReportGrain {
+  if (!offered || offered.length === 0 || offered.includes("day")) return "day";
+  return offered[0] ?? "day";
+}
+
+/**
  * The period control: the preset toggle, or — when the host formats a label
  * per period (`surface.periodLabel`, FUT-4063) — a select whose trigger reads
  * the current period whole, "Esta semana · 03–09/11".

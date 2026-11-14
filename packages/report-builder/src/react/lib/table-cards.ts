@@ -4,7 +4,7 @@
  * browser.
  */
 import type { ValueFormatCopy } from "../../copy";
-import { formatReportValue } from "../../format";
+import { columnText, type BucketFormatter } from "./column-value";
 import type { ReportCardPart, ReportPhoneCards, ReportRow, ReportTableColumn } from "../reports-api";
 
 /** One card, every string already formatted. */
@@ -17,13 +17,14 @@ interface TableCard {
   figureCaption?: string;
 }
 
-function cell(row: ReportRow, column: ReportTableColumn | undefined, copy: ValueFormatCopy): string {
-  if (!column) return "";
-  return formatReportValue(row[column.key] ?? null, column.format, copy, column.decimals);
+type Cell = (row: ReportRow, column: ReportTableColumn | undefined) => string;
+
+function cellWith(copy: ValueFormatCopy, formatBucket?: BucketFormatter): Cell {
+  return (row, column) => (column ? columnText(row[column.key], column, copy, formatBucket) : "");
 }
 
-function part(row: ReportRow, byKey: Map<string, ReportTableColumn>, entry: ReportCardPart, copy: ValueFormatCopy): string {
-  return `${cell(row, byKey.get(entry.measure), copy)}${entry.suffix ?? ""}`;
+function part(row: ReportRow, byKey: Map<string, ReportTableColumn>, entry: ReportCardPart, cell: Cell): string {
+  return `${cell(row, byKey.get(entry.measure))}${entry.suffix ?? ""}`;
 }
 
 function cardTitleKey(columns: readonly ReportTableColumn[], phone: ReportPhoneCards): string | undefined {
@@ -36,23 +37,25 @@ export function tableCard(
   columns: readonly ReportTableColumn[],
   phone: ReportPhoneCards,
   copy: ValueFormatCopy,
+  formatBucket?: BucketFormatter,
 ): TableCard {
+  const cell = cellWith(copy, formatBucket);
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const titleKey = cardTitleKey(columns, phone);
   const used = new Set([titleKey, phone.figure, phone.figureCaption?.measure]);
   const card: TableCard = {
-    title: cell(row, titleKey ? byKey.get(titleKey) : undefined, copy),
+    title: cell(row, titleKey ? byKey.get(titleKey) : undefined),
     lines: phone.subtitle
       ? []
       : columns
           .filter((column) => !used.has(column.key))
-          .map((column) => ({ label: column.label, value: cell(row, column, copy) })),
+          .map((column) => ({ label: column.label, value: cell(row, column) })),
   };
   if (phone.subtitle) {
-    card.subtitle = phone.subtitle.map((entry) => part(row, byKey, entry, copy)).join(" · ");
+    card.subtitle = phone.subtitle.map((entry) => part(row, byKey, entry, cell)).join(" · ");
   }
-  if (phone.figure) card.figure = { key: phone.figure, text: cell(row, byKey.get(phone.figure), copy) };
-  if (phone.figureCaption) card.figureCaption = part(row, byKey, phone.figureCaption, copy);
+  if (phone.figure) card.figure = { key: phone.figure, text: cell(row, byKey.get(phone.figure)) };
+  if (phone.figureCaption) card.figureCaption = part(row, byKey, phone.figureCaption, cell);
   return card;
 }
 

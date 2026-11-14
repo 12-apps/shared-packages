@@ -11,6 +11,7 @@ import type {
 
 import type { BlockTemplateGroup } from "../server/block-templates";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
+import type { BucketFormatter } from "./lib/column-value";
 import type { ReportRange } from "./reports-api";
 
 /**
@@ -49,6 +50,12 @@ export interface ReportBuilderSurface {
    * toggle as before. The host formats the dates, on its own clock.
    */
   periodLabel?: (range: ReportRange) => string;
+  /**
+   * How a dimension that names a `bucketFormat` reads (FUT-4063) — the host's
+   * "Seg 03/11" for a day, "Semana de 03/11" for a week. Absent: the value as
+   * the server sent it.
+   */
+  formatBucket?: BucketFormatter;
 }
 
 /**

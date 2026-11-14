@@ -142,6 +142,8 @@ function compileDimension(entity: string, def: EntityDef, dim: ReportDimension):
     field: dim.field,
     timeGrain: grain,
     alias: grain ? `${dim.field}_${grain}` : dim.field,
+    ...(dim.label !== undefined ? { label: dim.label } : {}),
+    ...(dim.bucketFormat !== undefined ? { bucketFormat: dim.bucketFormat } : {}),
   };
 }
 
@@ -195,6 +197,7 @@ function compileMeasure(entity: string, def: EntityDef, measure: ReportMeasure):
     ...(minSample !== undefined ? { minSample } : {}),
     format: resolveFormat(field, aggregation, measure.format),
     ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
+    ...(measure.label !== undefined ? { label: measure.label } : {}),
   };
 }
 

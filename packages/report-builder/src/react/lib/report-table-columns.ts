@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import type { ColumnConfig } from "@12-apps/ui/data-display/Table";
 
 import type { ValueFormatCopy } from "../../copy";
-import { formatReportValue } from "../../format";
+import { columnText, type BucketFormatter } from "./column-value";
 import type { ReportRow, ReportTableColumn } from "../reports-api";
 
 /**
@@ -43,6 +43,7 @@ export function reportTableColumns(
   columns: readonly ReportTableColumn[],
   copy: ValueFormatCopy,
   flagged?: FlaggedColumn,
+  formatBucket?: BucketFormatter,
 ): ColumnConfig[] {
   const labelKey = labelColumnKey(columns);
   return columns.map((column) => ({
@@ -54,7 +55,7 @@ export function reportTableColumns(
     align: column.format === "text" ? ("left" as const) : ("right" as const),
     ...(column.key === labelKey ? { minWidth: LABEL_COLUMN_MIN_WIDTH } : {}),
     render: (value: unknown, row: Record<string, unknown>) => {
-      const text = formatReportValue((value ?? null) as ReportRow[string], column.format, copy, column.decimals);
+      const text = columnText(value as ReportRow[string] | undefined, column, copy, formatBucket);
       return flagged?.column === column.key && row[FLAGGED_ROW_KEY] === true ? flagged.render(text) : text;
     },
   }));

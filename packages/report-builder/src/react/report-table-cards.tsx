@@ -13,7 +13,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { flaggedRowInk, flaggedRowTint } from "./lib/row-flag";
 import { tableCard } from "./lib/table-cards";
 import type { ReportPhoneCards, ReportRow, ReportTableColumn, ReportTableFlag } from "./reports-api";
-import { useReportEngineCopy } from "./transport-context";
+import { useReportEngineCopy, useReportSurface } from "./transport-context";
 
 function FlagLine({ label }: { label: string }): JSX.Element {
   return (
@@ -50,11 +50,12 @@ export function ReportTableCards({
   dataTestId: string;
 }): JSX.Element {
   const copy = useReportEngineCopy();
+  const { formatBucket } = useReportSurface();
   const flagged = new Set(flag?.rows ?? []);
   return (
     <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }} data-testid={`${dataTestId}-cards`}>
       {rows.map((row, index) => {
-        const card = tableCard(row, columns, phone, copy.values);
+        const card = tableCard(row, columns, phone, copy.values, formatBucket);
         const isFlagged = flagged.has(index);
         return (
           <Box

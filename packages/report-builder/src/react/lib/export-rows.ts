@@ -12,6 +12,19 @@ export interface ExportColumn<T> {
   header: string;
   /** Extracts the cell value for a row. */
   value: (row: T) => string | number | boolean | null | undefined;
+  /**
+   * A TEXT column (FUT-4063): its cells are guarded against formula injection
+   * in the CSV. Figures are not — "-12%" is a number, not a formula.
+   */
+  text?: boolean;
+}
+
+/** A cell a spreadsheet would run as a formula: it starts with = + - or @. */
+const FORMULA_START = /^[=+\-@]/;
+
+/** A text cell made inert for a spreadsheet: a leading apostrophe, as OWASP advises. */
+function inert(value: string): string {
+  return FORMULA_START.test(value) ? `'${value}` : value;
 }
 
 function escapeCsvCell(value: string): string {
@@ -29,17 +42,18 @@ function escapeCsvCell(value: string): string {
  */
 export function csvTrailer(notes: readonly string[]): string {
   if (notes.length === 0) return "";
-  return `\n\n${notes.map(escapeCsvCell).join("\n")}`;
+  return `\n\n${notes.map((note) => escapeCsvCell(inert(note))).join("\n")}`;
 }
 
-function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
-  const head = columns.map((column) => escapeCsvCell(column.header)).join(",");
+export function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
+  const head = columns.map((column) => escapeCsvCell(inert(column.header))).join(",");
   const body = rows
     .map((row) =>
       columns
         .map((column) => {
           const cell = column.value(row);
-          return escapeCsvCell(cell == null ? "" : String(cell));
+          const text = cell == null ? "" : String(cell);
+          return escapeCsvCell(column.text ? inert(text) : text);
         })
         .join(","),
     )

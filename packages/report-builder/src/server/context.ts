@@ -149,6 +149,8 @@ export interface ReportBuilderServerConfig {
   timeZone: string;
   /** The `week` preset's first day (FUT-4063): 1 Monday (default), 0 Sunday. The week GRAIN stays ISO. */
   weekStartsOn?: 0 | 1;
+  /** A built-in's failed `derive` (FUT-4063): the block still draws; this hears why. Absent: console. */
+  onDeriveError?: (error: unknown, report: { key: string }) => void;
   /** Hard row cap for a single run. Defaults to {@link REPORT_RUN_MAX_ROWS}. */
   maxRows?: number;
   /**

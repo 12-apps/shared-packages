@@ -87,6 +87,8 @@ export interface SystemReportDef {
 export interface SystemReportBuildOptions {
   grain: TimeGrain;
   params: SystemReportParams;
+  /** The reader's language (BCP-47), when the host negotiated one (FUT-4063). */
+  locale?: string;
 }
 
 /** Per-tenant numbers a built-in's spec is built with (FUT-4063). */
@@ -97,6 +99,8 @@ export interface SystemReportRunContext {
   actor: ReportActor;
   window: ReportWindow;
   grain: TimeGrain;
+  /** The reader's language (BCP-47), so notes and labels follow it (FUT-4063). */
+  locale?: string;
 }
 
 /** What `derive` answers. */
@@ -159,6 +163,11 @@ export interface SystemDashboardBlockDef {
   reportKey: string;
   /** Width on the 12-column canvas; at or above the presentation's floor. */
   span: number;
+  /**
+   * `false` draws the block BARE (FUT-4063): no titled card and no tools — a
+   * row of KPI tiles that are cards of their own. Default `true`.
+   */
+  frame?: boolean;
 }
 
 export interface SystemDashboardDef {

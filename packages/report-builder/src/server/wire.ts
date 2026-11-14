@@ -105,6 +105,10 @@ const reportTableColumnSchema = z.object({
   format: z.enum(['brl', 'integer', 'decimal', 'text', 'duration', 'percent']),
   /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
   decimals: z.number().int().optional(),
+  /** A dimension's labelled closed set, the host format key and grain (FUT-4063). */
+  valueLabels: z.record(z.string(), z.string()).optional(),
+  bucketFormat: z.string().optional(),
+  grain: z.enum(['day', 'week', 'month']).optional(),
 });
 
 /** Serializable ChartSpec consumed by @12-apps/ui SpecChart. */

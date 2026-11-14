@@ -48,8 +48,10 @@ export function widenAction(
   range: ReportRange,
   onRangeChange: (range: ReportRange) => void,
   copy: ReportRangeCopy,
+  /** The periods the surface offers (FUT-4063): never offer one it does not. */
+  offered?: readonly ReportRange[],
 ): { label: string; onClick: () => void } | undefined {
   const wider = widerRange(range);
-  if (!wider) return undefined;
+  if (!wider || (offered && !offered.includes(wider))) return undefined;
   return { label: widenLabel(wider, copy), onClick: () => onRangeChange(wider) };
 }

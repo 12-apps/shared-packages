@@ -22,7 +22,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { exportRows } from "./lib/export-rows";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
-import { initialRange, ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import { initialGrain, initialRange, ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { noteCsvLines } from "./lib/report-notes";
 import { NotesBelowCard, ReportBodyWithNotes } from "./report-notes";
 import { exportColumnsFor } from "./report-render";
@@ -34,8 +34,9 @@ function exportReportCsv(
   report: { key: string; render: Parameters<typeof exportColumnsFor>[0]; notes?: ReportNoteView[] },
   values: Parameters<typeof exportColumnsFor>[1],
   notes: string[],
+  formatBucket?: Parameters<typeof exportColumnsFor>[2],
 ): void {
-  exportRows("csv", report.render.rows, exportColumnsFor(report.render, values), `relatorio-${report.key}`, notes);
+  exportRows("csv", report.render.rows, exportColumnsFor(report.render, values, formatBucket), `relatorio-${report.key}`, notes);
 }
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
@@ -43,7 +44,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   const { reportKey = "" } = useParams();
   const entry = useReportSurface().systemReports.find((candidate) => candidate.key === reportKey);
   const [range, setRange] = useState<ReportRange>(() => initialRange(entry?.ranges));
-  const [grain, setGrain] = useState<ReportGrain>("day");
+  const [grain, setGrain] = useState<ReportGrain>(() => initialGrain(entry?.grains));
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
   // Before the early returns below, so the hook order cannot depend on whether
   // the run has resolved. `undefined` simply means "no tools yet".
@@ -91,7 +92,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         grainLabel={entry?.grainLabel}
         ranges={entry?.ranges}
         printTitle={report.title}
-        onExport={() => exportReportCsv(report, copy.values, noteCsvLines(report.notes, systemCopy))}
+        onExport={() => exportReportCsv(report, copy.values, noteCsvLines(report.notes, systemCopy), surface.formatBucket)}
       />
 
       {/* The same toggle every block on a canvas gets — one implementation, so
