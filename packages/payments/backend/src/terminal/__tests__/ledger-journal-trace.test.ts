@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createMemoryTerminalCaptureStore,
@@ -112,17 +112,13 @@ describe("a legacy JOURNAL row and the terminal's report", () => {
 describe("two reports racing for one legacy JOURNAL row", () => {
   /** A store where another report fills the row right after this one reads it. */
   function racedBy(store: TerminalCaptureStore, rival: () => Promise<unknown>): TerminalCaptureStore {
-    let raced = false;
-    return {
-      ...store,
-      async writeIfUnchanged(seen, patch) {
-        if (!raced) {
-          raced = true;
-          await rival();
-        }
+    const writeIfUnchanged = vi
+      .fn<TerminalCaptureStore["writeIfUnchanged"]>((seen, patch) => store.writeIfUnchanged(seen, patch))
+      .mockImplementationOnce(async (seen, patch) => {
+        await rival();
         return store.writeIfUnchanged(seen, patch);
-      },
-    };
+      });
+    return { ...store, writeIfUnchanged };
   }
 
   it("an agreeing loser re-reads and answers the first report's row, writing nothing", async () => {
