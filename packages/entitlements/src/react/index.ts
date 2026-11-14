@@ -56,6 +56,7 @@ export type {
   PageLockCopy,
   PlanCompareCopy,
   PlanPageCopy,
+  ResolvedEntitlementsWebCopy,
   ReasonCopy,
   TierCardsCopy,
   UpsellHostCopy,

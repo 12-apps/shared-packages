@@ -107,6 +107,13 @@ export interface ComparisonTier {
 
 /** The plan screen's whole payload: the tenant's status AND the comparison. */
 export interface TenantPlanPayload extends TenantPlanView {
+  /**
+   * The tiers on sale, ORDERED CHEAPEST FIRST — the order the host's
+   * `comparison` builder emits. `ComparisonTier` carries no rank of its own, so
+   * the surface reads this order as the ladder: the matrix places rows by the
+   * cheapest tier that mentions them, and the plan comparison's default offer
+   * is the FIRST upgrade tier that includes every compared row.
+   */
   comparison: ComparisonTier[];
 }
 

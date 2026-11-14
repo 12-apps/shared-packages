@@ -58,7 +58,10 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
   planCompare: {
     title: 'Compare the plans',
     currentBadge: 'Your plan',
-    empty: 'None of the features on this screen is in the plan comparison.',
+    offeredBadge: 'Recommended',
+    empty: 'To see everything each plan includes, open See every plan.',
+    alreadyIncluded: 'Your plan already includes all of these features.',
+    retry: 'Try again',
     closeLabel: 'Close',
   },
   upsell: {

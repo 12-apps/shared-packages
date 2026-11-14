@@ -128,11 +128,19 @@ function UpsellDialogBody({
  * interceptor — opens this dialog.
  */
 export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX.Element | null {
-  const [prompt, setPrompt] = useState<UpsellPrompt | null>(null);
-  useEffect(() => subscribeToUpsell(setPrompt), []);
-  if (prompt === null) return null;
+  // Each raise is its own dialog: keyed by a counter, so a second raise while
+  // one is open starts fresh instead of inheriting a "request sent" state that
+  // was about a different plan.
+  const [raised, setRaised] = useState<{ prompt: UpsellPrompt; id: number } | null>(null);
+  useEffect(
+    () =>
+      subscribeToUpsell((next) => setRaised((was) => ({ prompt: next, id: (was?.id ?? 0) + 1 }))),
+    [],
+  );
+  if (raised === null) return null;
+  const { prompt, id } = raised;
   const close = (): void => {
-    setPrompt(null);
+    setRaised(null);
   };
   // A prompt carrying `compareKeys` is a screen asking to show its own rows
   // side by side. Only a SALE gets the comparison: a restricted, suspended or
@@ -141,6 +149,7 @@ export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX
   if (prompt.compareKeys !== undefined && isUpgradeable(prompt.reason)) {
     return (
       <PlanCompareDialog
+        key={id}
         open
         onClose={close}
         keys={prompt.compareKeys}
@@ -152,6 +161,7 @@ export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX
   }
   return (
     <Dialog
+      key={id}
       open
       size="sm"
       title={config.copy.upsell.reasons[prompt.reason].title}

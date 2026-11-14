@@ -129,8 +129,17 @@ export interface PlanCompareCopy {
   title: string;
   /** Over the tenant's own tier column. */
   currentBadge: string;
-  /** When none of the screen's rows is in the payload — said, never blank. */
+  /** Over the tier the dialog offers — so the table points at the ask below it. */
+  offeredBadge: string;
+  /**
+   * When none of the screen's rows is in the payload — said, never blank, and
+   * pointing at the next step (the all-plans link), not at the host's wiring.
+   */
   empty: string;
+  /** When the tenant's own tier already includes every compared row: no sale. */
+  alreadyIncluded: string;
+  /** The retry on the load-failed state. */
+  retry: string;
   /** The close button's accessible name. */
   closeLabel: string;
 }

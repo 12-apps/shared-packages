@@ -23,10 +23,15 @@
  * ## Two densities
  *
  * `full` is the plan page's: a sticky label column and roomy tier columns
- * that scroll sideways under five tiers on a phone. `compact` is a dialog's:
- * a handful of rows across three or four tiers that must FIT at 320 px with
- * no sideways scroll — narrow fixed tier columns, the label column taking
- * what is left and wrapping.
+ * that scroll sideways under five tiers on a phone. `compact` is a dialog's
+ * table: a 160 px label floor and 88 px tier columns, used only where the
+ * dialog MEASURED room for them (`matrixLayoutFor`); narrower than that, the
+ * dialog stacks instead (`StackedMatrix`). Tier names wrap at word breaks and
+ * a long label word breaks anywhere rather than widening its column.
+ *
+ * Above the tier names, two optional words: the tenant's own tier
+ * (`currentLabel`) and the tier the caller is offering (`offeredLabel`) —
+ * text, never colour alone.
  */
 import type { JSX } from 'react';
 
@@ -43,12 +48,15 @@ export type MatrixDensity = 'full' | 'compact';
 interface MatrixStyle {
   cellPx: number;
   labelMinWidth: number | undefined;
-  /** `'1%'` shrinks a tier column to its own content; the label takes the rest. */
-  tierWidth: string | undefined;
-  tierMinWidth: number | undefined;
+  tierMinWidth: number;
   stickyLabel: boolean;
   detailSize: 'xs' | 'sm';
+  headAlign: 'bottom' | undefined;
 }
+
+/** The compact table's floors — what `matrixLayoutFor` budgets against. */
+export const COMPACT_LABEL_MIN_PX = 160;
+export const COMPACT_TIER_MIN_PX = 88;
 
 const STYLES: Record<MatrixDensity, MatrixStyle> = {
   // Sticky so the row label survives the horizontal scroll a five-column
@@ -56,30 +64,68 @@ const STYLES: Record<MatrixDensity, MatrixStyle> = {
   full: {
     cellPx: 1.5,
     labelMinWidth: 220,
-    tierWidth: undefined,
     tierMinWidth: 110,
     stickyLabel: true,
     detailSize: 'sm',
+    headAlign: undefined,
   },
-  // Each tier column shrinks to its own name (never broken mid-word), at least
-  // a mark's width plus air, and the label column takes what is left and
-  // wraps: three tiers leave ~110 px of label at a 320 px viewport inside a
-  // dense dialog, with no sideways scroll. That is the budget this density is
-  // built against.
   compact: {
     cellPx: 1,
-    labelMinWidth: undefined,
-    tierWidth: '1%',
-    tierMinWidth: 48,
+    labelMinWidth: COMPACT_LABEL_MIN_PX,
+    tierMinWidth: COMPACT_TIER_MIN_PX,
     stickyLabel: false,
     detailSize: 'xs',
+    headAlign: 'bottom',
   },
 };
 
 function labelColumnSx(style: MatrixStyle): Record<string, unknown> {
   return style.stickyLabel
     ? { position: 'sticky', left: 0, bgcolor: 'background.paper' }
-    : { overflowWrap: 'break-word' };
+    : // `anywhere`, not `break-word`: only `anywhere` lowers a cell's
+      // min-content width, so one long word cannot widen the label column.
+      { overflowWrap: 'anywhere' };
+}
+
+/** What a cell says: its mark, or the ceiling it prints. Shared with the stacked layout. */
+export function CellValue({
+  line,
+  copy,
+  size,
+}: {
+  line: ComparisonLine | undefined;
+  copy: ComparisonTableCopy;
+  size: 'xs' | 'sm';
+}): JSX.Element {
+  const included = line?.included ?? false;
+  const detail = included ? line?.detail ?? null : null;
+  if (detail !== null) {
+    return (
+      <Text as="span" size={size}>
+        {detail}
+      </Text>
+    );
+  }
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+      <IncludedMark included={included} label={included ? copy.included : copy.excluded} />
+    </Box>
+  );
+}
+
+/** The words over the tier names: whose tier it is, and which one is offered. */
+export interface TierBadges {
+  currentLabel: string | null;
+  offeredKey: string | null;
+  offeredLabel: string | null;
+}
+
+export const NO_BADGES: TierBadges = { currentLabel: null, offeredKey: null, offeredLabel: null };
+
+/** The badge a tier wears, if any — its own tier wins over being offered. */
+export function badgeFor(tier: ComparisonTier, badges: TierBadges): string | null {
+  if (tier.current) return badges.currentLabel;
+  return tier.key === badges.offeredKey ? badges.offeredLabel : null;
 }
 
 /**
@@ -100,8 +146,6 @@ function MatrixCell({
   style: MatrixStyle;
   current: boolean;
 }): JSX.Element {
-  const included = line?.included ?? false;
-  const detail = included ? line?.detail ?? null : null;
   return (
     <Box
       component="td"
@@ -115,15 +159,7 @@ function MatrixCell({
         bgcolor: current ? 'action.hover' : undefined,
       }}
     >
-      {detail === null ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <IncludedMark included={included} label={included ? copy.included : copy.excluded} />
-        </Box>
-      ) : (
-        <Text as="span" size={style.detailSize}>
-          {detail}
-        </Text>
-      )}
+      <CellValue line={line} copy={copy} size={style.detailSize} />
     </Box>
   );
 }
@@ -131,13 +167,14 @@ function MatrixCell({
 function TierHead({
   tier,
   style,
-  currentLabel,
+  badges,
 }: {
   tier: ComparisonTier;
   style: MatrixStyle;
-  currentLabel: string | null;
+  badges: TierBadges;
 }): JSX.Element {
-  const marked = tier.current && currentLabel !== null;
+  const badge = badgeFor(tier, badges);
+  const shaded = tier.current && badges.currentLabel !== null;
   return (
     <Box
       component="th"
@@ -148,20 +185,14 @@ function TierHead({
         py: 1,
         px: style.cellPx,
         textAlign: 'center',
-        verticalAlign: 'bottom',
+        verticalAlign: style.headAlign,
         borderBottom: '2px solid',
         borderColor: tier.current ? 'primary.main' : 'divider',
-        width: style.tierWidth,
         minWidth: style.tierMinWidth,
-        whiteSpace: style.tierWidth === undefined ? undefined : 'nowrap',
-        bgcolor: marked ? 'action.hover' : undefined,
+        bgcolor: shaded ? 'action.hover' : undefined,
       }}
     >
-      {marked ? (
-        <Text as="div" size="xs" weight="bold" color="primary" data-testid="plan-matrix-current">
-          {currentLabel}
-        </Text>
-      ) : null}
+      {badge === null ? null : <TierBadge tier={tier} text={badge} />}
       <Text as="span" size="sm" weight="bold">
         {tier.name}
       </Text>
@@ -169,16 +200,34 @@ function TierHead({
   );
 }
 
+/**
+ * The badge's text. Default (body) ink, not the brand colour: the brand
+ * primary on the shaded column measured 4.49:1, under AA, and a brand colour
+ * is the host's to pick, so it cannot be what the reading depends on.
+ */
+export function TierBadge({ tier, text }: { tier: ComparisonTier; text: string }): JSX.Element {
+  return (
+    <Text
+      as="div"
+      size="xs"
+      weight="bold"
+      data-testid={tier.current ? 'plan-matrix-current' : 'plan-matrix-offered'}
+    >
+      {text}
+    </Text>
+  );
+}
+
 function MatrixHead({
   tiers,
   copy,
   style,
-  currentLabel,
+  badges,
 }: {
   tiers: ComparisonTier[];
   copy: ComparisonTableCopy;
   style: MatrixStyle;
-  currentLabel: string | null;
+  badges: TierBadges;
 }): JSX.Element {
   return (
     <Box component="thead">
@@ -190,7 +239,7 @@ function MatrixHead({
             py: 1,
             px: style.cellPx,
             textAlign: 'left',
-            verticalAlign: 'bottom',
+            verticalAlign: style.headAlign,
             borderBottom: '2px solid',
             borderColor: 'divider',
             minWidth: style.labelMinWidth,
@@ -202,7 +251,7 @@ function MatrixHead({
           </Text>
         </Box>
         {tiers.map((tier) => (
-          <TierHead key={tier.key} tier={tier} style={style} currentLabel={currentLabel} />
+          <TierHead key={tier.key} tier={tier} style={style} badges={badges} />
         ))}
       </Box>
     </Box>
@@ -306,10 +355,10 @@ export interface ComparisonMatrixProps {
   copy: ComparisonTableCopy;
   density?: MatrixDensity;
   /**
-   * The words over the tenant's own tier column, or null for the border
-   * alone. When given, the column is also shaded down its length.
+   * The words over the tenant's own tier and the offered tier. With a
+   * `currentLabel`, the tenant's column is also shaded down its length.
    */
-  currentLabel?: string | null;
+  badges?: TierBadges;
   /** Section heading rows. A dialog showing one section drops them. */
   sectionTitles?: boolean;
   dataTestId?: string;
@@ -321,7 +370,7 @@ export function ComparisonMatrix({
   sections,
   copy,
   density = 'full',
-  currentLabel = null,
+  badges = NO_BADGES,
   sectionTitles = true,
   dataTestId,
 }: ComparisonMatrixProps): JSX.Element {
@@ -332,14 +381,14 @@ export function ComparisonMatrix({
       data-testid={dataTestId}
       sx={{ width: '100%', borderCollapse: 'collapse' }}
     >
-      <MatrixHead tiers={tiers} copy={copy} style={style} currentLabel={currentLabel} />
+      <MatrixHead tiers={tiers} copy={copy} style={style} badges={badges} />
       <MatrixBody
         sections={sections}
         tiers={tiers}
         copy={copy}
         style={style}
         sectionTitles={sectionTitles}
-        shadeCurrent={currentLabel !== null}
+        shadeCurrent={badges.currentLabel !== null}
       />
     </Box>
   );

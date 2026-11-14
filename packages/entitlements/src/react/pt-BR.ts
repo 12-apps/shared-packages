@@ -48,7 +48,10 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
   planCompare: {
     title: 'Compare os planos',
     currentBadge: 'Seu plano',
-    empty: 'Nenhum recurso desta tela aparece na comparação dos planos.',
+    offeredBadge: 'Recomendado',
+    empty: 'Para ver tudo o que cada plano inclui, abra Ver todos os planos.',
+    alreadyIncluded: 'Seu plano já inclui todos estes recursos.',
+    retry: 'Tentar de novo',
     closeLabel: 'Fechar',
   },
   upsell: {
