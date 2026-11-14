@@ -30,7 +30,8 @@ export interface ConfirmedAct<TAct extends string> {
   /**
    * Send the act now, with the reason (trimmed) and the PIN. A reason under
    * {@link MIN_REASON_LENGTH} or an empty PIN sends nothing and answers the
-   * problem; a confirm while one is in flight sends nothing either.
+   * problem; a confirm while one is in flight (`IN_FLIGHT`) or after the act
+   * was done (`ALREADY_SENT`) sends nothing either.
    */
   confirm(input: ConfirmedActInput<TAct>): Promise<ConfirmedActAnswer | { readonly ok: false; readonly problem: ConfirmedActProblem }>;
   state(): ConfirmedActState;
@@ -51,6 +52,8 @@ export function createConfirmedAct<TAct extends string>(options: {
       const problem = problemOf(input.reason, input.pin);
       if (problem !== null) return { ok: false, problem };
       if (state === 'sending') return { ok: false, code: 'IN_FLIGHT' };
+      // Done once: a tap after the act was done is never sent again.
+      if (state === 'sent') return { ok: false, code: 'ALREADY_SENT' };
       state = 'sending';
       try {
         const answer = await options.send({ act: input.act, reason: input.reason.trim(), pin: input.pin.trim() });

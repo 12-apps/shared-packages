@@ -1,4 +1,4 @@
-import { advance, currentIndex, isLive, isStopped, manualAllowed, withLeg } from './charge-flow';
+import { advance, currentIndex, isStopped, manualAllowed, withLeg } from './charge-flow';
 import type { ChargeFlow, Elsewhere, FlowLeg, FlowMove } from './flow-types';
 import { terminalMethodOf, type TerminalCancelAnswer, type TerminalChargeAnswer, type TerminalMethod } from './port';
 
@@ -23,7 +23,10 @@ export function pushing(flow: ChargeFlow, index: number): ChargeFlow {
 
 /** The station's answer to the push. */
 export function pushed(flow: ChargeFlow, index: number, answer: TerminalChargeAnswer): ChargeFlow {
-  if (flow.legs[index]?.status !== 'pushing') return flow;
+  const leg = flow.legs[index];
+  if (leg === undefined) return flow;
+  // The leg moved on while the push was out: the charge stays its own, for the run to cancel.
+  if (leg.status !== 'pushing') return answer.ok ? withLeg(flow, index, { history: [...leg.history, answer.chargeId] }) : flow;
   if (!answer.ok) return withLeg(flow, index, { status: 'refused', refusal: answer.code });
   return withLeg(flow, index, { status: 'waiting', chargeId: answer.chargeId, deviceId: answer.deviceId });
 }
@@ -68,14 +71,18 @@ export function resend(flow: ChargeFlow): ChargeFlow {
 }
 
 /**
- * "Another tender": the current leg — stopped, moved to cash on the terminal,
- * or refused by the server as disagreeing — taken with another of the store's
- * tenders. A disagreeing capture is never offered again.
+ * "Another tender": the current leg, wherever it stands, taken with another of
+ * the store's tenders — so there is always a way out (invariant 7). A charge
+ * it has on the terminal is the run's to cancel first, and stays the leg's
+ * (`history`), so a late approval of it reads as received twice. A
+ * disagreeing capture is never offered again. The one leg it refuses is an
+ * approval with no capture: money moved there, and another tender would take
+ * it twice.
  */
 export function otherTender(flow: ChargeFlow, tender: string): ChargeFlow {
   const index = currentIndex(flow);
   const leg = flow.legs[index];
-  if (leg === undefined || !(isStopped(leg) || leg.status === 'cash' || leg.status === 'conflict')) return flow;
+  if (leg === undefined || leg.status === 'unbound') return flow;
   return takeWith(flow, index, leg, tender);
 }
 
@@ -151,12 +158,6 @@ function conflicted(flow: ChargeFlow, transactionCode: string | undefined): Char
     next = withLeg(next, index, { status: 'conflict' });
   });
   return { ...next, retry: false };
-}
-
-/** The current leg is still on its way to the terminal or on it. */
-export function currentIsLive(flow: ChargeFlow): boolean {
-  const leg = flow.legs[currentIndex(flow)];
-  return leg !== undefined && isLive(leg);
 }
 
 /** A notice-free move. */

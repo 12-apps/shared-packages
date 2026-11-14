@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { startChargeRun } from '../charge-run';
@@ -56,7 +57,13 @@ const ELSEWHERE: ElsewhereCopy = {
   confirm: (amount) => `Record ${amount}`,
   back: 'Back',
 };
-const RECOVERED: RecoveredCopy = { title: 'Received, no sale', line: (method, amount, at) => `${method} ${amount} ${at}`, count: (count) => `${count} with no sale` };
+const RECOVERED: RecoveredCopy = {
+  title: 'Received, no sale',
+  lede: 'A charge was interrupted',
+  line: (method, at) => `${method} · ${at}`,
+  footnote: 'Unused after 24 h, it is refunded',
+  count: (count) => `${count} with no sale`,
+};
 const WAIT: TerminalWaitCopy = {
   where: (provider, method) => `${provider} · ${method}`,
   part: (part, parts) => `Part ${part} of ${parts}`,
@@ -188,11 +195,24 @@ describe('State 6: the terminal is down', () => {
     expect(screen.getByTestId('terminal-wait-resend')).toBeTruthy();
     expect(screen.getByTestId('terminal-wait-other')).toBeTruthy();
     expect(screen.getByTestId('terminal-wait-manual-exits').textContent).toBe('Another machineManual Pix');
+    // N6: frame 6-B draws the manual exits as text buttons under the primary row.
+    expect(screen.getByTestId('terminal-wait-other-machine').className).toContain('MuiButton-text');
 
     fireEvent.click(screen.getByTestId('terminal-wait-other-machine'));
     fireEvent.click(screen.getByTestId('terminal-wait-elsewhere-confirm'));
 
     expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'DEBIT', amountCents: 4600, elsewhere: { via: 'OTHER_MACHINE' } }], changeCents: 0 });
+  });
+
+  it('R06 (B1): Outra forma on a waiting leg takes it in cash', async () => {
+    const { run, onReady } = runWith([]);
+    await settle();
+    render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[{ id: 'CASH', name: 'cash' }]} tenderName={tenderName} money={money} copy={WAIT} elsewhereCopy={ELSEWHERE} />);
+
+    fireEvent.click(screen.getByTestId('terminal-wait-other'));
+    fireEvent.click(screen.getByTestId('terminal-wait-other-CASH'));
+
+    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'CASH', amountCents: 4600 }], changeCents: 0 });
   });
 
   it('R44 (owner rule): with the terminal usable the wait shows no manual exit', async () => {
@@ -224,6 +244,32 @@ describe('State 3: recovered on load', () => {
     );
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(['A']));
     await waitFor(() => expect(screen.queryByTestId('terminal-recovered-TYPED')).toBeNull());
-    expect(screen.getByText('credit $18.50 14:31')).toBeTruthy();
+    expect(screen.getAllByText('credit · 14:31')).toHaveLength(2);
+    expect(screen.getByTestId('terminal-recovered-B-amount').textContent).toBe('$18.50');
+  });
+
+  it('N4: shows the lede, the footnote, and each amount in a cell of its own', () => {
+    render(
+      <RecoveredCaptures captures={[held('A', 4600)]} dueCents={4600} typedCodes={new Set()} selected={['A']} onChange={vi.fn()} copy={RECOVERED} money={money} time={() => '14:31'} methodName={tenderName} />,
+    );
+    expect(screen.getByText('A charge was interrupted')).toBeTruthy();
+    expect(screen.getByText('Unused after 24 h, it is refunded')).toBeTruthy();
+    expect(screen.getByTestId('terminal-recovered-A-amount').textContent).toBe('$46.00');
+  });
+
+  it('N5: ticks again when the amount due changes, and not on a mere re-render', async () => {
+    const onChange = vi.fn();
+    const view = (dueCents: number): JSX.Element => (
+      <RecoveredCaptures captures={[held('A', 4600), held('B', 1850)]} dueCents={dueCents} typedCodes={new Set()} selected={[]} onChange={onChange} copy={RECOVERED} money={money} time={() => '14:31'} methodName={tenderName} />
+    );
+    const { rerender } = render(view(4600));
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(['A']));
+    rerender(view(4600));
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    rerender(view(1850));
+
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(['B']));
+    expect(onChange).toHaveBeenCalledTimes(2);
   });
 });

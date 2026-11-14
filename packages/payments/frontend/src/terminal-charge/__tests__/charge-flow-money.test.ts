@@ -137,13 +137,21 @@ describe("State 6 · A10: the terminal is down, the counter never freezes", () =
     expect(() => chargedElsewhere(declined, 0, { via: "MANUAL_PIX" })).toThrow();
   });
 
-  it("R01/R04: the link the flow holds decides — unknown or with no terminal connected, the manual exits are offered", () => {
-    const unknown = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, UNKNOWN);
+  it("R01/R04: the link the flow holds decides — a failed read or no terminal connected offers the manual exits under Outra forma", () => {
+    const failed = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, { known: false, failed: true });
     const down = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, { known: true, terminals: 1, down: true });
 
-    expect(unknown.legs[0]?.exits).toEqual(expect.arrayContaining(["other-machine", "manual-pix"]));
-    expect(down.legs[0]?.exits).toEqual(expect.arrayContaining(["other-machine", "manual-pix"]));
-    expect(readiness(chargedElsewhere(unknown, 0, { via: "MANUAL_PIX" }))).toBe("ready");
+    expect(failed.legs[0]?.exits).toEqual(["other-tender", "other-machine", "manual-pix"]);
+    expect(down.legs[0]?.exits).toEqual(["other-tender", "other-machine", "manual-pix"]);
+    expect(readiness(chargedElsewhere(failed, 0, { via: "MANUAL_PIX" }))).toBe("ready");
+  });
+
+  it("R01 (N2): before the station's first answer the flow waits with Outra forma only — no manual exit while loading", () => {
+    const loading = startFlow({ legs: [{ tender: "CREDIT", amountCents: 3200 }], changeCents: 0 }, 3200, UNKNOWN);
+
+    expect(readiness(loading)).toBe("waiting-link");
+    expect(loading.legs[0]?.exits).toEqual(["other-tender"]);
+    expect(() => chargedElsewhere(loading, 0, { via: "MANUAL_PIX" })).toThrow();
   });
 
   it("R06: a waiting leg has no clock: hours of silence leave it waiting, with its exits", () => {

@@ -80,12 +80,12 @@ function LegExits(props: TerminalWaitProps & { leg: FlowLeg; onManual: (via: Els
     cancel: () => button('cancel', copy.cancel, () => run.cancel(), 'outlined'),
     resend: () => button('resend', copy.resend, () => run.resend(), 'contained'),
     'other-tender': () => button('other', copy.other, () => setChoosing((open) => !open), 'outlined'),
-    'other-machine': () => button('other-machine', copy.otherMachine, () => onManual('OTHER_MACHINE'), 'outlined'),
-    'manual-pix': () => button('manual-pix', copy.manualPix, () => onManual('MANUAL_PIX'), 'outlined'),
+    'other-machine': () => button('other-machine', copy.otherMachine, () => onManual('OTHER_MACHINE'), 'text'),
+    'manual-pix': () => button('manual-pix', copy.manualPix, () => onManual('MANUAL_PIX'), 'text'),
   };
   const own = leg.exits.filter((exit) => exit !== 'other-machine' && exit !== 'manual-pix');
   const manual = leg.exits.filter((exit) => exit === 'other-machine' || exit === 'manual-pix');
-  function button(id: string, label: string, onClick: () => void, variant: 'contained' | 'outlined'): JSX.Element {
+  function button(id: string, label: string, onClick: () => void, variant: 'contained' | 'outlined' | 'text'): JSX.Element {
     return (
       <Button key={id} variant={variant} onClick={onClick} data-testid={`${dataTestId}-${id}`} sx={BUTTON_SX}>
         {label}

@@ -124,8 +124,12 @@ export interface OverCaptureCopy {
 /** Money the terminal took that no sale holds, offered on load. */
 export interface RecoveredCopy {
   readonly title: string;
-  /** One capture: its method's name, its amount and when. */
-  readonly line: (method: string, money: string, at: string) => string;
+  /** Why these are offered (a reload in the middle of a charge). */
+  readonly lede: string;
+  /** One capture's label: its method's name and when. Its amount sits in a cell of its own. */
+  readonly line: (method: string, at: string) => string;
+  /** Under the list: what happens to a capture nobody uses (the refund window). */
+  readonly footnote: string;
   /** The count shown on the station's indicator. */
   readonly count: (count: number) => string;
 }

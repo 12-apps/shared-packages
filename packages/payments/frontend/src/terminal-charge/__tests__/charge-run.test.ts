@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { startChargeRun, type ChargeRun } from '../charge-run';
+import { createConfirmedAct } from '../confirmed-act';
 import type { ChargedSplit, FlowNotice } from '../flow-types';
 import type { ChargeLink } from '../port';
 import { fakeTerminal, settle, trace, type FakeTerminal } from './fake-port';
@@ -121,13 +122,37 @@ describe('the operator and the station', () => {
     expect(statusOf(run)).toBe('local');
   });
 
-  it('R43: a transient refusal keeps the capture and settles the same body again', async () => {
+  it('R43: a transient refusal keeps the capture; the same body is settled again only when the operator retries', async () => {
     const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
     await settle();
     port.status('approved', { capture: trace(TOTAL) });
     run.refused('CAPTURE_CONTENDED');
+    expect(onReady).toHaveBeenCalledTimes(1);
+
+    expect(run.retry()).toBe(true);
+
     expect(onReady).toHaveBeenCalledTimes(2);
     expect(onReady.mock.calls[1]?.[0]).toEqual(onReady.mock.calls[0]?.[0]);
+  });
+
+  it('R43 (B2): a host that refuses NETWORK every time is settled once, never in a loop', async () => {
+    const port = fakeTerminal();
+    const onReady = vi.fn(() => charging.refused('NETWORK'));
+    const charging = startChargeRun({ port, split: { legs: [{ tender: 'CREDIT' }], changeCents: 0 }, totalCents: TOTAL, link: LINKED, saleRef: 's', operator: 'o', onReady, onNotice: vi.fn() });
+    await settle();
+    port.status('approved', { capture: trace(TOTAL) });
+    await settle();
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('R16 (B2): retry never resends a body the server refused as not fitting', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    port.status('approved', { capture: trace(TOTAL) });
+    run.refused('TENDERS_DONT_FIT');
+    expect(run.retry()).toBe(false);
+    expect(onReady).toHaveBeenCalledTimes(1);
   });
 
   it('R16: a body refused as not fitting is not settled again: the operator decides', async () => {
@@ -137,6 +162,77 @@ describe('the operator and the station', () => {
     run.refused('TENDERS_DONT_FIT');
     expect(onReady).toHaveBeenCalledTimes(1);
     expect(run.current()).toMatchObject({ refusedAs: 'TENDERS_DONT_FIT', retry: false });
+  });
+});
+
+describe('Outra forma is a way out wherever it is offered (B1, invariant 7)', () => {
+  it('R06: from a leg waiting on the terminal, another tender cancels the charge and takes the leg in cash', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    expect(run.current().legs[0]?.exits).toContain('other-tender');
+
+    run.other('CASH');
+    await settle();
+
+    expect(port.cancels).toEqual(['ch-1']);
+    expect(run.current().legs[0]).toMatchObject({ status: 'local', tender: 'CASH', history: ['ch-1'] });
+    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'CASH', amountCents: TOTAL }], changeCents: 0 });
+  });
+
+  it('R06: from a waiting leg, another card method cancels the old charge before the new push', async () => {
+    const { port, run } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    run.other('PIX');
+    await settle();
+    expect(port.cancels).toEqual(['ch-1']);
+    expect(port.charges.map((charge) => charge.method)).toEqual(['CREDIT', 'PIX']);
+    expect(run.current().legs[0]).toMatchObject({ status: 'waiting', chargeId: 'ch-2', history: ['ch-1'] });
+  });
+
+  it('R44 (B1): a start with the terminal down offers Outra forma above the manual exits, and it works', async () => {
+    const { port, run, onReady } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 }, { known: true, terminals: 1, down: true });
+    await settle();
+    expect(run.current().legs[0]?.exits).toEqual(['other-tender', 'other-machine', 'manual-pix']);
+
+    run.other('CASH');
+
+    expect(port.charges).toEqual([]);
+    expect(onReady).toHaveBeenCalledWith({ legs: [{ tender: 'CASH', amountCents: TOTAL }], changeCents: 0 });
+  });
+
+  it('B1: another tender while the push is still out cancels the charge the push answers with', async () => {
+    const { port, run } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await Promise.resolve();
+    expect(run.current().legs[0]?.status).toBe('pushing');
+    run.other('CASH');
+    await settle();
+    expect(port.cancels).toEqual(['ch-1']);
+    expect(run.current().legs[0]).toMatchObject({ status: 'local', history: ['ch-1'] });
+  });
+});
+
+describe('N1: an approval while the leg was moved to cash', () => {
+  it('is never applied silently: the leg stays cash and the operator is told it was received twice', async () => {
+    const { port, run, onNotice } = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    port.status('method_changed', { method: 'CASH' });
+
+    port.status('approved', { capture: trace(TOTAL), chargeId: 'ch-1' });
+
+    expect(run.current().legs[0]?.status).toBe('cash');
+    expect(onNotice).toHaveBeenCalledWith(expect.objectContaining({ kind: 'received-twice', index: 0 }));
+  });
+});
+
+describe('N3: a confirmed act is sent once', () => {
+  it('refuses a second confirm after the act was sent', async () => {
+    const send = vi.fn(async () => ({ ok: true as const }));
+    const act = createConfirmedAct({ send });
+
+    await act.confirm({ act: 'refund', reason: 'paid twice', pin: '1234' });
+    await expect(act.confirm({ act: 'refund', reason: 'paid twice', pin: '1234' })).resolves.toEqual({ ok: false, code: 'ALREADY_SENT' });
+
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });
 

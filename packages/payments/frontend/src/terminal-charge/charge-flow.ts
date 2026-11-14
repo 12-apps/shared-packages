@@ -43,8 +43,14 @@ export const isDone = (leg: FlowLeg): boolean => DONE.has(leg.status);
 
 type BareLeg = Omit<FlowLeg, 'exits' | 'preselected' | 'charged'>;
 
-/** The terminal cannot be used: no link answer, or linked terminals none of which is connected. */
-export const linkDown = (link: ChargeLink): boolean => !link.known || link.down === true;
+/**
+ * The terminal cannot be used: the link read failed, or terminals are linked
+ * and none is connected. No answer yet (loading) is not down.
+ */
+export const linkDown = (link: ChargeLink): boolean => (link.known ? link.down === true : link.failed === true);
+
+/** A push may go out: the link answered, a terminal is linked and connected. */
+export const pushable = (link: ChargeLink): boolean => link.known && link.terminals > 0 && link.down !== true;
 
 /**
  * Whether a manual leg may be recorded for this leg: a card or Pix leg not yet
@@ -57,24 +63,39 @@ export function manualAllowed(leg: BareLeg, link: ChargeLink): boolean {
   return leg.status === 'unknown' || (leg.status === 'refused' && TERMINAL_UNUSABLE.has(leg.refusal ?? ''));
 }
 
-/** The ways out of a leg that do not depend on the terminal being down. */
-function ownExitsOf(status: LegStatus, linkKnown: boolean): readonly LegExit[] {
-  if (STOPPED.has(status)) return STOPPED_EXITS;
-  if (status === 'waiting' || status === 'processing') return ON_TERMINAL_EXITS;
-  if (status === 'conflict' || status === 'cash') return ['other-tender'];
-  // No link answer yet: the push cannot go; the leg may still be taken with another tender.
-  if (!linkKnown && (status === 'send' || status === 'queued')) return ['other-tender'];
-  return [];
+/**
+ * The ways out of a leg that do not depend on the terminal being down. Every
+ * leg not yet accounted for (but one approved with no capture) can be taken
+ * with another tender, so cash is always reachable (invariant 7, R06).
+ */
+const OTHER_TENDER_ONLY: readonly LegExit[] = ['other-tender'];
+const OWN_EXITS: Partial<Record<LegStatus, readonly LegExit[]>> = {
+  declined: STOPPED_EXITS,
+  cancelled: STOPPED_EXITS,
+  unknown: STOPPED_EXITS,
+  refused: STOPPED_EXITS,
+  waiting: ON_TERMINAL_EXITS,
+  processing: ON_TERMINAL_EXITS,
+  conflict: OTHER_TENDER_ONLY,
+  cash: OTHER_TENDER_ONLY,
+  cancelling: OTHER_TENDER_ONLY,
+  pushing: OTHER_TENDER_ONLY,
+};
+
+function ownExitsOf(status: LegStatus, canPush: boolean): readonly LegExit[] {
+  // The push cannot go (no answer yet, or the terminal down): the leg may still be taken with another tender.
+  if (!canPush && (status === 'send' || status === 'queued')) return OTHER_TENDER_ONLY;
+  return OWN_EXITS[status] ?? [];
 }
 
 /** The ways out of a leg: its own, then the two manual ones while the terminal cannot be used. */
 function exitsOf(leg: BareLeg, link: ChargeLink): readonly LegExit[] {
-  const own = ownExitsOf(leg.status, link.known);
+  const own = ownExitsOf(leg.status, pushable(link));
   return manualAllowed(leg, link) ? [...own, ...MANUAL_EXITS] : own;
 }
 
 /** A leg with its derived fields filled from where it stands. */
-export function settled(leg: BareLeg, link: ChargeLink): FlowLeg {
+function settled(leg: BareLeg, link: ChargeLink): FlowLeg {
   return {
     ...leg,
     exits: exitsOf(leg, link),

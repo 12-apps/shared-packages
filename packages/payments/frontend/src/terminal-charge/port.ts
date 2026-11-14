@@ -57,8 +57,9 @@ export interface TerminalPort {
 /**
  * Where the station's link stands, as a flow needs it.
  *
- * - `known: false`: no answer yet, or the last read failed. A card or Pix leg
- *   then WAITS: it never degrades to a plain leg.
+ * - `known: false`: no answer yet, or (`failed`) the last read failed. A card
+ *   or Pix leg then WAITS: it never degrades to a plain leg. Only a failed
+ *   read means the terminal cannot be used; no answer yet is just loading.
  * - `known: true, terminals: 0`: no terminal linked (or no port at all): card
  *   legs are plain tenders, as before.
  * - `down`: terminals are linked but none is connected now: the terminal
@@ -67,7 +68,7 @@ export interface TerminalPort {
  *   reload, which the screen shows and may cancel.
  */
 export type ChargeLink =
-  | { readonly known: false }
+  | { readonly known: false; readonly failed?: boolean }
   | {
       readonly known: true;
       readonly terminals: number;
@@ -82,7 +83,8 @@ export function terminalMethodOf(tender: string): TerminalMethod | null {
 
 /** The link a station state means: known, with how many terminals it has. */
 export function linkOf(state: TerminalState | null, failed = false): ChargeLink {
-  if (state === null || failed) return { known: false };
+  if (failed) return { known: false, failed: true };
+  if (state === null) return { known: false };
   const pending = state.terminals.find((terminal) => terminal.pending !== null)?.pending ?? null;
   const down = state.terminals.length > 0 && state.terminals.every((terminal) => terminal.status !== 'connected');
   return { known: true, terminals: state.terminals.length, down, pending };

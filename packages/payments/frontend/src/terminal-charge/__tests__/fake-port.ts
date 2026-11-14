@@ -31,7 +31,7 @@ export interface FakeTerminal extends TerminalPort {
   ): void;
 }
 
-export const DEVICE = 'dev-1';
+const DEVICE = 'dev-1';
 
 export function trace(amountCents: number, kind: TerminalMethod = 'CREDIT', code = `TX-${amountCents}-${kind}`): TerminalCaptureTrace {
   return {

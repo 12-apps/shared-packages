@@ -1,4 +1,4 @@
-import { chargedSplit, currentIndex, linkDown, linked, partOf, readiness, remainingAfter, startFlow, withLink } from './charge-flow';
+import { chargedSplit, currentIndex, partOf, pushable, readiness, remainingAfter, startFlow, withLink } from './charge-flow';
 import { holdCharge, noteTaken, releaseCharges } from './charge-claims';
 import { onEvent } from './flow-events';
 import { cancelAnswered, cancelRequested, cashReceived, chargedElsewhere, otherTender, pendingCancelled, pushed, pushing, resend, serverRefused } from './flow-moves';
@@ -54,8 +54,17 @@ export interface ChargeRun {
   cancelPending(): void;
   /** The station's link changed (its first answer, a failed read, a re-pair). */
   linkChanged(link: ChargeLink): void;
-  /** The host's server refused the settle with this code. */
+  /**
+   * The host's server refused the settle with this code. Nothing is settled
+   * again by itself: the operator acts (`retry`, or another move) first.
+   */
   refused(code: string | number, detail?: { transactionCode?: string; excessCents?: number }): void;
+  /**
+   * "Try again" after a refusal: settles the same split once more, only when
+   * the refusal allows the same body (`flow.retry`) and every leg is covered.
+   * Answers whether it settled.
+   */
+  retry(): boolean;
   /**
    * Leave the run (the screen closed): a live charge is cancelled on the
    * terminal, and its later events are no longer heard here — an approval
@@ -113,12 +122,15 @@ class Run implements ChargeRun {
   }
 
   cashReceived(): void {
+    this.ready = false;
     this.move(cashReceived(this.flow));
   }
 
   elsewhere(index: number, elsewhere: Elsewhere, method?: TerminalMethod): void {
     const left = outThere(this.flow.legs[index]);
-    this.move(chargedElsewhere(this.flow, index, elsewhere, method));
+    const next = chargedElsewhere(this.flow, index, elsewhere, method);
+    this.ready = false;
+    this.move(next);
     if (left !== null) this.quietCancel(left);
   }
 
@@ -146,8 +158,15 @@ class Run implements ChargeRun {
   }
 
   refused(code: string | number, detail?: { transactionCode?: string; excessCents?: number }): void {
-    this.ready = false;
+    // `ready` stays set: nothing is settled again until the operator acts.
+    this.ready = true;
     this.move(serverRefused(this.flow, code, detail));
+  }
+
+  retry(): boolean {
+    if (this.disposed || !this.flow.retry || readiness(this.flow) !== 'ready') return false;
+    this.input.onReady(chargedSplit(this.flow));
+    return true;
   }
 
   dispose(): void {
@@ -205,7 +224,7 @@ class Run implements ChargeRun {
     const index = currentIndex(this.flow);
     const leg = this.flow.legs[index];
     const method = leg === undefined ? null : terminalMethodOf(leg.tender);
-    if (leg?.status !== 'send' || method === null || linkDown(this.flow.link) || !linked(this.flow.link)) return;
+    if (leg?.status !== 'send' || method === null || !pushable(this.flow.link)) return;
     const { part, parts } = partOf(this.flow, index);
     this.flow = pushing(this.flow, index);
     const { deviceId, saleRef, operator } = this.input;
@@ -242,7 +261,10 @@ class Run implements ChargeRun {
       }
       return;
     }
+    const before = this.flow.legs[index]?.status;
     this.flow = pushed(this.flow, index, answer);
+    // The leg moved on (another tender) while the push was out: that charge is cancelled at once.
+    if (answer.ok && before !== 'pushing') this.quietCancel(answer.chargeId);
     this.tell();
     if (answer.ok) early.filter((event) => chargeOf(event) === answer.chargeId).forEach((event) => this.heard(event));
   }
@@ -255,6 +277,8 @@ class Run implements ChargeRun {
   private decide(step: (current: ChargeFlow) => ChargeFlow): void {
     const next = step(this.flow);
     if (next === this.flow) return;
+    // The operator acted: a split covered again is settled again.
+    this.ready = false;
     const left = outThere(this.flow.legs[currentIndex(this.flow)]);
     if (left !== null) this.cancelFirst = this.input.port.cancel(left).catch(() => undefined);
     this.move(next);
