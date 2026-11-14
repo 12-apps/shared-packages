@@ -171,4 +171,8 @@ const StyledFormMessage = styled('span', {
   display: 'block',
 }));
 
-export const FormMessage: React.FC<FormMessageProps> = ({ error, children, dataTestId }) => <StyledFormMessage error={error} data-testid={dataTestId}>{children}</StyledFormMessage>;
+export const FormMessage: React.FC<FormMessageProps> = ({ error, children, dataTestId, id }) => (
+  <StyledFormMessage id={id} error={error} data-testid={dataTestId}>
+    {children}
+  </StyledFormMessage>
+);

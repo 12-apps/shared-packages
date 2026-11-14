@@ -1,7 +1,7 @@
 'use client';
 
 import type { InputHTMLAttributes } from 'react';
-import React from 'react';
+import React, { useId } from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { Input } from '../../Input';
@@ -66,11 +66,30 @@ const FIELD_OWNED = [
  * or every spec that finds the field by it. So they are dropped here too, and
  * the field's own test id is written last.
  */
-function callerInputProps(inputProps: TextFieldInputProps | undefined, testId: string): Record<string, unknown> {
+function callerInputProps(
+  inputProps: TextFieldInputProps | undefined,
+  testId: string,
+  messageId: string | undefined,
+): Record<string, unknown> {
   const kept = Object.fromEntries(
     Object.entries(inputProps ?? {}).filter(([key]) => !FIELD_OWNED.includes(key)),
   );
-  return { ...kept, 'data-testid': testId };
+  const describedBy = describedByWith(kept['aria-describedby'], messageId);
+  return {
+    ...kept,
+    ...(describedBy === undefined ? {} : { 'aria-describedby': describedBy }),
+    'data-testid': testId,
+  };
+}
+
+/**
+ * The caller's own `aria-describedby` (a hint, say), with the error message's
+ * id after it while the field shows one. The error is how a screen reader
+ * learns WHY the field is invalid; `aria-invalid` alone only says that it is.
+ */
+function describedByWith(callerIds: unknown, messageId: string | undefined): string | undefined {
+  const ids = [typeof callerIds === 'string' ? callerIds.trim() : '', messageId ?? ''].filter(Boolean);
+  return ids.length > 0 ? ids.join(' ') : undefined;
 }
 
 /**
@@ -79,7 +98,11 @@ function callerInputProps(inputProps: TextFieldInputProps | undefined, testId: s
  * reading its value/error from context and writing changes back through it.
  *
  * Renders its error via `total-form-field-<name>-message` and the input via
- * `total-form-field-<name>`.
+ * `total-form-field-<name>`. While it shows an error, the input's
+ * `aria-describedby` points at the message, by an id from `useId()`: unique on
+ * the page, so two forms with a field of the same name never cross-link. The id
+ * is not part of the contract; find the message by its test id or by the
+ * input's accessible description.
  */
 export function TextField({
   name,
@@ -94,6 +117,8 @@ export function TextField({
   const busy = useFormBusy();
   const error = errors[name];
   const testId = `total-form-field-${name}`;
+  const generatedId = useId();
+  const messageId = error ? `${generatedId}-message` : undefined;
 
   return (
     <FormControl fullWidth>
@@ -110,13 +135,13 @@ export function TextField({
         value={values[name] ?? ''}
         error={Boolean(error)}
         autoComplete={autoComplete}
-        inputProps={callerInputProps(inputProps, testId)}
+        inputProps={callerInputProps(inputProps, testId, messageId)}
         disabled={busy}
         data-testid={testId}
         onChange={(event) => setFieldValue(name, event.target.value)}
       />
       {error && (
-        <FormMessage error dataTestId={`${testId}-message`}>
+        <FormMessage error id={messageId} dataTestId={`${testId}-message`}>
           {error}
         </FormMessage>
       )}

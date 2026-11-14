@@ -68,6 +68,13 @@ function MyForm() {
 |------|------|---------|-------------|
 | error | `boolean` | `false` | Error state styling |
 | children | `ReactNode` | - | Message content |
+| id | `string` | - | The message's element id, for the control's `aria-describedby` |
+
+`total-form`'s `TextField` uses it: while the field shows an error, the input's
+`aria-describedby` points at the message by an id from `useId()` (unique on the
+page; not part of the contract). So far only `TextField` links its error this
+way. `SelectField` and `ToggleField` still show the message without linking it;
+a follow-up ticket covers them.
 
 ## Layout Variants
 
