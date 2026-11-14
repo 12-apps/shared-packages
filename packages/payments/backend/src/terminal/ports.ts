@@ -29,6 +29,12 @@ export interface CaptureVersion {
   orderId: string | null;
   refundFlaggedAt: Date | null;
   refundClearedAt: Date | null;
+  /**
+   * When true, the write also requires the row to still await its terminal
+   * report: a legacy `JOURNAL` row with no `transactionId`,
+   * `authorizationCode` or `terminalSerial`. So only the first report fills it.
+   */
+  awaitingReport?: boolean;
 }
 
 /** The columns a move may write. Absent: left as it is. */

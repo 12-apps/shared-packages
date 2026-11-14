@@ -19,6 +19,7 @@ import {
 } from './model';
 import type { CapturePatch, SaleDirectory, TerminalCaptureStore, TerminalCaptureStoreFor, TerminalDirectory } from './ports';
 import type { DeviceCaptureReport } from './readers';
+import { awaitsItsReport, fillLegacyTrace } from './legacy-journal';
 
 /**
  * The terminal capture ledger: one record per card or Pix capture a paired
@@ -235,55 +236,12 @@ async function record<TTx>(
   const row = await store.find(input.clientId, input.transactionCode);
   if (!row) throw new CaptureError('NOT_FOUND', input.transactionCode, 'The capture vanished after its insert.');
   if (!inserted && awaitsItsReport(row)) {
-    return { capture: await withReportedTrace(engine, store, input), created: false };
+    return { capture: await fillLegacyTrace(store, input, engine.clock()), created: false };
   }
   if (!inserted && (row.amountCents !== input.amountCents || row.kind !== input.kind)) {
     throw new CaptureError('CONFLICT', input.transactionCode, 'This transaction code was already recorded with another amount or kind.');
   }
   return { capture: row, created: inserted };
-}
-
-/**
- * A legacy row a host kept from a cashier-typed code (`JOURNAL`, written before
- * this package), still without the trace a terminal report brings.
- */
-function awaitsItsReport(row: TerminalCaptureRecord): boolean {
-  return row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null;
-}
-
-/**
- * The terminal's report fills a legacy `JOURNAL` row's trace, and the report is
- * the truth: when it names another kind or amount than the cashier kept, it is
- * never thrown away as a conflict (the terminal's outbox would drop it and an
- * overcharge would vanish). The row takes the report's kind and amount and is
- * flagged `JOURNAL_CONFLICT`, once, so a person reconciles the sale with what
- * the terminal charged. Otherwise its state, sale and flag stay as they are.
- */
-async function withReportedTrace<TTx>(
-  engine: Engine<TTx>,
-  store: TerminalCaptureStore,
-  input: RecordCaptureInput,
-): Promise<TerminalCaptureRecord> {
-  for (let attempt = 0; attempt < MOVE_ATTEMPTS; attempt += 1) {
-    const current = await readOrRefuse(store, input.clientId, input.transactionCode);
-    if (!awaitsItsReport(current)) {
-      if (current.amountCents !== input.amountCents || current.kind !== input.kind) {
-        throw new CaptureError('CONFLICT', input.transactionCode, 'This transaction code was already recorded with another amount or kind.');
-      }
-      return current;
-    }
-    const contradicts = current.kind !== input.kind || current.amountCents !== input.amountCents;
-    const conflict: CapturePatch = contradicts
-      ? { kind: input.kind, amountCents: input.amountCents, refundFlaggedAt: engine.clock(), refundReason: 'JOURNAL_CONFLICT', refundClearedAt: null }
-      : {};
-    const after = await landOn(store, current, {
-      ...traceColumns(input),
-      ...(input.deviceId ? { deviceId: input.deviceId } : {}),
-      ...conflict,
-    });
-    if (after) return after;
-  }
-  throw new CaptureError('CONTENDED', input.transactionCode, REFUSALS.CONTENDED);
 }
 
 async function markSaleCreated<TTx>(engine: Engine<TTx>, tx: TTx, key: CaptureKey, orderId: string): Promise<TerminalCaptureRecord> {

@@ -108,3 +108,39 @@ describe("a legacy JOURNAL row and the terminal's report", () => {
     await expect(ledger.record(report({ amountCents: 9999 }))).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });
+
+describe("two reports racing for one legacy JOURNAL row", () => {
+  /** A store where another report fills the row right after this one reads it. */
+  function racedBy(store: TerminalCaptureStore, rival: () => Promise<unknown>): TerminalCaptureStore {
+    let raced = false;
+    return {
+      ...store,
+      async writeIfUnchanged(seen, patch) {
+        if (!raced) {
+          raced = true;
+          await rival();
+        }
+        return store.writeIfUnchanged(seen, patch);
+      },
+    };
+  }
+
+  it("an agreeing loser re-reads and answers the first report's row, writing nothing", async () => {
+    const store = await withJournalRow("CREDIT", 4750);
+    const raced = racedBy(store, () => ledgerOver(store).record(report({ hostNsu: "NSU-1" })));
+
+    const { capture } = await ledgerOver(raced).record(report({ source: "STATION", transactionId: "TX-OTHER" }));
+
+    expect(capture).toMatchObject({ transactionId: "TX-9", hostNsu: "NSU-1" });
+    expect(capture.refundReason).toBeNull();
+  });
+
+  it("a contradicting loser re-reads and is refused as CONFLICT, writing nothing", async () => {
+    const store = await withJournalRow("CREDIT", 4750);
+    const raced = racedBy(store, () => ledgerOver(store).record(report()));
+
+    await expect(ledgerOver(raced).record(report({ amountCents: 9999 }))).rejects.toMatchObject({ code: "CONFLICT" });
+    const kept = await store.find("store-1", "TC-1");
+    expect(kept).toMatchObject({ amountCents: 4750, transactionId: "TX-9", refundReason: null });
+  });
+});
