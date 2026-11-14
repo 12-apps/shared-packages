@@ -152,7 +152,6 @@ function adoptRbac(host: ReturnType<typeof createWiringHost>, pg: PGlite): void 
           // the disable/removal invariants run on exactly the set this host's
           // composed governance already names, rather than on a package default
           // that used to read `['OWNER']` and protected nothing here.
-          adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
           customerRole: 'PATRON',
           // The refusal sentences are required host config; this host is pt-BR.
           messages: PT_BR_RBAC_MESSAGES,

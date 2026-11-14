@@ -26,14 +26,14 @@ export function ownerRolesOf<P extends string>(
 }
 
 /**
- * What the roster knows about the CALLER once the admin tier has admitted
- * them, and the reason it is two fields rather than one role string.
+ * What the roster knows about the CALLER once the route's permission has
+ * admitted them, and the reason it is two fields rather than one role string.
  *
  * A platform operator has no membership row, so the roster used to synthesize
  * the literal `'SUPERADMIN'` for them and the ownership rules compared against
  * that string. Downstream nothing could tell that sentinel from a member whose
- * REAL role is spelled `SUPERADMIN`: a host with such a role in `adminRoles`
- * but not `ownerRoles` inherited an owner-removal bypass, and a host naming
+ * REAL role is spelled `SUPERADMIN`: a host with such a role on the roster
+ * but not in `ownerRoles` inherited an owner-removal bypass, and a host naming
  * its platform tier anything else got a sentinel that matched nothing. The
  * discriminator says which one it is, so no role NAME has to carry that
  * meaning.

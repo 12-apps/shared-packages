@@ -442,7 +442,7 @@ describe('team routes', () => {
     expect(body.data.map((row) => row.userId)).toEqual(['chef-1']);
   });
 
-  it('denies the roster to a CONSERVATOR (admin tier) with 403', async () => {
+  it('denies the roster to a CONSERVATOR (no team:read) with 403', async () => {
     const h = await teamHost();
     const response = await call(h, 'GET', '/team', { actor: memberActor(TENANT, 'chef-1') });
     expect(response.status).toBe(403);
@@ -596,9 +596,9 @@ describe('team routes', () => {
     expect(h.state.roleAssignments.some((row) => row.userId === 'chef-1')).toBe(false);
   });
 
-  it('a soft-disabled DIRECTOR/HEAD_LIBRARIAN loses the roster tier entirely', async () => {
+  it('a soft-disabled DIRECTOR/HEAD_LIBRARIAN loses the roster entirely', async () => {
     // BLOCKER-1 regression: "Desativar" is the reversible revocation, and the
-    // tier gates are exactly the access it must revoke. A disabled DIRECTOR —
+    // roster gates are exactly the access it must revoke. A disabled DIRECTOR —
     // whose permissions already resolve to nothing — must not keep the roster
     // read, the invite port or the destructive member removal.
     const h = await teamHost();
@@ -623,7 +623,7 @@ describe('team routes', () => {
     expect(h.state.memberships.some((row) => row.userId === 'chef-1')).toBe(true);
   });
 
-  it('a soft-disabled member loses the staff tier (GET /permissions is 403)', async () => {
+  it('a soft-disabled member loses the shell (GET /permissions is 403)', async () => {
     const h = await teamHost();
     const disable = h.state.memberships.find((row) => row.userId === 'chef-1');
     if (disable) disable.active = false;
@@ -826,10 +826,10 @@ describe('team routes', () => {
       );
     });
 
-    it('refuses an admin-tier actor without team:manage, before the port is reached', async () => {
+    it('refuses a DIRECTOR previewing without team:manage, before the port is reached', async () => {
       const { h, calls, actor } = await resendHost({ status: 'resent', email: 'x@example.com' });
-      // Admin tier (DIRECTOR) but a ceiling that leaves only the read: the tier
-      // check passes and the manageTeam gate must still refuse.
+      // A DIRECTOR under a ceiling that leaves only the read: the manageTeam
+      // gate must refuse.
       const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
         actor: { ...actor, permissionCeiling: new Set(['team:read']) },
         params: { inviteId: 'i1' },
@@ -838,7 +838,7 @@ describe('team routes', () => {
       expect(calls).toEqual([]);
     });
 
-    it('refuses a member below the admin tier, before the port is reached', async () => {
+    it('refuses a member without team:manage, before the port is reached', async () => {
       const { h, calls } = await resendHost({ status: 'resent', email: 'x@example.com' });
       enrolMember(h.state, TENANT, 'clerk-1', 'CLERK');
       const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
@@ -1105,7 +1105,7 @@ describe('one mount, two languages', () => {
     (response.body as { error: string }).error;
 
   it('answers a ROUTE refusal in each caller’s language', async () => {
-    // A member with no admin role — `requireAdminTier`, in the routes layer.
+    // A non-member holds no `team:read` — the permission gate, in the routes layer.
     const h = bilingual();
     const actor = memberActor(TENANT, 'u-nobody');
     const pt = await call(h, 'GET', '/team', { actor, locale: 'pt-BR' });

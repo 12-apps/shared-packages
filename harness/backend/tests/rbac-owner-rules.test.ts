@@ -118,8 +118,15 @@ describe('revoking an owner role, over real SQL', () => {
     expect((await asUser('owner-1').send('DELETE', '/team/owner-2/roles/DIRECTOR')).status).toBe(
       200,
     );
-    // The harness writes the column verbatim: it still says DIRECTOR, so the
-    // admin tier admits owner-2 and only the owner rule refuses.
+    // The harness writes the column verbatim: it still says DIRECTOR. A
+    // HEAD_LIBRARIAN link gives owner-2 `team:manage`, so the route's
+    // permission admits them and only the owner rule, reading the caller
+    // inside the write, refuses (FUT-3661: the tier no longer gates the route).
+    await backend.pg.query(
+      `INSERT INTO membership_roles (id, membership_id, role_id)
+       VALUES ('mr-m-owner-2-head', 'm-owner-2', $1)`,
+      [`${RBAC_TENANT_ID}-role-head_librarian`],
+    );
     const removal = await asUser('owner-2').send('DELETE', '/team/owner-1');
     expect(removal.status).toBe(403);
     expect((await json<{ error: string }>(removal)).error).toBe(

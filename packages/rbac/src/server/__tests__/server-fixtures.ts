@@ -44,7 +44,6 @@ export function createTestHost(
     // on purpose: it derives from `DEMO_CATALOG.governance.ownerRoles`
     // (DIRECTOR + NETWORK_OPS), so these suites run the roster invariants on
     // the set the composed catalog actually names.
-    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
     customerRole: 'PATRON',
     // Required copy, passed the way a pt-BR host passes it — the suites
     // assert these exact sentences on the wire.

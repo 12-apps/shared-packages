@@ -296,7 +296,7 @@ describe('team — the roster over the directory seam', () => {
     expect(page.data.map((row) => row.userId)).toEqual(['chef-1']);
   });
 
-  it('a CONSERVATOR cannot reach the roster (admin tier)', async () => {
+  it('a CONSERVATOR cannot reach the roster (no team:read)', async () => {
     const response = await asUser('chef-1').get('/team');
     expect(response.status).toBe(403);
   });

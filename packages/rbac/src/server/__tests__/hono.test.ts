@@ -16,7 +16,6 @@ function mounted() {
   return rbacRouter({
     db: async () => db,
     catalog: DEMO_CATALOG,
-    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
     customerRole: 'PATRON',
     messages: PT_BR_RBAC_MESSAGES,
     directory: { getUsers: async () => [], searchUsers: async () => [] },

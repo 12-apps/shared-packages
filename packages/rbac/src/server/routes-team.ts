@@ -42,31 +42,28 @@ export interface TeamRouteDeps<P extends string> {
 }
 
 /**
- * The coarse admin tier — the outer boundary the whole roster sits behind
- * (the origin host's `requireTenantAdminBySlug`). Answers the caller's tier for the
- * ownership rules: their REAL membership role, or the platform discriminator
- * for a caller the host resolved as `isSuper`.
+ * The caller's tier, READ for the ownership rules and never a refusal: their
+ * REAL membership role, or the platform discriminator for a caller the host
+ * resolved as `isSuper`.
  *
- * It used to answer a bare string and synthesize `'SUPERADMIN'` for the
- * platform case — see {@link RbacActorTier} for why that could not stay.
+ * It used to be the roster's outer boundary too (`requireAdminTier`, against
+ * a host-stated `adminRoles` list), which made access a ROLE question: a
+ * custom role holding `team:manage` could not invite, and a role holding
+ * `team:read` could not open the roster. Access is now the permission each
+ * route asks ({@link requirePermission}); the tier only answers who may touch
+ * an owner. Call it AFTER the permission check, so a refusal never reads it.
+ *
+ * Resolved from the membership row, never from the actor object. The store's
+ * tier reader answers `null` for a soft-disabled membership, and the
+ * permission engine resolves nothing for one either, so a deactivated member
+ * is refused by the permission check before this runs.
  */
-export async function requireAdminTier<P extends string>(
+export async function readActorTier<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
-  locale?: string,
 ): Promise<RbacActorTier> {
-  const messages = messagesOf(deps.config, locale);
-  const adminRoles = new Set(deps.config.adminRoles);
   if (platformActorOf(actor)) return { role: null, isPlatformActor: true, userId: actor.userId };
-  if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
-  // Always resolved from the membership row — never from the actor object.
-  // The store's tier reader refuses a soft-disabled membership, so a
-  // deactivated admin loses the roster (and its removals and invites) the
-  // moment the flag flips, exactly like their permissions.
-  const role = await deps.team.getMemberRole(actor.tenantId, actor.userId);
-  if (!role || !adminRoles.has(role)) {
-    throw new RbacApiError(403, messages.forbidden);
-  }
+  const role = actor.userId ? await deps.team.getMemberRole(actor.tenantId, actor.userId) : null;
   return { role, isPlatformActor: false, userId: actor.userId };
 }
 
@@ -74,11 +71,12 @@ export function requirePermission<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
   permission: string,
+  locale?: string,
 ): Promise<void> {
   return deps.guards.requirePermission(
     { userId: actor.userId, isSuper: actor.isSuper, permissionCeiling: actor.permissionCeiling },
     permission as P,
-    { scope: actor.tenantId },
+    { scope: actor.tenantId, locale },
   );
 }
 
@@ -88,7 +86,7 @@ function rosterRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
     path: '/team',
     async handle({ actor, query, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
+        await requirePermission(deps, actor, gatesOf(deps.config).readTeam, locale);
         const page = await deps.team.listTeamPage(actor.tenantId, parseTeamListQuery(query));
         return pageResponse(page.data, page.pagination);
       } catch (error) {
@@ -104,7 +102,7 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
     path: '/team',
     async handle({ actor, body, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam, locale);
         const messages = messagesOf(deps.config, locale);
         // Accountless invites need storage this package does not own — the
         // optional invites port; without it the affordance does not exist.
@@ -154,10 +152,9 @@ function contextRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
     path: '/team/context',
     async handle({ actor, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
         // Same gate as the member-detail read: the context exposes invite
         // e-mails and per-member role assignments.
-        await requirePermission(deps, actor, gatesOf(deps.config).readTeam);
+        await requirePermission(deps, actor, gatesOf(deps.config).readTeam, locale);
         const [customRoles, assignableRoles, pendingInvites] = await Promise.all([
           deps.team.listTenantMemberExtraRoles(actor.tenantId),
           deps.roles.listAssignableRoleNames(actor.tenantId),
@@ -186,8 +183,7 @@ function cancelInviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/invites/:inviteId',
     async handle({ actor, params, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
-        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam, locale);
         const messages = messagesOf(deps.config, locale);
         if (!deps.config.invites) {
           return { status: 501, body: { error: messages.invitesNotConfigured } };
@@ -215,8 +211,7 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/:userId',
     async handle({ actor, params, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
-        await requirePermission(deps, actor, gatesOf(deps.config).readTeam);
+        await requirePermission(deps, actor, gatesOf(deps.config).readTeam, locale);
         const messages = messagesOf(deps.config, locale);
         const member = await deps.team.getTenantMemberDetail(
           actor.tenantId,
@@ -252,7 +247,8 @@ function removeMemberRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/:userId',
     async handle({ actor, params, locale }) {
       try {
-        const tier = await requireAdminTier(deps, actor, locale);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam, locale);
+        const tier = await readActorTier(deps, actor);
         await deps.team.removeTenantMemberGuarded(
           actor.tenantId,
           requireParam(params, 'userId', messagesOf(deps.config, locale)),
@@ -273,8 +269,7 @@ function memberStatusRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
     path: '/team/:userId/status',
     async handle({ actor, params, body, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
-        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam, locale);
         const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.setMemberActiveBody, body, messages);
         await deps.team.setMembershipActive(
@@ -297,7 +292,7 @@ function grantMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRou
     path: '/team/:userId/roles',
     async handle({ actor, params, body, locale }) {
       try {
-        await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageRoles, locale);
         const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.grantMemberRoleBody, body, messages);
         const userId = requireParam(params, 'userId', messages);
@@ -317,7 +312,7 @@ function revokeMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRo
     path: '/team/:userId/roles/:role',
     async handle({ actor, params, locale }) {
       try {
-        await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
+        await requirePermission(deps, actor, gatesOf(deps.config).manageRoles, locale);
         const messages = messagesOf(deps.config, locale);
         // Idempotent — revoking a role the member doesn't hold is a no-op.
         // Gated on the permission alone, so the tier is not read: an owner

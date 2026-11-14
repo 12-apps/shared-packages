@@ -238,19 +238,6 @@ export interface RbacServerConfig<
    */
   assignableBaseRoles?: readonly string[];
   /**
-   * The coarse admin tier — the base roles whose members may reach this
-   * surface at all (the outer boundary; the permission gates do the fine
-   * work).
-   *
-   * REQUIRED, and nothing in the catalog can answer it: "which roles are
-   * administrators" is not a property of the permissions or of the role
-   * policy. It used to default to `['OWNER', 'ADMIN']`, which is one
-   * application's vocabulary — closed for a host that spells its tiers
-   * otherwise (every admin locked out), and merely wrong for a host that
-   * happens to have a role called `ADMIN` meaning something else.
-   */
-  adminRoles: readonly string[];
-  /**
    * Roles protected from the disable/removal invariants (last owner, "only an
    * owner removes an owner"). Defaults to the composed
    * `catalog.governance.ownerRoles` — the host already had to state that set
@@ -263,13 +250,16 @@ export interface RbacServerConfig<
    */
   ownerRoles?: readonly string[];
   /**
-   * The storefront/no-op membership role excluded from the roster and from the
-   * staff tier, or `null` for a host whose memberships are all staff.
+   * The storefront/no-op membership role excluded from the roster, or `null`
+   * for a host whose memberships are all staff.
    *
-   * REQUIRED — and `null` has to be written out — because both effects fail
-   * OPEN when it is wrong: `requireStaffTier` admits every shopper, and the
-   * roster stops excluding customers, so their names and e-mails appear in a
-   * staff list. It used to default to `'CUSTOMER'`.
+   * REQUIRED — and `null` has to be written out — because it fails OPEN when
+   * it is wrong: the roster stops excluding customers, so their names and
+   * e-mails appear in a staff list. It used to default to `'CUSTOMER'`.
+   *
+   * There is no admin-tier field beside it. Who reaches the roster is the
+   * `gatePermissions` each route asks (`team:read` for reads, `team:manage`
+   * for writes); the membership tier is only READ, for the owner rules.
    */
   customerRole: string | null;
   /** Optional audit sink; every write and governance denial reports here. */

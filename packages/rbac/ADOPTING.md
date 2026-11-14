@@ -166,8 +166,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `directory` | yes | — | `getUsers(ids)`; optional `searchUsers(q)` (without it the roster's `q` is ignored) |
 | `resolveActor` (hono) | yes | — | `{ tenantId, userId, isSuper }`; `null` → 401 |
 | `assignableBaseRoles` | no | non-owner `roleTemplates` names | the system roles an invite may grant: ENFORCED on `POST /team` (its `role` and every system name in `customRoles`) before governance. `POST /team/:userId/roles` is judged by governance alone. It no longer guards a role swap — there is none (FUT-2440) |
-| `adminRoles` | **yes** | — | the coarse roster tier; no catalog field can answer it, so the host states it |
-| `customerRole` | **yes** | — | the membership excluded from the roster and the staff tier — `null` if this host has none, written out |
+| `customerRole` | **yes** | — | the membership excluded from the roster — `null` if this host has none, written out |
 | `ownerRoles` | no | `catalog.governance.ownerRoles` | protected by the owner rules (disable, removal, revoke; see rule 10); set it only to NARROW that set |
 | `gatePermissions` | no | `roles:manage` / `team:read` / `team:manage` | the permission ids gating each surface |
 | `audit` | no | — | the fenced sink (see rule 6) |
@@ -185,14 +184,15 @@ one failed OPEN when it was wrong for a host, and silently:
 
 - `adminRoles ?? ['OWNER', 'ADMIN']` — a host spelling its tiers otherwise had
   every admin locked out (fails closed), and a host with a role that happens to
-  be called `ADMIN` meaning something else had it let in.
-- `customerRole ?? 'CUSTOMER'` — `requireStaffTier` then admitted every
+  be called `ADMIN` meaning something else had it let in. The field is now gone
+  altogether: see "Who reaches the roster" below.
+- `customerRole ?? 'CUSTOMER'` — the shell's staff gate then admitted every
   shopper, and the roster stopped excluding customers, so their names and
   e-mails appeared in a staff list.
 - `ownerRoles ?? ['OWNER']` — a host whose owner role is `DIRECTOR` lost the
   last-owner invariant AND "only an owner removes an owner" outright.
 
-The first two are now REQUIRED. The third derives from the catalog the host
+`customerRole` is now REQUIRED. `ownerRoles` derives from the catalog the host
 already composed (`catalog.governance.ownerRoles`), so the roster invariants
 and the grant protection cannot name different sets by accident; pass
 `ownerRoles` only to deliberately narrow it (the origin host protects grants for
@@ -323,9 +323,12 @@ before the next `migrate deploy`. Then reconcile the deliberate deltas:
 ## The endpoints
 
 Mounted under whatever prefix the host chooses (the origin host uses
-`/api/admin/:tenantSlug`). Every "admin tier" and "staff tier" gate requires
-an **ACTIVE** membership: a soft-disabled member ("Desativar") holds no tier,
-exactly as their permissions already resolve to nothing.
+`/api/admin/:tenantSlug`). Every gate is a PERMISSION (FUT-3661): there is no
+admin tier any more, so a custom role holding `team:manage` invites and a role
+holding only `team:read` opens the roster read-only. The membership tier is
+still READ where the owner rules need it (removal, disable, revoke) and never
+refuses on its own. A soft-disabled member ("Desativar") resolves no
+permissions, so every gate refuses them.
 
 | Method | Path | Gate | Answers |
 |---|---|---|---|
@@ -335,17 +338,17 @@ exactly as their permissions already resolve to nothing.
 | DELETE | `/roles/:id` | `roles:manage` | `{ data: { status: 'deleted' } }` — an ARCHIVE (`archived_at` stamped): grants stop at once, the row and its member links survive for a restore surface (12-17); repeat is 404 |
 | PUT | `/roles/templates/:name` | `roles:manage` + curated governance | `{ data: role }` (copy-on-write override) |
 | DELETE | `/roles/templates/:name` | `roles:manage` + curated governance | `{ data: { status: 'reset' } }` (idempotent) — governance judges the SEED the reset would write, so a resetter can never restore a permission they do not themselves hold |
-| GET | `/permissions` | staff tier | `{ data: { permissions, ...permissionsExtras } }` |
-| GET | `/team` | admin tier (ACTIVE membership) | `{ data, pagination }` — `q`, `role_in`, `status_in`, `sort`, paging |
-| POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port. Any number of roles: `role` (first system role, optional) + `customRoles` (every other role, system or custom); each system role must be in `assignableBaseRoles`; the port grants ALL of them additively |
-| GET | `/team/context` | admin tier + `team:read` | custom roles by member, assignable roles, pending invites, `invitesEnabled`, `invitesResendable` |
-| GET | `/team/:userId` | admin tier + `team:read` | member detail, 404 reveals nothing |
-| DELETE | `/team/:userId` | admin tier (owner rules inside) | `{ data: { status: 'removed' } }` — an owner's removal counts ACTIVE owners only, decided inside the write |
-| PATCH | `/team/:userId/status` | admin tier + `team:manage` | enable/disable; owner never disabled (TOCTOU-safe) |
+| GET | `/permissions` | holds at least one permission here (or platform operator) | `{ data: { permissions, ...permissionsExtras } }` |
+| GET | `/team` | `team:read` | `{ data, pagination }` — `q`, `role_in`, `status_in`, `sort`, paging |
+| POST | `/team` | `team:manage` + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port. Any number of roles: `role` (first system role, optional) + `customRoles` (every other role, system or custom); each system role must be in `assignableBaseRoles`; the port grants ALL of them additively |
+| GET | `/team/context` | `team:read` | custom roles by member, assignable roles, pending invites, `invitesEnabled`, `invitesResendable` |
+| GET | `/team/:userId` | `team:read` | member detail, 404 reveals nothing |
+| DELETE | `/team/:userId` | `team:manage` (owner rules inside) | `{ data: { status: 'removed' } }` — an owner's removal counts ACTIVE owners only, decided inside the write |
+| PATCH | `/team/:userId/status` | `team:manage` | enable/disable; owner never disabled (TOCTOU-safe) |
 | POST | `/team/:userId/roles` | `roles:manage` + governance | grant one more role — system or custom, any number per member (idempotent) |
 | DELETE | `/team/:userId/roles/:role` | `roles:manage` | revoke (idempotent); an owner role the member holds follows the removal's owner rules |
-| DELETE | `/team/invites/:inviteId` | admin tier + `team:manage` + invites port | cancel a pending invite |
-| POST | `/team/invites/:inviteId/resend` | admin tier + `team:manage` + `invites.resend` | mail a pending invite a fresh link: `{ data: { status: 'resent', email } }`; 404 (`inviteNotFound`) when no longer pending, 502 (`inviteNotSent`) when the mail did not leave, 501 without `resend` |
+| DELETE | `/team/invites/:inviteId` | `team:manage` + invites port | cancel a pending invite |
+| POST | `/team/invites/:inviteId/resend` | `team:manage` + `invites.resend` | mail a pending invite a fresh link: `{ data: { status: 'resent', email } }`; 404 (`inviteNotFound`) when no longer pending, 502 (`inviteNotSent`) when the mail did not leave, 501 without `resend` |
 
 ## Minimal host (Hono)
 
@@ -376,8 +379,7 @@ export type ShopPermission = PermissionOf<typeof CATALOG>;
 const rbac = rbacRouter({
   db: async () => prisma,                    // structural RbacDb
   catalog: CATALOG,
-  adminRoles: ['OWNER', 'MANAGER'],          // this host's coarse roster tier
-  customerRole: null,                        // …and it has no customer tier
+  customerRole: null,                        // this host has no customer tier
   messages: PT_BR_RBAC_MESSAGES,             // required: the wire's sentences are yours
   directory: {
     getUsers: (ids) => users.byIds(ids),
@@ -428,7 +430,7 @@ enforce, and one assembly is the only arrangement in which they cannot drift.
 - **Invite storage and the signup hook** — the optional invites port.
 - **The impersonation machinery** — 12-24; the ceiling seam here is its
   attachment point. A `permissionCeiling` is authoritative: an actor carrying
-  one is never the platform operator, in the guards, the admin and staff tiers
+  one is never the platform operator, in the guards, the shell's staff gate
   and the owner rules alike, even if the host forgot to force `isSuper` off.
 - **The member PROFILE page** (`member-details-tab`, `member-role`,
   `member-since`, `member-last-login`, `member-custom-roles` in the origin host
@@ -491,7 +493,7 @@ insulation; a `@deprecated` tag is not.
 | `createWebRbac({ apiBase })` | `createWebRbac({ apiBase, catalog, copy })` |
 | `RbacLabelOverrides` (from `@12-apps/rbac/react`) | `RbacLabelVocabulary`, from the ROOT barrel `@12-apps/rbac` — see below |
 | the host-branded guard-name lists | required `rbacGuards` / `entitlementGuards` options |
-| `adminRoles` / `customerRole` defaults | REQUIRED config fields (`customerRole: null` for a host with no customer tier) |
+| `adminRoles` / `customerRole` defaults | `customerRole` is a REQUIRED config field (`null` for a host with no customer tier); `adminRoles` is gone — the roster asks `team:read` / `team:manage` |
 | `DEFAULT_MESSAGES` and the screens' compiled-in pt-BR | REQUIRED `messages` (server) and `copy` (react); the origin host's words ship as the named `PT_BR_RBAC_MESSAGES` / `PT_BR_RBAC_WEB_COPY` packs |
 | `ownerRoles` default `['OWNER']` | derived from `catalog.governance.ownerRoles`; pass it only to NARROW that set |
 | `PermissionContribution` (bare) | `PermissionContribution<P>` — the `= string` default is gone; prefer no annotation at all |
