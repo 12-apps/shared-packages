@@ -1,11 +1,11 @@
-import type { EntitlementsWebCopy } from './copy';
+import type { ResolvedEntitlementsWebCopy } from './copy';
 
 /**
  * The pt-BR pack — the exact sentences the screens compiled in until copy
  * became required config. The filename is what exempts this file from the
  * copy-portability gate: Portuguese may ship, it may not be silent.
  */
-export const PT_BR_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
+export const PT_BR_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
   requestFailed: ({ status }) => `Falha na requisição (${status}).`,
   planPage: {
     title: 'Planos',
@@ -44,6 +44,15 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     featureColumn: 'Recurso',
     included: 'Incluído',
     excluded: 'Não incluído',
+  },
+  planCompare: {
+    title: 'Compare os planos',
+    currentBadge: 'Seu plano',
+    offeredBadge: 'Recomendado',
+    empty: 'Para ver tudo o que cada plano inclui, abra Ver todos os planos.',
+    alreadyIncluded: 'Seu plano já inclui todos estes recursos.',
+    retry: 'Tentar de novo',
+    closeLabel: 'Fechar',
   },
   upsell: {
     reasons: {

@@ -55,7 +55,10 @@ export function IncludedMark({ included, label }: MarkProps): JSX.Element {
         height: MARK_PX,
         flexShrink: 0,
         display: 'block',
-        color: included ? 'success.main' : 'text.disabled',
+        // `text.secondary`, not `text.disabled`: the − is a graphic that
+        // CARRIES meaning in a matrix cell, so it needs 3:1 (WCAG 1.4.11);
+        // `text.disabled` measured 2.65:1 on a shaded column (FUT-5062).
+        color: included ? 'success.main' : 'text.secondary',
       }}
     >
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />

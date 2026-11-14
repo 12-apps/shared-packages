@@ -11,7 +11,8 @@
  * the host's `switchLocation` map) and never mentions money. `requiredPlan`
  * can be null even on a real plan gap — the pitch line renders only when
  * there is a plan to name, never "Disponível no plano " with a dangling
- * blank.
+ * blank. A plan-gap prompt that carries `compareKeys` opens the per-screen
+ * comparison (`PlanCompareDialog`) instead.
  *
  * PRICING copy stays out: the prompt names the tier and files the lead; what
  * a tier costs is the plan screen's business, where the numbers arrive from
@@ -19,87 +20,20 @@
  */
 import { useEffect, useState, type JSX } from 'react';
 
-import { Alert } from '@12-apps/ui/data-display/Alert';
 import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
-import { Button } from '@12-apps/ui/form/Button';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { UpsellPrompt, UpsellReason } from '../plan-wire';
+import { PlanCompareDialog } from './plan-compare-dialog';
 import { createPlanApi, useRead } from './plan-api';
+import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
 import { subscribeToUpsell } from './upsell-channel';
 import type { ResolvedWebConfig } from './web-config';
 
 /** The two reasons an upgrade honestly fixes. */
 function isUpgradeable(reason: UpsellReason): boolean {
   return reason === 'not-entitled' || reason === 'quota-exceeded';
-}
-
-/**
- * The ask-for-the-plan action. Mirrors the plan page's gate: the WRITE requires
- * `plan:request` server-side, so a caller without it gets told which plan
- * unlocks the feature and to talk to whoever holds that permission — never a
- * button that answers 403.
- */
-function UpgradeCta({
-  prompt,
-  planName,
-  config,
-}: {
-  prompt: UpsellPrompt;
-  planName: string | null;
-  config: ResolvedWebConfig;
-}): JSX.Element | null {
-  const [state, setState] = useState<{ sent: boolean; pending: boolean; error: Error | null }>({
-    sent: false,
-    pending: false,
-    error: null,
-  });
-  const copy = config.copy.upsell;
-  const { requiredPlan } = prompt;
-  if (requiredPlan === null) return null;
-  if (!config.canRequestPlanChange) {
-    return (
-      <Text as="div" size="sm" color="secondary" data-testid="upsell-ask-admin">
-        {copy.askAdmin}
-      </Text>
-    );
-  }
-  if (state.sent) {
-    // Never the raw plan key, not even here: while the commercial name is
-    // still loading, `requestReceived` gets null and drops the clause.
-    return (
-      <Alert severity="info" data-testid="upsell-request-sent">
-        {copy.requestReceived({ planName })}
-      </Alert>
-    );
-  }
-  const ask = (): void => {
-    setState({ sent: false, pending: true, error: null });
-    createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed)
-      .requestPlanChange({ requestedPlan: requiredPlan, feature: prompt.feature })
-      .then(
-        () => setState({ sent: true, pending: false, error: null }),
-        (error: unknown) =>
-          setState({
-            sent: false,
-            pending: false,
-            error: error instanceof Error ? error : new Error(String(error)),
-          }),
-      );
-  };
-  return (
-    <Stack spacing={1}>
-      {state.error === null ? null : (
-        <Alert severity="error" data-testid="upsell-request-error">
-          {state.error.message}
-        </Alert>
-      )}
-      <Button size="sm" fullWidth disabled={state.pending} data-testid="upsell-cta" onClick={ask}>
-        {copy.requestAction}
-      </Button>
-    </Stack>
-  );
 }
 
 /** The non-sale destination: their own config switch, named per feature. */
@@ -142,31 +76,6 @@ function QuotaLine({
   );
 }
 
-/**
- * The pitch line — only once the catalog resolves the COMMERCIAL name: the
- * raw plan key must never face a customer, not even as a loading fallback,
- * and a null `requiredPlan` must never leave the pitch dangling around a
- * blank. The name slot is markup, so the sentence ships as prefix + suffix
- * around it, each half carrying its own spacing.
- */
-function PlanPitchLine({
-  planName,
-  config,
-}: {
-  planName: string | null;
-  config: ResolvedWebConfig;
-}): JSX.Element | null {
-  if (planName === null) return null;
-  const { prefix, suffix } = config.copy.upsell.planPitch;
-  return (
-    <Text as="div" data-testid="upsell-plan-name">
-      {prefix}
-      <strong>{planName}</strong>
-      {suffix}
-    </Text>
-  );
-}
-
 function UpsellDialogBody({
   prompt,
   config,
@@ -195,7 +104,7 @@ function UpsellDialogBody({
       <QuotaLine quota={prompt.quota} config={config} />
       <PlanPitchLine planName={planName} config={config} />
       {upgradeable ? (
-        <UpgradeCta prompt={prompt} planName={planName} config={config} />
+        <UpgradeCta target={prompt} planName={planName} config={config} />
       ) : (
         <LockedElsewhereLink
           reason={prompt.reason}
@@ -219,14 +128,40 @@ function UpsellDialogBody({
  * interceptor — opens this dialog.
  */
 export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX.Element | null {
-  const [prompt, setPrompt] = useState<UpsellPrompt | null>(null);
-  useEffect(() => subscribeToUpsell(setPrompt), []);
-  if (prompt === null) return null;
+  // Each raise is its own dialog: keyed by a counter, so a second raise while
+  // one is open starts fresh instead of inheriting a "request sent" state that
+  // was about a different plan.
+  const [raised, setRaised] = useState<{ prompt: UpsellPrompt; id: number } | null>(null);
+  useEffect(
+    () =>
+      subscribeToUpsell((next) => setRaised((was) => ({ prompt: next, id: (was?.id ?? 0) + 1 }))),
+    [],
+  );
+  if (raised === null) return null;
+  const { prompt, id } = raised;
   const close = (): void => {
-    setPrompt(null);
+    setRaised(null);
   };
+  // A prompt carrying `compareKeys` is a screen asking to show its own rows
+  // side by side. Only a SALE gets the comparison: a restricted, suspended or
+  // switched-off feature keeps the plain prompt, whose copy says why no plan
+  // fixes it.
+  if (prompt.compareKeys !== undefined && isUpgradeable(prompt.reason)) {
+    return (
+      <PlanCompareDialog
+        key={id}
+        open
+        onClose={close}
+        keys={prompt.compareKeys}
+        feature={prompt.feature}
+        plan={prompt.requiredPlan}
+        config={config}
+      />
+    );
+  }
   return (
     <Dialog
+      key={id}
       open
       size="sm"
       title={config.copy.upsell.reasons[prompt.reason].title}

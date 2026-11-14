@@ -16,7 +16,10 @@
  */
 import type { ComponentType, JSX } from 'react';
 
+import type { EntitlementsWebCopy, ResolvedEntitlementsWebCopy } from './copy';
+import { EN_US_ENTITLEMENTS_WEB_COPY } from './en-US';
 import type { EntitlementsLinkProps, ResolvedWebConfig, WebEntitlementsConfig } from './web-config';
+import { PlanCompareDialog, type PlanCompareProps } from './plan-compare-dialog';
 import { PlanFeaturesScreen, PlanScreen, PlanSummary, PlansScreen } from './plan-page';
 import { UpsellPromptHost } from './upsell-host';
 import { UpgradeButton, type UpgradeButtonProps } from './upgrade-button';
@@ -51,6 +54,13 @@ export interface WebEntitlements {
   planSummary: ComponentType;
   /** Mount ONCE in the layout: the upgrade prompt every trigger lands on. */
   UpsellHost: ComponentType;
+  /**
+   * A screen's own rows side by side across the tiers on sale, the tenant's
+   * tier marked, ending on the upgrade ask (FUT-5062). Controlled; to open it
+   * from anywhere without rendering it, call `openPlanCompare` and let
+   * {@link UpsellHost} render it.
+   */
+  PlanCompare: ComponentType<PlanCompareProps>;
   /**
    * The way out of a refused request, for a host to render beside the refusal
    * it shows: opens {@link UpsellHost} for a plan denial, renders nothing for
@@ -93,13 +103,22 @@ function assertWebConfig(config: WebEntitlementsConfig): void {
   }
 }
 
+/**
+ * Fill the copy blocks a host may omit. `planCompare` arrived after hosts had
+ * written their own copy objects; the package resolves no active locale (the
+ * host chooses a pack by hand), so the fallback is the en-US pack's block.
+ */
+function resolveCopy(copy: EntitlementsWebCopy): ResolvedEntitlementsWebCopy {
+  return { ...copy, planCompare: copy.planCompare ?? EN_US_ENTITLEMENTS_WEB_COPY.planCompare };
+}
+
 export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitlements {
   assertWebConfig(config);
   const resolved: ResolvedWebConfig = {
     apiBase: config.apiBase,
     fetchImpl: config.fetchImpl ?? ((...args) => fetch(...args)),
     canRequestPlanChange: config.canRequestPlanChange,
-    copy: config.copy,
+    copy: resolveCopy(config.copy),
     switchLocation: config.switchLocation ?? (() => null),
     plansPath: config.plansPath ?? null,
     featuresPath: config.featuresPath ?? null,
@@ -131,6 +150,11 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
   }
   Host.displayName = 'EntitlementsUpsellHost';
 
+  function Compare(props: PlanCompareProps): JSX.Element | null {
+    return <PlanCompareDialog {...props} config={resolved} />;
+  }
+  Compare.displayName = 'EntitlementsPlanCompare';
+
   function Upgrade(props: UpgradeButtonProps): JSX.Element | null {
     return <UpgradeButton {...props} label={resolved.copy.upsell.upgradeAction} />;
   }
@@ -142,6 +166,7 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
     featuresPage: Features,
     planSummary: Summary,
     UpsellHost: Host,
+    PlanCompare: Compare,
     UpgradeButton: Upgrade,
     withEntitlement: createWithEntitlement(config.copy.pageLock),
   };
