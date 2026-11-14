@@ -37,7 +37,7 @@ export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'month', 'week', 'cus
 export type ReportRangePreset = (typeof REPORT_RANGE_PRESETS)[number];
 
 /** The weekday the `week` preset opens on (FUT-4063): 0 = Sunday, 1 = Monday. */
-export type WeekStart = 0 | 1;
+type WeekStart = 0 | 1;
 
 /**
  * The presets a SAVED report may declare as the one it OPENS on (FUT-755).

@@ -6,7 +6,7 @@ import type { ReportNoteView } from "../reports-api";
 import type { ReportSystemCopy } from "../screens-copy";
 
 /** The most names a note lists before "e mais N". */
-export const NOTE_ITEMS_SHOWN = 3;
+const NOTE_ITEMS_SHOWN = 3;
 
 /** Whether a note has anything to say: one that lists names and has none is hidden. */
 export function isNoteShown(note: ReportNoteView): boolean {

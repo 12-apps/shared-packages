@@ -32,7 +32,7 @@ export function csvTrailer(notes: readonly string[]): string {
   return `\n\n${notes.map(escapeCsvCell).join("\n")}`;
 }
 
-export function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
+function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
   const head = columns.map((column) => escapeCsvCell(column.header)).join(",");
   const body = rows
     .map((row) =>

@@ -220,7 +220,7 @@ export const systemReportSummarySchema = z.object({
 });
 
 /** One thing a built-in says about its own data (FUT-4063) — see `ReportNote`. */
-export const reportNoteSchema = z.object({
+const reportNoteSchema = z.object({
   key: z.string(),
   text: z.string(),
   items: z.array(z.string()).optional(),

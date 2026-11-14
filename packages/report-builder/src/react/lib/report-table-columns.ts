@@ -34,7 +34,7 @@ function labelColumnKey(columns: readonly ReportTableColumn[]): string | undefin
 export const FLAGGED_ROW_KEY = "__reportRowFlagged";
 
 /** How the judged column draws a flagged row's cell, given its formatted figure. */
-export interface FlaggedColumn {
+interface FlaggedColumn {
   column: string;
   render: (text: string) => ReactNode;
 }

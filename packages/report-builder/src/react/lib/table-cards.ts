@@ -8,7 +8,7 @@ import { formatReportValue } from "../../format";
 import type { ReportCardPart, ReportPhoneCards, ReportRow, ReportTableColumn } from "../reports-api";
 
 /** One card, every string already formatted. */
-export interface TableCard {
+interface TableCard {
   title: string;
   /** Joined parts under the title; absent when the card lists label/value lines. */
   subtitle?: string;
