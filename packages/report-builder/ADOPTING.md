@@ -18,6 +18,48 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Next minor — heat maps, flags, phone cards, derived notes (FUT-4063)
+
+Everything here is opt-in: a host that declares none of it renders as before.
+Four things can still reach a host that does not use them, so check them:
+
+- **Two widened unions.** `ReportRender` gains `{ kind: 'heatmap' }`, and a
+  table render gains the optional `flag` and `phone`. `ReportRange` gains
+  `'week'`. A host that switches exhaustively over either adds a branch; one
+  that reads only the kinds it knows is unaffected.
+- **Table columns carry more.** A dimension whose catalog field declares
+  `values` now carries `valueLabels`, and its cells (table, cards, CSV, "Ver
+  como tabela") read the label ("Cartão") rather than the stored value
+  (`CARD`). A measure that declares `decimals` or `label`, and a dimension that
+  declares `label` or `bucketFormat`, carry those too. Nothing else changes.
+- **The system run payload** always carries `notes` (`[]` without `derive`),
+  and `grains` when the report declares them.
+- **The CSV.** A flagged table adds one column holding the flag's words. Text
+  cells starting with `=`, `+`, `-` or `@` are written with a leading `'`.
+  This guard is new for every host. A built-in's notes follow the rows, every
+  name listed.
+
+New copy keys are OPTIONAL: `system.noteSeparator` and `system.noteMore(n)`,
+which join a note's names and close a list past three. A pack without them
+reads `"; "` and `" +N"`. Both shipped packs fill them (`"; "`, `" e mais N"` /
+`" and N more"`). Ranges gain the label `ranges.week` ("Esta semana" / "This
+week"). A pack without it shows the id.
+
+New on the host side, all optional:
+
+| where | what |
+|---|---|
+| spec measure | `decimals` (0-4; `duration` at decimals reads whole hours, "62 h"), `label` |
+| spec dimension | `label`, `bucketFormat` (a key the surface's `formatBucket` reads) |
+| `presentation: table` | `flag`, `phone: { layout: 'cards', below?: 'md' \| 'always' \| px, title?, figure?, figureCaption?, subtitle? }` |
+| `presentation: kpi` | `flag` (the whole-period target signal) |
+| `presentation: heatmap` | a new kind: 2 dimensions × 1 measure, `target`, `strongAbove/Below`, `labels` |
+| `SystemReportDef` | `grains`, `grainLabel`, `ranges` (first is the default), `derive(ctx)` → `{ params, notes }`; `build({ grain, params, locale })` |
+| `SystemDashboardDef` / block | `grainLabel`, `ranges`; a block's `frame: false` draws it bare |
+| `ReportNote` | `text` with `{items}`, `items`, `figure`, `action`, `phone: 'below'` |
+| server config | `weekStartsOn` (`week` preset, Monday default), `onDeriveError` (a failed `derive` draws the block without notes) |
+| surface | `periodLabel(range)` (period as a select), `formatBucket(value, { format, grain })` |
+
 ## Migrating 5.20.x → 5.21.0 — a failed call reads in the host's words (FUT-4070)
 
 The default transport worded its own failures in English: a refusal with no

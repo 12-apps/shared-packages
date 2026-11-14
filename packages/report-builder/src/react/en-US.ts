@@ -152,6 +152,7 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
       "7d": "7 days",
       "30d": "30 days",
       month: "This month",
+      week: "This week",
       custom: "Custom…",
     },
     grains: {
@@ -171,6 +172,8 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
     reportFailedTitle: "Could not load the report",
     reportFailedBody: "Check your permission, or try again in a moment.",
     retry: "Try again",
+    noteSeparator: "; ",
+    noteMore: (count) => ` and ${count} more`,
   },
   builder: {
     emptySelection: "Select a block to edit",

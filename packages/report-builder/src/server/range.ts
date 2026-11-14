@@ -33,8 +33,11 @@ import type { ReportRangeMessages } from './messages';
  * it names a window the caller supplies, so the pill opens a picker rather than
  * resolving anything by itself.
  */
-export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'month', 'custom'] as const;
+export const REPORT_RANGE_PRESETS = ['today', '7d', '30d', 'month', 'week', 'custom'] as const;
 export type ReportRangePreset = (typeof REPORT_RANGE_PRESETS)[number];
+
+/** The weekday the `week` preset opens on (FUT-4063): 0 = Sunday, 1 = Monday. */
+type WeekStart = 0 | 1;
 
 /**
  * The presets a SAVED report may declare as the one it OPENS on (FUT-755).
@@ -80,7 +83,7 @@ type RollingPreset = Exclude<ReportRangePreset, 'custom'>;
  * union is what makes a NEW preset a compile error here instead of a silent
  * `undefined` day count.
  */
-const PRESET_DAYS: Record<Exclude<RollingPreset, 'month'>, number> = {
+const PRESET_DAYS: Record<Exclude<RollingPreset, 'month' | 'week'>, number> = {
   today: 1,
   '7d': 7,
   '30d': 30,
@@ -257,8 +260,14 @@ function resolveCustomWindow(
  * still serving July's dinner — the whole month's figures gone from the screen
  * three hours early.
  */
-function rollingStart(preset: RollingPreset, today: CivilDay): CivilDay {
+function rollingStart(preset: RollingPreset, today: CivilDay, weekStartsOn: WeekStart): CivilDay {
   if (preset === 'month') return { year: today.year, month: today.month, day: 1 };
+  if (preset === 'week') {
+    // `week` ("Esta semana", FUT-4063) is week-TO-DATE from the host's first
+    // weekday, read on the civil calendar like `month`.
+    const weekday = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay();
+    return civilDayPlus(today, -((weekday - weekStartsOn + 7) % 7));
+  }
   return civilDayPlus(today, 1 - PRESET_DAYS[preset]);
 }
 
@@ -267,10 +276,11 @@ function resolveRollingWindow(
   preset: RollingPreset,
   now: Date,
   timeZone: string | undefined,
+  weekStartsOn: WeekStart,
 ): { from: Date; toExclusive: Date } {
   const today = civilDayOf(now, timeZone);
   return {
-    from: startOfCivilDay(rollingStart(preset, today), timeZone),
+    from: startOfCivilDay(rollingStart(preset, today, weekStartsOn), timeZone),
     toExclusive: startOfCivilDay(civilDayPlus(today, 1), timeZone),
   };
 }
@@ -287,11 +297,13 @@ export function resolveReportRange(
   now: Date,
   messages: ReportRangeMessages,
   timeZone?: string,
+  /** The first day of `week`: 1 = Monday (the default, as the ISO week grain), 0 = Sunday. */
+  weekStartsOn: WeekStart = 1,
 ): ResolvedReportRange {
   const window =
     input.preset === 'custom'
       ? resolveCustomWindow(input, timeZone, messages)
-      : resolveRollingWindow(input.preset, now, timeZone);
+      : resolveRollingWindow(input.preset, now, timeZone, weekStartsOn);
   return { preset: input.preset, ...window };
 }
 

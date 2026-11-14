@@ -240,6 +240,10 @@ export interface CompiledDimension {
   timeGrain?: TimeGrain;
   /** Output column name for this dimension's bucket values. */
   alias: string;
+  /** The spec's own heading (FUT-4063); absent: derived from the field. */
+  label?: string;
+  /** The spec's host format key for the values (FUT-4063). */
+  bucketFormat?: string;
 }
 
 export interface CompiledMeasure {
@@ -265,6 +269,10 @@ export interface CompiledMeasure {
   minSample?: number;
   /** Resolved render format (catalog field default, or the spec's override). */
   format: ReportValueFormat;
+  /** The spec's fraction digits (FUT-4063); absent = the format's default. */
+  decimals?: number;
+  /** The spec's own heading (FUT-4063); absent: derived from the field. */
+  label?: string;
 }
 
 /**

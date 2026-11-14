@@ -3,13 +3,18 @@ import type { ChartNumberFormat, ChartSemanticColor, ChartSpec } from '@12-apps/
 import { requireEntityForRender } from './catalog';
 import { isOrderedDimension } from './compatibility';
 import { pivotSplit } from './pivot';
+import { tableFlag, type ReportTableFlag } from './render-flag';
+import { toHeatmapModel, type ReportHeatmapModel } from './render-heatmap';
 import { toKpiModel, type ReportKpiFigure } from './render-kpi';
 import type { RenderLabelCopy } from './copy';
 import { dimensionLabel, measureLabel } from './render-labels';
-import type { ReportPresentation } from './spec';
+import type { ReportPhoneCards, ReportPresentation } from './spec';
 import {
   isSuppressed,
+  type CompiledDimension,
   type CompiledQuery,
+  type FieldDef,
+  type TimeGrain,
   type FieldCatalog,
   type ReportKpiFormat,
   type ReportRow,
@@ -21,10 +26,29 @@ export interface ReportTableColumn {
   key: string;
   label: string;
   format: ReportValueFormat;
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals?: number;
+  /**
+   * A dimension's closed set of values, labelled (FUT-4063): a cell shows
+   * "Cozinha", not `k`, in the table, its cards and the CSV.
+   */
+  valueLabels?: Record<string, string>;
+  /** The spec's host format key and the bucket's grain (FUT-4063); the surface formats. */
+  bucketFormat?: string;
+  grain?: TimeGrain;
 }
 
 export type ReportRenderModel =
-  | { kind: 'table'; columns: ReportTableColumn[]; rows: ReportRow[] }
+  | {
+      kind: 'table';
+      columns: ReportTableColumn[];
+      rows: ReportRow[];
+      /** The rows the presentation's `flag` marks (FUT-4063); absent without one. */
+      flag?: ReportTableFlag;
+      /** The opt-in phone form (FUT-4063), passed through as the spec states it. */
+      phone?: ReportPhoneCards;
+    }
+  | ReportHeatmapModel
   | {
       kind: 'chart';
       chartSpec: ChartSpec;
@@ -312,7 +336,33 @@ export function renderReport(
   if (presentation.kind === 'kpi') {
     return toKpiModel(query, presentation, catalog, rows, copy);
   }
-  return { kind: 'table', columns: tableColumnsFor(query, catalog, copy), rows };
+  if (presentation.kind === 'heatmap') {
+    return toHeatmapModel(query, presentation, catalog, rows, tableColumnsFor(query, catalog, copy));
+  }
+  const columns = tableColumnsFor(query, catalog, copy);
+  return {
+    kind: 'table',
+    columns,
+    rows,
+    ...(presentation.flag ? { flag: tableFlag(rows, presentation.flag) } : {}),
+    ...(presentation.phone ? { phone: presentation.phone } : {}),
+  };
+}
+
+/** One dimension's column: heading, and how its values read (FUT-4063). */
+function dimensionColumn(dimension: CompiledDimension, field: FieldDef | undefined, copy: RenderLabelCopy): ReportTableColumn {
+  const values = field?.values;
+  return {
+    key: dimension.alias,
+    label: dimension.label ?? dimensionLabel(field, dimension.alias, copy, dimension.timeGrain),
+    format: 'text',
+    ...(values && values.length > 0
+      ? { valueLabels: Object.fromEntries(values.map((option) => [option.value, option.label])) }
+      : {}),
+    ...(dimension.bucketFormat !== undefined
+      ? { bucketFormat: dimension.bucketFormat, ...(dimension.timeGrain ? { grain: dimension.timeGrain } : {}) }
+      : {}),
+  };
 }
 
 /**
@@ -327,15 +377,12 @@ function tableColumnsFor(
 ): ReportTableColumn[] {
   const entity = requireEntityForRender(catalog, query.entity);
   return [
-    ...query.dimensions.map((dimension) => ({
-      key: dimension.alias,
-      label: dimensionLabel(entity.fields[dimension.field], dimension.alias, copy, dimension.timeGrain),
-      format: 'text' as const,
-    })),
+    ...query.dimensions.map((dimension) => dimensionColumn(dimension, entity.fields[dimension.field], copy)),
     ...query.measures.map((measure) => ({
       key: measure.alias,
       label: measureLabel(entity.fields[measure.field], measure, copy),
       format: measure.format,
+      ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
     })),
   ];
 }

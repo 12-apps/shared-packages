@@ -11,6 +11,8 @@ import type {
 
 import type { BlockTemplateGroup } from "../server/block-templates";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
+import type { BucketFormatter } from "./lib/column-value";
+import type { ReportRange } from "./reports-api";
 
 /**
  * What every screen in this package reads from: how to reach the API, whose
@@ -41,6 +43,19 @@ export interface ReportBuilderSurface {
   blockTemplates: readonly BlockTemplateGroup[];
   /** The tenant's IANA zone — the clock the period picker calls "hoje". */
   timeZone: string;
+  /**
+   * A built-in surface's period, as its trigger reads it (FUT-4063): given a
+   * preset, the host's whole label — "Esta semana · 03–09/11". When present,
+   * the period is a select whose trigger shows that label; absent, the preset
+   * toggle as before. The host formats the dates, on its own clock.
+   */
+  periodLabel?: (range: ReportRange) => string;
+  /**
+   * How a dimension that names a `bucketFormat` reads (FUT-4063) — the host's
+   * "Seg 03/11" for a day, "Semana de 03/11" for a week. Absent: the value as
+   * the server sent it.
+   */
+  formatBucket?: BucketFormatter;
 }
 
 /**

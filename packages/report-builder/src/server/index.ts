@@ -80,9 +80,14 @@ export {
   findSystemReport,
   systemReportNav,
   type SystemDashboardBlockDef,
+  type ReportNote,
   type SystemDashboardDef,
+  type SystemReportBuildOptions,
   type SystemReportDef,
+  type SystemReportDerived,
   type SystemReportNavEntry,
+  type SystemReportParams,
+  type SystemReportRunContext,
   type SystemReportSection,
 } from './system-reports';
 export { REPORT_RUN_MAX_ROWS } from './policy';

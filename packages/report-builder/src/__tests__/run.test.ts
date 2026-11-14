@@ -25,7 +25,14 @@ describe('runReport', () => {
     expect(result.render.kind).toBe('table');
     if (result.render.kind === 'table') {
       expect(result.render.columns).toEqual([
-        { key: 'method', label: 'Forma de pagamento', format: 'text' },
+        // FUT-4063: a dimension with a declared closed set carries its labels,
+        // so the cell reads "Cartão" (table, cards, CSV), not the stored `CARD`.
+        {
+          key: 'method',
+          label: 'Forma de pagamento',
+          format: 'text',
+          valueLabels: { PIX: 'PIX', CARD: 'Cartão', WAITER: 'Com o garçom' },
+        },
         { key: 'sum_totalCents', label: 'Receita', format: 'brl' },
         { key: 'orders', label: 'Pedido (contagem)', format: 'integer' },
       ]);

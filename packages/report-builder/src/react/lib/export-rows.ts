@@ -12,6 +12,19 @@ export interface ExportColumn<T> {
   header: string;
   /** Extracts the cell value for a row. */
   value: (row: T) => string | number | boolean | null | undefined;
+  /**
+   * A TEXT column (FUT-4063): its cells are guarded against formula injection
+   * in the CSV. Figures are not — "-12%" is a number, not a formula.
+   */
+  text?: boolean;
+}
+
+/** A cell a spreadsheet would run as a formula: it starts with = + - or @. */
+const FORMULA_START = /^[=+\-@]/;
+
+/** A text cell made inert for a spreadsheet: a leading apostrophe, as OWASP advises. */
+function inert(value: string): string {
+  return FORMULA_START.test(value) ? `'${value}` : value;
 }
 
 function escapeCsvCell(value: string): string {
@@ -22,14 +35,25 @@ function escapeCsvCell(value: string): string {
   return value;
 }
 
-function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
-  const head = columns.map((column) => escapeCsvCell(column.header)).join(",");
+/**
+ * The notes a report says about its data (FUT-4063), after the rows: a blank
+ * line, then one note per line as a single cell, so a spreadsheet keeps them
+ * beside the figures they qualify without inventing a column for them.
+ */
+export function csvTrailer(notes: readonly string[]): string {
+  if (notes.length === 0) return "";
+  return `\n\n${notes.map((note) => escapeCsvCell(inert(note))).join("\n")}`;
+}
+
+export function toCsv<T>(rows: T[], columns: ExportColumn<T>[]): string {
+  const head = columns.map((column) => escapeCsvCell(inert(column.header))).join(",");
   const body = rows
     .map((row) =>
       columns
         .map((column) => {
           const cell = column.value(row);
-          return escapeCsvCell(cell == null ? "" : String(cell));
+          const text = cell == null ? "" : String(cell);
+          return escapeCsvCell(column.text ? inert(text) : text);
         })
         .join(","),
     )
@@ -75,10 +99,12 @@ export function exportRows<T>(
   rows: T[],
   columns: ExportColumn<T>[],
   baseName: string,
+  /** CSV only (FUT-4063): appended after the rows. JSON keeps its array shape. */
+  notes: readonly string[] = [],
 ): void {
   if (format === "json") {
     triggerDownload(toJson(rows, columns), `${baseName}.json`, "application/json");
     return;
   }
-  triggerDownload(toCsv(rows, columns), `${baseName}.csv`, "text/csv;charset=utf-8");
+  triggerDownload(`${toCsv(rows, columns)}${csvTrailer(notes)}`, `${baseName}.csv`, "text/csv;charset=utf-8");
 }

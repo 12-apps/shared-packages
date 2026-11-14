@@ -200,6 +200,10 @@
       "types": "./dist/types/components/data-display/DayRuler/index.d.ts",
       "default": "./dist/data-display/DayRuler.js"
     },
+    "./data-display/HeatMap": {
+      "types": "./dist/types/components/data-display/HeatMap/index.d.ts",
+      "default": "./dist/data-display/HeatMap.js"
+    },
     "./data-display/DescriptionItem": {
       "types": "./dist/types/components/data-display/DescriptionItem/index.d.ts",
       "default": "./dist/data-display/DescriptionItem.js"

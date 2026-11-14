@@ -21,17 +21,37 @@ import { useParams } from "react-router-dom";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
+import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
-import { findSystemDashboard } from "../server/system-reports";
+import {
+  findSystemDashboard,
+  type SystemDashboardBlockDef,
+  type SystemDashboardDef,
+  type SystemReportNavEntry,
+} from "../server/system-reports";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
-import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
+import {
+  initialGrain,
+  initialRange,
+  ReportControls,
+  ReportPageHeader,
+  sectionBackTarget,
+} from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
+import { NotesBelowCard, ReportBodyWithNotes } from "./report-notes";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
-import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
+import {
+  REPORT_GRAINS,
+  useSystemReport,
+  type ReportGrain,
+  type ReportNoteView,
+  type ReportRange,
+  type ReportRender,
+} from "./reports-api";
 import { useReportCopy, useReportSurface } from "./transport-context";
 
 interface BlockProps {
@@ -42,6 +62,8 @@ interface BlockProps {
   grain: ReportGrain;
   /** Widens the WHOLE canvas — an empty block's offer moves every block. */
   onRangeChange: (range: ReportRange) => void;
+  /** The periods the canvas offers: the empty state never offers another (FUT-4063). */
+  offered?: readonly ReportRange[];
 }
 
 /**
@@ -63,6 +85,7 @@ function DashboardBlock({
   range,
   grain,
   onRangeChange,
+  offered,
 }: BlockProps): JSX.Element {
   const { system: copy, ranges } = useReportCopy().screens;
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
@@ -90,11 +113,7 @@ function DashboardBlock({
             view={tableView}
             renderTestId={`${testId}-render`}
             menuTestId={`${testId}-menu`}
-            csv={
-              report
-                ? { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export` }
-                : undefined
-            }
+            csv={blockCsv(report, testId)}
             expandable
           />
         }
@@ -104,10 +123,12 @@ function DashboardBlock({
             {copy.blockFailed}
           </Alert>
         ) : report ? (
-          <ReportRenderView
-            render={report.render}
+          <ReportBodyWithNotes
+            report={report}
+            title={title}
+            tenantSlug={tenantSlug}
             dataTestId={`${testId}-render`}
-            onWidenRange={widenAction(range, onRangeChange, ranges)}
+            onWidenRange={widenAction(range, onRangeChange, ranges, offered)}
             asTable={tableView.asTable}
             bounded
           />
@@ -115,21 +136,110 @@ function DashboardBlock({
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
       </ReportBlockFrame>
+      <NotesBelowCard notes={report?.notes} tenantSlug={tenantSlug} dataTestId={testId} />
       {report ? (
-        <BlockExpandDialog
-          open={tableView.expanded}
-          onClose={() => tableView.setExpanded(false)}
-          title={title}
-          description={navEntry?.description}
-          dataTestId={`${testId}-expanded`}
-        >
-          <ReportRenderView
-            render={report.render}
-            dataTestId={`${testId}-expanded-render`}
-            asTable={tableView.asTable}
-          />
-        </BlockExpandDialog>
+        <ExpandedBlock report={report} view={tableView} title={title} description={navEntry?.description} testId={testId} />
       ) : null}
+    </ReportGridItem>
+  );
+}
+
+/** A block's CSV tool, once its run has landed: its rows, then its notes. */
+function blockCsv(
+  report: { key: string; notes?: ReportNoteView[] } | undefined,
+  testId: string,
+): { filename: string; dataTestId: string; notes?: ReportNoteView[] } | undefined {
+  if (!report) return undefined;
+  return { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export`, notes: report.notes };
+}
+
+/** A bounded block's table, whole, in a dialog — the block's "expand" tool. */
+function ExpandedBlock({
+  report,
+  view,
+  title,
+  description,
+  testId,
+}: {
+  report: { render: ReportRender; notes?: ReportNoteView[] };
+  view: ReturnType<typeof useBlockTableView>;
+  title: string;
+  description?: string;
+  testId: string;
+}): JSX.Element {
+  return (
+    <BlockExpandDialog
+      open={view.expanded}
+      onClose={() => view.setExpanded(false)}
+      title={title}
+      description={description}
+      dataTestId={`${testId}-expanded`}
+    >
+      <ReportRenderView
+        render={report.render}
+        dataTestId={`${testId}-expanded-render`}
+        asTable={view.asTable}
+        notes={report.notes}
+        caption={title}
+      />
+    </BlockExpandDialog>
+  );
+}
+
+/**
+ * The grain toggle a canvas offers: it applies when ANY block buckets by date,
+ * and offers what ANY such block can draw (FUT-4063) — the union, in the
+ * canonical order. A block that names no grains offers all three.
+ */
+function dashboardGrains(
+  dashboard: SystemDashboardDef | undefined,
+  reports: readonly SystemReportNavEntry[],
+): { supportsGrain: boolean; grains: ReportGrain[] } {
+  const grained = (dashboard?.blocks ?? [])
+    .map((block) => reports.find((entry) => entry.key === block.reportKey))
+    .filter((entry) => entry?.supportsGrain === true);
+  const grains = REPORT_GRAINS.filter((grain) =>
+    grained.some((entry) => (entry?.grains ?? REPORT_GRAINS).includes(grain)),
+  );
+  return { supportsGrain: grained.length > 0, grains };
+}
+
+/**
+ * A block drawn bare (`frame: false`, FUT-4063): its rendering straight on the
+ * canvas, no titled card and no tools — the KPI row the prototype draws as
+ * four cards of their own.
+ */
+function BareBlock({
+  tenantSlug,
+  block,
+  range,
+  grain,
+}: {
+  tenantSlug: string;
+  block: SystemDashboardBlockDef;
+  range: ReportRange;
+  grain: ReportGrain;
+}): JSX.Element {
+  const { system: copy } = useReportCopy().screens;
+  const query = useSystemReport(tenantSlug, block.reportKey, range, grain);
+  const testId = `system-dashboard-block-${block.reportKey}`;
+  const title = useReportSurface().systemReports.find((entry) => entry.key === block.reportKey)?.title;
+  return (
+    <ReportGridItem span={block.span}>
+      <Box data-testid={testId}>
+        {query.isError ? (
+          <Alert severity="error" data-testid={`${testId}-error`}>
+            {copy.blockFailed}
+          </Alert>
+        ) : query.data ? (
+          <ReportBodyWithNotes report={query.data} title={title ?? block.reportKey} tenantSlug={tenantSlug} dataTestId={`${testId}-render`} />
+        ) : (
+          <LoadingState dataTestId={`${testId}-loading`} />
+        )}
+      </Box>
+      {/* As on a framed block: on a phone, a note that sits below the card
+        * sits below this bare rendering, never nowhere (FUT-4063). */}
+      <NotesBelowCard notes={query.data?.notes} tenantSlug={tenantSlug} dataTestId={testId} />
     </ReportGridItem>
   );
 }
@@ -137,10 +247,11 @@ function DashboardBlock({
 export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
   const { system: copy, builder: builderCopy } = useReportCopy().screens;
   const { dashboardKey = "" } = useParams();
-  const [range, setRange] = useState<ReportRange>("30d");
-  const [grain, setGrain] = useState<ReportGrain>("day");
   const surface = useReportSurface();
   const dashboard = findSystemDashboard(surface.systemDashboards, dashboardKey);
+  const { supportsGrain, grains } = dashboardGrains(dashboard, surface.systemReports);
+  const [range, setRange] = useState<ReportRange>(() => initialRange(dashboard?.ranges));
+  const [grain, setGrain] = useState<ReportGrain>(() => initialGrain(grains));
 
   if (!dashboard) {
     return (
@@ -151,13 +262,6 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
       />
     );
   }
-
-  // The toggle applies when ANY block buckets by date: it then moves those
-  // blocks and leaves the rest untouched.
-  const supportsGrain = dashboard.blocks.some(
-    (block) =>
-      surface.systemReports.find((entry) => entry.key === block.reportKey)?.supportsGrain ?? false,
-  );
 
   return (
     <Stack spacing={3} data-testid="page-system-dashboard" {...{ [PRINT_REGION_ATTR]: "" }}>
@@ -176,6 +280,9 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
         grain={grain}
         onGrainChange={setGrain}
         showGrain={supportsGrain}
+        grains={grains}
+        grainLabel={dashboard.grainLabel}
+        ranges={dashboard.ranges}
         printTitle={dashboard.title}
       />
 
@@ -190,17 +297,22 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
       ))}
 
       <ReportGrid dataTestId="system-dashboard-grid">
-        {dashboard.blocks.map((block) => (
-          <DashboardBlock
-            key={block.reportKey}
-            tenantSlug={tenantSlug}
-            reportKey={block.reportKey}
-            span={block.span}
-            range={range}
-            grain={grain}
-            onRangeChange={setRange}
-          />
-        ))}
+        {dashboard.blocks.map((block) =>
+          block.frame === false ? (
+            <BareBlock key={block.reportKey} tenantSlug={tenantSlug} block={block} range={range} grain={grain} />
+          ) : (
+            <DashboardBlock
+              key={block.reportKey}
+              tenantSlug={tenantSlug}
+              reportKey={block.reportKey}
+              span={block.span}
+              range={range}
+              grain={grain}
+              onRangeChange={setRange}
+              offered={dashboard.ranges}
+            />
+          ),
+        )}
       </ReportGrid>
     </Stack>
   );

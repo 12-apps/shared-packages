@@ -148,6 +148,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/LoadingState`
 **Docs**: `src/components/data-display/LoadingState/LoadingState.md`
 
+### HeatMap
+**Purpose**: Show a grid of figures judged against one target, e.g. cost / sales by weekday × hour
+**Use Cases**: Where in the week a ratio runs over its target; any two-axis grid of one figure with a threshold. Not a chart of trends (use `Chart`), and not a table of many measures (use `Table`)
+**Features**: A real `<table>` (caption, column and row headers) so every cell is named, e.g. "54% acima da meta"; diverging tints from roles (`warning` above, `info` at or under, disabled surface for "—"), bold above, never colour alone; `table-layout: fixed`, so it never scrolls sideways; transposed below `md` (`transpose="auto"`); legend; no default copy, the host formats the numbers; pure `heatMapTone` / `heatMapGrid`
+**Location**: `src/components/data-display/HeatMap`
+**Docs**: `src/components/data-display/HeatMap/HeatMap.md`
+
 ### HoverCard
 **Purpose**: Display content on hover
 **Use Cases**: User previews, additional information, contextual help

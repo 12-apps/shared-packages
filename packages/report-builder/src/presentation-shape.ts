@@ -1,6 +1,6 @@
 import { invalidSpecError } from './errors';
 import type { ReportSpec } from './spec';
-import type { CompiledDimension } from './types';
+import type { CompiledDimension, CompiledMeasure } from './types';
 
 /**
  * What each PRESENTATION demands of a spec's shape — the compiler half of the
@@ -101,5 +101,59 @@ export function assertKpiShape(spec: ReportSpec, dimensions: CompiledDimension[]
     throw invalidSpecError(
       `KPI presentation aggregates the whole period and takes no dimensions, got ${dimensions.length}. Remove the dimensions or use a chart/table.`,
     );
+  }
+}
+
+/**
+ * The heat map rule (FUT-4063): TWO dimensions — the rows, then the columns —
+ * and ONE measure, the figure each cell holds. A third axis has nowhere to go,
+ * and a second measure would need a second colour scale.
+ */
+export function assertHeatmapShape(spec: ReportSpec, dimensions: CompiledDimension[]): void {
+  if (spec.presentation.kind !== 'heatmap') return;
+  if (dimensions.length !== 2) {
+    throw invalidSpecError(
+      `Heatmap presentation takes exactly 2 dimensions (rows, then columns), got ${dimensions.length}.`,
+    );
+  }
+  if (spec.measures.length !== 1) {
+    throw invalidSpecError(
+      `Heatmap presentation draws exactly 1 measure per cell, got ${spec.measures.length}.`,
+    );
+  }
+}
+
+/**
+ * The table and KPI aliases rule (FUT-4063): a flag, and a table's phone cards,
+ * name columns OF THIS SPEC by alias — the key a row carries them under. A
+ * typo would otherwise flag nothing, or draw an empty card, silently.
+ */
+export function assertRowFlagShape(
+  spec: ReportSpec,
+  dimensions: CompiledDimension[],
+  measures: CompiledMeasure[],
+): void {
+  const { presentation } = spec;
+  if (presentation.kind !== 'table' && presentation.kind !== 'kpi') return;
+  const measureAliases = measures.map((measure) => measure.alias);
+  const flag = presentation.flag;
+  assertAliases('presentation.flag', [flag?.measure, flag?.whenEmpty?.measure], measureAliases);
+  if (presentation.kind !== 'table' || !presentation.phone) return;
+  const { phone } = presentation;
+  const all = [...dimensions.map((dimension) => dimension.alias), ...measureAliases];
+  assertAliases(
+    'presentation.phone',
+    [phone.title, phone.figure, phone.figureCaption?.measure, ...(phone.subtitle ?? []).map((part) => part.measure)],
+    all,
+  );
+}
+
+function assertAliases(where: string, named: ReadonlyArray<string | undefined>, known: string[]): void {
+  for (const alias of named) {
+    if (alias !== undefined && !known.includes(alias)) {
+      throw invalidSpecError(
+        `${where} names "${alias}", which this spec does not select. Use one of: ${known.join(', ')}.`,
+      );
+    }
   }
 }

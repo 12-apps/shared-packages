@@ -41,6 +41,7 @@ export {
  */
 export type { ReportBuilderSurface } from './transport-context';
 export type {
+  ReportNote,
   SystemDashboardDef,
   SystemReportDef,
   SystemReportNavEntry,

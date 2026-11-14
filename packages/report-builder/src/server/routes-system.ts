@@ -13,7 +13,7 @@ import {
   type ReportRoute,
 } from './context';
 import { windowOfQuery } from './range-query';
-import type { SystemReportDef } from './system-reports';
+import type { SystemReportDef, SystemReportDerived, SystemReportRunContext } from './system-reports';
 import { REPORT_GRAINS } from './wire';
 import { REPORT_BUILDER_FEATURES } from './features';
 
@@ -27,9 +27,38 @@ import { REPORT_BUILDER_FEATURES } from './features';
  * but reading three package constants and calling one package function.
  */
 
-/** The grain a request asks for, defaulted the way the wire schema does. */
-function grainOf(query: Record<string, string | undefined>): TimeGrain {
-  return REPORT_GRAINS.find((candidate) => candidate === query.grain) ?? 'day';
+/**
+ * The grain a request asks for, defaulted the way the wire schema does — and
+ * held to the report's own `grains` (FUT-4063): a grain it does not offer runs
+ * as its first one, never as a bucket the report was not built for. The grain
+ * actually run is echoed back.
+ */
+function grainOf(query: Record<string, string | undefined>, offered?: readonly TimeGrain[]): TimeGrain {
+  const asked = REPORT_GRAINS.find((candidate) => candidate === query.grain) ?? 'day';
+  if (!offered || offered.length === 0 || offered.includes(asked)) return asked;
+  return offered[0] ?? asked;
+}
+
+/**
+ * The host's `derive`, never fatal to the block (FUT-4063): a failing host
+ * read (a shift table down) draws the figures without notes and default
+ * params, and is reported to the host's `onDeriveError` (else the console).
+ */
+async function deriveSafely(
+  config: ReportBuilderServerConfig,
+  report: SystemReportDef,
+  context: SystemReportRunContext,
+): Promise<SystemReportDerived> {
+  if (!report.derive) return {};
+  try {
+    return await report.derive(context);
+  } catch (error) {
+    if (config.onDeriveError) config.onDeriveError(error, { key: report.key });
+    // The one console call: a host that wired no logger still hears of it.
+    // eslint-disable-next-line no-console
+    else console.error(`[report-builder] derive failed for built-in "${report.key}"`, error);
+    return {};
+  }
 }
 
 /** What the hub card needs — deliberately not the whole definition. */
@@ -39,6 +68,7 @@ function toSystemSummary(report: SystemReportDef): {
   description: string;
   presentation: 'chart' | 'table';
   supportsGrain: boolean;
+  grains?: readonly TimeGrain[];
 } {
   return {
     key: report.key,
@@ -46,6 +76,7 @@ function toSystemSummary(report: SystemReportDef): {
     description: report.description,
     presentation: report.presentation,
     supportsGrain: report.supportsGrain,
+    ...(report.grains ? { grains: report.grains } : {}),
   };
 }
 
@@ -83,11 +114,15 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
       if (!report) return fail(404, messagesOf(config, locale).notFound);
       if (!actor.permissions.includes(report.permission)) return forbidden(config);
 
-      const grain = grainOf(query);
+      const grain = grainOf(query, report.grains);
       try {
         const range = windowOfQuery(config, { query, locale });
+        const window = { from: range.from, toExclusive: range.toExclusive };
+        // Before the run: the tenant's own numbers are what the spec is BUILT
+        // with (FUT-4063), so they have to exist before `build` does.
+        const derived = await deriveSafely(config, report, { actor, window, grain, locale });
         const result = await runReport(
-          report.build({ grain }),
+          report.build({ grain, params: derived.params ?? {}, locale }),
           await runOptions(config, actor, range, locale),
         );
         return ok({
@@ -95,9 +130,11 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
           title: report.title,
           description: report.description,
           supportsGrain: report.supportsGrain,
+          ...(report.grains ? { grains: report.grains } : {}),
           range: toReportRangeView(range),
           grain,
           render: result.render,
+          notes: derived.notes ?? [],
         });
       } catch (error) {
         return foldSpecError(error);
