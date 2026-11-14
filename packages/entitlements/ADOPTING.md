@@ -361,6 +361,59 @@ collections — an empty `surfaces` map made the grandfathering report answer
 "nobody loses anything, move the whole fleet to the cheapest tier" about a
 fleet it never measured.
 
+### A screen's own plan comparison (`PlanCompare`, `openPlanCompare`)
+
+A plan-locked screen can open a popup that sets ITS rows side by side across
+the tiers on sale, marks the tenant's own tier, and ends on the upsell prompt's
+ask (FUT-5062). It reads the same `GET /plan` payload as the plan page and
+draws the same matrix, so the two cannot disagree about what a tier includes.
+
+**Give the rows a stable key.** `ComparisonLine.key` is optional on the wire,
+and only a line that carries one can be picked: the dialog filters by key,
+never by the translated label. Use the feature key the line describes:
+
+```ts
+// your `comparison` builder (server)
+{ key: 'chat.assistant', label: messages.chatAssistant, included, detail: null }
+```
+
+**Open it** from the controlled component, or from anywhere through the upsell
+channel (the `UpsellHost` you already mount renders it):
+
+```tsx
+const { PlanCompare } = createWebEntitlements({ /* … */ });
+
+<PlanCompare
+  open={open}
+  onClose={close}
+  keys={['chat.line', 'chat.assistant', 'chat.own-model']}
+  plan="max"                 // optional; default: the cheapest upgrade with every row
+  feature="chat.assistant"   // optional; filed beside the ask
+/>
+
+// or, with no component of your own:
+import { openPlanCompare } from '@12-apps/entitlements/react';
+openPlanCompare({ feature: 'chat.assistant', keys: CHAT_KEYS, plan: 'max' });
+```
+
+| prop | |
+|---|---|
+| `keys` | the rows, by `ComparisonLine.key`, shown in the payload's order; unknown keys are ignored, and no match shows `copy.planCompare.empty` |
+| `plan` | the tier to offer; a tier that is not an upgrade offers nothing |
+| `feature` | the feature that prompted the ask, sent with `POST /plan/request` |
+
+The ask is the upsell prompt's own: without `canRequestPlanChange` the dialog
+names the plan and says who can ask, with no button. `plansPath` adds the "all
+plans" link. Below the theme's `sm` breakpoint it is the library's inset bottom
+sheet with a compact matrix: three tiers fit 320 px with no sideways scroll.
+
+Copy: `copy.planCompare` (`title`, `currentBadge`, `empty`, `closeLabel`) —
+both packs carry it. It is OPTIONAL, so a hand-written `EntitlementsWebCopy`
+from before it keeps compiling: a missing block falls back to the en-US pack's
+(the package resolves no active locale; the host picks its pack by hand), so a
+host writing its own pt-BR object should add it. The marks and column heading
+are `copy.comparisonTable`'s, the ask `copy.upsell`'s.
+
 ### The money boundary, drawn precisely
 
 `Plan`, `Subscription` and `PlanChangeRequest` are **billing models and stay in
