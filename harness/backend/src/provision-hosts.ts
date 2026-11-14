@@ -137,16 +137,13 @@ async function provisionStored(pg: PGlite) {
   // @12-apps/fiscal (FUT-2237) is the fourth: its own store runs raw SQL
   // through the same client's `$transaction`, over its own migration.
   await applyFiscalMigrations(pg);
-  // @12-apps/messaging (FUT-3734) is the fifth: the package's own Prisma store
-  // over its own migration, on the same client.
-  await applyMessagingMigrations(pg);
+  await applyMessagingMigrations(pg); // @12-apps/messaging (FUT-3734): the fifth, same client.
   const prisma = await createPrismaClient(pg);
   const payments = paymentsHost(prisma);
   const chat = chatHost(prisma);
   const marketplace = marketplaceHost(prisma);
   const fiscal = fiscalHost(prisma);
-  const messaging = messagingHost(prisma);
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace, fiscal, messaging };
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace, fiscal, messaging: messagingHost(prisma) };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {

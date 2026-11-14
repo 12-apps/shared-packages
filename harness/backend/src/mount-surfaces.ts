@@ -31,20 +31,28 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
 }
 
 /**
- * Everything under `/api/admin/:tenantSlug` — the store's own surfaces, in the
- * order the header's more-specific-first rule requires.
+ * The package routers whose every path carries a literal prefix, mounted before
+ * everything else so no broader tenant mount below can claim them first.
  */
-function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
-  // @12-apps/marketplace (FUT-4762), before everything: its paths are under
-  // `/api`, and every one of them carries a literal (`/webhooks/marketplace`,
-  // `/admin/:tenantSlug/marketplace`) that no broader mount below may claim
-  // first. The webhook is unauthenticated by design; the bridge asks no actor.
+function mountLiteralPackageRouters(app: Hono, hosts: Hosts): void {
+  // @12-apps/marketplace (FUT-4762): its paths are under `/api`, and every one
+  // of them carries a literal (`/webhooks/marketplace`,
+  // `/admin/:tenantSlug/marketplace`). The webhook is unauthenticated by
+  // design; the bridge asks no actor.
   app.route(MARKETPLACE_MOUNT_PATH, hosts.marketplace.router);
   // @12-apps/fiscal (FUT-2237) the same way: every path is a literal `/fiscal/…`.
   app.route(FISCAL_MOUNT_PATH, hosts.fiscal.router);
   // @12-apps/messaging (FUT-3734): the webhook pair, `/webhooks/messaging/:channel`,
-  // one URL per channel for every tenant. A literal prefix no mount below claims.
+  // one URL per channel for every tenant.
   app.route(MESSAGING_MOUNT_PATH, hosts.messaging.router);
+}
+
+/**
+ * Everything under `/api/admin/:tenantSlug` — the store's own surfaces, in the
+ * order the header's more-specific-first rule requires.
+ */
+function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
+  mountLiteralPackageRouters(app, hosts);
 
   // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
   // reversing these two blocks is a red test, not a silent 404.
