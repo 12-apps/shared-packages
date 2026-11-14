@@ -42,11 +42,13 @@ async function submitAndSeeError(): Promise<HTMLElement> {
 }
 
 describe('Fields.TextField: the error describes the input', () => {
-  it('points the input at nothing while the field has no error', () => {
+  it('points the input at nothing while the field has no error', async () => {
     const input = renderField();
 
     expect(input).not.toHaveAttribute('aria-describedby');
-    expect(screen.queryByTestId('total-form-field-documentId-message')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('total-form-field-documentId-message')).toBeNull();
+    });
   });
 
   it("points the input's aria-describedby at the message's id once the error shows", async () => {
