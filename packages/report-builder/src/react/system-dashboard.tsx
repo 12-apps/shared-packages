@@ -237,6 +237,9 @@ function BareBlock({
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
       </Box>
+      {/* As on a framed block: on a phone, a note that sits below the card
+        * sits below this bare rendering, never nowhere (FUT-4063). */}
+      <NotesBelowCard notes={query.data?.notes} tenantSlug={tenantSlug} dataTestId={testId} />
     </ReportGridItem>
   );
 }

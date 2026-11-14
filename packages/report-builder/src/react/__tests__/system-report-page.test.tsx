@@ -14,6 +14,7 @@ import { PT_BR_REPORT_ENGINE_COPY } from "../../pt-BR";
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from "../../server/pt-BR";
 import { PT_BR_REPORT_SCREENS_COPY } from "../pt-BR";
 import type { ReportRender } from "../reports-api";
+import { SystemDashboardPage } from "../system-dashboard";
 import { SystemReportPage } from "../system-report";
 import type { ReportBuilderTransport } from "../transport";
 import { ReportBuilderProvider } from "../transport-context";
@@ -116,5 +117,62 @@ describe("the single built-in page on a phone", () => {
     expect([...(name?.children ?? [])].map((line) => line.tagName)).toEqual(["DIV", "DIV"]);
     expect([...(figure?.children ?? [])].map((line) => line.tagName)).toEqual(["DIV", "DIV"]);
     expect(within(figure as HTMLElement).getByText("acima da meta")).toBeTruthy();
+  });
+});
+
+describe("a bare dashboard block on a phone (frame: false)", () => {
+  function renderDashboard(): void {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function Wrapper({ children }: { children: ReactNode }): JSX.Element {
+      return (
+        <QueryClientProvider client={client}>
+          <ReportBuilderProvider
+            transport={transport()}
+            tenantSlug="acme"
+            surface={{
+              systemReports: [
+                { key: "by-period", title: "Por dia", description: "", permission: "x", section: "team", supportsGrain: false },
+              ],
+              systemDashboards: [
+                {
+                  key: "team-cost",
+                  title: "Custo de equipe",
+                  description: "",
+                  permission: "x",
+                  section: "team",
+                  blocks: [{ reportKey: "by-period", span: 12, frame: false }],
+                },
+              ],
+              sections: [],
+              blockTemplates: [],
+              timeZone: "UTC",
+            }}
+            copy={{ engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY, screens: PT_BR_REPORT_SCREENS_COPY }}
+          >
+            <MemoryRouter initialEntries={["/acme/dashboards/team-cost"]}>
+              <Routes>
+                <Route path="/acme/dashboards/:dashboardKey" element={children} />
+              </Routes>
+            </MemoryRouter>
+          </ReportBuilderProvider>
+        </QueryClientProvider>
+      );
+    }
+    render(<SystemDashboardPage tenantSlug="acme" />, { wrapper: Wrapper });
+  }
+
+  it("draws the below-card note under the bare block, not nowhere", async () => {
+    asPhone();
+    renderDashboard();
+    const below = await screen.findByTestId("system-dashboard-block-by-period-below-notes");
+    expect(below.textContent).toBe("1 turno fechado automaticamente (sáb, Marcos).");
+    expect(screen.queryAllByTestId("system-dashboard-block-by-period-render-notes")).toHaveLength(0);
+  });
+
+  it("keeps the note inside the block above md, drawn once", async () => {
+    renderDashboard();
+    await screen.findByTestId("system-dashboard-block-by-period-render-notes");
+    expect(screen.queryAllByTestId("system-dashboard-block-by-period-below-notes")).toHaveLength(0);
+    expect(screen.getAllByText("1 turno fechado automaticamente (sáb, Marcos).")).toHaveLength(1);
   });
 });
