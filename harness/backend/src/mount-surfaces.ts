@@ -7,6 +7,7 @@ import { ROUTING_MOUNT_PATH } from './routing-host';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { FISCAL_MOUNT_PATH } from './fiscal-host';
 import { MARKETPLACE_MOUNT_PATH } from './marketplace-host';
+import { MESSAGING_MOUNT_PATH } from './messaging-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
@@ -41,6 +42,9 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   app.route(MARKETPLACE_MOUNT_PATH, hosts.marketplace.router);
   // @12-apps/fiscal (FUT-2237) the same way: every path is a literal `/fiscal/…`.
   app.route(FISCAL_MOUNT_PATH, hosts.fiscal.router);
+  // @12-apps/messaging (FUT-3734): the webhook pair, `/webhooks/messaging/:channel`,
+  // one URL per channel for every tenant. A literal prefix no mount below claims.
+  app.route(MESSAGING_MOUNT_PATH, hosts.messaging.router);
 
   // FIRST — before the host's `/catalog-items/:id` CRUD below. See the header:
   // reversing these two blocks is a red test, not a silent 404.

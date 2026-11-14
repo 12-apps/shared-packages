@@ -33,6 +33,7 @@ import { impersonationHost } from './impersonation-host';
 import { applyLifecycleMigrations } from './lifecycle-db';
 import { applyFiscalMigrations, fiscalHost } from './fiscal-host';
 import { applyMarketplaceMigrations, marketplaceHost } from './marketplace-host';
+import { applyMessagingMigrations, messagingHost } from './messaging-host';
 import { createLifecycleDemoTables, lifecycleHost, reseedLifecycle } from './lifecycle-host';
 import { applyMcpMigrations, mcpOauthHost } from './mcp-oauth-host';
 import { applyNotificationMigrations } from './notifications-db';
@@ -136,12 +137,16 @@ async function provisionStored(pg: PGlite) {
   // @12-apps/fiscal (FUT-2237) is the fourth: its own store runs raw SQL
   // through the same client's `$transaction`, over its own migration.
   await applyFiscalMigrations(pg);
+  // @12-apps/messaging (FUT-3734) is the fifth: the package's own Prisma store
+  // over its own migration, on the same client.
+  await applyMessagingMigrations(pg);
   const prisma = await createPrismaClient(pg);
   const payments = paymentsHost(prisma);
   const chat = chatHost(prisma);
   const marketplace = marketplaceHost(prisma);
   const fiscal = fiscalHost(prisma);
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace, fiscal };
+  const messaging = messagingHost(prisma);
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat, marketplace, fiscal, messaging };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {
@@ -221,5 +226,6 @@ export interface Hosts {
   chat: ReturnType<typeof chatHost>;
   marketplace: ReturnType<typeof marketplaceHost>;
   fiscal: ReturnType<typeof fiscalHost>;
+  messaging: ReturnType<typeof messagingHost>;
 }
 
