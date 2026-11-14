@@ -58,7 +58,7 @@ export interface TeamRouteDeps<P extends string> {
  * permission engine resolves nothing for one either, so a deactivated member
  * is refused by the permission check before this runs.
  */
-export async function readActorTier<P extends string>(
+async function readActorTier<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
 ): Promise<RbacActorTier> {
