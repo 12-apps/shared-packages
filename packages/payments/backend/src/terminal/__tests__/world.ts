@@ -14,7 +14,7 @@ export const TENANT = 'tenant-a';
 export const OTHER_TENANT = 'tenant-b';
 export const NOW = new Date('2026-11-03T15:00:00.000Z');
 export const DAY = 24 * 60 * 60_000;
-export const MAX_CENTS = 100_000_000;
+const MAX_CENTS = 100_000_000;
 
 export interface World {
   captures: MemoryTerminalCaptures;
@@ -29,7 +29,7 @@ export interface World {
   row(code: string, clientId?: string): ReturnType<MemoryTerminalCaptures['all']>[number];
 }
 
-export interface WorldOptions {
+interface WorldOptions {
   /** Wrap the store every move uses — to land a write between a move's read and its write. */
   wrap?: (store: TerminalCaptureStore) => TerminalCaptureStore;
   now?: () => Date;
