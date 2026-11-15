@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Legend, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -120,7 +120,20 @@ export const ChartTooltipContent: React.FC<ChartTooltipContentProps> = ({
 };
 
 export interface ChartLegendContentProps {
-  payload?: Array<{ value?: string | number; color?: string }>;
+  payload?: Array<{ value?: string | number; color?: string; payload?: { strokeDasharray?: string | number } }>;
+}
+
+/**
+ * A legend entry's mark: the colour square, or — for a series drawn DASHED
+ * (FUT-145, a comparison period) — a short dashed rule, so the legend tells the
+ * two lines apart by more than their colour.
+ */
+function legendSwatchSx(color: string | undefined, dashed: boolean): SxProps<Theme> {
+  const ink = color ?? 'currentColor';
+  if (dashed) {
+    return { width: sxRem(16), height: 0, borderTopWidth: sxRem(2), borderTopStyle: 'dashed', borderTopColor: ink, flexShrink: 0 };
+  }
+  return { width: sxRem(10), height: sxRem(10), borderRadius: sxRem(2), backgroundColor: color, flexShrink: 0 };
 }
 
 /** Theme-aware legend content matching the tooltip's swatch styling. */
@@ -132,7 +145,8 @@ export const ChartLegendContent: React.FC<ChartLegendContentProps> = ({ payload 
         <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
           <Box
             component="span"
-            sx={{ width: sxRem(10), height: sxRem(10), borderRadius: sxRem(2), backgroundColor: entry.color, flexShrink: 0 }}
+            data-legend-dashed={entry.payload?.strokeDasharray ? 'true' : undefined}
+            sx={legendSwatchSx(entry.color, Boolean(entry.payload?.strokeDasharray))}
           />
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {entry.value}

@@ -66,6 +66,26 @@ import { Chart } from '@procurement/ui';
 - `xAxisLabel` (string): X-axis label text
 - `curved` (boolean): Use curved lines for line/area charts (default: true)
 - `stacked` (boolean): Stack data series for bar/area charts
+
+### Series stroke and fill
+
+Each `series` entry may declare `strokeWidth`, `strokeDasharray` and `fillOpacity`. They are
+honoured by `line` and `area` charts and by every `composed` series (line, area; a bar takes
+`fillOpacity`). Undeclared, a series draws as it always did: line width 2 on a `line` chart,
+area fill 0.6. A comparison period reads as a dashed, thinner line, and the legend draws a
+dashed series as a dashed rule rather than a square, so the two are told apart by more than
+colour:
+
+```tsx
+<Chart
+  type="composed"
+  data={days}
+  series={[
+    { dataKey: 'now', name: 'Este período', type: 'area', fillOpacity: 0.15 },
+    { dataKey: 'before', name: 'Período anterior', type: 'line', strokeDasharray: '6 4', strokeWidth: 1.5 },
+  ]}
+/>
+```
 - `showValues` (boolean): Display data values on chart
 - `valueFormatter` (function): Formats tooltip values and value-axis ticks
 - `axisValueFormatter` (function): Formats the value-axis ticks only, when they should read
