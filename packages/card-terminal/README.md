@@ -74,13 +74,17 @@ the tenant's.
    writes nothing else.
 4. From the answer, in the same transaction: book `cashRefundCents` in your
    till (`CHANGE`), charge `rechargeCents` again (`REFUND_AND_RECHARGE`),
-   write your audit from `record`. On `{ ok: false }`, roll back: some flags
-   may already be on `tx`.
-5. After the COMMIT, for `STORE_CREDIT`, post `credit` (`amountCents` to the
-   sale's buyer) to your wallet with `credit.dedupeKey` as its idempotency key.
-   The key is the tenant and the captures' codes, which a retry keeps (a
-   retried sale gets a new id), so a rollback and a retry credit once. Never
-   post it inside the transaction unless the wallet shares that transaction.
+   write your audit from `record`. For `STORE_CREDIT`, also write the credit
+   as an OUTBOX row of your own (`credit.dedupeKey`, `amountCents`, the
+   buyer's sale `orderId`), so it commits with the sale or not at all; the
+   `record` carries the same `dedupeKey` and `transactionCodes`. On
+   `{ ok: false }`, roll back: some flags may already be on `tx`.
+5. After the COMMIT, post each outbox credit to your wallet with its
+   `dedupeKey` as the idempotency key, and retry until the wallet answers. The
+   key is the tenant and the captures' codes, which a retry keeps (a retried
+   sale gets a new id), so retries and a rolled-back attempt credit once, and
+   a post that failed is never lost. If the wallet shares your database, post
+   inside the transaction instead.
 
 ### Book a typed capture as a sale of its own (`createTypedCaptureClaims`)
 

@@ -130,6 +130,13 @@ export interface ExcessRecord {
   as: ExcessChoice;
   excessCents: number;
   reason: string;
+  /**
+   * `STORE_CREDIT` only: the credit's idempotency key and captures, the same as
+   * `credit`'s, so the caller's committed audit or outbox row can replay the
+   * post until the wallet answers.
+   */
+  dedupeKey?: string;
+  transactionCodes?: string[];
 }
 
 /**
@@ -218,13 +225,15 @@ function creditOf(plan: Extract<ExcessPlan, { kind: 'STORE_CREDIT' }>, clientId:
 }
 
 function settledOf(plan: Booked, sale: ExcessSale): Extract<ExcessSettled, { ok: true }> {
-  const record: ExcessRecord = { clientId: sale.clientId, orderId: sale.orderId, as: plan.kind, excessCents: plan.excessCents, reason: plan.reason };
+  const credit = plan.kind === 'STORE_CREDIT' && sale.orderId !== null ? creditOf(plan, sale.clientId, sale.orderId) : null;
+  const replay = credit === null ? {} : { dedupeKey: credit.dedupeKey, transactionCodes: [...credit.transactionCodes] };
+  const record: ExcessRecord = { clientId: sale.clientId, orderId: sale.orderId, as: plan.kind, excessCents: plan.excessCents, reason: plan.reason, ...replay };
   return {
     ok: true,
     plan,
     cashRefundCents: plan.kind === 'CHANGE' ? plan.cashRefundCents : 0,
     creditCents: plan.kind === 'STORE_CREDIT' ? plan.creditCents : 0,
-    credit: plan.kind === 'STORE_CREDIT' && sale.orderId !== null ? creditOf(plan, sale.clientId, sale.orderId) : null,
+    credit,
     rechargeCents: plan.kind === 'REFUND_AND_RECHARGE' ? plan.rechargeCents : 0,
     record,
   };

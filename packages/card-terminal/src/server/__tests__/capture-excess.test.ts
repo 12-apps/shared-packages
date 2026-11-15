@@ -164,6 +164,26 @@ describe('settle: booking the excess on the written sale', () => {
     expect(host.wallet.size).toBe(0);
   });
 
+  it('a STORE_CREDIT record carries the credit\'s dedupeKey and transactionCodes, so a committed outbox row can replay the post', async () => {
+    const { engine, sale } = setup();
+    const orderId = sale(true);
+    const plan = planExcess({ captures: [{ transactionCode: 'TC-2', amountCents: 3000 }, { transactionCode: 'TC-1', amountCents: 2000 }], dueCents: 4600, choice: { as: 'STORE_CREDIT', reason: 'r' } });
+
+    const settled = await engine.settle(plan, { clientId: TENANT, orderId }, 'tx');
+
+    if (!settled.ok || settled.credit === null || settled.record === null) throw new Error('expected a booked credit');
+    expect(settled.record).toEqual({
+      clientId: TENANT,
+      orderId,
+      as: 'STORE_CREDIT',
+      excessCents: 400,
+      reason: 'r',
+      dedupeKey: settled.credit.dedupeKey,
+      transactionCodes: settled.credit.transactionCodes,
+    });
+    expect(settled.record.transactionCodes).toEqual(['TC-1', 'TC-2']);
+  });
+
   it('a caller that rolls back after settle and retries on a NEW sale id credits the buyer once — the key is the captures, not the sale', async () => {
     const { w, host, excess } = setup();
     const plan = planExcess({ captures: [{ transactionCode: 'TC-2', amountCents: 3000 }, { transactionCode: 'TC-1', amountCents: 2000 }], dueCents: 4600, choice: { as: 'STORE_CREDIT', reason: 'r' } });
