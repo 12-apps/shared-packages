@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActConfirm } from '../act-confirm';
+import { ElsewhereForm } from '../elsewhere-form';
 import { startChargeRun } from '../charge-run';
 import { OverCaptureChoice, ReceivedTwiceBand } from '../money-choices';
 import type { TerminalWaitCopy } from '../copy';
@@ -136,5 +137,53 @@ describe('6-B: the wait follows the link the host passes in', () => {
     rerender(<TerminalWait flow={run.current()} {...props} />);
 
     expect(screen.getByTestId('terminal-wait-title').textContent).not.toBe('The terminal cannot be reached');
+  });
+});
+
+describe('6-B form: the package ranks and the host case (UI review B5)', () => {
+  const caseOf = (testId: string): string => getComputedStyle(screen.getByTestId(testId)).textTransform;
+
+  function form(onBack = vi.fn()) {
+    const onConfirm = vi.fn();
+    render(<ElsewhereForm via="OTHER_MACHINE" money="$46.00" preselected="CREDIT" methodName={tenderName} copy={ELSEWHERE} onConfirm={onConfirm} onBack={onBack} />);
+    return onConfirm;
+  }
+
+  it('register is the primary and back the secondary, one group of two, in the case the host wrote', () => {
+    const onBack = vi.fn();
+    form(onBack);
+
+    const actions = screen.getByTestId('terminal-elsewhere-actions');
+    expect(actions.getAttribute('data-choices')).toBe('2');
+    expect(actions.contains(screen.getByTestId('terminal-elsewhere-confirm'))).toBe(true);
+    expect(actions.contains(screen.getByTestId('terminal-elsewhere-back'))).toBe(true);
+    expect([variantOf('terminal-elsewhere-confirm'), variantOf('terminal-elsewhere-back')]).toEqual(['contained', 'outlined']);
+    expect(['terminal-elsewhere-confirm', 'terminal-elsewhere-back'].map(caseOf)).toEqual(['none', 'none']);
+    expect(screen.getByTestId('terminal-elsewhere-confirm').textContent).toBe('Record $46.00');
+
+    fireEvent.click(screen.getByTestId('terminal-elsewhere-back'));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it('credit or debit is one question: one named group of two options, in the host case, the choice pressed', () => {
+    const onConfirm = form();
+
+    const question = screen.getByRole('group', { name: 'Method' });
+    expect(question).toBe(screen.getByTestId('terminal-elsewhere-method'));
+    expect(question.getAttribute('data-choices')).toBe('2');
+    expect(['terminal-elsewhere-method-CREDIT', 'terminal-elsewhere-method-DEBIT'].map(caseOf)).toEqual(['none', 'none']);
+    expect(screen.getByTestId('terminal-elsewhere-method-CREDIT').getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(screen.getByTestId('terminal-elsewhere-method-DEBIT'));
+    expect(screen.getByTestId('terminal-elsewhere-method-DEBIT').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('terminal-elsewhere-method-CREDIT').getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByTestId('terminal-elsewhere-confirm'));
+    expect(onConfirm).toHaveBeenCalledWith({ via: 'OTHER_MACHINE' }, 'DEBIT');
+  });
+
+  it('a manual Pix asks no method', () => {
+    render(<ElsewhereForm via="MANUAL_PIX" money="$46.00" preselected="CREDIT" methodName={tenderName} copy={ELSEWHERE} onConfirm={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getAllByRole('button').map((button) => button.getAttribute('data-testid'))).toEqual(['terminal-elsewhere-confirm', 'terminal-elsewhere-back']);
+    expect(variantOf('terminal-elsewhere-confirm')).toBe('contained');
   });
 });
