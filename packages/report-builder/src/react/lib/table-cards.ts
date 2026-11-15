@@ -23,8 +23,26 @@ function cellWith(copy: ValueFormatCopy, formatBucket?: BucketFormatter): Cell {
   return (row, column) => (column ? columnText(row[column.key], column, copy, formatBucket) : "");
 }
 
+/** The part's words: its singular when the value is exactly 1 and one is given (FUT-4063). */
+function suffixFor(value: unknown, entry: ReportCardPart): string {
+  if (value === 1 && entry.suffixOne !== undefined) return entry.suffixOne;
+  return entry.suffix ?? "";
+}
+
 function part(row: ReportRow, byKey: Map<string, ReportTableColumn>, entry: ReportCardPart, cell: Cell): string {
-  return `${cell(row, byKey.get(entry.measure))}${entry.suffix ?? ""}`;
+  const raw = row[entry.measure];
+  if (entry.emptyText !== undefined && (raw === null || raw === undefined)) return entry.emptyText;
+  return `${cell(row, byKey.get(entry.measure))}${suffixFor(row[entry.measure], entry)}`;
+}
+
+/** The default between two subtitle parts. */
+const PART_JOINER = " · ";
+
+/** The subtitle parts joined, each by its own `joiner` (FUT-4063): "62 h · R$ 1.240 de R$ 4.960". */
+function joinParts(row: ReportRow, byKey: Map<string, ReportTableColumn>, parts: readonly ReportCardPart[], cell: Cell): string {
+  return parts
+    .map((entry, index) => `${index === 0 ? "" : (entry.joiner ?? PART_JOINER)}${part(row, byKey, entry, cell)}`)
+    .join("");
 }
 
 function cardTitleKey(columns: readonly ReportTableColumn[], phone: ReportPhoneCards): string | undefined {
@@ -52,7 +70,7 @@ export function tableCard(
           .map((column) => ({ label: column.label, value: cell(row, column) })),
   };
   if (phone.subtitle) {
-    card.subtitle = phone.subtitle.map((entry) => part(row, byKey, entry, cell)).join(" · ");
+    card.subtitle = joinParts(row, byKey, phone.subtitle, cell);
   }
   if (phone.figure) card.figure = { key: phone.figure, text: cell(row, byKey.get(phone.figure)) };
   if (phone.figureCaption) card.figureCaption = part(row, byKey, phone.figureCaption, cell);

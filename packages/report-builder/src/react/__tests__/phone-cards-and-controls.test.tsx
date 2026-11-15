@@ -198,6 +198,7 @@ describe("a built-in's controls", () => {
       grains={["day", "week"]}
       grainLabel="Agrupar por"
       ranges={["week", "7d", "month"]}
+      surface={{ kind: "report", key: "team-cost" }}
       printTitle="Custo"
     />
   );

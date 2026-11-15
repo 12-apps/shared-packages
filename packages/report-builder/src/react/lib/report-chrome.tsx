@@ -13,8 +13,6 @@ import type { JSX } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@12-apps/ui/form/Button";
-import { Select } from "@12-apps/ui/form/Select";
-import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -29,9 +27,15 @@ import {
   type ReportGrain,
   type ReportRange,
 } from "../reports-api";
+import { OneLineChoice } from "./one-line-choice";
 import { NO_PRINT_CLASS, PrintExportButton } from "./print-export";
 import type { ReportBuilderPanelCopy, ReportRangeCopy } from "../screens-copy";
-import { useReportCopy, useReportSurface } from "../transport-context";
+import {
+  useReportCopy,
+  useReportSurface,
+  type ReportBuilderSurface,
+  type ReportPeriodSurface,
+} from "../transport-context";
 
 /**
  * ROLLING presets only — no `Personalizado…` on a built-in surface (FUT-755).
@@ -45,9 +49,8 @@ import { useReportCopy, useReportSurface } from "../transport-context";
 function rangeOptions(
   copy: ReportRangeCopy,
   offered: readonly ReportRange[] = REPORT_ROLLING_RANGES,
-  label: (range: ReportRange) => string = (range) => reportRangeLabel(range, copy),
 ): Array<{ value: ReportRange; label: string }> {
-  return offered.map((range) => ({ value: range, label: label(range) }));
+  return offered.map((range) => ({ value: range, label: reportRangeLabel(range, copy) }));
 }
 
 /**
@@ -69,43 +72,59 @@ export function initialGrain(offered: readonly ReportGrain[] | undefined): Repor
 }
 
 /**
+ * The host's whole label for every period this surface offers, or `undefined`
+ * when the host labels none of them HERE (FUT-4063): `periodLabel` answering
+ * `undefined` for a surface keeps that surface on the toggle, so a host can
+ * give one built-in "Esta semana · 09–15/11" and leave the rest as they were.
+ * A host label for only SOME periods is completed from the package's own words.
+ */
+function hostPeriodLabels(
+  ranges: readonly ReportRange[],
+  periodLabel: ReportBuilderSurface["periodLabel"],
+  surface: ReportPeriodSurface,
+  fallback: (range: ReportRange) => string,
+): Map<ReportRange, string> | undefined {
+  if (!periodLabel) return undefined;
+  const labels = new Map<ReportRange, string>();
+  for (const range of ranges) {
+    const label = periodLabel(range, surface);
+    if (label !== undefined) labels.set(range, label);
+  }
+  if (labels.size === 0) return undefined;
+  for (const range of ranges) if (!labels.has(range)) labels.set(range, fallback(range));
+  return labels;
+}
+
+/**
  * The period control: the preset toggle, or — when the host formats a label
- * per period (`surface.periodLabel`, FUT-4063) — a select whose trigger reads
- * the current period whole, "Esta semana · 03–09/11".
+ * per period for THIS surface (`surface.periodLabel`, FUT-4063) — a select
+ * whose trigger reads the current period whole, "Esta semana · 03–09/11". The
+ * toggle itself becomes a select on a row too narrow for its labels on one line.
  */
 function PeriodControl({
   range,
   onRangeChange,
   offered,
-}: Pick<ReportControlsProps, "range" | "onRangeChange"> & { offered?: readonly ReportRange[] }): JSX.Element {
+  surface,
+}: Pick<ReportControlsProps, "range" | "onRangeChange" | "surface"> & { offered?: readonly ReportRange[] }): JSX.Element {
   const ranges = useReportCopy().screens.ranges;
   const copy = useReportCopy().screens.builder;
   const { periodLabel } = useReportSurface();
-  if (periodLabel) {
-    return (
-      <Box sx={{ minWidth: 0, flex: { xs: "1 1 100%", md: "0 1 auto" } }}>
-        <Select
-          size="sm"
-          label={copy.period}
-          options={rangeOptions(ranges, offered, periodLabel)}
-          value={range}
-          onChange={(event) => onRangeChange(event.target.value as ReportRange)}
-          data-testid="report-range"
-        />
-      </Box>
-    );
-  }
+  const options = rangeOptions(ranges, offered);
+  const hostLabels = hostPeriodLabels(
+    options.map((option) => option.value),
+    periodLabel,
+    surface,
+    (range) => reportRangeLabel(range, ranges),
+  );
   return (
-    <ToggleGroup
-      variant="exclusive"
-      size="sm"
-      options={rangeOptions(ranges, offered)}
+    <OneLineChoice
+      options={hostLabels ? options.map((option) => ({ ...option, label: hostLabels.get(option.value) ?? option.label })) : options}
       value={range}
-      onChange={(_event, next) => {
-        if (typeof next === "string") onRangeChange(next as ReportRange);
-      }}
-      aria-label={copy.period}
+      onChange={onRangeChange}
+      label={copy.period}
       dataTestId="report-range"
+      select={hostLabels !== undefined}
     />
   );
 }
@@ -132,6 +151,8 @@ interface ReportControlsProps {
   grainLabel?: string;
   /** The periods offered (FUT-4063); absent = the rolling four. */
   ranges?: readonly ReportRange[];
+  /** The surface this row controls, passed to the host's `periodLabel` (FUT-4063). */
+  surface: ReportPeriodSurface;
   printTitle: string;
   /**
    * CSV of the whole surface. A dashboard has one file per block instead, so
@@ -150,6 +171,7 @@ export function ReportControls({
   grains,
   grainLabel,
   ranges: offered,
+  surface,
   printTitle,
   onExport,
 }: ReportControlsProps): JSX.Element {
@@ -162,17 +184,13 @@ export function ReportControls({
       sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
       className={NO_PRINT_CLASS}
     >
-      <PeriodControl range={range} onRangeChange={onRangeChange} offered={offered} />
+      <PeriodControl range={range} onRangeChange={onRangeChange} offered={offered} surface={surface} />
       {showGrain ? (
-        <ToggleGroup
-          variant="exclusive"
-          size="sm"
+        <OneLineChoice
           options={grainOptions(ranges, grains)}
           value={grain}
-          onChange={(_event, next) => {
-            if (typeof next === "string") onGrainChange(next as ReportGrain);
-          }}
-          aria-label={grainLabel ?? copy.grouping}
+          onChange={onGrainChange}
+          label={grainLabel ?? copy.grouping}
           dataTestId="report-grain"
         />
       ) : null}

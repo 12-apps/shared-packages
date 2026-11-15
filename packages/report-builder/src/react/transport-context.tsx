@@ -32,6 +32,13 @@ import type { ReportRange } from "./reports-api";
  * section labels and its template picker whether it wanted them or not, with no
  * config field to say otherwise.
  */
+/** Which built-in surface a period control belongs to, as `periodLabel` is told (FUT-4063). */
+export interface ReportPeriodSurface {
+  kind: "report" | "dashboard";
+  /** The built-in report's or dashboard's key. */
+  key: string;
+}
+
 export interface ReportBuilderSurface {
   /** The host's built-in reports, as nav/lookup entries. `[]` for none. */
   systemReports: readonly SystemReportNavEntry[];
@@ -45,11 +52,15 @@ export interface ReportBuilderSurface {
   timeZone: string;
   /**
    * A built-in surface's period, as its trigger reads it (FUT-4063): given a
-   * preset, the host's whole label — "Esta semana · 03–09/11". When present,
-   * the period is a select whose trigger shows that label; absent, the preset
-   * toggle as before. The host formats the dates, on its own clock.
+   * preset and the surface it is asked for, the host's whole label — "Esta
+   * semana · 03–09/11". Where it answers a label, that surface's period is a
+   * select whose trigger shows it; where it answers `undefined` for every
+   * period, that surface keeps the preset toggle. So one built-in (a dashboard,
+   * a report, by `surface.key`) can opt in alone. The host formats the dates,
+   * on its own clock. A function that ignores `surface` and always answers
+   * labels every surface, as before.
    */
-  periodLabel?: (range: ReportRange) => string;
+  periodLabel?: (range: ReportRange, surface: ReportPeriodSurface) => string | undefined;
   /**
    * How a dimension that names a `bucketFormat` reads (FUT-4063) — the host's
    * "Seg 03/11" for a day, "Semana de 03/11" for a week. Absent: the value as

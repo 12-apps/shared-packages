@@ -126,6 +126,8 @@ export function RangeToggle({
     <>
       <ToggleGroup
         variant="exclusive"
+        // Neutral: a period is a selection, not an alert (FUT-4063).
+        selection="quiet"
         size="sm"
         options={(custom ? REPORT_RANGES : REPORT_ROLLING_RANGES).map(option(ranges))}
         value={value}
