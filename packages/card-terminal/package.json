@@ -1,0 +1,78 @@
+{
+  "name": "@12-apps/card-terminal",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "A paired card terminal at a point of sale, apart from any payments platform: the capture ledger (one record per capture the terminal took, bound to a sale's payment row exactly once), the operator's acts on a capture and the over-capture decision as caller-driven results, typed-capture claims, the LAN link protocol between a station and its terminal, the station's link server, and the headless + MUI charge screens. The engine decides payment state only; the host writes its own sale, legs, till and audit. Depends on no other @12-apps package.",
+  "exports": {
+    "./server": "./src/server/index.ts",
+    "./link": "./src/link/index.ts",
+    "./station": "./src/station/index.ts",
+    "./react": "./src/react/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@emotion/react": ">=11.0.0",
+    "@emotion/styled": ">=11.0.0",
+    "@mui/material": ">=6.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@emotion/react": { "optional": true },
+    "@emotion/styled": { "optional": true },
+    "@mui/material": { "optional": true },
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^6.5.0",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@types/ws": "^8.5.13",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/card-terminal"
+  },
+  "files": [
+    "src",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}
