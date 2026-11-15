@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, AlertTitle, Paper } from '@mui/material';
-import { useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type JSX, type ReactNode, type RefObject } from 'react';
 
 import { ActConfirm } from './act-confirm';
 import { ActionButton, ChoiceRow } from './choice-actions';
@@ -27,12 +27,33 @@ import type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy } from './copy'
  */
 
 /** The question in a warning, and its answers on the paper below it. */
-function Band({ dataTestId, children }: { dataTestId: string; children: ReactNode }): JSX.Element {
+function Band({ dataTestId, band, children }: { dataTestId: string; band: RefObject<HTMLDivElement | null>; children: ReactNode }): JSX.Element {
   return (
-    <Paper variant="outlined" data-testid={dataTestId} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, borderColor: 'warning.main' }}>
+    <Paper ref={band} variant="outlined" data-testid={dataTestId} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, borderColor: 'warning.main' }}>
       {children}
     </Paper>
   );
+}
+
+/**
+ * The act chosen in a band, and where focus goes: the confirm step takes it
+ * (its reason field), and "back" returns it to the button that was chosen, so
+ * a keyboard never starts again from the top of the page.
+ */
+function useChoice<A extends string>(dataTestId: string) {
+  const [chosen, setChosen] = useState<A | null>(null);
+  const returnTo = useRef<A | null>(null);
+  const band = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (chosen !== null || returnTo.current === null) return;
+    band.current?.querySelector<HTMLElement>(`[data-testid="${dataTestId}-${returnTo.current}"]`)?.focus();
+    returnTo.current = null;
+  }, [chosen, dataTestId]);
+  const back = (): void => {
+    returnTo.current = chosen;
+    setChosen(null);
+  };
+  return { chosen, choose: setChosen, back, band };
 }
 
 function Question({ title, lede }: { title: string; lede: string }): JSX.Element {
@@ -58,10 +79,10 @@ export interface ReceivedTwiceBandProps {
 }
 
 export function ReceivedTwiceBand({ money, copy, confirmCopy, onAct, onDone, dataTestId = 'terminal-received-twice' }: ReceivedTwiceBandProps): JSX.Element {
-  const [chosen, setChosen] = useState<ReceivedTwiceAct | null>(null);
+  const { chosen, choose: setChosen, back, band } = useChoice<ReceivedTwiceAct>(dataTestId);
   const titleOf = (act: ReceivedTwiceAct): string => (act === 'give-back' ? copy.giveBack(money) : copy.refundCard);
   return (
-    <Band dataTestId={dataTestId}>
+    <Band dataTestId={dataTestId} band={band}>
       {chosen === null ? (
         <>
           <Question title={copy.title(money)} lede={copy.lede} />
@@ -80,7 +101,7 @@ export function ReceivedTwiceBand({ money, copy, confirmCopy, onAct, onDone, dat
           copy={confirmCopy}
           onSend={(input) => onAct(chosen, input)}
           onDone={() => onDone(chosen)}
-          onBack={() => setChosen(null)}
+          onBack={back}
           dataTestId={`${dataTestId}-confirm`}
         />
       )}
@@ -106,7 +127,7 @@ export interface OverCaptureChoiceProps {
 
 export function OverCaptureChoice(props: OverCaptureChoiceProps): JSX.Element {
   const { excess, refund, charge, buyer, copy, confirmCopy, onAct, onDone, dataTestId = 'terminal-over-capture' } = props;
-  const [chosen, setChosen] = useState<OverCaptureAct | null>(null);
+  const { chosen, choose: setChosen, back, band } = useChoice<OverCaptureAct>(dataTestId);
   const labels: Record<OverCaptureAct, string> = {
     change: copy.change(excess),
     credit: buyer === null ? '' : copy.credit(excess, buyer),
@@ -114,20 +135,20 @@ export function OverCaptureChoice(props: OverCaptureChoiceProps): JSX.Element {
   };
   if (chosen !== null) {
     return (
-      <Band dataTestId={dataTestId}>
+      <Band dataTestId={dataTestId} band={band}>
         <ActConfirm
           title={labels[chosen]}
           copy={confirmCopy}
           onSend={(input) => onAct(chosen, input)}
           onDone={() => onDone(chosen)}
-          onBack={() => setChosen(null)}
+          onBack={back}
           dataTestId={`${dataTestId}-confirm`}
         />
       </Band>
     );
   }
   return (
-    <Band dataTestId={dataTestId}>
+    <Band dataTestId={dataTestId} band={band}>
       <Question title={copy.title(excess)} lede={copy.lede} />
       <ChoiceRow label={copy.title(excess)}>
         <ActionButton rank="primary" onClick={() => setChosen('change')} data-testid={`${dataTestId}-change`}>

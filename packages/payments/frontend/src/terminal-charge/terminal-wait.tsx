@@ -67,10 +67,15 @@ const WORDS: Readonly<Record<LegStatus, (copy: TerminalWaitCopy, leg: FlowLeg, m
 /** A leg nothing has reached the terminal for yet. */
 const UNSENT: ReadonlySet<LegStatus> = new Set<LegStatus>(['send', 'pushing', 'queued']);
 
-/** The link is down under a leg not sent: the host's words for it, or the not-connected refusal's (nothing was charged). */
+/**
+ * The link is down under a leg not sent: the host's words for it, or the
+ * not-connected refusal's title with NO subtitle — the refusal's own sub asks
+ * for a resend, and none is offered while the link is down (the push goes out
+ * by itself when it returns).
+ */
 function downSaid(copy: TerminalWaitCopy): Said {
   if (copy.down !== undefined) return say(copy.down, copy.downSub ?? null, true);
-  return say(copy.refused.NOT_CONNECTED ?? '', copy.refusedSub, true);
+  return say(copy.refused.NOT_CONNECTED ?? '', null, true);
 }
 
 function saidOf(flow: ChargeFlow, leg: FlowLeg, copy: TerminalWaitCopy, money: string, away: boolean): Said {
@@ -182,7 +187,9 @@ function partLine(flow: ChargeFlow, index: number, copy: TerminalWaitCopy, money
   return remaining > 0 ? `${copy.part(part, parts)} · ${copy.after(money(remaining))}` : copy.part(part, parts);
 }
 
-function borderOf(leg: FlowLeg, said: Said): string {
+function borderOf(leg: FlowLeg, said: Said, down: boolean): string {
+  // A leg the link cannot carry is a warning, not "in progress" (6-B).
+  if (down && said.warn) return 'warning.main';
   if (isLive(leg)) return 'primary.main';
   return said.warn ? 'warning.main' : 'divider';
 }
@@ -193,7 +200,7 @@ function LegCard({ flow, index, leg, props }: { flow: ChargeFlow; index: number;
   const said = saidOf(flow, leg, copy, money(leg.amountCents), away);
   const part = partLine(flow, index, copy, money);
   return (
-    <Stack spacing={0.75} sx={{ p: 2, borderRadius: 3, border: 1.5, borderColor: borderOf(leg, said) }}>
+    <Stack spacing={0.75} sx={{ p: 2, borderRadius: 3, border: 1.5, borderColor: borderOf(leg, said, linkDown(flow.link)) }}>
       {part === null ? null : (
         <Typography variant="caption" component="p" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-part`}>
           {part}

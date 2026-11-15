@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActConfirm } from '../act-confirm';
@@ -73,6 +73,25 @@ describe('States 4 and 5: the question in a warning, the answers on the paper', 
   });
 });
 
+describe('focus and keyboard in a band', () => {
+  it('the confirm step opens on its reason field, Enter in the PIN confirms, and back returns focus to the chosen button', async () => {
+    const onAct = vi.fn(async () => ({ ok: true as const }));
+    render(<ReceivedTwiceBand money="$32.00" copy={TWICE} confirmCopy={CONFIRM} onAct={onAct} onDone={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId('terminal-received-twice-refund-card'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('terminal-received-twice-confirm-reason')));
+    fireEvent.click(screen.getByTestId('terminal-received-twice-confirm-back'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('terminal-received-twice-refund-card')));
+
+    fireEvent.click(screen.getByTestId('terminal-received-twice-give-back'));
+    fireEvent.change(screen.getByTestId('terminal-received-twice-confirm-reason'), { target: { value: 'paid twice' } });
+    fireEvent.change(screen.getByTestId('terminal-received-twice-confirm-pin'), { target: { value: '1234' } });
+    fireEvent.submit(screen.getByTestId('terminal-received-twice-confirm-pin').closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(onAct).toHaveBeenCalledWith('give-back', { reason: 'paid twice', pin: '1234' }));
+  });
+});
+
 describe('6-B: the wait follows the link the host passes in', () => {
   function waitWith(link: ChargeLink) {
     return startChargeRun({ port: fakeTerminal(), split: { legs: [{ tender: 'CREDIT' }], changeCents: 0 }, totalCents: 4600, link, saleRef: 's', operator: 'o', onReady: vi.fn(), onNotice: vi.fn() });
@@ -93,7 +112,7 @@ describe('6-B: the wait follows the link the host passes in', () => {
     expect(['terminal-wait-other', 'terminal-wait-other-machine', 'terminal-wait-manual-pix'].map(variantOf)).toEqual(['outlined', 'text', 'text']);
   });
 
-  it('a host that gives no words for the down link gets the not-connected refusal and its sub, never "sending"', async () => {
+  it('a host that gives no words for the down link gets the not-connected title and NO subtitle — never "sending", never a resend it cannot offer', async () => {
     const run = waitWith({ known: true, terminals: 1, down: true });
     await settle();
     const older: TerminalWaitCopy = { ...WAIT, down: undefined, downSub: undefined };
@@ -101,7 +120,8 @@ describe('6-B: the wait follows the link the host passes in', () => {
     render(<TerminalWait flow={run.current()} run={run} provider="Acquirer" tenders={[]} tenderName={tenderName} money={money} copy={older} elsewhereCopy={ELSEWHERE} />);
 
     expect(screen.getByTestId('terminal-wait-title').textContent).toBe('The terminal is down');
-    expect(screen.getByText('Charge it another way')).toBeTruthy();
+    expect(screen.getByTestId('terminal-wait-title').parentElement?.textContent).toBe('The terminal is down');
+    await waitFor(() => expect(screen.queryByTestId('terminal-wait-resend')).toBeNull());
   });
 
   it('the link going down under a queued leg turns its words, and coming back turns them again', async () => {
