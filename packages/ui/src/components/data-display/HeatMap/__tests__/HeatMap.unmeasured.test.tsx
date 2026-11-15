@@ -62,12 +62,12 @@ describe("an unmeasured cell", () => {
   it("reads its dash alone when the host gave no unmeasured words", () => {
     renderGrid(LABELS);
     expect(screen.getByTestId("hm-cell-seg-11").textContent).toBe("—");
-    expect(screen.queryByTestId("hm-legend-unmeasured")).toBeNull();
+    expect(screen.getByTestId("hm-legend").textContent).toBe("abaixo da metaacima da meta— sem venda na hora");
   });
 
   it("draws no extra legend entry when no cell is unmeasured", () => {
     renderGrid({ ...LABELS, unmeasured: "sem custo na hora" }, false);
-    expect(screen.queryByTestId("hm-legend-unmeasured")).toBeNull();
+    expect(screen.getByTestId("hm-legend").textContent).not.toContain("sem custo na hora");
     expect(screen.getByTestId("hm-cell-seg-11").hasAttribute("data-reason")).toBe(false);
   });
 });

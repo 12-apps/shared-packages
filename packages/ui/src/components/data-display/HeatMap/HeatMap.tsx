@@ -76,6 +76,20 @@ function emptyReason(cell: HeatMapCell, labels: HeatMapLabels): string | undefin
   return cell.reason === 'unmeasured' ? labels.unmeasured : labels.empty;
 }
 
+/** Whether a cell is drawn as unmeasured: no figure, for that reason. */
+function isUnmeasured(cell: HeatMapCell): boolean {
+  return cell.value === null && cell.reason === 'unmeasured';
+}
+
+/**
+ * The words a cell reads after its figure, visually hidden: the attention
+ * side's, or a no-figure cell's reason.
+ */
+function hiddenWords(tone: ReturnType<typeof heatMapTone>, cell: HeatMapCell, labels: HeatMapLabels): string | undefined {
+  if (isAboveTone(tone)) return labels.above;
+  return tone === 'empty' ? emptyReason(cell, labels) : undefined;
+}
+
 /** One figure cell: blank, "—", or the figure on its side's tint. */
 function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellProps): React.JSX.Element {
   const theme = useTheme();
@@ -86,8 +100,8 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
   const tone = heatMapTone(cell.value, scale);
   const above = isAboveTone(tone);
   const text = cell.value === null ? (labels.emptyValue ?? EM_DASH) : formatValue(cell.value);
-  const reason = tone === 'empty' ? emptyReason(cell, labels) : undefined;
-  const unmeasured = tone === 'empty' && cell.reason === 'unmeasured';
+  const words = hiddenWords(tone, cell, labels);
+  const unmeasured = isUnmeasured(cell);
   return (
     <Box
       component="td"
@@ -102,14 +116,9 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
       {...(unmeasured ? { 'data-reason': 'unmeasured' } : {})}
     >
       {text}
-      {above ? (
+      {words ? (
         <Box component="span" sx={SR_ONLY_SX}>
-          {` ${labels.above}`}
-        </Box>
-      ) : null}
-      {reason ? (
-        <Box component="span" sx={SR_ONLY_SX}>
-          {` ${reason}`}
+          {` ${words}`}
         </Box>
       ) : null}
     </Box>
@@ -245,13 +254,7 @@ export function HeatMap({
           ))}
         </tbody>
       </Box>
-      {legend ? (
-        <Legend
-          labels={labels}
-          unmeasured={cells.some((cell) => cell.value === null && cell.reason === 'unmeasured')}
-          testId={dataTestId}
-        />
-      ) : null}
+      {legend ? <Legend labels={labels} unmeasured={cells.some(isUnmeasured)} testId={dataTestId} /> : null}
     </Box>
   );
 }
