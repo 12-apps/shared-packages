@@ -111,3 +111,14 @@ export {
 } from './money-choices';
 export { RecoveredCaptures, type RecoveredCapturesProps } from './recovered-captures';
 export { TerminalWait, type TerminalWaitProps } from './terminal-wait';
+export {
+  createTypedCaptureInbox,
+  matchTypedCapture,
+  type DueSale,
+  type TypedCaptureInbox,
+  type TypedCaptureInboxConfig,
+  type TypedEntry,
+  type TypedEntryState,
+  type TypedWait,
+} from './typed-captures';
+export { chargedNotHeld, holdTaken, legsByCode, takenCaptures, type CodedLeg } from './offline-hand-off';
