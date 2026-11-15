@@ -31,7 +31,7 @@ describe('createWebhookLog', () => {
     ]);
   });
 
-  it('names the signing field once per provider and field, and nothing when none is known (FUT-678)', () => {
+  it('names the signing field once per provider and field, at info, and nothing when none is known (FUT-678, FUT-5077)', () => {
     const log = logger();
     const { observer } = createWebhookLog(log);
 
@@ -41,10 +41,11 @@ describe('createWebhookLog', () => {
     observer.accepted('stripe', 1, null);
     observer.accepted('stripe', 1);
 
-    expect(log.warn.mock.calls.map(([line]) => line)).toEqual([
+    expect(log.info.mock.calls.map(([line]) => line)).toEqual([
       'payments.webhook signer: pagbank deliveries verify under platformWebhookSecret',
       'payments.webhook signer: pagbank deliveries verify under token',
     ]);
+    expect(log.warn).not.toHaveBeenCalled();
   });
 });
 

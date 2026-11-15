@@ -103,7 +103,9 @@ export function createWebhookLog(log: WebhookLogger, options: WebhookLogOptions 
         const key = `${provider}:${signer}`;
         if (signersSeen.has(key)) return;
         signersSeen.add(key);
-        log.warn(`payments.webhook signer: ${provider} deliveries verify under ${signer}`);
+        // INFO, not warn (FUT-5077): which field verified a delivery is information, once per
+        // process, and a host forwards warn to its error tracker.
+        log.info(`payments.webhook signer: ${provider} deliveries verify under ${signer}`);
       },
     } satisfies WebhookPipelineObserver,
   };
