@@ -68,6 +68,28 @@ export type NotificationChannelPolicy = (
   channels: readonly NotificationChannel[],
 ) => Promise<NotificationChannel[]> | NotificationChannel[];
 
+/**
+ * Which channels ONE emit may use, decided from the event itself — the host's
+ * per-emit hook.
+ *
+ * {@link NotificationChannelPolicy} answers per TENANT and sees no event, and a
+ * generator's `channels` answers per TYPE: neither can say "this order is
+ * already being told on another path, so not on this channel". This can. It is
+ * handed the event (type, recipient, payload) and the channels that survived
+ * preferences, transport support and the plan gate, and answers the ones this
+ * emit keeps.
+ *
+ * It only NARROWS: whatever it answers is intersected with what it was given,
+ * so it cannot put back a channel the user, the transport or the plan took
+ * away. It runs for platform emits too (no tenant), because the question is
+ * about the event, not about billing. A hook that THROWS degrades the way a
+ * failed plan gate does, to the free channels of what it was given.
+ */
+export type NotificationEmitChannelFilter = (
+  event: NotificationEvent<unknown>,
+  channels: readonly NotificationChannel[],
+) => readonly NotificationChannel[] | Promise<readonly NotificationChannel[]>;
+
 /** How the host defers dispatch of one already-committed notification. */
 export type NotificationDispatchScheduler = (notificationId: string) => Promise<void>;
 
@@ -125,6 +147,7 @@ interface NotificationRouterDeps extends NotificationDispatchDeps {
   generators: NotificationGeneratorRegistry;
   preferences: NotificationPreferenceStore;
   channelPolicy?: NotificationChannelPolicy;
+  emitChannelFilter?: NotificationEmitChannelFilter;
   scheduleDispatch?: NotificationDispatchScheduler;
   onCommitted?: NotificationCommittedListener;
   sideOf?: NotificationSideResolver;
@@ -178,6 +201,28 @@ async function applyPolicy(
 }
 
 /**
+ * Apply the host's per-emit hook. Narrow-only: the answer is intersected with
+ * the input, and a throw degrades to the free channels of the input.
+ */
+async function applyEmitFilter(
+  deps: NotificationRouterDeps,
+  event: NotificationEvent<unknown>,
+  channels: NotificationChannel[],
+): Promise<NotificationChannel[]> {
+  if (!deps.emitChannelFilter || channels.length === 0) return channels;
+  try {
+    const kept = new Set(await deps.emitChannelFilter(event, channels));
+    return channels.filter((channel) => kept.has(channel));
+  } catch (error) {
+    deps.logger.error(
+      `[notifications] emitChannelFilter failed for ${event.type}; degrading to the free channels:`,
+      error,
+    );
+    return policyFallback(channels);
+  }
+}
+
+/**
  * The type's side, or `null`. A resolver that THROWS degrades to unclassified
  * (every reader sees it) rather than failing the emit: a notification that
  * reaches one app too many is recoverable, one that was never written is not.
@@ -209,7 +254,8 @@ function announce(deps: NotificationRouterDeps, notification: CommittedNotificat
 
 /**
  * The channels one emit will actually enqueue:
- * preference ∩ transport ∩ plan ∩ the TYPE's own availability.
+ * preference ∩ transport ∩ plan ∩ the emit's own hook ∩ the TYPE's own
+ * availability.
  *
  * Availability is applied LAST rather than left to the preference store,
  * because {@link NotificationChannelPolicy} is a HOST function returning an
@@ -247,7 +293,10 @@ async function resolveChannels(
   // tenant's plan covers, so a revoked transport DEGRADES to the remaining ones
   // rather than dropping the notification silently.
   const permitted = await applyPolicy(deps, event.recipient.clientId, supported);
-  return capToAvailable(permitted, generator.channels);
+  // The host's per-emit hook: what THIS event may use, beyond its tenant and
+  // its type (an order already told on another path skips a channel).
+  const kept = await applyEmitFilter(deps, event, permitted);
+  return capToAvailable(kept, generator.channels);
 }
 
 /** Commit the inbox record and its delivery rows together, in one transaction. */
