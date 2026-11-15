@@ -21,11 +21,11 @@ function setup(options: { wrap?: (store: TerminalCaptureStore) => TerminalCaptur
   const made: World = world(options);
   const host = actsHost(made.captures);
   const legs = createTerminalLegs({ ledger: made.ledger, directory: made.directory, now: () => NOW });
-  const engine = createCaptureActs({ ledger: made.ledger, legs });
+  const actsEngine = createCaptureActs({ ledger: made.ledger, legs });
   /** The acts as the caller drives them: one transaction, the engine's answer, the caller's own writes. */
-  const acts = {
-    refund: (input: Parameters<typeof host.refund>[1], note: string) => host.refund(engine, input, note),
-    rebind: (input: Parameters<typeof host.rebind>[1], note: string) => host.rebind(engine, input, note),
+  const drivenActs = {
+    refund: (input: Parameters<typeof host.refund>[1], note: string) => host.refund(actsEngine, input, note),
+    rebind: (input: Parameters<typeof host.rebind>[1], note: string) => host.rebind(actsEngine, input, note),
   };
   /** A sale paid in cash and its payment row, as the host settled it. */
   function cashSale(cents = DRINK_CENTS, clientId = TENANT) {
@@ -33,7 +33,7 @@ function setup(options: { wrap?: (store: TerminalCaptureStore) => TerminalCaptur
     host.sales.set(sale.orderId, { clientId, paymentId: sale.paymentId, paid: true, legs: [{ tender: 'CASH', amountCents: cents }], buyer: false });
     return sale;
   }
-  return { w: made, host, acts, engine, cashSale };
+  return { w: made, host, acts: drivenActs, engine: actsEngine, cashSale };
 }
 
 describe('planRebind', () => {

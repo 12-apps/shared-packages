@@ -20,10 +20,10 @@ const REDUCED = 'CONTA_REDUCED';
 function setup() {
   const made = world();
   const host = actsHost(made.captures);
-  const engine = createCaptureExcess({ ledger: made.ledger, credit: host.credit, refundReason: REDUCED });
+  const excessEngine = createCaptureExcess({ ledger: made.ledger, credit: host.credit, refundReason: REDUCED });
   /** The settle as the caller drives it: one transaction, the engine's answer, the caller's own cash and audit. */
-  const excess = {
-    settle: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }, note: string) => host.settle(engine, plan, sale, note),
+  const drivenExcess = {
+    settle: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }, note: string) => host.settle(excessEngine, plan, sale, note),
     /** The caller's read of its buyer, then the pure admission. */
     admit: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }) => admitExcess(plan, { buyerHoldsCredit: host.buyerHoldsCredit(sale.orderId) }),
   };
@@ -32,7 +32,7 @@ function setup() {
     host.sales.set(orderId, { clientId: TENANT, paymentId, paid: true, legs: [], buyer });
     return orderId;
   }
-  return { w: made, host, excess, engine, sale };
+  return { w: made, host, excess: drivenExcess, engine: excessEngine, sale };
 }
 
 describe('planExcess', () => {

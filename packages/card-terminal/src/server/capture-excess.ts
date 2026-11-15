@@ -218,6 +218,30 @@ function settledOf(plan: Booked, sale: ExcessSale): Extract<ExcessSettled, { ok:
   };
 }
 
+/** Post a `STORE_CREDIT` plan's credit through the credit port. */
+async function postCredit<TTx, TNote>(config: CaptureExcessConfig<TTx, TNote>, plan: Extract<ExcessPlan, { kind: 'STORE_CREDIT' }>, orderId: string, sale: ExcessSale, note: TNote | undefined): Promise<void> {
+  if (config.credit === undefined) throw new Error('STORE_CREDIT needs a credit port in the config.');
+  await config.credit.post({ clientId: sale.clientId, orderId, amountCents: plan.creditCents, reason: plan.reason }, note);
+}
+
+/** Flag a `REFUND_AND_RECHARGE` plan's refunded captures with the caller's reason code; a ledger refusal as its code. */
+async function flagRefunded<TTx, TNote>(
+  config: CaptureExcessConfig<TTx, TNote>,
+  plan: Extract<ExcessPlan, { kind: 'REFUND_AND_RECHARGE' }>,
+  sale: ExcessSale,
+  tx: TTx | undefined,
+): Promise<{ ok: false; code: CaptureActRefusal } | null> {
+  try {
+    for (const capture of plan.refunded) {
+      await config.ledger.flag({ clientId: sale.clientId, transactionCode: capture.transactionCode }, config.refundReason, undefined, tx);
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof CaptureError) return { ok: false, code: captureActRefusalOf(error) };
+    throw error;
+  }
+}
+
 async function settle<TTx, TNote>(
   config: CaptureExcessConfig<TTx, TNote>,
   plan: ExcessPlan,
@@ -226,21 +250,12 @@ async function settle<TTx, TNote>(
 ): Promise<ExcessSettled> {
   if (plan.kind === 'FITS') return { ok: true, plan, cashRefundCents: 0, creditCents: 0, rechargeCents: 0, record: null };
   if (plan.kind === 'REFUSED') throw new Error('A refused excess plan cannot be settled: admit it first.');
-  if (plan.kind !== 'REFUND_AND_RECHARGE' && sale.orderId === null) throw new Error(`${plan.kind} is booked on a written sale: pass its id.`);
-  if (plan.kind === 'STORE_CREDIT' && sale.orderId !== null) {
-    if (config.credit === undefined) throw new Error('STORE_CREDIT needs a credit port in the config.');
-    await config.credit.post({ clientId: sale.clientId, orderId: sale.orderId, amountCents: plan.creditCents, reason: plan.reason }, options.note);
-  }
   if (plan.kind === 'REFUND_AND_RECHARGE') {
-    try {
-      for (const capture of plan.refunded) {
-        await config.ledger.flag({ clientId: sale.clientId, transactionCode: capture.transactionCode }, config.refundReason, undefined, options.tx);
-      }
-    } catch (error) {
-      if (error instanceof CaptureError) return { ok: false, code: captureActRefusalOf(error) };
-      throw error;
-    }
+    const refused = await flagRefunded(config, plan, sale, options.tx);
+    return refused ?? settledOf(plan, sale);
   }
+  if (sale.orderId === null) throw new Error(`${plan.kind} is booked on a written sale: pass its id.`);
+  if (plan.kind === 'STORE_CREDIT') await postCredit(config, plan, sale.orderId, sale, options.note);
   return settledOf(plan, sale);
 }
 

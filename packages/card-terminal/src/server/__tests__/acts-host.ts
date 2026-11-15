@@ -36,7 +36,7 @@ interface Tables {
 }
 
 /** The caller's own writes, each one statement of its own; spied on by the suites. */
-export interface HostWrites {
+interface HostWrites {
   writeLegs(orderId: string, legs: ReadonlyArray<SettledLeg | CaptureLeg>): Promise<void>;
   bookCashBack(cash: CashBack, note: string): Promise<void>;
   bookCashRefund(refund: { clientId: string; orderId: string; amountCents: number }, note: string): Promise<void>;

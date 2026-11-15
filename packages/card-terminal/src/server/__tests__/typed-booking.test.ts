@@ -95,11 +95,11 @@ function host(made: World, options: HostOptions = {}) {
       return target;
     }),
   };
-  const claims = createTypedCaptureClaims({ ledger: made.ledger });
+  const typedClaims = createTypedCaptureClaims({ ledger: made.ledger });
 
   /** One decision: the claim, then the caller's policy and session, then its sale and the bind in one transaction. */
   async function once(input: TypedCaptureInput): Promise<TypedBookAnswer | { lost: unknown }> {
-    const claim = await claims.claimable(input);
+    const claim = await typedClaims.claimable(input);
     if (claim.claim !== 'FREE') return heldAnswer(claim, await hostPorts.bookedFor(input.clientId, input.capture.transactionCode));
     const policy = await hostPorts.mayBook();
     if (!policy.ok) return { outcome: 'NOT_ALLOWED', reason: policy.reason, ack: false };
@@ -110,7 +110,7 @@ function host(made: World, options: HostOptions = {}) {
         const prior = await hostPorts.bookedFor(input.clientId, claim.capture.transactionCode, tx);
         if (prior !== null) return { outcome: 'BOOKED', ...prior, created: false, ack: true };
         const target = await hostPorts.createSale(tx, { clientId: claim.clientId, deviceId: claim.deviceId, session, capture: claim.capture });
-        return claims.bind(tx, claim, target);
+        return typedClaims.bind(tx, claim, target);
       });
     } catch (lost) {
       if (!(lost instanceof CaptureError) && !hostPorts.isRetryable(lost)) throw lost;
@@ -118,14 +118,15 @@ function host(made: World, options: HostOptions = {}) {
     }
   }
 
-  const booking = {
+  const typedBooking = {
     async book(input: TypedCaptureInput): Promise<TypedBookAnswer> {
-      let last: unknown = null;
+      const losses: unknown[] = [];
       for (let attempt = 0; attempt < BOOK_ATTEMPTS; attempt += 1) {
         const answer = await once(input);
         if (!('lost' in answer)) return answer;
-        last = answer.lost;
+        losses.push(answer.lost);
       }
+      const last = losses[losses.length - 1];
       const refused = typedRefusalOf(last);
       if (refused !== null) return heldAnswer(refused, null);
       throw last;
@@ -136,10 +137,10 @@ function host(made: World, options: HostOptions = {}) {
     ports: hostPorts,
     booked,
     sold,
-    claims,
+    claims: typedClaims,
     /** A session opens at the station. */
     openSession: (session: SessionRow) => void (live.session = session),
-    booking,
+    booking: typedBooking,
   };
 }
 
