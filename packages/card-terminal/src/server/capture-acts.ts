@@ -5,30 +5,33 @@ import type { StationCaptureWire } from './readers';
 
 /**
  * The operator's acts on a capture the terminal took (FUT-4996): give its money
- * back, or let it pay a sale's leg that was taken another way. The engine
- * decides and moves the capture through the ledger; the host answers the ports
- * over its own tables — the sale and its legs, the cash it gives back, its
- * record of who did what — and keeps the permission, the confirmation and the
- * copy.
+ * back, or let it pay a sale's leg that was taken another way.
+ *
+ * CALLER-DRIVEN. The engine moves only the capture, through the ledger, and
+ * answers with a result that says what happened and what the caller must do
+ * with its OWN records. It never reads or writes the caller's sale, legs, till
+ * or audit: the caller (a point of sale) depends on this package, never the
+ * other way round.
  *
  * - **Refund** ({@link CaptureActs.refund}): the capture's money is owed back,
- *   flagged once with the reason the host names. `RECEIVED_TWICE` (the leg was
- *   already received another way) fits only a capture no sale holds; any other
- *   reason is the host's own, an open string, and fits a held capture too
- *   unless the ledger was configured with it as unbound-only. A second act is
- *   answered as the first and records nothing more.
+ *   flagged once with the reason the caller names. `RECEIVED_TWICE` (the leg
+ *   was already received another way) fits only a capture no sale holds; any
+ *   other reason is the caller's own, an open string, and fits a held capture
+ *   too unless the ledger was configured with it as unbound-only. A second act
+ *   answers `flagged: false`: the caller records nothing more.
  * - **Rebind** ({@link CaptureActs.rebind}): the sale received a leg in cash
- *   AND the terminal captured it. The capture stays: the sale's cash leg of at
- *   least that amount gives the amount up to a leg of the captured kind, the
- *   capture binds to the sale's payment row (compare-and-set), and the cash
- *   goes back — all in ONE transaction of the host's, or none of it. A
- *   capture already bound to that sale's payment row answers as the first act
- *   and writes nothing more.
+ *   AND the terminal captured it. The caller opens ONE transaction, passes its
+ *   handle and the sale's current legs as plain data; the engine binds the
+ *   capture to the sale's payment row (compare-and-set) on that handle and
+ *   answers the sale's new legs and the cash to give back. The caller writes
+ *   those in the same transaction, or throws and nothing commits. A repeated or
+ *   concurrent rebind answers `moved: false` and the caller writes nothing.
  *
- * Every answer is a code; the host owns the words and the status.
+ * Every refusal is a code; the caller owns the words, the permission and the
+ * status.
  */
 
-/** A settled leg of a sale: how it was paid and how much. A host's leg may carry more; it is kept as is. */
+/** A settled leg of a sale: how it was paid and how much. A caller's leg may carry more; it is kept as is. */
 export interface SettledLeg {
   tender: string;
   amountCents: number;
@@ -44,53 +47,59 @@ export interface CaptureLeg {
  * Why an act refused. The ledger's refusals as a sale-path names them
  * ({@link CaptureNotBoundReason}), plus:
  * - `NOT_FOUND`: no capture with that code at this tenant;
- * - `NO_CASH_LEG`: the sale is not a settled sale of this tenant, or has no
- *   cash leg as large as the capture.
+ * - `NO_CASH_LEG`: the sale has no cash leg as large as the capture.
  */
 export type CaptureActRefusal = CaptureNotBoundReason | 'NOT_FOUND' | 'NO_CASH_LEG';
 
-export type CaptureActResult = { ok: true } | { ok: false; code: CaptureActRefusal };
-
-/** A sale a rebind may land on: its settled legs and its one payment row. */
-export interface SettledSale<L extends SettledLeg = SettledLeg> {
-  legs: readonly L[];
-  paymentId: string;
+export interface CaptureActRefused {
+  ok: false;
+  code: CaptureActRefusal;
 }
 
-/** What an act did, for the host's record of it (an audit row). The host adds who and why. */
-export type CaptureActRecord =
-  | { act: 'REFUND'; clientId: string; transactionCode: string; refundReason: string; orderId?: string }
-  | { act: 'REBIND'; clientId: string; transactionCode: string; kind: CaptureKind; amountCents: number; orderId: string };
-
-/** The money a rebind gives back from the sale's cash, for the host to book. */
-export interface CashBack {
+/** What a refund did, enough for the caller's own audit row. */
+export interface RefundRecord {
+  act: 'REFUND';
   clientId: string;
-  orderId: string;
-  amountCents: number;
   transactionCode: string;
+  refundReason: string;
+  orderId?: string;
+}
+
+/** What a rebind did, enough for the caller's own audit row. */
+export interface RebindRecord {
+  act: 'REBIND';
+  clientId: string;
+  transactionCode: string;
+  kind: CaptureKind;
+  amountCents: number;
+  orderId: string;
 }
 
 /**
- * What the host answers, each on the handle of the transaction the engine
- * opened through {@link CaptureActPorts.transaction}.
+ * The refund's answer. `flagged: true` with the `record` the caller audits;
+ * `flagged: false` when a flag was already live (a repeated act), and the
+ * caller writes nothing.
  */
-export interface CaptureActPorts<TTx = unknown, L extends SettledLeg = SettledLeg, TNote = unknown> {
-  /** Run `work` in one transaction of the host's: everything it writes commits together, or nothing does. */
-  transaction<T>(work: (tx: TTx) => Promise<T>): Promise<T>;
-  /** The sale, when it is a settled (paid) sale of this tenant with its payment row; otherwise null. */
-  settledSale(tx: TTx, clientId: string, orderId: string): Promise<SettledSale<L> | null>;
-  /** Replace the sale's settled legs. */
-  writeLegs(tx: TTx, clientId: string, orderId: string, legs: ReadonlyArray<L | CaptureLeg>): Promise<void>;
-  /** Book the cash the sale gives back, where the sale's cash was taken in, with the caller's note (who acted). */
-  bookCashBack(tx: TTx, cash: CashBack, note: TNote): Promise<void>;
-  /** The host's record of the act, with the note the caller passed (who, why, under which permission). */
-  record(tx: TTx, act: CaptureActRecord, note: TNote): Promise<void>;
-}
+export type RefundOutcome = { ok: true; flagged: true; record: RefundRecord } | { ok: true; flagged: false } | CaptureActRefused;
 
-export interface CaptureActsConfig<TTx = unknown, L extends SettledLeg = SettledLeg, TNote = unknown> {
+/**
+ * The rebind's answer.
+ * - `moved: true`: this call bound the capture. The caller replaces the sale's
+ *   legs with `legs`, gives back `cashBackCents` from its till, and audits
+ *   `record` — all on the same transaction handle it passed.
+ * - `moved: false`: the capture already was this sale's (a repeat), or a
+ *   concurrent twin bound it between the read and the write. Its act wrote the
+ *   rest: the caller writes nothing.
+ */
+export type RebindOutcome<L extends SettledLeg = SettledLeg> =
+  | { ok: true; moved: true; legs: Array<L | CaptureLeg>; cashBackCents: number; record: RebindRecord }
+  | { ok: true; moved: false }
+  | CaptureActRefused;
+
+export interface CaptureActsConfig<TTx = unknown> {
   ledger: TerminalCaptureLedger<TTx>;
+  /** Used only to record the station's report of a capture before a refund. */
   legs: TerminalLegs<TTx>;
-  ports: CaptureActPorts<TTx, L, TNote>;
   /** The tender a cash leg carries. Default: `CASH`. */
   cashTender?: string;
 }
@@ -98,23 +107,29 @@ export interface CaptureActsConfig<TTx = unknown, L extends SettledLeg = Settled
 export interface RefundCaptureInput {
   clientId: string;
   transactionCode: string;
-  /** `RECEIVED_TWICE`, or a reason of the host's own. */
+  /** `RECEIVED_TWICE`, or a reason of the caller's own. */
   refundReason: string;
   /** The station's report of the capture, recorded first when the terminal may not have reported yet. */
   capture?: StationCaptureWire;
-  /** The sale the act was taken from, carried to the host's record. */
+  /** The sale the act was taken from, carried into the record. */
   orderId?: string;
 }
 
-export interface RebindCaptureInput {
+export interface RebindCaptureInput<L extends SettledLeg = SettledLeg> {
   clientId: string;
   transactionCode: string;
+  /** The caller's settled sale and its one payment row; the ledger checks the row is the sale's and the tenant's. */
   orderId: string;
+  paymentId: string;
+  /** The sale's settled legs as the caller read them in this transaction. Plain data: nothing is written back here. */
+  legs: readonly L[];
 }
 
-export interface CaptureActs<TNote = unknown> {
-  refund(input: RefundCaptureInput, note: TNote): Promise<CaptureActResult>;
-  rebind(input: RebindCaptureInput, note: TNote): Promise<CaptureActResult>;
+export interface CaptureActs<TTx = unknown> {
+  /** Flag the capture's money to go back. With `tx`, the flag joins the caller's transaction (its audit row with it). */
+  refund(input: RefundCaptureInput, tx?: TTx): Promise<RefundOutcome>;
+  /** Bind the capture to the sale's payment row on the caller's transaction and answer the legs and the cash back. */
+  rebind<L extends SettledLeg>(input: RebindCaptureInput<L>, tx: TTx): Promise<RebindOutcome<L>>;
 }
 
 /** A ledger refusal as an act's code. */
@@ -149,7 +164,7 @@ export function planRebind<L extends SettledLeg>(
 }
 
 /** Run `act`, answering a ledger refusal as its code; anything else is thrown. */
-async function refusing(act: () => Promise<CaptureActResult>): Promise<CaptureActResult> {
+async function refusing<T>(act: () => Promise<T | CaptureActRefused>): Promise<T | CaptureActRefused> {
   try {
     return await act();
   } catch (error) {
@@ -158,62 +173,43 @@ async function refusing(act: () => Promise<CaptureActResult>): Promise<CaptureAc
   }
 }
 
-async function refund<TTx, L extends SettledLeg, TNote>(
-  config: CaptureActsConfig<TTx, L, TNote>,
-  input: RefundCaptureInput,
-  note: TNote,
-): Promise<CaptureActResult> {
+async function refund<TTx>(config: CaptureActsConfig<TTx>, input: RefundCaptureInput, tx: TTx | undefined): Promise<RefundOutcome> {
   const { clientId, transactionCode, refundReason } = input;
   if (input.capture !== undefined) {
     const refused = await config.legs.recordStation(clientId, [{ ...input.capture, transactionCode }]);
     if (refused !== null) return { ok: false, code: refused };
   }
-  return refusing(() =>
-    config.ports.transaction(async (tx) => {
-      const { flagged } = await config.ledger.flag({ clientId, transactionCode }, refundReason, undefined, tx);
-      // A flag already live is the first act's: answered as it, recorded once.
-      if (!flagged) return { ok: true };
-      const orderId = input.orderId === undefined ? {} : { orderId: input.orderId };
-      await config.ports.record(tx, { act: 'REFUND', clientId, transactionCode, refundReason, ...orderId }, note);
-      return { ok: true };
-    }),
-  );
+  return refusing(async (): Promise<RefundOutcome> => {
+    const { flagged } = await config.ledger.flag({ clientId, transactionCode }, refundReason, undefined, tx);
+    // A flag already live is the first act's: answered as it, recorded once by the caller.
+    if (!flagged) return { ok: true, flagged: false };
+    const orderId = input.orderId === undefined ? {} : { orderId: input.orderId };
+    return { ok: true, flagged: true, record: { act: 'REFUND', clientId, transactionCode, refundReason, ...orderId } };
+  });
 }
 
-async function rebind<TTx, L extends SettledLeg, TNote>(
-  config: CaptureActsConfig<TTx, L, TNote>,
-  input: RebindCaptureInput,
-  note: TNote,
-): Promise<CaptureActResult> {
-  const { clientId, transactionCode, orderId } = input;
-  const { ledger, ports } = config;
-  return refusing(() =>
-    ports.transaction(async (tx): Promise<CaptureActResult> => {
-      const [capture] = await ledger.findByCodes(clientId, [transactionCode], tx);
-      if (capture === undefined) return { ok: false, code: 'NOT_FOUND' };
-      const sale = await ports.settledSale(tx, clientId, orderId);
-      // Already this sale's leg (a repeated act): answered as the first, nothing written again.
-      if (sale !== null && capture.state === 'BOUND' && capture.orderId === orderId && capture.paymentId === sale.paymentId) return { ok: true };
-      const plan = sale === null ? null : planRebind(sale.legs, capture, config.cashTender);
-      if (sale === null || plan === null) return { ok: false, code: 'NO_CASH_LEG' };
-      const { moved } = await ledger.bindReporting(tx, clientId, [transactionCode], { orderId, paymentId: sale.paymentId });
-      // A concurrent twin bound it between our read and our write: its act wrote the rest.
-      if (moved.length === 0) return { ok: true };
-      await ports.writeLegs(tx, clientId, orderId, plan.legs);
-      await ports.bookCashBack(tx, { clientId, orderId, amountCents: plan.cashBackCents, transactionCode }, note);
-      const { kind, amountCents } = capture;
-      await ports.record(tx, { act: 'REBIND', clientId, transactionCode, kind, amountCents, orderId }, note);
-      return { ok: true };
-    }),
-  );
+async function rebind<TTx, L extends SettledLeg>(config: CaptureActsConfig<TTx>, input: RebindCaptureInput<L>, tx: TTx): Promise<RebindOutcome<L>> {
+  const { clientId, transactionCode, orderId, paymentId } = input;
+  const { ledger } = config;
+  return refusing(async (): Promise<RebindOutcome<L>> => {
+    const [capture] = await ledger.findByCodes(clientId, [transactionCode], tx);
+    if (capture === undefined) return { ok: false, code: 'NOT_FOUND' };
+    // Already this sale's leg (a repeated act): answered as the first, nothing written again.
+    if (capture.state === 'BOUND' && capture.orderId === orderId && capture.paymentId === paymentId) return { ok: true, moved: false };
+    const plan = planRebind(input.legs, capture, config.cashTender);
+    if (plan === null) return { ok: false, code: 'NO_CASH_LEG' };
+    const { moved } = await ledger.bindReporting(tx, clientId, [transactionCode], { orderId, paymentId });
+    // A concurrent twin bound it between our read and our write: its act wrote the rest.
+    if (moved.length === 0) return { ok: true, moved: false };
+    const { kind, amountCents } = capture;
+    return { ok: true, moved: true, ...plan, record: { act: 'REBIND', clientId, transactionCode, kind, amountCents, orderId } };
+  });
 }
 
-/** The capture acts over a ledger, its legs and the host's ports. */
-export function createCaptureActs<TTx = unknown, L extends SettledLeg = SettledLeg, TNote = unknown>(
-  config: CaptureActsConfig<TTx, L, TNote>,
-): CaptureActs<TNote> {
+/** The capture acts over a ledger. Each answers what the caller must write; none writes it. */
+export function createCaptureActs<TTx = unknown>(config: CaptureActsConfig<TTx>): CaptureActs<TTx> {
   return {
-    refund: (input, note) => refund(config, input, note),
-    rebind: (input, note) => rebind(config, input, note),
+    refund: (input, tx) => refund(config, input, tx),
+    rebind: (input, tx) => rebind(config, input, tx),
   };
 }

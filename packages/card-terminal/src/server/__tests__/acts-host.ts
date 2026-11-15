@@ -1,12 +1,14 @@
-import type { CaptureActPorts, CaptureActRecord, CaptureLeg, CashBack, SettledLeg } from '../capture-acts';
-import type { CaptureExcessPorts, ExcessRecord } from '../capture-excess';
+import type { CaptureActs, CaptureLeg, RebindOutcome, RebindRecord, RefundCaptureInput, RefundOutcome, RefundRecord, SettledLeg } from '../capture-acts';
+import type { CaptureExcess, ExcessPlan, ExcessRecord, ExcessSale, ExcessSettled, StoreCreditPort } from '../capture-excess';
 import type { MemoryTerminalCaptures } from '../memory-store';
 
 /**
- * A host's tables behind the capture acts' and the excess's ports, held in
- * memory: the settled sales with their legs, the cash given back, the credit
- * posted and the record of each act. `transaction` puts all of it, and the
- * capture rows, back as they were when the work throws.
+ * A CALLER of the caller-driven acts, held in memory: a point of sale with its
+ * settled sales and their legs, the cash it gives back, the credit wallet and
+ * its own audit. It follows the documented steps — one transaction, the
+ * engine's act on that handle, then its own writes from the answer — and
+ * `transaction` puts all of it, and the capture rows, back as they were when
+ * the work throws.
  */
 
 interface HostSale {
@@ -18,22 +20,27 @@ interface HostSale {
   buyer: boolean;
 }
 
-interface ActsHost {
-  sales: Map<string, HostSale>;
-  cashBack: CashBack[];
-  cashRefunds: Array<{ clientId: string; orderId: string; amountCents: number }>;
-  credits: Array<{ clientId: string; orderId: string; amountCents: number; reason: string }>;
-  records: Array<{ act: CaptureActRecord | ExcessRecord; note: string }>;
-  acts: CaptureActPorts<unknown, SettledLeg, string>;
-  excess: CaptureExcessPorts<unknown, string>;
+interface CashBack {
+  clientId: string;
+  orderId: string;
+  amountCents: number;
+  transactionCode: string;
 }
 
 interface Tables {
   sales: Map<string, HostSale>;
   cashBack: CashBack[];
-  cashRefunds: ActsHost['cashRefunds'];
-  credits: ActsHost['credits'];
-  records: ActsHost['records'];
+  cashRefunds: Array<{ clientId: string; orderId: string; amountCents: number }>;
+  credits: Array<{ clientId: string; orderId: string; amountCents: number; reason: string }>;
+  records: Array<{ act: RefundRecord | RebindRecord | ExcessRecord; note: string }>;
+}
+
+/** The caller's own writes, each one statement of its own; spied on by the suites. */
+export interface HostWrites {
+  writeLegs(orderId: string, legs: ReadonlyArray<SettledLeg | CaptureLeg>): Promise<void>;
+  bookCashBack(cash: CashBack, note: string): Promise<void>;
+  bookCashRefund(refund: { clientId: string; orderId: string; amountCents: number }, note: string): Promise<void>;
+  record(act: RefundRecord | RebindRecord | ExcessRecord, note: string): Promise<void>;
 }
 
 function snapshot(tables: Tables): Tables {
@@ -52,7 +59,14 @@ function restore(tables: Tables, from: Tables): void {
   for (const key of ['cashBack', 'cashRefunds', 'credits', 'records'] as const) tables[key].splice(0, tables[key].length, ...(from[key] as never[]));
 }
 
-export function actsHost(captures: MemoryTerminalCaptures): ActsHost {
+/** A refusal the caller cannot book: thrown to roll its transaction back, then answered. */
+class Refused extends Error {
+  constructor(readonly answer: Extract<ExcessSettled, { ok: false }>) {
+    super(answer.code);
+  }
+}
+
+export function actsHost(captures: MemoryTerminalCaptures) {
   const tables: Tables = { sales: new Map(), cashBack: [], cashRefunds: [], credits: [], records: [] };
   async function transaction<T>(work: (tx: unknown) => Promise<T>): Promise<T> {
     const before = snapshot(tables);
@@ -63,38 +77,68 @@ export function actsHost(captures: MemoryTerminalCaptures): ActsHost {
       throw error;
     }
   }
-  const acts: CaptureActPorts<unknown, SettledLeg, string> = {
-    transaction,
-    async settledSale(_tx, clientId, orderId) {
-      const sale = tables.sales.get(orderId);
-      if (sale === undefined || sale.clientId !== clientId || !sale.paid) return null;
-      return { legs: sale.legs, paymentId: sale.paymentId };
-    },
-    async writeLegs(_tx, _clientId, orderId, legs) {
+  const writes: HostWrites = {
+    async writeLegs(orderId, legs) {
       const sale = tables.sales.get(orderId);
       if (sale) sale.legs = [...legs];
     },
-    async bookCashBack(_tx, cash) {
+    async bookCashBack(cash) {
       tables.cashBack.push(cash);
     },
-    async record(_tx, act, note) {
+    async bookCashRefund(refund) {
+      tables.cashRefunds.push(refund);
+    },
+    async record(act, note) {
       tables.records.push({ act, note });
     },
   };
-  const excess: CaptureExcessPorts<unknown, string> = {
-    transaction,
-    async buyerHoldsCredit(_clientId, orderId) {
-      return orderId !== null && tables.sales.get(orderId)?.buyer === true;
-    },
-    async bookCashRefund(_tx, refund) {
-      tables.cashRefunds.push(refund);
-    },
-    async postCredit(credit) {
-      tables.credits.push(credit);
-    },
-    async record(_tx, booked, note) {
-      tables.records.push({ act: booked, note });
+  const credit: StoreCreditPort<string> = {
+    async post(posted) {
+      tables.credits.push(posted);
     },
   };
-  return { ...tables, acts, excess };
+
+  /** Refund: one transaction, the flag on its handle, the audit only when this act flagged. */
+  function refund(acts: CaptureActs, input: RefundCaptureInput, note: string): Promise<RefundOutcome> {
+    return transaction(async (tx) => {
+      const outcome = await acts.refund(input, tx);
+      if (outcome.ok && outcome.flagged) await writes.record(outcome.record, note);
+      return outcome;
+    });
+  }
+
+  /** Rebind: the caller reads its sale, the engine binds on the same handle, the caller writes what it answered. */
+  function rebind(acts: CaptureActs, input: { clientId: string; transactionCode: string; orderId: string }, note: string): Promise<RebindOutcome | { ok: false; code: 'NOT_A_SETTLED_SALE' }> {
+    return transaction(async (tx) => {
+      const sale = tables.sales.get(input.orderId);
+      if (sale === undefined || sale.clientId !== input.clientId || !sale.paid) return { ok: false, code: 'NOT_A_SETTLED_SALE' } as const;
+      const outcome = await acts.rebind({ ...input, paymentId: sale.paymentId, legs: [...sale.legs] }, tx);
+      if (!outcome.ok || !outcome.moved) return outcome;
+      await writes.writeLegs(input.orderId, outcome.legs);
+      await writes.bookCashBack({ clientId: input.clientId, orderId: input.orderId, amountCents: outcome.cashBackCents, transactionCode: input.transactionCode }, note);
+      await writes.record(outcome.record, note);
+      return outcome;
+    });
+  }
+
+  /** Excess: the engine's payment side on the caller's handle, then the caller's cash and audit. */
+  async function settle(excess: CaptureExcess<unknown, string>, plan: ExcessPlan, sale: ExcessSale, note: string): Promise<ExcessSettled> {
+    try {
+      return await transaction(async (tx) => {
+        const settled = await excess.settle(plan, sale, { tx, note });
+        if (!settled.ok) throw new Refused(settled);
+        if (settled.cashRefundCents > 0 && sale.orderId !== null) await writes.bookCashRefund({ clientId: sale.clientId, orderId: sale.orderId, amountCents: settled.cashRefundCents }, note);
+        if (settled.record !== null) await writes.record(settled.record, note);
+        return settled;
+      });
+    } catch (error) {
+      if (error instanceof Refused) return error.answer;
+      throw error;
+    }
+  }
+
+  /** Whether the sale has an identified buyer: the caller's answer for `admitExcess`. */
+  const buyerHoldsCredit = (orderId: string | null): boolean => orderId !== null && tables.sales.get(orderId)?.buyer === true;
+
+  return { ...tables, writes, credit, refund, rebind, settle, buyerHoldsCredit };
 }

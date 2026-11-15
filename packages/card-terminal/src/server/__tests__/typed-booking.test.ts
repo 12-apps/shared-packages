@@ -1,14 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { BindTarget } from '../model';
-import { createTypedCaptureBooking, type StandaloneSale, type TypedBookingPorts } from '../typed-booking';
+import { CaptureError, type BindTarget, type TerminalCaptureRecord } from '../model';
+import { createTypedCaptureClaims, heldAnswer, typedRefusalOf, type TypedBookAnswer, type TypedCaptureInput } from '../typed-booking';
 import { OTHER_TENANT, TENANT, capture, wire, world, type World } from './world';
 
 /**
  * FUT-4997 contract rows D9-R11 to D9-R23 (package half): a typed capture
- * booked as a sale of its own, idempotent on its code, over a host held in
- * memory — its session, its policy, its sales keyed by the capture's code.
+ * booked as a sale of its own, idempotent on its code, by a CALLER held in
+ * memory — its session, its policy, its sales keyed by the capture's code —
+ * that follows the documented steps: ask `claimable`, write its own sale in
+ * its own transaction, `bind` on that handle, and on a lost race roll back and
+ * ask again.
  */
+
+/** The sale the caller writes for one capture: no line, one payment row, sold by the terminal. */
+interface StandaloneSale<TSession> {
+  clientId: string;
+  deviceId: string;
+  session: TSession;
+  capture: TerminalCaptureRecord;
+}
+
+/** How often the caller decides again after a lost transaction: the second read sees the winner. */
+const BOOK_ATTEMPTS = 3;
 
 interface SessionRow {
   id: string;
@@ -43,7 +57,7 @@ function host(made: World, options: HostOptions = {}) {
       arrived.push(resolve);
       if (arrived.length >= (options.barrier ?? 1)) arrived.splice(0).forEach((release) => release());
     });
-  const hostPorts: TypedBookingPorts<unknown, SessionRow> = {
+  const hostPorts = {
     // One transaction at a time, as row locks would order two writers of one capture.
     async transaction<T>(work: (tx: unknown) => Promise<T>): Promise<T> {
       await gate();
@@ -66,8 +80,8 @@ function host(made: World, options: HostOptions = {}) {
       await options.meanwhile?.(made);
       return live.session;
     }),
-    isRetryable: (error) => error === options.saleRacesOnce,
-    bookedFor: async (_clientId, code, tx) => (options.blindKey === true && tx !== undefined ? null : (booked.get(code) ?? null)),
+    isRetryable: (error: unknown) => error === options.saleRacesOnce,
+    bookedFor: async (_clientId: string, code: string, tx?: unknown): Promise<BindTarget | null> => (options.blindKey === true && tx !== undefined ? null : (booked.get(code) ?? null)),
     createSale: vi.fn(async (_tx: unknown, sale: StandaloneSale<SessionRow>) => {
       if (options.saleFails !== undefined) throw options.saleFails;
       const race = options.saleRacesOnce;
@@ -81,13 +95,51 @@ function host(made: World, options: HostOptions = {}) {
       return target;
     }),
   };
+  const claims = createTypedCaptureClaims({ ledger: made.ledger });
+
+  /** One decision: the claim, then the caller's policy and session, then its sale and the bind in one transaction. */
+  async function once(input: TypedCaptureInput): Promise<TypedBookAnswer | { lost: unknown }> {
+    const claim = await claims.claimable(input);
+    if (claim.claim !== 'FREE') return heldAnswer(claim, await hostPorts.bookedFor(input.clientId, input.capture.transactionCode));
+    const policy = await hostPorts.mayBook();
+    if (!policy.ok) return { outcome: 'NOT_ALLOWED', reason: policy.reason, ack: false };
+    const session = await hostPorts.openSession();
+    if (session === null) return { outcome: 'WAITING', ack: false };
+    try {
+      return await hostPorts.transaction(async (tx): Promise<TypedBookAnswer> => {
+        const prior = await hostPorts.bookedFor(input.clientId, claim.capture.transactionCode, tx);
+        if (prior !== null) return { outcome: 'BOOKED', ...prior, created: false, ack: true };
+        const target = await hostPorts.createSale(tx, { clientId: claim.clientId, deviceId: claim.deviceId, session, capture: claim.capture });
+        return claims.bind(tx, claim, target);
+      });
+    } catch (lost) {
+      if (!(lost instanceof CaptureError) && !hostPorts.isRetryable(lost)) throw lost;
+      return { lost };
+    }
+  }
+
+  const booking = {
+    async book(input: TypedCaptureInput): Promise<TypedBookAnswer> {
+      let last: unknown = null;
+      for (let attempt = 0; attempt < BOOK_ATTEMPTS; attempt += 1) {
+        const answer = await once(input);
+        if (!('lost' in answer)) return answer;
+        last = answer.lost;
+      }
+      const refused = typedRefusalOf(last);
+      if (refused !== null) return heldAnswer(refused, null);
+      throw last;
+    },
+  };
+
   return {
     ports: hostPorts,
     booked,
     sold,
+    claims,
     /** A session opens at the station. */
     openSession: (session: SessionRow) => void (live.session = session),
-    booking: createTypedCaptureBooking({ ledger: made.ledger, ports: hostPorts }),
+    booking,
   };
 }
 
@@ -313,5 +365,38 @@ describe('what refuses it', () => {
     expect(answer).toMatchObject({ outcome: 'BOOKED', created: true });
     expect(ports.createSale).toHaveBeenCalledTimes(2);
     expect(sold).toHaveLength(1);
+  });
+});
+
+describe('caller-driven: the claims decide payment state only', () => {
+  it('claimable records the capture and answers FREE with the seller; nothing of the caller is written', async () => {
+    const { w, deviceId, claims, sold } = setUp();
+
+    const claim = await claims.claimable({ clientId: TENANT, deviceId, capture: wire() });
+
+    expect(claim).toMatchObject({ claim: 'FREE', clientId: TENANT, deviceId, capture: expect.objectContaining({ transactionCode: 'TC-0001', state: 'UNBOUND' }) });
+    expect(w.row('TC-0001').state).toBe('UNBOUND');
+    expect(sold).toHaveLength(0);
+  });
+
+  it("bind on a capture another sale took first throws the ledger's refusal, so the caller's transaction rolls its sale back", async () => {
+    const { w, deviceId, claims } = setUp();
+    const claim = await claims.claimable({ clientId: TENANT, deviceId, capture: wire() });
+    if (claim.claim !== 'FREE') throw new Error('expected a free capture');
+    const first = w.sale();
+    await w.ledger.bind(undefined, TENANT, ['TC-0001'], first);
+
+    await expect(claims.bind(undefined, claim, w.sale())).rejects.toBeInstanceOf(CaptureError);
+    expect(w.row('TC-0001').orderId).toBe(first.orderId);
+    expect(await claims.claimable({ clientId: TENANT, deviceId, capture: wire() })).toEqual({ claim: 'HELD', orderId: first.orderId, paymentId: first.paymentId });
+  });
+
+  it('heldAnswer: BOOKED created false only for the sale the caller booked for this code; BOUND otherwise', () => {
+    const held = { claim: 'HELD' as const, orderId: 'order-1', paymentId: 'payment-1' };
+
+    expect(heldAnswer(held, { orderId: 'order-1', paymentId: 'payment-1' })).toEqual({ outcome: 'BOOKED', orderId: 'order-1', paymentId: 'payment-1', created: false, ack: true });
+    expect(heldAnswer(held, null)).toEqual({ outcome: 'BOUND', orderId: 'order-1', ack: true });
+    expect(heldAnswer({ claim: 'FLAGGED' }, null)).toEqual({ outcome: 'FLAGGED', ack: true });
+    expect(heldAnswer({ claim: 'REFUSED', code: 'CONTENDED' }, null)).toEqual({ outcome: 'REFUSED', code: 'CONTENDED', ack: false });
   });
 });

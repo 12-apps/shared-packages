@@ -8,8 +8,11 @@
  * Only the terminal's word records a capture.
  *
  * Server-safe and dependency-free: no `node:` import, no database client. The
- * host binds the ports (`./ports`) over its own tables. Deliberately NOT on the
- * root barrel — a browser build never needs a capture ledger.
+ * host binds the store and the two read-only directories (`./ports`) over its
+ * own tables. The acts, the excess and the typed claims are CALLER-DRIVEN: they
+ * move only the capture and answer what the caller must write in its own
+ * sale, legs, till and audit — this package never writes them. A point of sale
+ * depends on this package, never the other way round.
  */
 
 export {
@@ -101,32 +104,33 @@ export {
   type TerminalCaptureJobContext,
   type TerminalCaptureJobDeps,
 } from './job';
+export { SWEEP_QUEUE } from './cadence';
 export {
   captureActRefusalOf,
   createCaptureActs,
   planRebind,
-  type CaptureActPorts,
-  type CaptureActRecord,
   type CaptureActRefusal,
-  type CaptureActResult,
+  type CaptureActRefused,
   type CaptureActs,
   type CaptureActsConfig,
   type CaptureLeg,
-  type CashBack,
   type RebindCaptureInput,
+  type RebindOutcome,
   type RebindPlan,
+  type RebindRecord,
   type RefundCaptureInput,
+  type RefundOutcome,
+  type RefundRecord,
   type SettledLeg,
-  type SettledSale,
 } from './capture-acts';
 export {
   EXCESS_CHOICES,
+  admitExcess,
   capturedAbove,
   createCaptureExcess,
   planExcess,
   type CaptureExcess,
   type CaptureExcessConfig,
-  type CaptureExcessPorts,
   type ExcessCapture,
   type ExcessChoice,
   type ExcessInput,
@@ -136,14 +140,17 @@ export {
   type ExcessResolution,
   type ExcessSale,
   type ExcessSettled,
+  type SettleOptions,
+  type StoreCreditPort,
 } from './capture-excess';
 export {
-  createTypedCaptureBooking,
-  type StandaloneSale,
+  createTypedCaptureClaims,
+  heldAnswer,
+  typedRefusalOf,
   type TypedBookAnswer,
   type TypedBookRefusal,
-  type TypedBookingPorts,
-  type TypedCaptureBooking,
-  type TypedCaptureBookingConfig,
+  type TypedCaptureClaims,
+  type TypedCaptureClaimsConfig,
   type TypedCaptureInput,
+  type TypedClaim,
 } from './typed-booking';
