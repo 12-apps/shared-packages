@@ -123,15 +123,7 @@ export function isValidAccessKey(key: string): boolean {
  */
 export function assertDraftFits(draft: Pick<SaleDraft, "purpose" | "operation" | "referencedDocuments">, model: FiscalDocumentModel): void {
   const references = draft.referencedDocuments ?? [];
-  if (model === "NFCE" && draft.purpose === "RETURN") {
-    throw new FiscalDocumentError("RETURN_ON_NFCE", "an NFC-e has no return purpose: issue an NF-e (model 55) of entry referencing it.");
-  }
-  if (model === "NFCE" && draft.operation === "IN") {
-    throw new FiscalDocumentError("INVALID_INPUT", 'an NFC-e is an outgoing document: operation must be "OUT".');
-  }
-  if (model === "NFCE" && references.length > 0) {
-    throw new FiscalDocumentError("INVALID_INPUT", "an NFC-e references no document (SEFAZ 708): referencedDocuments must be empty.");
-  }
+  if (model === "NFCE") assertNfceDraftFits(draft, references.length);
   if (draft.purpose === "RETURN" && references.length === 0) {
     throw new FiscalDocumentError("RETURN_NEEDS_REFERENCE", "a return must reference the document it returns (referencedDocuments).");
   }
@@ -141,6 +133,19 @@ export function assertDraftFits(draft: Pick<SaleDraft, "purpose" | "operation" |
   const bad = references.findIndex((reference) => !isValidAccessKey(reference.accessKey));
   if (bad !== -1) {
     throw new FiscalDocumentError("INVALID_INPUT", `referencedDocuments[${bad}].accessKey is not a 44-character access key.`);
+  }
+}
+
+/** The NFC-e half of `assertDraftFits`: no return, no entry, no reference. */
+function assertNfceDraftFits(draft: Pick<SaleDraft, "purpose" | "operation">, referenceCount: number): void {
+  if (draft.purpose === "RETURN") {
+    throw new FiscalDocumentError("RETURN_ON_NFCE", "an NFC-e has no return purpose: issue an NF-e (model 55) of entry referencing it.");
+  }
+  if (draft.operation === "IN") {
+    throw new FiscalDocumentError("INVALID_INPUT", 'an NFC-e is an outgoing document: operation must be "OUT".');
+  }
+  if (referenceCount > 0) {
+    throw new FiscalDocumentError("INVALID_INPUT", "an NFC-e references no document (SEFAZ 708): referencedDocuments must be empty.");
   }
 }
 
