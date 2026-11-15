@@ -14,6 +14,14 @@ export interface HeatMapCell {
   row: string;
   column: string;
   value: number | null;
+  /**
+   * Why a `null` cell has no figure, when it is not the usual reason.
+   * `'unmeasured'`: the occurrence happened (a ratio's denominator is there —
+   * sales in that hour) but its measure was never taken (no cost priced). It
+   * reads `labels.unmeasured` instead of `labels.empty`, so a host's "no sale
+   * in that hour" is never said of an hour that sold. Ignored on a figure.
+   */
+  reason?: 'unmeasured';
 }
 
 /**
@@ -40,6 +48,12 @@ export interface HeatMapLabels {
   empty: string;
   /** What a `null` cell shows. Defaults to an em dash. */
   emptyValue?: string;
+  /**
+   * What an `'unmeasured'` cell means, e.g. "sem custo na hora". Legend (only
+   * while such a cell is drawn), and read on such a cell. Absent: that cell
+   * reads its dash alone, never `empty`'s words.
+   */
+  unmeasured?: string;
 }
 
 export interface HeatMapProps {
