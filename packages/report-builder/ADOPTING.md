@@ -33,8 +33,13 @@ Three changes reach EVERY host, on purpose. Check them:
   toggle's labels would break onto a second line — the phone, a narrow column
   — the control is a `Select` with the same options and the question's name as
   its label (`data-choice="select"` on its wrapper). It turns back into the
-  toggle once the row can hold it. A test that clicks `report-range-item-<id>`
-  at a phone width opens the select instead.
+  toggle once the row can hold it, and a resize that swaps one for the other
+  keeps the keyboard focus on the control. The custom report's and the
+  editor's period (`RangeToggle`) do the same: their five options no longer
+  wrap inside the frame, and in the select "Personalizado…" opens the picker —
+  and re-opens it when picked again while it is the period. A test that clicks
+  `report-range-item-<id>` at a phone width opens the select instead
+  (`report-range-option-<id>`).
 - **A ratio whose every numerator is null is null.** `aggregation: 'ratio'`
   over a bucket where no row carried a number in the numerator (a cost nobody
   priced) is `null`, read "—", in tables, KPIs, cards and heat maps. It was the
