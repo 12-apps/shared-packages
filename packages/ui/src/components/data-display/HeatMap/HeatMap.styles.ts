@@ -59,6 +59,18 @@ export function valueCellSx(compact: boolean, transposed: boolean) {
   };
 }
 
+/**
+ * An unmeasured cell (FUT-4063): the same no-figure ground, with a dashed ring
+ * inside its edge — the sighted reader's way to tell "not measured" from "no
+ * sale", where both show a dash. The legend's swatch carries the same ring.
+ */
+export const unmeasuredRingSx = {
+  outlineStyle: 'dashed',
+  outlineWidth: sxRem(M.unmeasuredRing),
+  outlineOffset: sxRem(M.unmeasuredRingInset),
+  outlineColor: (theme: Theme) => theme.palette.text.secondary,
+} satisfies SxProps<Theme>;
+
 export const SR_ONLY_SX = {
   position: 'absolute',
   width: sxRem(1),

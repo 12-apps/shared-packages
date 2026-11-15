@@ -51,6 +51,7 @@ export {
 export {
   accumulate,
   finalize,
+  isUnmeasuredRatio,
   newAccumulator,
   percentileOf,
   type MeasureAccumulator,
@@ -97,6 +98,7 @@ export type { ReportKpiFigure } from './render-kpi';
 export { isRowFlagged, type ReportTableFlag } from './render-flag';
 export {
   heatmapAxis,
+  trimAxisEdges,
   type ReportHeatmapAxisItem,
   type ReportHeatmapCell,
   type ReportHeatmapModel,
@@ -171,4 +173,5 @@ export {
   REPORT_VALUE_FORMATS,
   SUPPRESSED,
   TIME_GRAINS,
+  unmeasuredKey,
 } from './types';

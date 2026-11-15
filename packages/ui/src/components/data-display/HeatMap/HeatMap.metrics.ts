@@ -23,4 +23,10 @@ export const HEAT_MAP_METRICS = {
   compactMinCell: 28,
   swatch: 12,
   swatchRadius: 3,
+  /**
+   * An unmeasured cell's dashed ring, inset so the grid does not move: what
+   * tells it apart from a "no sale" dash without colour or words.
+   */
+  unmeasuredRing: 1,
+  unmeasuredRingInset: -3,
 } as const;

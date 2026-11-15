@@ -155,6 +155,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/HeatMap`
 **Docs**: `src/components/data-display/HeatMap/HeatMap.md`
 
+### ShareBar
+**Purpose**: Show how one whole splits into parts, e.g. sales by payment method
+**Use Cases**: A split across up to ~6 parts (payment methods, channels, categories). Not a trend (use `Chart`), not many measures per part (use `Table`)
+**Features**: One horizontal 100% bar with each part's percent inside its segment only where it fits (never clipped); the same parts as an accessible list (`aria-label`ed `<ul>`, bar `aria-hidden`) with swatch, name, whole percent and optional host-formatted figure; whole percents add to exactly 100 (largest remainder); role fills, never `primary`/`error` by default; pure `shareBarParts`
+**Location**: `src/components/data-display/ShareBar`
+**Docs**: `src/components/data-display/ShareBar/ShareBar.md`
+
 ### HoverCard
 **Purpose**: Display content on hover
 **Use Cases**: User previews, additional information, contextual help

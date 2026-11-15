@@ -31,6 +31,16 @@ export interface ToggleGroupProps extends Omit<ToggleButtonGroupProps, 'color' |
   options: ToggleOption[];
 
   /**
+   * How the CHOSEN option is drawn (FUT-4063).
+   *
+   * - `'fill'` (default): filled with `color`, as always.
+   * - `'quiet'`: neutral — the text ink on a faint neutral surface, ringed by a
+   *   hairline in the secondary ink. No brand colour, so a red primary never
+   *   paints a choice as a fault. `color` and `gradient` are ignored.
+   */
+  selection?: 'fill' | 'quiet';
+
+  /**
    * Whether the toggle group should have a glow effect
    */
   glow?: boolean;

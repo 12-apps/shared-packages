@@ -111,13 +111,37 @@ export const reportRowFlagSchema = z.strictObject({
 const heatmapLabelsSchema = z.strictObject({
   above: z.string().min(1).max(60),
   below: z.string().min(1).max(60),
+  /** A cell with no figure because its denominator is nothing ("sem venda na hora"). */
   empty: z.string().min(1).max(60),
+  /**
+   * A cell with no figure because its measure was never taken: the denominator
+   * is there, no numerator is ("sem custo na hora"). Absent: the engine copy's
+   * `labels.heatmapUnmeasured`, a neutral "not measured".
+   */
+  unmeasured: z.string().min(1).max(60).optional(),
 });
 
 /** One measure on a phone card line, with the host's words after it ("9" + " pessoas"). */
 const cardPartSchema = z.strictObject({
   measure: z.string().min(1),
   suffix: z.string().max(40).optional(),
+  /**
+   * The suffix when the value is exactly 1 (FUT-4063): `suffix: ' pessoas'`,
+   * `suffixOne: ' pessoa'`, so one person never reads "1 pessoas". Absent: the
+   * `suffix` for every value.
+   */
+  suffixOne: z.string().max(40).optional(),
+  /**
+   * The text between the PREVIOUS subtitle part and this one (FUT-4063), e.g.
+   * `' de '` for "R$ 1.240 de R$ 4.960". Absent: `' · '`, as always. Ignored on
+   * the first part and on `figureCaption`.
+   */
+  joiner: z.string().max(12).optional(),
+  /**
+   * The part's WHOLE text when its value is empty (FUT-4063): `'sem custo'`
+   * instead of "— das vendas". Absent: the empty mark and the suffix, as always.
+   */
+  emptyText: z.string().max(40).optional(),
 });
 
 /**
@@ -162,6 +186,15 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
     /** Below this, the deeper calm tint. */
     strongBelow: z.number().optional(),
     labels: heatmapLabelsSchema,
+    /**
+     * Drop the leading and trailing rows and/or columns with no activity in any
+     * cell (FUT-4063): no figure, and no unmeasured cell either (an hour that
+     * sold with no cost priced is activity). An hour axis then starts at the
+     * first such hour and ends at the last, and stays contiguous between them.
+     * Absent: every present value is drawn, as always. Axes are in the data's
+     * orientation (rows = the first dimension), whichever way the grid is drawn.
+     */
+    trimEdges: z.enum(['rows', 'columns', 'both']).optional(),
   }),
   z.strictObject({
     kind: z.literal('chart'),

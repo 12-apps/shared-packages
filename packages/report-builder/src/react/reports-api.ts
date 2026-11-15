@@ -157,6 +157,12 @@ export interface ReportTableColumn {
 export interface ReportCardPart {
   measure: string;
   suffix?: string;
+  /** The suffix when the value is exactly 1 (FUT-4063): " pessoa" beside " pessoas". */
+  suffixOne?: string;
+  /** What joins this part to the previous subtitle part (FUT-4063); default " · ". */
+  joiner?: string;
+  /** The part's whole text when its value is empty (FUT-4063), e.g. "sem custo". */
+  emptyText?: string;
 }
 
 /** A table's opt-in phone form (FUT-4063): each row a stacked card below `md`. */
@@ -188,7 +194,9 @@ export interface ReportHeatmapPresentationWire {
   target: number;
   strongAbove?: number;
   strongBelow?: number;
-  labels: { above: string; below: string; empty: string };
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
+  /** Drop the empty leading/trailing rows and/or columns (FUT-4063). */
+  trimEdges?: "rows" | "columns" | "both";
 }
 
 /** A table's flagged rows (FUT-4063): the judged column, the flag's words, row indices. */
@@ -203,9 +211,9 @@ export interface ReportHeatmapRender {
   kind: "heatmap";
   rowAxis: Array<{ key: string; label: string }>;
   columnAxis: Array<{ key: string; label: string }>;
-  cells: Array<{ row: string; column: string; value: number | null }>;
+  cells: Array<{ row: string; column: string; value: number | null; reason?: "unmeasured" }>;
   scale: { target: number; strongAbove?: number; strongBelow?: number };
-  labels: { above: string; below: string; empty: string };
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
   valueFormat: ReportTableColumn["format"];
   valueDecimals?: number;
   /** The long form — the dimensions, then the measure — for CSV and the table view. */

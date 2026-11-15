@@ -13,8 +13,15 @@ hand-rolling the label/value pattern.
 - **Direction separate from meaning**: `delta.direction` picks the arrow;
   `delta.tone` picks the colour. A rising cost can render an up arrow and still
   read as negative.
-- **Semantic colour only**: `success.main` / `error.main` / `text.secondary`
-  from the MUI palette — no hardcoded hex, so themes and dark mode work.
+- **Semantic colour only**: `success.main` / the `warning` role /
+  `text.secondary` from the MUI palette — no hardcoded hex, so themes and dark
+  mode work.
+- **A fall is amber, never red** (FUT-145): the `negative` tone draws in the
+  warning role's shade that reads at 4.5:1 on the card, with
+  its arrow. Red beside green says "failed", and a figure that moved the wrong
+  way has not failed. Until this change it drew `error.main`; the API is the
+  same, only the colour moved. Set `tone` per card: `positive`, `negative`
+  (amber) or `neutral` (secondary ink).
 - **Accessible**: the tile is a `role="group"` labelled by its own label; the
   arrow is `aria-hidden` and the delta carries a direction-aware sentence that
   callers can localize.

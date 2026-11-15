@@ -283,6 +283,7 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
         grains={grains}
         grainLabel={dashboard.grainLabel}
         ranges={dashboard.ranges}
+        surface={{ kind: "dashboard", key: dashboard.key }}
         printTitle={dashboard.title}
       />
 

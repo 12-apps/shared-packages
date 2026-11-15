@@ -14,7 +14,14 @@ for any grid of figures judged against one threshold.
   always in the DATA's orientation).
 - **Never colour alone**: an attention cell is bold and carries `labels.above`
   (visually hidden in the cell, visible in the legend); a no-figure cell shows
-  `labels.emptyValue` ("—") and reads `labels.empty`.
+  `labels.emptyValue` ("—") and reads `labels.empty`. A no-figure cell marked
+  `reason: 'unmeasured'` (the occurrence happened, its measure was never taken:
+  sales in the hour, no cost priced) reads `labels.unmeasured` instead, which
+  joins the legend while such a cell is drawn; with no `unmeasured` words it
+  reads its dash alone, never `empty`'s, so "no sale" is not said of an hour
+  that sold. Both show a dash, so an unmeasured cell also carries a dashed ring
+  inside its edge (`data-reason="unmeasured"`), and its legend entry the same
+  ring on its swatch: the difference is never words alone for a sighted reader.
 - **Roles, not values**: above → `warning` tints (deeper above `strongAbove`), at
   or under → `info` tints (deeper below `strongBelow`), no figure →
   `action.disabledBackground` / `text.disabled`. Never `primary`: a red brand
@@ -32,10 +39,10 @@ for any grid of figures judged against one threshold.
 | ------------- | --------------------------------- | -------- | ----------- |
 | `rows`        | `HeatMapAxisItem[]`               | —        | Row axis, top to bottom: `{ key, label }`. |
 | `columns`     | `HeatMapAxisItem[]`               | —        | Column axis, left to right. |
-| `cells`       | `HeatMapCell[]`                   | —        | `{ row, column, value }`; `value: null` = "—"; an absent cell is blank. |
+| `cells`       | `HeatMapCell[]`                   | —        | `{ row, column, value, reason? }`; `value: null` = "—"; `reason: 'unmeasured'` = no figure because nothing was measured; an absent cell is blank. |
 | `scale`       | `HeatMapScale`                    | —        | `{ target, strongAbove?, strongBelow? }`, in the values' units. |
 | `formatValue` | `(value: number) => string`       | —        | A figure as text. |
-| `labels`      | `HeatMapLabels`                   | —        | `{ above, below, empty, emptyValue? }`. |
+| `labels`      | `HeatMapLabels`                   | —        | `{ above, below, empty, emptyValue?, unmeasured? }`. |
 | `caption`     | `string`                          | —        | The table's accessible name (visually hidden). |
 | `transpose`   | `boolean \| 'auto'`                | `'auto'` | Swap the axes; `'auto'` = below `md`. |
 | `legend`      | `boolean`                         | `true`   | Draw the legend. |

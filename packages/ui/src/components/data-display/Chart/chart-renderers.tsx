@@ -89,6 +89,34 @@ function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
   return nodes;
 }
 
+/**
+ * A series' declared dash (FUT-145), passed only when the series declares one,
+ * so an undeclared series renders exactly as before.
+ */
+function seriesDash(s: ChartSeries): { strokeDasharray?: string } {
+  return s.strokeDasharray !== undefined ? { strokeDasharray: s.strokeDasharray } : {};
+}
+
+/** The width key {@link seriesWidth} passes through as declared. */
+const DECLARED_WIDTH = ['strokeWidth'] as const;
+
+/**
+ * A series' declared stroke width, passed only when declared: even an explicit
+ * `undefined` prop moves the renderer's own `stroke-width` within the element's
+ * attributes, and a host's SVG golden would read that as a change. It is the
+ * host's own number in the chart's user units, handed through as `strokeWidth`
+ * always was, never a length this file picks.
+ */
+function seriesWidth(s: ChartSeries): Pick<ChartSeries, 'strokeWidth'> {
+  return Object.fromEntries(DECLARED_WIDTH.flatMap((key) => (s[key] === undefined ? [] : [[key, s[key]]])));
+}
+
+/** A series' declared fill opacity, else the renderer's default (absent: none passed). */
+function seriesFillOpacity(s: ChartSeries, fallback?: number): { fillOpacity?: number } {
+  const opacity = s.fillOpacity ?? fallback;
+  return opacity !== undefined ? { fillOpacity: opacity } : {};
+}
+
 function renderLine(ctx: ChartRenderContext): React.ReactElement {
   return (
     <LineChart {...ctx.commonProps}>
@@ -102,6 +130,7 @@ function renderLine(ctx: ChartRenderContext): React.ReactElement {
           name={s.name}
           stroke={s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           strokeWidth={s.strokeWidth ?? 2}
+          {...seriesDash(s)}
           dot={s.dot !== false}
           activeDot={s.activeDot !== false ? { r: 8 } : false}
           animationDuration={ctx.animationDuration}
@@ -146,6 +175,8 @@ function renderArea(ctx: ChartRenderContext): React.ReactElement {
           stroke={s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fill={s.fill ?? s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fillOpacity={s.fillOpacity ?? 0.6}
+          {...seriesWidth(s)}
+          {...seriesDash(s)}
           stackId={ctx.props.stacked ? 'stack' : undefined}
           animationDuration={ctx.animationDuration}
         />
@@ -272,6 +303,7 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
         dataKey={s.dataKey}
         name={s.name}
         fill={color}
+        {...seriesFillOpacity(s)}
         radius={ctx.barGeometry.radius}
         maxBarSize={ctx.barGeometry.maxBarSize}
         animationDuration={ctx.animationDuration}
@@ -287,7 +319,9 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
         name={s.name}
         stroke={color}
         fill={color}
-        fillOpacity={0.6}
+        {...seriesFillOpacity(s, 0.6)}
+        {...seriesWidth(s)}
+        {...seriesDash(s)}
         animationDuration={ctx.animationDuration}
       />
     );
@@ -299,6 +333,8 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
       dataKey={s.dataKey}
       name={s.name}
       stroke={color}
+      {...seriesWidth(s)}
+      {...seriesDash(s)}
       animationDuration={ctx.animationDuration}
     />
   );

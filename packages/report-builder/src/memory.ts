@@ -2,6 +2,7 @@ import {
   accumulate,
   compareValues,
   finalize,
+  isUnmeasuredRatio,
   mergeAccumulator,
   newAccumulator,
   normalize,
@@ -18,6 +19,7 @@ import {
   type FilterValue,
   type ReportDataSource,
   type ReportRow,
+  unmeasuredKey,
 } from './types';
 
 /**
@@ -105,7 +107,12 @@ function toReportRow(group: Group, query: CompiledQuery): ReportRow {
   });
   query.measures.forEach((measure, index) => {
     const accumulator = group.accumulators[index];
-    row[measure.alias] = accumulator ? finalize(measure, accumulator) : null;
+    const value = accumulator ? finalize(measure, accumulator) : null;
+    row[measure.alias] = value;
+    // Only beside a plain null: a suppressed cell says nothing about its inputs.
+    if (value === null && accumulator && isUnmeasuredRatio(measure, accumulator)) {
+      row[unmeasuredKey(measure.alias)] = true;
+    }
   });
   return row;
 }

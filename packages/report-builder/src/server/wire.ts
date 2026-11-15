@@ -95,6 +95,15 @@ const reportRowSchema = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
 );
 
+/** One part of a phone card line (FUT-4063): the measure, its words, and what joins it to the last. */
+const cardPartWireSchema = z.object({
+  measure: z.string(),
+  suffix: z.string().optional(),
+  suffixOne: z.string().optional(),
+  joiner: z.string().optional(),
+  emptyText: z.string().optional(),
+});
+
 const reportTableColumnSchema = z.object({
   key: z.string(),
   label: z.string(),
@@ -146,8 +155,8 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
         below: z.union([z.literal('md'), z.literal('always'), z.number()]).optional(),
         title: z.string().optional(),
         figure: z.string().optional(),
-        figureCaption: z.object({ measure: z.string(), suffix: z.string().optional() }).optional(),
-        subtitle: z.array(z.object({ measure: z.string(), suffix: z.string().optional() })).optional(),
+        figureCaption: cardPartWireSchema.optional(),
+        subtitle: z.array(cardPartWireSchema).optional(),
       })
       .optional(),
   }),
@@ -156,13 +165,13 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     kind: z.literal('heatmap'),
     rowAxis: z.array(z.object({ key: z.string(), label: z.string() })),
     columnAxis: z.array(z.object({ key: z.string(), label: z.string() })),
-    cells: z.array(z.object({ row: z.string(), column: z.string(), value: z.number().nullable() })),
+    cells: z.array(z.object({ row: z.string(), column: z.string(), value: z.number().nullable(), reason: z.literal('unmeasured').optional() })),
     scale: z.object({
       target: z.number(),
       strongAbove: z.number().optional(),
       strongBelow: z.number().optional(),
     }),
-    labels: z.object({ above: z.string(), below: z.string(), empty: z.string() }),
+    labels: z.object({ above: z.string(), below: z.string(), empty: z.string(), unmeasured: z.string().optional() }),
     valueFormat: reportTableColumnSchema.shape.format,
     valueDecimals: z.number().int().optional(),
     tableColumns: z.array(reportTableColumnSchema),

@@ -39,7 +39,7 @@ export {
  * is the shape they are declared in; the entries themselves are the host's, and
  * travel INTO the surface rather than out of it.
  */
-export type { ReportBuilderSurface } from './transport-context';
+export type { ReportBuilderSurface, ReportPeriodSurface } from './transport-context';
 export type {
   ReportNote,
   SystemDashboardDef,

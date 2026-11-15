@@ -18,7 +18,15 @@ import { useMeasuredWidth } from '../../utility/Overflow/overflow';
 import { heatMapToneColors } from './heat-map-colors';
 import { heatMapFit, heatMapGrid, heatMapTone, isAboveTone, type HeatMapFit } from './heat-map-model';
 import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
-import { headerCellSx, rowHeaderSx, SR_ONLY_SX, swatchSx, tableSx, valueCellSx } from './HeatMap.styles';
+import {
+  headerCellSx,
+  rowHeaderSx,
+  SR_ONLY_SX,
+  swatchSx,
+  tableSx,
+  unmeasuredRingSx,
+  valueCellSx,
+} from './HeatMap.styles';
 import type { HeatMapCell, HeatMapLabels, HeatMapProps, HeatMapScale } from './HeatMap.types';
 
 const EM_DASH = '—';
@@ -59,6 +67,29 @@ interface ValueCellProps {
   testId: string;
 }
 
+/**
+ * The words a no-figure cell reads: `empty`'s, or — for a cell whose measure
+ * was never taken — `unmeasured`'s, and nothing at all rather than `empty`'s
+ * when the host gave none (they would say "no sale" of an hour that sold).
+ */
+function emptyReason(cell: HeatMapCell, labels: HeatMapLabels): string | undefined {
+  return cell.reason === 'unmeasured' ? labels.unmeasured : labels.empty;
+}
+
+/** Whether a cell is drawn as unmeasured: no figure, for that reason. */
+function isUnmeasured(cell: HeatMapCell): boolean {
+  return cell.value === null && cell.reason === 'unmeasured';
+}
+
+/**
+ * The words a cell reads after its figure, visually hidden: the attention
+ * side's, or a no-figure cell's reason.
+ */
+function hiddenWords(tone: ReturnType<typeof heatMapTone>, cell: HeatMapCell, labels: HeatMapLabels): string | undefined {
+  if (isAboveTone(tone)) return labels.above;
+  return tone === 'empty' ? emptyReason(cell, labels) : undefined;
+}
+
 /** One figure cell: blank, "—", or the figure on its side's tint. */
 function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellProps): React.JSX.Element {
   const theme = useTheme();
@@ -69,22 +100,25 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
   const tone = heatMapTone(cell.value, scale);
   const above = isAboveTone(tone);
   const text = cell.value === null ? (labels.emptyValue ?? EM_DASH) : formatValue(cell.value);
+  const words = hiddenWords(tone, cell, labels);
+  const unmeasured = isUnmeasured(cell);
   return (
     <Box
       component="td"
-      sx={{ ...cellSx, ...heatMapToneColors(tone, theme), ...(above ? { fontWeight: 'fontWeightBold' } : {}) }}
+      sx={{
+        ...cellSx,
+        ...heatMapToneColors(tone, theme),
+        ...(above ? { fontWeight: 'fontWeightBold' } : {}),
+        ...(unmeasured ? unmeasuredRingSx : {}),
+      }}
       data-testid={testId}
       data-tone={tone}
+      {...(unmeasured ? { 'data-reason': 'unmeasured' } : {})}
     >
       {text}
-      {above ? (
+      {words ? (
         <Box component="span" sx={SR_ONLY_SX}>
-          {` ${labels.above}`}
-        </Box>
-      ) : null}
-      {tone === 'empty' ? (
-        <Box component="span" sx={SR_ONLY_SX}>
-          {` ${labels.empty}`}
+          {` ${words}`}
         </Box>
       ) : null}
     </Box>
@@ -92,7 +126,16 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
 }
 
 /** The legend: both sides and the "—", each with its own words (never colour alone). */
-function Legend({ labels, testId }: { labels: HeatMapLabels; testId: string }): React.JSX.Element {
+function Legend({
+  labels,
+  unmeasured,
+  testId,
+}: {
+  labels: HeatMapLabels;
+  /** Whether any drawn cell is unmeasured: its words join the legend only then. */
+  unmeasured: boolean;
+  testId: string;
+}): React.JSX.Element {
   const theme = useTheme();
   const items = [
     { key: 'below', swatch: heatMapToneColors('below', theme), text: labels.below, bold: false },
@@ -118,6 +161,21 @@ function Legend({ labels, testId }: { labels: HeatMapLabels; testId: string }): 
       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
         {`${labels.emptyValue ?? EM_DASH} ${labels.empty}`}
       </Typography>
+      {unmeasured && labels.unmeasured ? (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+          <Box
+            component="span"
+            sx={[
+              swatchSx,
+              unmeasuredRingSx,
+              { outlineOffset: 0, backgroundColor: heatMapToneColors('empty', theme).backgroundColor },
+            ]}
+          />
+          <Typography variant="caption" sx={{ color: 'text.secondary' }} data-testid={`${testId}-legend-unmeasured`}>
+            {`${labels.emptyValue ?? EM_DASH} ${labels.unmeasured}`}
+          </Typography>
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -196,7 +254,7 @@ export function HeatMap({
           ))}
         </tbody>
       </Box>
-      {legend ? <Legend labels={labels} testId={dataTestId} /> : null}
+      {legend ? <Legend labels={labels} unmeasured={cells.some(isUnmeasured)} testId={dataTestId} /> : null}
     </Box>
   );
 }

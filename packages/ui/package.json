@@ -232,6 +232,10 @@
       "types": "./dist/types/components/data-display/ScheduleGrid/index.d.ts",
       "default": "./dist/data-display/ScheduleGrid.js"
     },
+    "./data-display/ShareBar": {
+      "types": "./dist/types/components/data-display/ShareBar/index.d.ts",
+      "default": "./dist/data-display/ShareBar.js"
+    },
     "./data-display/SectionOnboarding": {
       "types": "./dist/types/components/data-display/SectionOnboarding/index.d.ts",
       "default": "./dist/data-display/SectionOnboarding.js"

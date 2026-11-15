@@ -39,6 +39,12 @@ The ToggleGroup component is ideal for:
 | `glass`    | `boolean` | `false` | Applies glass morphism styling      |
 | `gradient` | `boolean` | `false` | Enables gradient background effects |
 
+### Selection style
+
+| Prop        | Type                | Default  | Description                                                                                                                                                                                                         |
+| ----------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selection` | `'fill' \| 'quiet'` | `'fill'` | How the chosen option is drawn. `'quiet'` is neutral: the text ink on a faint neutral wash, ringed by a hairline in the secondary ink, with no brand colour (`color` and `gradient` are ignored). Use it where a choice is not an alert: a period, a grouping, a filter on a staff screen whose primary is red. |
+
 ### ToggleOption Interface
 
 ```typescript

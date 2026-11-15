@@ -91,6 +91,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
         grains={report.grains}
         grainLabel={entry?.grainLabel}
         ranges={entry?.ranges}
+        surface={{ kind: "report", key: reportKey }}
         printTitle={report.title}
         onExport={() => exportReportCsv(report, copy.values, noteCsvLines(report.notes, systemCopy), surface.formatBucket)}
       />

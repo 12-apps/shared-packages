@@ -6,9 +6,11 @@
  * shape of its own (two axes and a cell list) rather than columns over rows.
  */
 import { requireEntityForRender } from './catalog';
+import type { RenderLabelCopy } from './copy';
 import type { ReportPresentation } from './spec';
 import {
   isSuppressed,
+  unmeasuredKey,
   type CompiledDimension,
   type CompiledQuery,
   type FieldCatalog,
@@ -23,11 +25,16 @@ export interface ReportHeatmapAxisItem {
   label: string;
 }
 
-/** One cell; `value: null` is an occurrence with no figure (a ratio over zero). */
+/**
+ * One cell; `value: null` is an occurrence with no figure — a ratio over zero
+ * ("no sale"), or, with `reason: 'unmeasured'`, a ratio whose denominator is
+ * there but whose measure was never taken (sales, no cost priced).
+ */
 export interface ReportHeatmapCell {
   row: string;
   column: string;
   value: number | null;
+  reason?: 'unmeasured';
 }
 
 export interface ReportHeatmapModel {
@@ -36,7 +43,8 @@ export interface ReportHeatmapModel {
   columnAxis: ReportHeatmapAxisItem[];
   cells: ReportHeatmapCell[];
   scale: { target: number; strongAbove?: number; strongBelow?: number };
-  labels: { above: string; below: string; empty: string };
+  /** `unmeasured` only when some cell is unmeasured (FUT-4063). */
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
   /** How a cell's figure renders (the measure's format). */
   valueFormat: ReportValueFormat;
   /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
@@ -94,7 +102,69 @@ function toCell(row: ReportRow, rowDim: CompiledDimension, columnDim: CompiledDi
   const raw = row[alias];
   // A suppressed figure is drawn as no figure, the rule every other branch follows.
   const value = typeof raw === 'number' && Number.isFinite(raw) && !isSuppressed(raw) ? raw : null;
-  return { row: rowKey, column: columnKey, value };
+  const unmeasured = value === null && row[unmeasuredKey(alias)] === true;
+  return { row: rowKey, column: columnKey, value, ...(unmeasured ? { reason: 'unmeasured' as const } : {}) };
+}
+
+/**
+ * Whether a cell shows activity (FUT-4063): a figure, or an unmeasured hour —
+ * it SOLD, its cost was never priced. A null over no sale (an auto-closed
+ * shift's night) is not activity, and is what an edge trim drops.
+ */
+function isActive(cell: ReportHeatmapCell): boolean {
+  return cell.value !== null || cell.reason === 'unmeasured';
+}
+
+/**
+ * An axis with its empty EDGES dropped (FUT-4063): the leading and trailing
+ * items no cell shows activity in. What lies between the first and the last
+ * active item stays, gaps included, so the axis is still contiguous — an
+ * auto-closed shift that spread cost over the night (no sale, so no figure)
+ * no longer stretches the hours to 0h–23h, while an hour that sold with no
+ * cost priced (unmeasured) is kept.
+ */
+export function trimAxisEdges(axis: ReportHeatmapAxisItem[], active: ReadonlySet<string>): ReportHeatmapAxisItem[] {
+  const first = axis.findIndex((item) => active.has(item.key));
+  if (first < 0) return axis;
+  let last = axis.length - 1;
+  while (last > first && !active.has(axis[last]?.key ?? '')) last -= 1;
+  return axis.slice(first, last + 1);
+}
+
+/**
+ * The heat map's words: the presentation's, plus — only while a drawn cell is
+ * unmeasured, so every other grid's model is unchanged — what such a cell
+ * reads: the presentation's own, else the engine copy's neutral one.
+ */
+function heatmapLabels(
+  labels: Extract<ReportPresentation, { kind: 'heatmap' }>['labels'],
+  cells: ReportHeatmapCell[],
+  copy: Pick<RenderLabelCopy, 'heatmapUnmeasured'>,
+): ReportHeatmapModel['labels'] {
+  const { unmeasured: own, ...base } = labels;
+  const unmeasured = own ?? copy.heatmapUnmeasured;
+  const needed = cells.some((cell) => cell.reason === 'unmeasured');
+  return needed && unmeasured ? { ...base, unmeasured } : base;
+}
+
+/** The cells a trimmed grid still draws, and the axes with their empty edges dropped. */
+function trimmed(
+  rowAxis: ReportHeatmapAxisItem[],
+  columnAxis: ReportHeatmapAxisItem[],
+  cells: ReportHeatmapCell[],
+  trim: 'rows' | 'columns' | 'both' | undefined,
+): Pick<ReportHeatmapModel, 'rowAxis' | 'columnAxis' | 'cells'> {
+  if (!trim) return { rowAxis, columnAxis, cells };
+  const active = cells.filter(isActive);
+  const rows = trim === 'columns' ? rowAxis : trimAxisEdges(rowAxis, new Set(active.map((cell) => cell.row)));
+  const columns = trim === 'rows' ? columnAxis : trimAxisEdges(columnAxis, new Set(active.map((cell) => cell.column)));
+  const rowKeys = new Set(rows.map((item) => item.key));
+  const columnKeys = new Set(columns.map((item) => item.key));
+  return {
+    rowAxis: rows,
+    columnAxis: columns,
+    cells: cells.filter((cell) => rowKeys.has(cell.row) && columnKeys.has(cell.column)),
+  };
 }
 
 export function toHeatmapModel(
@@ -103,6 +173,7 @@ export function toHeatmapModel(
   catalog: FieldCatalog,
   rows: ReportRow[],
   tableColumns: ReportHeatmapModel['tableColumns'],
+  copy: Pick<RenderLabelCopy, 'heatmapUnmeasured'> = {},
 ): ReportHeatmapModel {
   const entity = requireEntityForRender(catalog, query.entity);
   const [rowDim, columnDim] = query.dimensions;
@@ -114,17 +185,21 @@ export function toHeatmapModel(
   const cells = rows
     .map((row) => toCell(row, rowDim, columnDim, measure.alias))
     .filter((cell): cell is ReportHeatmapCell => cell !== null);
+  const grid = trimmed(
+    heatmapAxis(entity.fields[rowDim.field], presentKeys(rows, rowDim)),
+    heatmapAxis(entity.fields[columnDim.field], presentKeys(rows, columnDim)),
+    cells,
+    presentation.trimEdges,
+  );
   return {
     kind: 'heatmap',
-    rowAxis: heatmapAxis(entity.fields[rowDim.field], presentKeys(rows, rowDim)),
-    columnAxis: heatmapAxis(entity.fields[columnDim.field], presentKeys(rows, columnDim)),
-    cells,
+    ...grid,
     scale: {
       target: presentation.target,
       ...(presentation.strongAbove !== undefined ? { strongAbove: presentation.strongAbove } : {}),
       ...(presentation.strongBelow !== undefined ? { strongBelow: presentation.strongBelow } : {}),
     },
-    labels: presentation.labels,
+    labels: heatmapLabels(presentation.labels, grid.cells, copy),
     valueFormat: measure.format,
     ...(measure.decimals !== undefined ? { valueDecimals: measure.decimals } : {}),
     tableColumns,

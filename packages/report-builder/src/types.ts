@@ -101,6 +101,19 @@ export function isSuppressed(value: ReportCellValue | undefined): value is Suppr
   return value === SUPPRESSED;
 }
 
+/**
+ * The row key that marks a ratio measure's cell as UNMEASURED (FUT-4063): its
+ * value is `null` although its denominator is there — an hour that sold, whose
+ * cost nobody priced. Written `true` beside the measure's own alias, and only
+ * on such a row, so a reader that names its columns (a table, a CSV) never
+ * sees it; the heat map reads it to say "not measured" rather than "no sale",
+ * and to keep that hour when it trims empty edges. An adapter that does not
+ * write it leaves every null reading as before.
+ */
+export function unmeasuredKey(alias: string): string {
+  return `${alias}__unmeasured`;
+}
+
 /** One selectable value of a closed-set field: stored `value`, shown `label`. */
 export interface FieldValueOption {
   value: string;

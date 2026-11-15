@@ -99,6 +99,28 @@ function selectedSx(theme: Theme, palette: Palette, gradient: boolean) {
   };
 }
 
+/**
+ * The chosen option drawn NEUTRAL (`selection="quiet"`, FUT-4063): the text ink
+ * on a faint wash of it, ringed by a hairline in the secondary ink (an inset
+ * shadow, so the option does not grow when chosen). The ring and the ink carry
+ * the choice, never a brand colour.
+ */
+function quietSelectedSx(theme: Theme) {
+  const ring = rem(theme, FIELD_BORDER_WIDTH * 2);
+  const hairline = `inset 0 0 0 ${rem(theme, FIELD_BORDER_WIDTH)} ${theme.palette.text.secondary}`;
+  const chosen = {
+    backgroundColor: alpha(theme.palette.text.primary, 0.08),
+    color: theme.palette.text.primary,
+    boxShadow: hairline,
+  };
+  return {
+    '&.Mui-selected': chosen,
+    '&.Mui-selected:hover': { ...chosen, backgroundColor: alpha(theme.palette.text.primary, 0.12) },
+    '&.Mui-selected.Mui-focusVisible': chosen,
+    '&.Mui-focusVisible': { outline: `${ring} solid ${theme.palette.text.primary}`, outlineOffset: ring },
+  };
+}
+
 export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
   (
     {
@@ -111,6 +133,7 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
       value,
       onChange,
       dataTestId = 'toggle-group',
+      selection = 'fill',
       ...props
     },
     ref,
@@ -136,6 +159,7 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
         onChange={onChange}
         exclusive={variant === 'exclusive' || variant === 'single'}
         data-testid={dataTestId}
+        data-selection={selection === 'quiet' ? 'quiet' : undefined}
         {...props}
       >
         {options.map((option) => (
@@ -154,7 +178,7 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
               paddingTop: 0,
               paddingBottom: 0,
 
-              ...selectedSx(theme, colorPalette, gradient),
+              ...(selection === 'quiet' ? quietSelectedSx(theme) : selectedSx(theme, colorPalette, gradient)),
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
