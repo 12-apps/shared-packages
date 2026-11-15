@@ -97,13 +97,18 @@ function seriesDash(s: ChartSeries): { strokeDasharray?: string } {
   return s.strokeDasharray !== undefined ? { strokeDasharray: s.strokeDasharray } : {};
 }
 
+/** The width key {@link seriesWidth} passes through as declared. */
+const DECLARED_WIDTH = ['strokeWidth'] as const;
+
 /**
  * A series' declared stroke width, passed only when declared: even an explicit
  * `undefined` prop moves the renderer's own `stroke-width` within the element's
- * attributes, and a host's SVG golden would read that as a change.
+ * attributes, and a host's SVG golden would read that as a change. It is the
+ * host's own number in the chart's user units, handed through as `strokeWidth`
+ * always was, never a length this file picks.
  */
-function seriesWidth(s: ChartSeries): { strokeWidth?: number } {
-  return s.strokeWidth !== undefined ? { strokeWidth: s.strokeWidth } : {};
+function seriesWidth(s: ChartSeries): Pick<ChartSeries, 'strokeWidth'> {
+  return Object.fromEntries(DECLARED_WIDTH.flatMap((key) => (s[key] === undefined ? [] : [[key, s[key]]])));
 }
 
 /** A series' declared fill opacity, else the renderer's default (absent: none passed). */
