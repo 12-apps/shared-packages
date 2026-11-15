@@ -97,6 +97,7 @@ export type { ReportKpiFigure } from './render-kpi';
 export { isRowFlagged, type ReportTableFlag } from './render-flag';
 export {
   heatmapAxis,
+  trimAxisEdges,
   type ReportHeatmapAxisItem,
   type ReportHeatmapCell,
   type ReportHeatmapModel,

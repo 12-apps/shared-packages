@@ -97,6 +97,41 @@ function toCell(row: ReportRow, rowDim: CompiledDimension, columnDim: CompiledDi
   return { row: rowKey, column: columnKey, value };
 }
 
+/**
+ * An axis with its empty EDGES dropped (FUT-4063): the leading and trailing
+ * items no cell gives a figure. What lies between the first and the last item
+ * with a figure stays, gaps included, so the axis is still contiguous — an
+ * auto-closed shift that spread cost over the night (no sale, so no figure)
+ * no longer stretches the hours to 0h–23h.
+ */
+export function trimAxisEdges(axis: ReportHeatmapAxisItem[], withFigure: ReadonlySet<string>): ReportHeatmapAxisItem[] {
+  const first = axis.findIndex((item) => withFigure.has(item.key));
+  if (first < 0) return axis;
+  let last = axis.length - 1;
+  while (last > first && !withFigure.has(axis[last]?.key ?? '')) last -= 1;
+  return axis.slice(first, last + 1);
+}
+
+/** The cells a trimmed grid still draws, and the axes with their empty edges dropped. */
+function trimmed(
+  rowAxis: ReportHeatmapAxisItem[],
+  columnAxis: ReportHeatmapAxisItem[],
+  cells: ReportHeatmapCell[],
+  trim: 'rows' | 'columns' | 'both' | undefined,
+): Pick<ReportHeatmapModel, 'rowAxis' | 'columnAxis' | 'cells'> {
+  if (!trim) return { rowAxis, columnAxis, cells };
+  const figured = cells.filter((cell) => cell.value !== null);
+  const rows = trim === 'columns' ? rowAxis : trimAxisEdges(rowAxis, new Set(figured.map((cell) => cell.row)));
+  const columns = trim === 'rows' ? columnAxis : trimAxisEdges(columnAxis, new Set(figured.map((cell) => cell.column)));
+  const rowKeys = new Set(rows.map((item) => item.key));
+  const columnKeys = new Set(columns.map((item) => item.key));
+  return {
+    rowAxis: rows,
+    columnAxis: columns,
+    cells: cells.filter((cell) => rowKeys.has(cell.row) && columnKeys.has(cell.column)),
+  };
+}
+
 export function toHeatmapModel(
   query: CompiledQuery,
   presentation: Extract<ReportPresentation, { kind: 'heatmap' }>,
@@ -116,9 +151,12 @@ export function toHeatmapModel(
     .filter((cell): cell is ReportHeatmapCell => cell !== null);
   return {
     kind: 'heatmap',
-    rowAxis: heatmapAxis(entity.fields[rowDim.field], presentKeys(rows, rowDim)),
-    columnAxis: heatmapAxis(entity.fields[columnDim.field], presentKeys(rows, columnDim)),
-    cells,
+    ...trimmed(
+      heatmapAxis(entity.fields[rowDim.field], presentKeys(rows, rowDim)),
+      heatmapAxis(entity.fields[columnDim.field], presentKeys(rows, columnDim)),
+      cells,
+      presentation.trimEdges,
+    ),
     scale: {
       target: presentation.target,
       ...(presentation.strongAbove !== undefined ? { strongAbove: presentation.strongAbove } : {}),
