@@ -145,6 +145,7 @@ export {
 export {
   createTypedCaptureClaims,
   heldAnswer,
+  timeoutHold,
   typedRefusalOf,
   type TypedBookAnswer,
   type TypedBookRefusal,

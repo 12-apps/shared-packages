@@ -18,6 +18,11 @@ import { captureWireOf, type CaptureWire, type TerminalCaptureTrace } from './po
  * - A resend of a capture already accounted for is acknowledged again from
  *   memory; one being asked or booked is not booked twice.
  *
+ * - A capture the refund sweep flagged `UNBOUND_TIMEOUT` (the server answers
+ *   `FLAGGED_TIMEOUT`) waits on the band with `flaggedAt`: its money may
+ *   already have been refunded on the terminal, so only a person's "on its
+ *   own" books it, confirming that flag (D9-R22); an arrival or a retry never.
+ *
  * - The matches are the sales due NOW: recomputed whenever the entries are
  *   read and when a sale is chosen, so a sale paid meanwhile is never offered.
  *
@@ -55,6 +60,16 @@ export type TypedEntryState = 'asking' | 'booking' | 'held' | 'waiting' | 'done'
 /** Why a capture waits: no open session, the server out of reach, a transient refusal, or a refusal for a person. */
 export type TypedWait = 'session' | 'link' | 'retry' | 'refused';
 
+/** How the sale a capture was tapped onto left without it, as the host knows it. */
+export type TypedUnholdReason = 'paid-elsewhere' | 'cancelled' | 'discarded';
+
+/** The sale a capture was tapped onto, and how it left without it (`unhold`). */
+export interface TypedUnheld {
+  readonly saleKey: string;
+  /** Null when the host did not say. */
+  readonly reason: TypedUnholdReason | null;
+}
+
 export interface TypedEntry<S extends DueSale = DueSale> {
   readonly deviceId: string;
   readonly capture: CaptureWire;
@@ -67,11 +82,29 @@ export interface TypedEntry<S extends DueSale = DueSale> {
   readonly saleKey: string | null;
   /** The server's last answer. */
   readonly answer: TypedBookAnswer | null;
+  /**
+   * Put back on the band by `unhold`: the sale it was tapped onto left without
+   * it. Such a capture is never booked by itself, even when nothing matches;
+   * only a person's "on its own" books it. A late `bound` still settles it.
+   */
+  readonly unheldFrom: TypedUnheld | null;
+  /**
+   * When the refund sweep flagged it `UNBOUND_TIMEOUT` ("A estornar"), as the
+   * server's `FLAGGED_TIMEOUT` answer said (ISO); null otherwise. Such a capture
+   * is booked only by `chooseStandalone`, which confirms this flag.
+   */
+  readonly flaggedAt: string | null;
 }
 
 export interface TypedCaptureInboxConfig<S extends DueSale = DueSale> {
-  /** Ask the host's server to book the capture on its own. A throw means the server could not be reached. */
-  book(deviceId: string, capture: CaptureWire): Promise<TypedBookAnswer>;
+  /**
+   * Ask the host's server to book the capture on its own. A throw means the
+   * server could not be reached. `confirmedFlaggedAt`: the `UNBOUND_TIMEOUT`
+   * flag a person confirmed booking anyway (`chooseStandalone` on an entry
+   * with `flaggedAt`), null on every other call; the server passes it to
+   * `timeoutHold`.
+   */
+  book(deviceId: string, capture: CaptureWire, confirmedFlaggedAt: string | null): Promise<TypedBookAnswer>;
   /** Tell the terminal it may stop reporting these codes. A throw (or a rejection) leaves the capture to tell again. */
   ack(deviceId: string, transactionCodes: readonly string[]): unknown;
   /** The open sales and what is still due on each, now. */
@@ -87,10 +120,26 @@ export interface TypedCaptureInbox<S extends DueSale = DueSale> {
   received(event: { readonly deviceId: string; readonly captures: readonly TerminalCaptureTrace[] }): void;
   /** "Is it this sale?" answered yes: the capture to hold under that sale's key, or null when it is not asking. */
   chooseSale(transactionCode: string, key: string): CaptureWire | null;
-  /** "None of these": book it on its own. False when that is not offered. */
+  /** "None of these": book it on its own, confirming its `flaggedAt` when it has one. False when that is not offered. */
   chooseStandalone(transactionCode: string): boolean;
-  /** The sales these captures were tapped onto settled with them: acknowledge them. */
+  /**
+   * The sales these captures were tapped onto settled with them: acknowledge
+   * them. It also takes a capture `unhold` put back that nobody has answered
+   * since: the bind wins over the unhold.
+   */
   bound(transactionCodes: readonly string[]): void;
+  /**
+   * The sales these captures were tapped onto left without them (paid another
+   * way, cancelled, discarded): put each back on the band, `held` → `asking`,
+   * its matches recomputed against the sales due now and `unheldFrom` naming
+   * the sale and how it left. It never acknowledges the terminal and never
+   * books, now or later by itself, even when nothing matches. A code that is
+   * not held, or whose sale already settled with it (`waitingFor: 'link'`,
+   * only the acknowledgement is left), is left as it is, so a second call
+   * changes nothing. Call it only once the sale left WITHOUT this page settling
+   * it with the capture; a `bound` that comes after still wins.
+   */
+  unhold(transactionCodes: readonly string[], reason?: TypedUnholdReason): void;
   /**
    * Ask again for everything that waits: no session, the link down, a refusal a
    * person may since have resolved, a policy that refused (once it allows),
@@ -107,6 +156,7 @@ export interface TypedCaptureInbox<S extends DueSale = DueSale> {
 /** Where an entry goes on an answer that did not account for it. */
 function unackedPatch<S extends DueSale>(answer: TypedBookAnswer): Partial<TypedEntry<S>> {
   if (answer.outcome === 'NOT_ALLOWED') return { state: 'asking', standalone: false, waitingFor: null, answer };
+  if (answer.outcome === 'FLAGGED_TIMEOUT') return { state: 'asking', standalone: true, waitingFor: null, flaggedAt: answer.flaggedAt, answer };
   if (answer.outcome === 'WAITING') return { state: 'waiting', waitingFor: 'session', answer };
   const wait: TypedWait = answer.outcome === 'REFUSED' && answer.code === 'CONTENDED' ? 'retry' : 'refused';
   return { state: 'waiting', waitingFor: wait, answer };
@@ -144,29 +194,50 @@ async function told(config: Pick<TypedCaptureInboxConfig<DueSale>, 'ack'>, entry
 /** A capture on the band that the policy kept off "on its own", and nothing it matches: it may be booked once allowed. */
 const policyHeld = <S extends DueSale>(entry: TypedEntry<S>): boolean => entry.state === 'asking' && !entry.standalone;
 
+/** The entries among these codes, each once, that pass the test. */
+function among<S extends DueSale>(byCode: ReadonlyMap<string, TypedEntry<S>>, codes: readonly string[], test: (entry: TypedEntry<S>) => boolean): TypedEntry<S>[] {
+  return [...new Set(codes)].flatMap((code) => {
+    const entry = byCode.get(code);
+    return entry !== undefined && test(entry) ? [entry] : [];
+  });
+}
+
+/** A sale's settle takes it: held, or put back by `unhold` and not answered since (the bind wins). */
+const settleable = <S extends DueSale>(entry: TypedEntry<S>): boolean => entry.state === 'held' || (entry.state === 'asking' && entry.unheldFrom !== null);
+
+/** `unhold` moves it: held, with its sale not settled yet. */
+const unholdable = <S extends DueSale>(entry: TypedEntry<S>): boolean => entry.state === 'held' && entry.waitingFor === null && entry.saleKey !== null;
+
+/** Back on the band, naming the sale it left. */
+function unheldPatch<S extends DueSale>(entry: TypedEntry<S>, matches: readonly S[], standalone: boolean, reason: TypedUnholdReason | undefined): Partial<TypedEntry<S>> {
+  const unheldFrom: TypedUnheld = { saleKey: entry.saleKey ?? '', reason: reason ?? null };
+  return { state: 'asking', saleKey: null, matches, standalone, waitingFor: null, unheldFrom };
+}
+
 export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: TypedCaptureInboxConfig<S>): TypedCaptureInbox<S> {
   const { byCode, put, subscribe } = entryStore<S>();
   const allowed = (): boolean => config.standaloneAllowed?.() ?? true;
   const current = (entry: TypedEntry<S>): readonly S[] => matchTypedCapture(entry.capture, config.dueSales());
 
-  async function book(entry: TypedEntry<S>): Promise<void> {
+  async function book(entry: TypedEntry<S>, confirmedFlaggedAt: string | null = null): Promise<void> {
     const asked = put(entry, { state: 'booking', waitingFor: null });
     let answer: TypedBookAnswer;
     try {
-      answer = await config.book(asked.deviceId, asked.capture);
+      answer = await config.book(asked.deviceId, asked.capture, confirmedFlaggedAt);
     } catch {
       put(asked, { state: 'waiting', waitingFor: 'link' });
       return;
     }
     let patch: Partial<TypedEntry<S>> = unackedPatch<S>(answer);
-    if (answer.ack) patch = (await told(config, asked)) ? { state: 'done', waitingFor: null, answer } : { state: 'waiting', waitingFor: 'link', answer };
+    if (answer.ack) patch = (await told(config, asked)) ? { state: 'done', waitingFor: null, flaggedAt: null, answer } : { state: 'waiting', waitingFor: 'link', answer };
     const next = put(asked, patch);
     config.onAnswer?.(next);
   }
 
   /** The sale took it: done at once (so a second call tells nothing twice), held again when the terminal could not be told. */
   async function settled(entry: TypedEntry<S>): Promise<void> {
-    const telling = put(entry, { state: 'done', waitingFor: null });
+    const saleKey = entry.saleKey ?? entry.unheldFrom?.saleKey ?? null;
+    const telling = put(entry, { state: 'done', waitingFor: null, saleKey, unheldFrom: null });
     if (!(await told(config, telling))) put(telling, { state: 'held', waitingFor: 'link' });
   }
 
@@ -180,15 +251,15 @@ export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: Typ
     const capture = captureWireOf(trace, deviceId);
     const matches = matchTypedCapture(capture, config.dueSales());
     const standalone = allowed();
-    const entry: TypedEntry<S> = { deviceId, capture, state: 'asking', matches, standalone, waitingFor: null, saleKey: null, answer: null };
+    const entry: TypedEntry<S> = { deviceId, capture, state: 'asking', matches, standalone, waitingFor: null, saleKey: null, answer: null, unheldFrom: null, flaggedAt: null };
     if (matches.length > 0 || !standalone) put(entry, {});
     else void book(entry);
   }
 
-  /** A capture the policy kept off "on its own": offered again once allowed, booked when nothing matches. */
+  /** A capture the policy kept off "on its own": offered again once allowed, booked when nothing matches unless `unhold` put it back or it is flagged. */
   function reask(entry: TypedEntry<S>): void {
     if (!allowed()) return;
-    if (current(entry).length === 0) void book(entry);
+    if (current(entry).length === 0 && entry.unheldFrom === null && entry.flaggedAt === null) void book(entry);
     else put(entry, { standalone: true });
   }
 
@@ -197,20 +268,17 @@ export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: Typ
     chooseSale(transactionCode, key) {
       const entry = byCode.get(transactionCode);
       if (entry?.state !== 'asking' || !current(entry).some((sale) => sale.key === key)) return null;
-      return put(entry, { state: 'held', saleKey: key }).capture;
+      return put(entry, { state: 'held', saleKey: key, unheldFrom: null }).capture;
     },
     chooseStandalone(transactionCode) {
       const entry = byCode.get(transactionCode);
       if (entry?.state !== 'asking' || !entry.standalone) return false;
-      void book(entry);
+      void book(entry, entry.flaggedAt);
       return true;
     },
-    bound(transactionCodes) {
-      transactionCodes.forEach((code) => {
-        const entry = byCode.get(code);
-        if (entry?.state === 'held') void settled(entry);
-      });
-    },
+    bound: (transactionCodes) => among(byCode, transactionCodes, settleable).forEach((entry) => void settled(entry)),
+    unhold: (transactionCodes, reason) =>
+      among(byCode, transactionCodes, unholdable).forEach((entry) => put(entry, unheldPatch(entry, current(entry), allowed(), reason))),
     retry() {
       [...byCode.values()].forEach((entry) => {
         if (entry.state === 'waiting') void book(entry);

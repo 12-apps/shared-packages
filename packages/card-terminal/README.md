@@ -91,19 +91,60 @@ the tenant's.
 1. `claimable({ clientId, deviceId, capture })`. Not `FREE`: answer
    `heldAnswer(claim, yourSaleBookedForThisCode)` (`BOOKED` `created: false`,
    `BOUND`, `FLAGGED` or `REFUSED`).
-2. `FREE`, and your policy and an open session allow it — otherwise answer your
+2. `FREE`: first `timeoutHold(claim, confirmedFlaggedAt)`. A capture the
+   refund sweep flagged `UNBOUND_TIMEOUT` ("A estornar") may already have been
+   refunded on the terminal, so it is booked only once a person confirmed that
+   very flag: pass the `flaggedAt` the inbox's `book` hands you (null unless a
+   person chose "on its own" on an entry showing the flag). Not null: answer it
+   (`FLAGGED_TIMEOUT`, `flaggedAt` as ISO, `ack: false`) and write nothing.
+   `claim.timeoutFlaggedAt` carries the flag date (D9-R22).
+3. Then, if your policy and an open session allow it — otherwise answer your
    own `NOT_ALLOWED` / `WAITING` with `ack: false`, and the capture stays
    unbound: open a transaction and write your sale and its one payment row,
    sold by `claim.deviceId`.
-3. `bind(tx, claim, { orderId, paymentId })` on that transaction → `BOOKED`
-   `created: true`.
-4. A lost race throws the ledger's `CaptureError`: your transaction rolls the
+4. `bind(tx, claim, { orderId, paymentId })` on that transaction → `BOOKED`
+   `created: true`. The bind clears a timeout flag.
+5. A lost race throws the ledger's `CaptureError`: your transaction rolls the
    sale back; go to step 1, which now answers the winner. Decide at most three
    times in all; still losing, answer `typedRefusalOf(error)` (`REFUSED`
    `CONTENDED`, `ack: false`) and let the terminal report the capture again.
-5. Acknowledge the terminal only AFTER your transaction commits, and only on
+6. Acknowledge the terminal only AFTER your transaction commits, and only on
    an answer with `ack: true`. `bind`'s `ack: true` means nothing if your
    transaction then rolls back.
+
+### A typed capture flagged for a refund (`entry.flaggedAt`)
+
+On the inbox, a `FLAGGED_TIMEOUT` answer puts the entry back on the band as
+`asking`, with `entry.flaggedAt` (ISO) for the line "marcado para estorno em
+{data}; confirme que não foi estornado na maquininha". An arrival, a resend or
+`retry` never books it; only `chooseStandalone` does, calling your `book` with
+that `flaggedAt` as its third argument (every other call passes null).
+
+### A tapped sale that left without its capture (`inbox.unhold`)
+
+On the station, `createTypedCaptureInbox` (`./react`) holds a typed capture the
+cashier tapped onto a sale (`chooseSale` → `held`) until that sale settles with
+it (`bound(codes)`, which acknowledges the terminal). When the sale leaves your
+receivables WITHOUT it instead — paid another way, cancelled, discarded — call
+`inbox.unhold(codes, reason?)`, with `reason` one of `'paid-elsewhere'`,
+`'cancelled'` or `'discarded'`:
+
+- each `held` capture goes back to `asking`, its sale cleared and its matches
+  recomputed against the sales due now. `entry.unheldFrom` is
+  `{ saleKey, reason }`, so the band can name the sale it left and how;
+- it never acknowledges the terminal and never books, and an unheld capture is
+  never booked by itself later either, even when nothing matches: only a
+  person's "on its own" (`chooseStandalone`) books it;
+- subscribers are notified once per capture it moves;
+- a code that is not held, or whose sale already settled with it and only the
+  acknowledgement is left (`waitingFor: 'link'`), is left as it is, so calling
+  it again changes nothing.
+
+A bind wins. Call `unhold` only once you know the sale left without settling
+with that capture, never while your own settle of it is in flight. If a
+`bound(codes)` still arrives for an unheld capture nobody answered since, it
+settles it under the sale it left and acknowledges the terminal. Never use
+`bound` in place of `unhold`: it acknowledges a capture no sale took.
 
 ## Moving from the payments subpaths
 
