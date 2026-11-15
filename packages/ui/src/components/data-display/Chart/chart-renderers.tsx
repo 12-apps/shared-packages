@@ -91,12 +91,19 @@ function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
 
 /**
  * A series' declared dash (FUT-145), passed only when the series declares one,
- * so an undeclared series renders exactly as before. Its width goes on the
- * element itself (`strokeWidth={s.strokeWidth}`): undefined there is the
- * renderer's own default.
+ * so an undeclared series renders exactly as before.
  */
 function seriesDash(s: ChartSeries): { strokeDasharray?: string } {
   return s.strokeDasharray !== undefined ? { strokeDasharray: s.strokeDasharray } : {};
+}
+
+/**
+ * A series' declared stroke width, passed only when declared: even an explicit
+ * `undefined` prop moves the renderer's own `stroke-width` within the element's
+ * attributes, and a host's SVG golden would read that as a change.
+ */
+function seriesWidth(s: ChartSeries): { strokeWidth?: number } {
+  return s.strokeWidth !== undefined ? { strokeWidth: s.strokeWidth } : {};
 }
 
 /** A series' declared fill opacity, else the renderer's default (absent: none passed). */
@@ -163,7 +170,7 @@ function renderArea(ctx: ChartRenderContext): React.ReactElement {
           stroke={s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fill={s.fill ?? s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fillOpacity={s.fillOpacity ?? 0.6}
-          strokeWidth={s.strokeWidth}
+          {...seriesWidth(s)}
           {...seriesDash(s)}
           stackId={ctx.props.stacked ? 'stack' : undefined}
           animationDuration={ctx.animationDuration}
@@ -308,7 +315,7 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
         stroke={color}
         fill={color}
         {...seriesFillOpacity(s, 0.6)}
-        strokeWidth={s.strokeWidth}
+        {...seriesWidth(s)}
         {...seriesDash(s)}
         animationDuration={ctx.animationDuration}
       />
@@ -321,7 +328,7 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
       dataKey={s.dataKey}
       name={s.name}
       stroke={color}
-      strokeWidth={s.strokeWidth}
+      {...seriesWidth(s)}
       {...seriesDash(s)}
       animationDuration={ctx.animationDuration}
     />

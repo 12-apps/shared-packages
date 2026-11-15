@@ -73,8 +73,10 @@ describe('Chart series stroke (FUT-145)', () => {
     const [line] = seriesOf(props, Line);
     const [bar] = seriesOf(props, Bar);
     expect(area).toMatchObject({ fillOpacity: 0.6 });
-    expect(area?.strokeWidth).toBeUndefined();
-    expect(line?.strokeWidth).toBeUndefined();
+    // Not even an explicit `undefined`: it moves the renderer's own stroke-width
+    // within the SVG element, and a host's golden would read that as a change.
+    expect(area).not.toHaveProperty('strokeWidth');
+    expect(line).not.toHaveProperty('strokeWidth');
     expect(line).not.toHaveProperty('strokeDasharray');
     expect(bar).not.toHaveProperty('fillOpacity');
   });
