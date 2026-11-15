@@ -104,36 +104,55 @@ const PROVIDER_KEYS = new Set(PROVIDER_NAMES);
 // Rule 1 — the payments package imports nothing repo-specific
 // ---------------------------------------------------------------------------
 
-const PAYMENTS_ROOT = join(HERE, "packages", "payments");
-
 /**
- * Scoped specifiers the payments package MAY name. Both halves of the package
- * itself (the frontend depends on the backend for types), plus the two tooling
- * configs, which are genuinely generic — they carry an ESLint preset and a
- * tsconfig, are `devDependencies`, and are reached from `eslint.config.js` /
- * `tsconfig.json` rather than from any source file. Vendoring the folder into
- * another repo drops them with no code change.
+ * The packages rule 1 guards, each with the scoped specifiers it MAY name.
+ *
+ * payments: both halves of the package itself (the frontend depends on the
+ * backend for types), plus the two tooling configs, which are genuinely
+ * generic — they carry an ESLint preset and a tsconfig, are `devDependencies`,
+ * and are reached from `eslint.config.js` / `tsconfig.json` rather than from
+ * any source file. Vendoring the folder into another repo drops them with no
+ * code change.
+ *
+ * card-terminal (FUT-4996): its own name and the same two configs, and NOT
+ * payments. The owner's rule is that the point of sale depends on payments and
+ * payments knows nothing of it; the terminal flow was split out so payments
+ * stays light for a storefront. So neither may name the other: payments
+ * importing `@12-apps/card-terminal` would drag the terminal back into every
+ * storefront bundle, and card-terminal importing payments would make the
+ * independent package dependent again.
  *
  * Everything else under `@12-apps/*` / `@repo/*` — shared-helpers, ui, auth,
  * rbac, … — is repo-specific for this purpose: real or not as a shared
  * library, it is not something an adopting repo is guaranteed to have.
  */
-const ALLOWED_SCOPED_IMPORTS = new Set([
-  "@12-apps/payments-backend",
-  "@12-apps/payments-frontend",
-  "@12-apps/eslint-config",
-  "@12-apps/typescript-config",
-]);
+const TOOLING = ["@12-apps/eslint-config", "@12-apps/typescript-config"];
+const GUARDED_PACKAGES = [
+  {
+    root: join(HERE, "packages", "payments"),
+    label: "packages/payments/",
+    allowed: new Set(["@12-apps/payments-backend", "@12-apps/payments-frontend", ...TOOLING]),
+  },
+  {
+    root: join(HERE, "packages", "card-terminal"),
+    label: "packages/card-terminal/",
+    allowed: new Set(["@12-apps/card-terminal", ...TOOLING]),
+  },
+];
+
+/** The guarded package a file sits in; payments for anything else (the rule is only scoped onto these two). */
+const guardedPackageOf = (filename) =>
+  GUARDED_PACKAGES.find((pkg) => under(resolve(filename), pkg.root)) ?? GUARDED_PACKAGES[0];
 
 const SCOPED_RE = /^(@12-apps\/[^/]+|@repo\/[^/]+)/;
 
-function scopedViolation(specifier) {
+function scopedViolation(specifier, pkg) {
   const scope = SCOPED_RE.exec(specifier)?.[1];
-  if (!scope || ALLOWED_SCOPED_IMPORTS.has(scope)) return null;
+  if (!scope || pkg.allowed.has(scope)) return null;
   return (
-    `\`${specifier}\` is a sibling workspace package. Nothing under packages/payments/ may import one — ` +
+    `\`${specifier}\` is a sibling workspace package. Nothing under ${pkg.label} may import one — ` +
     `the package is meant to be published or vendored into a repo that does not have it (ADOPTING.md §6). ` +
-    `Move what you need into packages/payments/, or take it as a constructor port from the host.`
+    `Move what you need into ${pkg.label}, or take it as a constructor port from the host.`
   );
 }
 
@@ -153,13 +172,13 @@ const harnessMessage = (specifier) =>
  * fixture app and is not. A rule that matched the word would have failed four
  * existing test files and been switched off the same afternoon.
  */
-function relativeViolation(specifier, filename) {
+function relativeViolation(specifier, filename, pkg) {
   if (!specifier.startsWith(".")) return null;
   const target = resolve(dirname(filename), specifier);
-  if (under(target, PAYMENTS_ROOT)) return null;
+  if (under(target, pkg.root)) return null;
   if (under(target, HARNESS_ROOT)) return harnessMessage(specifier);
   return (
-    `\`${specifier}\` reaches outside packages/payments/. The package must be liftable as a folder, ` +
+    `\`${specifier}\` reaches outside ${pkg.label}. The package must be liftable as a folder, ` +
     `so every relative import has to stay inside it (ADOPTING.md §6).`
   );
 }
@@ -175,18 +194,19 @@ const noHostImports = {
     type: "problem",
     docs: {
       description:
-        "packages/payments/** may not import the harness or a sibling workspace package",
+        "packages/payments/** and packages/card-terminal/** may not import the harness or a sibling workspace package",
     },
     schema: [],
   },
   create(context) {
     const filename = context.filename ?? context.getFilename();
+    const pkg = guardedPackageOf(filename);
     const check = (node, specifier) => {
       if (typeof specifier !== "string") return;
       const message =
         bareHarnessViolation(specifier) ??
-        scopedViolation(specifier) ??
-        relativeViolation(specifier, filename);
+        scopedViolation(specifier, pkg) ??
+        relativeViolation(specifier, filename, pkg);
       if (message) context.report({ node, message });
     };
     return {
@@ -266,18 +286,26 @@ const BACKEND_PKG = "@12-apps/payments-backend";
  * package name. Judging the RESOLVED path rather than the string is what makes
  * the rule about the harm instead of about the spelling.
  */
-const BACKEND_DIR = `${sep}payments${sep}backend${sep}`;
+const BACKEND_DIRS = [
+  `${sep}payments${sep}backend${sep}`,
+  // card-terminal's server halves (FUT-4996): its `./react` half takes only
+  // their types, for the same reason — `./station` reaches `node:crypto`.
+  `${sep}card-terminal${sep}src${sep}server${sep}`,
+  `${sep}card-terminal${sep}src${sep}station${sep}`,
+];
+const BACKEND_SUBPATHS = [`${BACKEND_PKG}`, "@12-apps/card-terminal/server", "@12-apps/card-terminal/station"];
 
 const isBackendSpecifier = (specifier, fromFile) => {
   if (typeof specifier !== "string") return false;
-  if (specifier === BACKEND_PKG || specifier.startsWith(`${BACKEND_PKG}/`)) return true;
+  if (BACKEND_SUBPATHS.some((name) => specifier === name || specifier.startsWith(`${name}/`))) return true;
   if (!specifier.startsWith(".")) return false;
-  const resolved = resolve(dirname(fromFile ?? ""), specifier);
-  return `${resolved}${sep}`.includes(BACKEND_DIR);
+  const resolved = `${resolve(dirname(fromFile ?? ""), specifier)}${sep}`;
+  return BACKEND_DIRS.some((dir) => resolved.includes(dir));
 };
 
 const RUNTIME_MESSAGE =
-  `packages/payments/frontend may import only TYPES from ${BACKEND_PKG} (ADOPTING.md §6). ` +
+  `packages/payments/frontend may import only TYPES from ${BACKEND_PKG}, and card-terminal's ./react only TYPES ` +
+  `from its ./server and ./station (ADOPTING.md §6). ` +
   `A runtime value pulls server code — and its \`node:crypto\` imports — into a browser bundle. ` +
   `Use \`import type { … }\`, or reach the behaviour over the host's mounted HTTP surface via src/client.ts.`;
 

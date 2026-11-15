@@ -6,7 +6,7 @@ import { paymentsPortabilityPlugin } from "./eslint.payments-portability.rules.m
 import { GLOBAL_IGNORES, TEST_GLOBS } from "./eslint.quality.shared.mjs";
 
 /**
- * PORTABILITY gate for `packages/payments/**` — run via
+ * PORTABILITY gate for `packages/payments/**` and `packages/card-terminal/**` — run via
  * `pnpm quality:portability`. Makes the rules in `packages/payments/ADOPTING.md`
  * §6 EXECUTABLE (FUT-562).
  *
@@ -84,6 +84,11 @@ const PROVIDER_NAME_EXEMPT_GLOBS = [
   // catalog.ts still contains all five names — also by spelling them.
   "eslint.payments-portability.rules.mjs",
   "scripts/payments-portability-selftest.mjs",
+  // The terminal LINK protocol names the terminal vendors it speaks to
+  // (`LINK_PROVIDERS`): a terminal's own wire, moved out of payments with the
+  // rest of the terminal flow (FUT-4996). This one file, not the package: the
+  // ledger, the station and the screens stay vendor-free.
+  "packages/card-terminal/src/link/messages.ts",
 ];
 
 export default [
@@ -120,9 +125,11 @@ export default [
     rules: {},
   },
 
-  // Rule 1 — inside the package only.
+  // Rule 1 — inside the guarded packages only: payments, and card-terminal,
+  // which may not name payments either (FUT-4996: the point of sale depends on
+  // payments, never the reverse, and the terminal flow stays independent).
   {
-    files: [`packages/payments/${SOURCE_GLOB}`],
+    files: [`packages/payments/${SOURCE_GLOB}`, `packages/card-terminal/${SOURCE_GLOB}`],
     rules: { "payments/no-host-imports": "error" },
   },
 
@@ -149,6 +156,12 @@ export default [
   {
     files: [`packages/payments/frontend/${SOURCE_GLOB}`],
     ignores: [...TEST_GLOBS, "packages/payments/frontend/src/stories/**"],
+    rules: { "payments/frontend-types-only": "error" },
+  },
+  // …and card-terminal's browser half, against its own server halves.
+  {
+    files: [`packages/card-terminal/src/react/${SOURCE_GLOB}`],
+    ignores: [...TEST_GLOBS],
     rules: { "payments/frontend-types-only": "error" },
   },
 
