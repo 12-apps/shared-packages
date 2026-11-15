@@ -204,6 +204,10 @@
       "types": "./dist/types/components/data-display/HeatMap/index.d.ts",
       "default": "./dist/data-display/HeatMap.js"
     },
+    "./data-display/ShareBar": {
+      "types": "./dist/types/components/data-display/ShareBar/index.d.ts",
+      "default": "./dist/data-display/ShareBar.js"
+    },
     "./data-display/DescriptionItem": {
       "types": "./dist/types/components/data-display/DescriptionItem/index.d.ts",
       "default": "./dist/data-display/DescriptionItem.js"
