@@ -113,6 +113,12 @@ export const VisualStateDownDelta: Story = {
     await step('The generated sentence says "Decrease"', async () => {
       await expect(canvas.getByLabelText('Decrease of -8,2%')).toBeInTheDocument();
     });
+
+    await step('A fall is amber, not red (FUT-145): more red than blue, and green above blue', async () => {
+      const [r = 0, g = 0, b = 0] = (getComputedStyle(canvas.getByText('-8,2%')).color.match(/\d+/g) ?? []).map(Number);
+      await expect(r).toBeGreaterThan(b);
+      await expect(g).toBeGreaterThan(b);
+    });
   },
 };
 

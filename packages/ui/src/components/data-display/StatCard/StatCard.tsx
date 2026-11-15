@@ -16,6 +16,8 @@ import type {
   StatCardProps,
 } from './StatCard.types';
 import { rem, sxRem } from '../../../tokens/relative';
+import { darken, lighten } from '../../../tokens/color';
+import { readableInk, roleInk, tintOver } from '../HeatMap/heat-map-colors';
 
 /** The arrow each direction renders (decorative — the text carries the meaning). */
 const DIRECTION_ICON: Record<StatCardDeltaDirection, typeof ArrowUpwardIcon> = {
@@ -38,10 +40,24 @@ const IMPLIED_TONE: Record<StatCardDeltaDirection, StatCardDeltaTone> = {
   neutral: 'neutral',
 };
 
+/**
+ * A fall's ink (FUT-145): the WARNING role, never `error`. Red beside green on a
+ * staff screen reads as a failure, and a figure that moved the wrong way has
+ * not failed. The role's own shade for the mode where it reads at 4.5:1 on the
+ * card, else a deeper step of it, else the palette's contrast text; the arrow
+ * beside it carries the direction either way, so colour is never the only signal.
+ */
+function statCardFallInk(theme: Theme): string {
+  const ground = tintOver(theme, theme.palette.warning.main, 0);
+  const shade = roleInk(theme, 'warning');
+  const deeper = theme.palette.mode === 'dark' ? lighten(shade, 0.3) : darken(shade, 0.25);
+  return readableInk(theme, ground, [shade, deeper]);
+}
+
 /** Resolve a tone to its semantic palette colour (never a hardcoded hex). */
 function toneColor(tone: StatCardDeltaTone, theme: Theme): string {
   if (tone === 'positive') return theme.palette.success.main;
-  if (tone === 'negative') return theme.palette.error.main;
+  if (tone === 'negative') return statCardFallInk(theme);
   return theme.palette.text.secondary;
 }
 
