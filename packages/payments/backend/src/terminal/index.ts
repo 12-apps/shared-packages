@@ -137,3 +137,13 @@ export {
   type ExcessSale,
   type ExcessSettled,
 } from './capture-excess';
+export {
+  createTypedCaptureBooking,
+  type StandaloneSale,
+  type TypedBookAnswer,
+  type TypedBookRefusal,
+  type TypedBookingPorts,
+  type TypedCaptureBooking,
+  type TypedCaptureBookingConfig,
+  type TypedCaptureInput,
+} from './typed-booking';

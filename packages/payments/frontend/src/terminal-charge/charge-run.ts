@@ -23,6 +23,10 @@ import {
  * Kept outside React (a store a screen subscribes to), so a re-render can
  * never push a charge twice, and every path is a unit test over a fake port.
  * It has no timer: a leg on the terminal waits until something moves it.
+ *
+ * It reads nothing from a server, so it runs the same with none in reach: the
+ * host settles the split through a station's own journal then, and the
+ * journal's refusals stop it like any other (`./offline-hand-off`).
  */
 
 export interface ChargeRunInput {
