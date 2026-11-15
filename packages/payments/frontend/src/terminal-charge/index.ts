@@ -12,6 +12,11 @@
  * drives them over the host's {@link TerminalPort}), with generic screens on
  * top that take every word as props. Its own entry rather than the root
  * barrel's: a host with no terminal should not pull it.
+ *
+ * @deprecated Moved to `@12-apps/card-terminal/react` (FUT-4996): the terminal
+ * flow is its own package, so a storefront that loads payments pulls none of it.
+ * This copy keeps working and is no longer developed; its removal is a later
+ * major release that needs the owner's approval.
  */
 export {
   chargedSplit,

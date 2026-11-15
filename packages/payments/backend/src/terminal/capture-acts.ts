@@ -208,7 +208,15 @@ async function rebind<TTx, L extends SettledLeg, TNote>(
   );
 }
 
-/** The capture acts over a ledger, its legs and the host's ports. */
+/**
+ * The capture acts over a ledger, its legs and the host's ports.
+ *
+ * @deprecated Its ports write the host's own sale, legs, till and audit — the
+ * payment code calling into the point of sale. Use the caller-driven
+ * `createCaptureActs` from `@12-apps/card-terminal/server`, which moves only the
+ * capture and answers what the caller writes (FUT-4996). Removal is a later
+ * major release that needs the owner's approval.
+ */
 export function createCaptureActs<TTx = unknown, L extends SettledLeg = SettledLeg, TNote = unknown>(
   config: CaptureActsConfig<TTx, L, TNote>,
 ): CaptureActs<TNote> {

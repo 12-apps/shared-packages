@@ -10,6 +10,11 @@
  * key store ({@link SecretSealer}), the settings file and the durable files
  * ({@link CaptureBookFiles}) are the host's, behind ports. Not on the root
  * barrel.
+ *
+ * @deprecated Moved to `@12-apps/card-terminal/station` (FUT-4996): the terminal
+ * flow is its own package, so a storefront that loads payments pulls none of it.
+ * This copy keeps working and is no longer developed; its removal is a later
+ * major release that needs the owner's approval.
  */
 export { privateBindAddresses, isPrivateIpv4, type InterfaceAddress, type NetworkInterfaces } from "./terminal-bind";
 export { ChargeBook, chargeBody, endsCharge } from "./terminal-charges";
