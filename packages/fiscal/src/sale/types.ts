@@ -287,7 +287,10 @@ export interface SaleForDocument {
   readonly operation?: DocumentOperation;
   /**
    * `NFref`, at most 500, in order. Absent is none. A `RETURN` quotes the
-   * document it returns here, or it is refused (`RETURN_NEEDS_REFERENCE`).
+   * document it returns here, or it is refused (`RETURN_NEEDS_REFERENCE`); an
+   * NFC-e quotes none (SEFAZ 708). For a buyer's return the host sets CFOP
+   * 1202 (within the state) or 2202 (between states) on every line, and a
+   * single `NO_PAYMENT` payment; the package checks neither.
    */
   readonly referencedDocuments?: readonly ReferencedDocument[];
   readonly destination: OperationDestination;

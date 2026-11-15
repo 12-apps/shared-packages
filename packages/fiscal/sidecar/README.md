@@ -63,7 +63,11 @@ what it built before they existed. A buyer's return is an NF-e of entry
 (`/nfe/issue`, `purpose: "RETURN"`, `operation: "IN"`) that references the
 NFC-e. `INVALID` with code `RETURN_ON_NFCE` refuses a return asked of an NFC-e
 (an NFC-e has no return purpose), and with code `RETURN_NEEDS_REFERENCE` a
-return quoting no document; an NFC-e of entry is `INVALID` too.
+return quoting no document; an NFC-e of entry, and an NFC-e with any
+`referencedDocuments` (SEFAZ rejects `NFref` on a model 65 with 708), are
+`INVALID` too. The caller sets CFOP 1202 (within the state) or 2202 (between
+states) on every line, and a single `NO_PAYMENT` payment; the service checks
+neither.
 
 ## Errors
 

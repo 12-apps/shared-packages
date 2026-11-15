@@ -116,8 +116,9 @@ export function isValidAccessKey(key: string): boolean {
 
 /**
  * Refuses a sale the model cannot carry, before a number is drawn: a return on
- * an NFC-e, an NFC-e of entry, a return quoting nothing, or a reference that
- * is not an access key. A document without `operation` and
+ * an NFC-e, an NFC-e of entry, an NFC-e quoting another document (SEFAZ
+ * rejects `NFref` on a model 65 with 708, and the number would be burned), a
+ * return quoting nothing, or a reference that is not an access key. A document without `operation` and
  * `referencedDocuments` passes as it always did.
  */
 export function assertDraftFits(draft: Pick<SaleDraft, "purpose" | "operation" | "referencedDocuments">, model: FiscalDocumentModel): void {
@@ -127,6 +128,9 @@ export function assertDraftFits(draft: Pick<SaleDraft, "purpose" | "operation" |
   }
   if (model === "NFCE" && draft.operation === "IN") {
     throw new FiscalDocumentError("INVALID_INPUT", 'an NFC-e is an outgoing document: operation must be "OUT".');
+  }
+  if (model === "NFCE" && references.length > 0) {
+    throw new FiscalDocumentError("INVALID_INPUT", "an NFC-e references no document (SEFAZ 708): referencedDocuments must be empty.");
   }
   if (draft.purpose === "RETURN" && references.length === 0) {
     throw new FiscalDocumentError("RETURN_NEEDS_REFERENCE", "a return must reference the document it returns (referencedDocuments).");

@@ -208,6 +208,22 @@ final class DocumentMapperTest extends TestCase
         self::assertSame(['operation: an NFC-e takes "OUT" (tpNF 1)'], $error->details);
     }
 
+    public function testAnNfceQuotesNoDocumentButAnEmptyListPasses(): void
+    {
+        $document = Fixtures::document('nfce-simples');
+        $document['referencedDocuments'] = [['accessKey' => '35261111222333000181650010000012011482139076']];
+
+        $error = self::refusal($document, Model::NFCE);
+
+        self::assertSame('INVALID', $error->class->value);
+        self::assertSame(['referencedDocuments: an NFC-e takes none (708)'], $error->details);
+        $document['referencedDocuments'] = [];
+        self::assertSame(
+            (string) file_get_contents(__DIR__ . '/../fixtures/golden/nfce-simples.xml'),
+            (new DocumentMapper())->build($document, Model::NFCE, 2)['xml'],
+        );
+    }
+
     public function testTheCodedRefusalTravelsToTheCallerAndNothingIsSent(): void
     {
         $transport = new RecordedTransport();

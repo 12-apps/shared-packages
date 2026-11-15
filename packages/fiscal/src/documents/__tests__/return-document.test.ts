@@ -53,6 +53,7 @@ describe("assertDraftFits", () => {
     ["a return quoting nothing", { purpose: "RETURN", operation: "IN" }, "NFE", "RETURN_NEEDS_REFERENCE"],
     ["a return quoting an empty list", { purpose: "RETURN", referencedDocuments: [] }, "NFE", "RETURN_NEEDS_REFERENCE"],
     ["an NFC-e of entry", { purpose: "NORMAL", operation: "IN" }, "NFCE", "INVALID_INPUT"],
+    ["an NFC-e quoting a document (SEFAZ 708)", { purpose: "NORMAL", referencedDocuments: quoted }, "NFCE", "INVALID_INPUT"],
     ["a reference that is not a key", { purpose: "RETURN", referencedDocuments: [{ accessKey: "123" }] }, "NFE", "INVALID_INPUT"],
     [
       "501 references",

@@ -203,8 +203,11 @@ nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
   `operation: "IN"` (`tpNF` 0) and the NFC-e's key in `referencedDocuments`
   (`NFref/refNFe`). Before a number is drawn, `issue()` refuses a return on an
   NFC-e (`RETURN_ON_NFCE`), a return quoting nothing
-  (`RETURN_NEEDS_REFERENCE`), an NFC-e of entry and a reference that is not an
-  access key (`INVALID_INPUT`). `isValidAccessKey` checks a typed key: 44
+  (`RETURN_NEEDS_REFERENCE`), an NFC-e of entry, an NFC-e quoting any document
+  (SEFAZ would reject it with 708 and burn the number) and a reference that is
+  not an access key (`INVALID_INPUT`). The host sets CFOP 1202 (within the
+  state) or 2202 (between states) on every line, and a single `NO_PAYMENT`
+  payment; the package checks neither. `isValidAccessKey` checks a typed key: 44
   characters, the CNPJ inside it alphanumeric or not, the modulo-11 check
   digit. A sale without the two fields is issued exactly as before.
 - **An authorised document always has its XML.** A lookup that finds a

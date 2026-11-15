@@ -164,6 +164,10 @@ final class DocumentMapper
         if ($model === Model::NFCE && ($document['operation'] ?? 'OUT') === 'IN') {
             throw ServiceError::invalid('An NFC-e is an outgoing document.', ['operation: an NFC-e takes "OUT" (tpNF 1)']);
         }
+        if ($model === Model::NFCE && ($document['referencedDocuments'] ?? []) !== []) {
+            // SEFAZ rejects NFref on a model 65 with 708, after the number is spent.
+            throw ServiceError::invalid('An NFC-e references no document.', ['referencedDocuments: an NFC-e takes none (708)']);
+        }
         if ($isReturn && ($document['referencedDocuments'] ?? []) === []) {
             throw new ServiceError(
                 \Fiscal\Sidecar\ErrorClass::INVALID,
