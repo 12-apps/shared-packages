@@ -133,6 +133,7 @@ export {
   type CaptureExcessConfig,
   type ExcessCapture,
   type ExcessChoice,
+  type ExcessCredit,
   type ExcessInput,
   type ExcessPlan,
   type ExcessRecord,
@@ -140,8 +141,6 @@ export {
   type ExcessResolution,
   type ExcessSale,
   type ExcessSettled,
-  type SettleOptions,
-  type StoreCreditPort,
 } from './capture-excess';
 export {
   createTypedCaptureClaims,

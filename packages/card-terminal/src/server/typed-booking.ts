@@ -21,8 +21,10 @@ import type { StationCaptureWire } from './readers';
  * 3. In that same transaction it calls {@link TypedCaptureClaims.bind} with the
  *    handle and the new sale's payment row. The bind's compare-and-set decides
  *    a race: a loser throws a {@link CaptureError}, the caller's transaction
- *    rolls its sale back, and the caller asks `claimable` again, which now
- *    answers the winner (`HELD`).
+ *    rolls its sale back, and the caller asks `claimable` again (at most three
+ *    times in all), which now answers the winner (`HELD`).
+ * 4. Only after its transaction COMMITS does the caller acknowledge the
+ *    terminal.
  *
  * - **Idempotent per `(clientId, transactionCode)`.** A repeat finds the
  *   capture `HELD` by the first booking's sale; {@link heldAnswer} turns that
@@ -87,9 +89,12 @@ export interface TypedCaptureClaims<TTx = unknown> {
   claimable(input: TypedCaptureInput): Promise<TypedClaim>;
   /**
    * Bind a `FREE` capture to the caller's new sale's payment row, on the
-   * caller's transaction. Answers `BOOKED` (`created: true`). A lost race
-   * THROWS the ledger's {@link CaptureError}, so the caller's transaction rolls
-   * its sale back; ask {@link claimable} again.
+   * caller's transaction. Answers `BOOKED` (`created: true`). Its `ack: true`
+   * holds only once that transaction COMMITS: acknowledge the terminal after
+   * the commit, never inside the transaction. A lost race THROWS the ledger's
+   * {@link CaptureError}, so the caller's transaction rolls its sale back; ask
+   * {@link claimable} again, at most three times in all, then answer
+   * `REFUSED` `CONTENDED` (`ack: false`) and let the terminal report it again.
    */
   bind(tx: TTx, claim: Extract<TypedClaim, { claim: 'FREE' }>, target: BindTarget): Promise<Extract<TypedBookAnswer, { outcome: 'BOOKED' }>>;
 }

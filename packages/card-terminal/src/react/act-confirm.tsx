@@ -75,7 +75,7 @@ export function ActConfirm({ title, copy, onSend, onDone, onBack, dataTestId = '
         value={reason}
         onChange={(event) => setReason(event.target.value)}
         inputProps={{ 'data-testid': `${dataTestId}-reason`, maxLength: 200 }}
-        // The act opens on its first question; the caixa is driven from the keyboard.
+        // The act opens on its first question; a point of sale is driven from the keyboard.
         autoFocus
         size="small"
         fullWidth

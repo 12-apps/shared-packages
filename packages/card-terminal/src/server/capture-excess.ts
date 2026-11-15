@@ -11,18 +11,19 @@ import type { TerminalCaptureLedger } from './ledger';
  * - `CHANGE`: every capture leg stays at what was captured, and the excess is
  *   handed back in cash: `settle` answers `cashRefundCents` and the CALLER
  *   books it in its own till.
- * - `STORE_CREDIT`: the excess is kept for the sale's buyer, posted through
- *   the store-credit port (credit is payment state, not the caller's); refused
- *   `EXCESS_NEEDS_BUYER` when the caller says the sale has no identified buyer
- *   to hold it.
+ * - `STORE_CREDIT`: the excess is kept for the sale's buyer: `settle` answers
+ *   the `credit` to post, with a dedupe key stable across retries (the
+ *   captures' codes), and the CALLER posts it to its wallet after its own
+ *   commit; refused `EXCESS_NEEDS_BUYER` when the caller says the sale has no
+ *   identified buyer to hold it.
  * - `REFUND_AND_RECHARGE`: the captures that overshoot are flagged for a refund
  *   with the caller's refund reason CODE (`refundReason` in the config, e.g. a
  *   reduced total), and the amount left to charge again is answered.
  *
  * CALLER-DRIVEN: {@link planExcess} and {@link admitExcess} are pure, and
- * {@link CaptureExcess.settle} does only the payment-side effects — the refund
- * flags and the credit — and answers what the caller must book in its own
- * records (the cash, its audit row). The caller keeps the permission, the
+ * {@link CaptureExcess.settle} writes only the captures' refund flags, on the
+ * caller's transaction, and answers what the caller must book in its own
+ * records (the cash, the credit, its audit row). The caller keeps the permission, the
  * confirmation and the copy.
  */
 
@@ -131,26 +132,30 @@ export interface ExcessRecord {
   reason: string;
 }
 
-/** Store credit for a buyer: payment state, wired by the caller to its wallet. */
-export interface StoreCreditPort<TNote = unknown> {
-  /**
-   * Post the excess as credit to the sale's buyer. It runs OUTSIDE the
-   * caller's transaction (a wallet keeps its own) and before the refund flags,
-   * so a retried settle reaches it again: the port MUST dedupe on
-   * `(clientId, orderId)` — one excess credit per sale — or a retry credits
-   * twice.
-   */
-  post(credit: { clientId: string; orderId: string; amountCents: number; reason: string }, note: TNote | undefined): Promise<void>;
+/**
+ * The credit a `STORE_CREDIT` settle asks the caller to post to the sale's
+ * buyer. Post it AFTER your transaction commits — never inside a transaction
+ * that may still roll back — and dedupe on `dedupeKey`: it is built from the
+ * tenant and the captures' codes, which a retry keeps (a retried sale gets a
+ * new id; its captures do not), so one excess is credited once.
+ */
+export interface ExcessCredit {
+  clientId: string;
+  orderId: string;
+  amountCents: number;
+  reason: string;
+  /** The captures whose excess this is, sorted. */
+  transactionCodes: string[];
+  /** `excess-credit:<clientId>:<codes joined by ','>`: the wallet's idempotency key. */
+  dedupeKey: string;
 }
 
-export interface CaptureExcessConfig<TTx = unknown, TNote = unknown> {
+export interface CaptureExcessConfig<TTx = unknown> {
   ledger: TerminalCaptureLedger<TTx>;
-  /** Where `STORE_CREDIT` posts. Absent: a `STORE_CREDIT` settle is a programming error. */
-  credit?: StoreCreditPort<TNote>;
   /**
    * The refund reason CODE a `REFUND_AND_RECHARGE` flags its captures with —
    * one the caller's table accepts (a reduced total, say). Required: the
-   * operator's free-text `reason` goes to the record and the credit note only,
+   * operator's free-text `reason` goes to the record and the credit only,
    * never into the capture's refund reason.
    */
   refundReason: string;
@@ -165,32 +170,25 @@ export type ExcessRefusal =
  * What a settle did, and what the caller must still book in its own records:
  * `cashRefundCents` handed back from its till (`CHANGE`), `rechargeCents` left
  * to charge again (`REFUND_AND_RECHARGE`), and `record` for its audit row
- * (null for a `FITS` plan, which books nothing). `creditCents` was already
- * posted through the credit port.
+ * (null for a `FITS` plan, which books nothing), and `credit` to post after its
+ * commit (`STORE_CREDIT` only, else null).
  *
  * A refusal (`ok: false`) may come after some of a `REFUND_AND_RECHARGE`'s
  * flags were written on `tx`: the caller rolls its transaction back, as it
  * would for any refusal it cannot book.
  */
 export type ExcessSettled =
-  | { ok: true; plan: ExcessPlan; cashRefundCents: number; creditCents: number; rechargeCents: number; record: ExcessRecord | null }
+  | { ok: true; plan: ExcessPlan; cashRefundCents: number; creditCents: number; credit: ExcessCredit | null; rechargeCents: number; record: ExcessRecord | null }
   | { ok: false; code: CaptureActRefusal };
 
-export interface SettleOptions<TTx = unknown, TNote = unknown> {
-  /** The caller's transaction: the refund flags commit with the caller's own writes, or not at all. */
-  tx?: TTx;
-  /** Passed to the credit port as is (who acted). */
-  note?: TNote;
-}
-
-export interface CaptureExcess<TTx = unknown, TNote = unknown> {
+export interface CaptureExcess<TTx = unknown> {
   /**
-   * Book an admitted plan's payment side on the written sale: the credit or the
+   * Book an admitted plan's capture side on the written sale: the
    * refund flags. A `FITS` plan books nothing. `CHANGE` and `STORE_CREDIT` need
    * the written sale's id; `REFUND_AND_RECHARGE` may run before any sale was
    * written.
    */
-  settle(plan: ExcessPlan, sale: ExcessSale, options?: SettleOptions<TTx, TNote>): Promise<ExcessSettled>;
+  settle(plan: ExcessPlan, sale: ExcessSale, tx: TTx): Promise<ExcessSettled>;
 }
 
 /**
@@ -206,6 +204,19 @@ export function admitExcess(plan: ExcessPlan, sale: { buyerHoldsCredit: boolean 
 
 type Booked = Exclude<ExcessPlan, { kind: 'FITS' } | { kind: 'REFUSED' }>;
 
+/** The credit a `STORE_CREDIT` plan asks the caller to post, keyed on the tenant and the captures' codes. */
+function creditOf(plan: Extract<ExcessPlan, { kind: 'STORE_CREDIT' }>, clientId: string, orderId: string): ExcessCredit {
+  const transactionCodes = plan.legs.map((leg) => leg.transactionCode).sort();
+  return {
+    clientId,
+    orderId,
+    amountCents: plan.creditCents,
+    reason: plan.reason,
+    transactionCodes,
+    dedupeKey: `excess-credit:${clientId}:${transactionCodes.join(',')}`,
+  };
+}
+
 function settledOf(plan: Booked, sale: ExcessSale): Extract<ExcessSettled, { ok: true }> {
   const record: ExcessRecord = { clientId: sale.clientId, orderId: sale.orderId, as: plan.kind, excessCents: plan.excessCents, reason: plan.reason };
   return {
@@ -213,23 +224,18 @@ function settledOf(plan: Booked, sale: ExcessSale): Extract<ExcessSettled, { ok:
     plan,
     cashRefundCents: plan.kind === 'CHANGE' ? plan.cashRefundCents : 0,
     creditCents: plan.kind === 'STORE_CREDIT' ? plan.creditCents : 0,
+    credit: plan.kind === 'STORE_CREDIT' && sale.orderId !== null ? creditOf(plan, sale.clientId, sale.orderId) : null,
     rechargeCents: plan.kind === 'REFUND_AND_RECHARGE' ? plan.rechargeCents : 0,
     record,
   };
 }
 
-/** Post a `STORE_CREDIT` plan's credit through the credit port. */
-async function postCredit<TTx, TNote>(config: CaptureExcessConfig<TTx, TNote>, plan: Extract<ExcessPlan, { kind: 'STORE_CREDIT' }>, orderId: string, sale: ExcessSale, note: TNote | undefined): Promise<void> {
-  if (config.credit === undefined) throw new Error('STORE_CREDIT needs a credit port in the config.');
-  await config.credit.post({ clientId: sale.clientId, orderId, amountCents: plan.creditCents, reason: plan.reason }, note);
-}
-
 /** Flag a `REFUND_AND_RECHARGE` plan's refunded captures with the caller's reason code; a ledger refusal as its code. */
-async function flagRefunded<TTx, TNote>(
-  config: CaptureExcessConfig<TTx, TNote>,
+async function flagRefunded<TTx>(
+  config: CaptureExcessConfig<TTx>,
   plan: Extract<ExcessPlan, { kind: 'REFUND_AND_RECHARGE' }>,
   sale: ExcessSale,
-  tx: TTx | undefined,
+  tx: TTx,
 ): Promise<{ ok: false; code: CaptureActRefusal } | null> {
   try {
     for (const capture of plan.refunded) {
@@ -242,26 +248,22 @@ async function flagRefunded<TTx, TNote>(
   }
 }
 
-async function settle<TTx, TNote>(
-  config: CaptureExcessConfig<TTx, TNote>,
-  plan: ExcessPlan,
-  sale: ExcessSale,
-  options: SettleOptions<TTx, TNote>,
-): Promise<ExcessSettled> {
-  if (plan.kind === 'FITS') return { ok: true, plan, cashRefundCents: 0, creditCents: 0, rechargeCents: 0, record: null };
+async function settle<TTx>(config: CaptureExcessConfig<TTx>, plan: ExcessPlan, sale: ExcessSale, tx: TTx): Promise<ExcessSettled> {
+  // Without the caller's handle a refusal part-way through the flags would leave the earlier ones committed.
+  if (tx === undefined) throw new Error("settle runs on the caller's transaction: pass its handle.");
+  if (plan.kind === 'FITS') return { ok: true, plan, cashRefundCents: 0, creditCents: 0, credit: null, rechargeCents: 0, record: null };
   if (plan.kind === 'REFUSED') throw new Error('A refused excess plan cannot be settled: admit it first.');
   if (plan.kind === 'REFUND_AND_RECHARGE') {
-    const refused = await flagRefunded(config, plan, sale, options.tx);
+    const refused = await flagRefunded(config, plan, sale, tx);
     return refused ?? settledOf(plan, sale);
   }
   if (sale.orderId === null) throw new Error(`${plan.kind} is booked on a written sale: pass its id.`);
-  if (plan.kind === 'STORE_CREDIT') await postCredit(config, plan, sale.orderId, sale, options.note);
   return settledOf(plan, sale);
 }
 
-/** The excess settler over a ledger. It writes payment state only and answers the rest. */
-export function createCaptureExcess<TTx = unknown, TNote = unknown>(config: CaptureExcessConfig<TTx, TNote>): CaptureExcess<TTx, TNote> {
+/** The excess settler over a ledger. It writes the captures' flags only and answers the rest. */
+export function createCaptureExcess<TTx = unknown>(config: CaptureExcessConfig<TTx>): CaptureExcess<TTx> {
   return {
-    settle: (plan, sale, options = {}) => settle(config, plan, sale, options),
+    settle: (plan, sale, tx) => settle(config, plan, sale, tx),
   };
 }

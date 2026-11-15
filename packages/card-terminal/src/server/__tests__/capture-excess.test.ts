@@ -20,10 +20,11 @@ const REDUCED = 'CONTA_REDUCED';
 function setup() {
   const made = world();
   const host = actsHost(made.captures);
-  const excessEngine = createCaptureExcess({ ledger: made.ledger, credit: host.credit, refundReason: REDUCED });
+  const excessEngine = createCaptureExcess({ ledger: made.ledger, refundReason: REDUCED });
   /** The settle as the caller drives it: one transaction, the engine's answer, the caller's own cash and audit. */
   const drivenExcess = {
-    settle: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }, note: string) => host.settle(excessEngine, plan, sale, note),
+    settle: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }, note: string, options?: { afterSettle?: () => Promise<void> }) =>
+      host.settle(excessEngine, plan, sale, note, options),
     /** The caller's read of its buyer, then the pure admission. */
     admit: (plan: ExcessPlan, sale: { clientId: string; orderId: string | null }) => admitExcess(plan, { buyerHoldsCredit: host.buyerHoldsCredit(sale.orderId) }),
   };
@@ -120,9 +121,9 @@ describe('settle: booking the excess on the written sale', () => {
     const orderId = sale(false);
     const plan = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 7800 }], dueCents: 4600, choice: { as: 'CHANGE', reason: 'item removed' } });
 
-    expect(await excess.settle(plan, { clientId: TENANT, orderId }, NOTE)).toEqual({ ok: true, plan, cashRefundCents: 3200, creditCents: 0, rechargeCents: 0, record: { clientId: TENANT, orderId, as: 'CHANGE', excessCents: 3200, reason: 'item removed' } });
+    expect(await excess.settle(plan, { clientId: TENANT, orderId }, NOTE)).toEqual({ ok: true, plan, cashRefundCents: 3200, creditCents: 0, credit: null, rechargeCents: 0, record: { clientId: TENANT, orderId, as: 'CHANGE', excessCents: 3200, reason: 'item removed' } });
     expect(host.cashRefunds).toEqual([{ clientId: TENANT, orderId, amountCents: 3200 }]);
-    expect(host.credits).toEqual([]);
+    expect(host.wallet.size).toBe(0);
     expect(host.records).toEqual([{ act: { clientId: TENANT, orderId, as: 'CHANGE', excessCents: 3200, reason: 'item removed' }, note: NOTE }]);
   });
 
@@ -132,7 +133,7 @@ describe('settle: booking the excess on the written sale', () => {
     const plan = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 7800 }], dueCents: 4600, choice: { as: 'STORE_CREDIT', reason: 'kept' } });
 
     expect(await excess.settle(plan, { clientId: TENANT, orderId }, NOTE)).toMatchObject({ ok: true });
-    expect(host.credits).toEqual([{ clientId: TENANT, orderId, amountCents: 3200, reason: 'kept' }]);
+    expect([...host.wallet.values()]).toEqual([{ clientId: TENANT, orderId, amountCents: 3200, reason: 'kept', transactionCodes: ['TC-1'], dedupeKey: `excess-credit:${TENANT}:TC-1` }]);
     expect(host.cashRefunds).toEqual([]);
   });
 
@@ -143,24 +144,41 @@ describe('settle: booking the excess on the written sale', () => {
 
     expect(await excess.settle(plan, { clientId: TENANT, orderId: null }, NOTE)).toMatchObject({ ok: true, rechargeCents: 1200 });
     expect(w.row('TC-OLD')).toMatchObject({ state: 'UNBOUND', refundReason: REDUCED, orderId: null });
-    expect([host.cashRefunds, host.credits]).toEqual([[], []]);
+    expect([host.cashRefunds, host.wallet.size]).toEqual([[], 0]);
     expect(host.records).toEqual([
       { act: { clientId: TENANT, orderId: null, as: 'REFUND_AND_RECHARGE', excessCents: 6600, reason: 'item taken off the bill' }, note: NOTE },
     ]);
   });
 
-  it('the credit port gets the caller note, so the wallet can write who acted; the caller books its own cash', async () => {
-    const { host, excess, sale } = setup();
+  it('the caller books its own cash refund with its note; the credit is answered, never posted by the engine', async () => {
+    const { host, excess, engine, sale } = setup();
     const refund = vi.spyOn(host.writes, 'bookCashRefund');
-    const credit = vi.spyOn(host.credit, 'post');
     const change = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 1500 }], dueCents: 1200, choice: { as: 'CHANGE', reason: 'r' } });
     const kept = planExcess({ captures: [{ transactionCode: 'TC-2', amountCents: 1500 }], dueCents: 1200, choice: { as: 'STORE_CREDIT', reason: 'r' } });
 
     await excess.settle(change, { clientId: TENANT, orderId: sale(false) }, NOTE);
-    await excess.settle(kept, { clientId: TENANT, orderId: sale(true) }, NOTE);
+    const credited = await engine.settle(kept, { clientId: TENANT, orderId: sale(true) }, 'tx');
 
     expect(refund.mock.calls.map((call) => call[1])).toEqual([NOTE]);
-    expect(credit.mock.calls.map((call) => call[1])).toEqual([NOTE]);
+    expect(credited).toMatchObject({ ok: true, creditCents: 300, credit: { amountCents: 300, dedupeKey: `excess-credit:${TENANT}:TC-2` } });
+    expect(host.wallet.size).toBe(0);
+  });
+
+  it('a caller that rolls back after settle and retries on a NEW sale id credits the buyer once — the key is the captures, not the sale', async () => {
+    const { w, host, excess } = setup();
+    const plan = planExcess({ captures: [{ transactionCode: 'TC-2', amountCents: 3000 }, { transactionCode: 'TC-1', amountCents: 2000 }], dueCents: 4600, choice: { as: 'STORE_CREDIT', reason: 'r' } });
+    const afterSettle = vi.fn<() => Promise<void>>().mockRejectedValueOnce(new Error('audit write failed')).mockResolvedValue(undefined);
+    // The documented order: sale and settle in one transaction, the credit only after the commit; each try writes a NEW sale.
+    const onNewSale = () => excess.settle(plan, { clientId: TENANT, orderId: w.sale().orderId }, NOTE, { afterSettle });
+
+    await expect(onNewSale()).rejects.toThrow('audit write failed');
+    expect(host.wallet.size).toBe(0);
+    await onNewSale();
+    // A retry after a lost answer posts the same key again: still one credit.
+    await onNewSale();
+
+    expect([...host.wallet.values()].map((credit) => credit.amountCents)).toEqual([400]);
+    expect([...host.wallet.keys()]).toEqual([`excess-credit:${TENANT}:TC-1,TC-2`]);
   });
 
   it('REFUND_AND_RECHARGE of a code the tenant does not hold is NOT_FOUND, and nothing is recorded', async () => {
@@ -177,7 +195,7 @@ describe('settle: booking the excess on the written sale', () => {
     const refused = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 50 }], dueCents: 10 });
     const change = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 50 }], dueCents: 10, choice: { as: 'CHANGE', reason: 'r' } });
 
-    expect(await excess.settle(fits, { clientId: TENANT, orderId: 'order-x' }, NOTE)).toEqual({ ok: true, plan: fits, cashRefundCents: 0, creditCents: 0, rechargeCents: 0, record: null });
+    expect(await excess.settle(fits, { clientId: TENANT, orderId: 'order-x' }, NOTE)).toEqual({ ok: true, plan: fits, cashRefundCents: 0, creditCents: 0, credit: null, rechargeCents: 0, record: null });
     await expect(excess.settle(refused, { clientId: TENANT, orderId: 'order-x' }, NOTE)).rejects.toThrow('admit it first');
     await expect(excess.settle(change, { clientId: TENANT, orderId: null }, NOTE)).rejects.toThrow('written sale');
     expect(host.records).toEqual([]);
@@ -190,7 +208,7 @@ describe('caller-driven: settle writes payment state only', () => {
     const orderId = sale(false);
     const plan = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 7800 }], dueCents: 4600, choice: { as: 'CHANGE', reason: 'r' } });
 
-    expect(await engine.settle(plan, { clientId: TENANT, orderId })).toMatchObject({ ok: true, cashRefundCents: 3200, rechargeCents: 0, record: { as: 'CHANGE', orderId } });
+    expect(await engine.settle(plan, { clientId: TENANT, orderId }, 'tx')).toMatchObject({ ok: true, cashRefundCents: 3200, rechargeCents: 0, record: { as: 'CHANGE', orderId } });
     expect([host.cashRefunds, host.records, w.rows()]).toEqual([[], [], []]);
   });
 
@@ -201,7 +219,7 @@ describe('caller-driven: settle writes payment state only', () => {
 
     await expect(
       w.captures.transaction(async () => {
-        await engine.settle(plan, { clientId: TENANT, orderId: null }, { tx: undefined });
+        await engine.settle(plan, { clientId: TENANT, orderId: null }, 'tx');
         throw new Error('the caller failed its own write');
       }),
     ).rejects.toThrow('own write');
@@ -209,11 +227,27 @@ describe('caller-driven: settle writes payment state only', () => {
     expect(host.records).toEqual([]);
   });
 
-  it('STORE_CREDIT with no credit port configured is a programming error, and nothing is posted', async () => {
-    const { w, sale } = setup();
-    const bare = createCaptureExcess({ ledger: w.ledger, refundReason: REDUCED });
-    const plan = planExcess({ captures: [{ transactionCode: 'TC-1', amountCents: 1500 }], dueCents: 1200, choice: { as: 'STORE_CREDIT', reason: 'r' } });
+  it('settle with no transaction handle throws before any flag: a refusal part-way would leave the earlier flags committed', async () => {
+    const { w, engine } = setup();
+    await w.ledger.record(capture({ transactionCode: 'TC-K', transactionId: 'TID-K', amountCents: 1000 }));
+    const plan = planExcess({ captures: [{ transactionCode: 'TC-K', amountCents: 1000 }, { transactionCode: 'TC-X', amountCents: 3000 }], dueCents: 1000, choice: { as: 'REFUND_AND_RECHARGE', reason: 'r' } });
 
-    await expect(bare.settle(plan, { clientId: TENANT, orderId: sale(true) })).rejects.toThrow('credit port');
+    await expect(engine.settle(plan, { clientId: TENANT, orderId: null }, undefined)).rejects.toThrow("caller's transaction");
+    expect(w.row('TC-K').refundFlaggedAt).toBeNull();
+  });
+
+  it('REFUND_AND_RECHARGE refused part-way on the caller transaction leaves no flag behind', async () => {
+    const { w, host, excess } = setup();
+    await w.ledger.record(capture({ transactionCode: 'TC-K', transactionId: 'TID-K', amountCents: 1000 }));
+    await w.ledger.record(capture({ transactionCode: 'TC-A', transactionId: 'TID-A', amountCents: 3000 }));
+    const plan = planExcess({
+      captures: [{ transactionCode: 'TC-K', amountCents: 1000 }, { transactionCode: 'TC-A', amountCents: 3000 }, { transactionCode: 'TC-X', amountCents: 3000 }],
+      dueCents: 1000,
+      choice: { as: 'REFUND_AND_RECHARGE', reason: 'r' },
+    });
+
+    expect(await excess.settle(plan, { clientId: TENANT, orderId: null }, NOTE)).toEqual({ ok: false, code: 'NOT_FOUND' });
+    expect(w.row('TC-A').refundFlaggedAt).toBeNull();
+    expect(host.records).toEqual([]);
   });
 });

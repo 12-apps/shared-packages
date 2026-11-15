@@ -20,12 +20,16 @@ import type { StationCaptureWire } from './readers';
  *   too unless the ledger was configured with it as unbound-only. A second act
  *   answers `flagged: false`: the caller records nothing more.
  * - **Rebind** ({@link CaptureActs.rebind}): the sale received a leg in cash
- *   AND the terminal captured it. The caller opens ONE transaction, passes its
- *   handle and the sale's current legs as plain data; the engine binds the
- *   capture to the sale's payment row (compare-and-set) on that handle and
- *   answers the sale's new legs and the cash to give back. The caller writes
- *   those in the same transaction, or throws and nothing commits. A repeated or
- *   concurrent rebind answers `moved: false` and the caller writes nothing.
+ *   AND the terminal captured it. The caller opens ONE transaction, LOCKS its
+ *   sale row (`SELECT … FOR UPDATE`), reads the sale's legs and passes them as
+ *   plain data with the handle; the engine binds the capture to the sale's
+ *   payment row (compare-and-set) on that handle and answers the sale's new
+ *   legs and the cash to give back. The caller writes those in the same
+ *   transaction, or throws and nothing commits. A repeated or concurrent rebind
+ *   of the SAME capture answers `moved: false` and the caller writes nothing.
+ *   Two DIFFERENT captures rebound onto one sale are serialised only by the
+ *   caller's lock: the engine plans from the legs it is given, so without the
+ *   lock both plan from the same cash leg and too much cash goes back.
  *
  * Every refusal is a code; the caller owns the words, the permission and the
  * status.
@@ -121,14 +125,24 @@ export interface RebindCaptureInput<L extends SettledLeg = SettledLeg> {
   /** The caller's settled sale and its one payment row; the ledger checks the row is the sale's and the tenant's. */
   orderId: string;
   paymentId: string;
-  /** The sale's settled legs as the caller read them in this transaction. Plain data: nothing is written back here. */
+  /**
+   * The sale's settled legs as the caller read them in this transaction, AFTER
+   * locking the sale row. Plain data: nothing is written back here. A capture
+   * the legs' cash cannot cover is `NO_CASH_LEG`.
+   */
   legs: readonly L[];
 }
 
 export interface CaptureActs<TTx = unknown> {
   /** Flag the capture's money to go back. With `tx`, the flag joins the caller's transaction (its audit row with it). */
   refund(input: RefundCaptureInput, tx?: TTx): Promise<RefundOutcome>;
-  /** Bind the capture to the sale's payment row on the caller's transaction and answer the legs and the cash back. */
+  /**
+   * Bind the capture to the sale's payment row on the caller's transaction and
+   * answer the legs and the cash back. `tx` is required (an undefined handle
+   * throws): without it the bind commits alone, and a caller write that then
+   * fails leaves the capture bound with no cash given back. The caller must
+   * hold its sale row's lock for the whole transaction.
+   */
   rebind<L extends SettledLeg>(input: RebindCaptureInput<L>, tx: TTx): Promise<RebindOutcome<L>>;
 }
 
@@ -191,6 +205,7 @@ async function refund<TTx>(config: CaptureActsConfig<TTx>, input: RefundCaptureI
 async function rebind<TTx, L extends SettledLeg>(config: CaptureActsConfig<TTx>, input: RebindCaptureInput<L>, tx: TTx): Promise<RebindOutcome<L>> {
   const { clientId, transactionCode, orderId, paymentId } = input;
   const { ledger } = config;
+  if (tx === undefined) throw new Error("rebind runs on the caller's transaction: pass its handle.");
   return refusing(async (): Promise<RebindOutcome<L>> => {
     const [capture] = await ledger.findByCodes(clientId, [transactionCode], tx);
     if (capture === undefined) return { ok: false, code: 'NOT_FOUND' };

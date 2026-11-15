@@ -25,7 +25,7 @@ function setup(options: { wrap?: (store: TerminalCaptureStore) => TerminalCaptur
   /** The acts as the caller drives them: one transaction, the engine's answer, the caller's own writes. */
   const drivenActs = {
     refund: (input: Parameters<typeof host.refund>[1], note: string) => host.refund(actsEngine, input, note),
-    rebind: (input: Parameters<typeof host.rebind>[1], note: string) => host.rebind(actsEngine, input, note),
+    rebind: (input: Parameters<typeof host.rebind>[1], note: string, options?: { lock?: boolean }) => host.rebind(actsEngine, input, note, options),
   };
   /** A sale paid in cash and its payment row, as the host settled it. */
   function cashSale(cents = DRINK_CENTS, clientId = TENANT) {
@@ -156,7 +156,8 @@ describe('State 4: received twice — pay the leg with the capture instead of ca
     const { orderId } = cashSale(10_000);
     await w.ledger.record(capture({ transactionCode: 'TC-1', amountCents: 3000 }));
 
-    const answers = await Promise.all([1, 2].map(() => acts.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId }, NOTE)));
+    // No sale lock: both read the capture UNBOUND, and the engine's own `moved` guard decides.
+    const answers = await Promise.all([1, 2].map(() => acts.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId }, NOTE, { lock: false })));
 
     expect(answers).toEqual(expect.arrayContaining([expect.objectContaining({ ok: true, moved: true }), { ok: true, moved: false }]));
     expect(host.sales.get(orderId)?.legs).toEqual([{ tender: 'CASH', amountCents: 7000 }, { tender: 'CREDIT', amountCents: 3000 }]);
@@ -247,7 +248,7 @@ describe('caller-driven: the engine writes payment state only', () => {
     await w.ledger.record(capture({ transactionCode: 'TC-1', amountCents: 2000 }));
     const legs = [{ tender: 'PIX', amountCents: 1000 }, { tender: 'CASH', amountCents: 4000 }];
 
-    const outcome = await engine.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId, paymentId, legs }, undefined);
+    const outcome = await engine.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId, paymentId, legs }, 'tx');
 
     expect(outcome).toEqual({
       ok: true,
@@ -267,7 +268,7 @@ describe('caller-driven: the engine writes payment state only', () => {
     const theirs = cashSale(DRINK_CENTS, OTHER_TENANT);
     await w.ledger.record(capture({ transactionCode: 'TC-1', amountCents: DRINK_CENTS }));
 
-    const outcome = await engine.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId: ours.orderId, paymentId: theirs.paymentId, legs: [{ tender: 'CASH', amountCents: DRINK_CENTS }] }, undefined);
+    const outcome = await engine.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId: ours.orderId, paymentId: theirs.paymentId, legs: [{ tender: 'CASH', amountCents: DRINK_CENTS }] }, 'tx');
 
     expect(outcome.ok).toBe(false);
     expect(w.row('TC-1').state).toBe('UNBOUND');
@@ -294,5 +295,28 @@ describe('caller-driven: the engine writes payment state only', () => {
     expect(w.row('TC-1').state).toBe('UNBOUND');
     expect([host.sales.get(orderId)?.legs, host.cashBack]).toEqual([[{ tender: 'CASH', amountCents: DRINK_CENTS }], []]);
     expect(await acts.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId }, NOTE)).toMatchObject({ ok: true, moved: true });
+  });
+
+  it('a rebind with no transaction handle throws before anything is bound: the bind would otherwise commit alone', async () => {
+    const { w, engine, cashSale } = setup();
+    const { orderId, paymentId } = cashSale();
+    await w.ledger.record(capture({ transactionCode: 'TC-1', amountCents: DRINK_CENTS }));
+
+    await expect(engine.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId, paymentId, legs: [{ tender: 'CASH', amountCents: DRINK_CENTS }] }, undefined)).rejects.toThrow("caller's transaction");
+    expect(w.row('TC-1').state).toBe('UNBOUND');
+  });
+
+  it('two DIFFERENT captures rebound onto one cash leg at once: under the sale lock the second plans from the first one\'s legs, and the cash goes back once', async () => {
+    const { w, host, acts, cashSale } = setup();
+    const { orderId } = cashSale(10_000);
+    await w.ledger.record(capture({ transactionCode: 'TC-A', transactionId: 'TID-A', amountCents: 6000 }));
+    await w.ledger.record(capture({ transactionCode: 'TC-B', transactionId: 'TID-B', amountCents: 6000 }));
+
+    const answers = await Promise.all(['TC-A', 'TC-B'].map((code) => acts.rebind({ clientId: TENANT, transactionCode: code, orderId }, NOTE)));
+
+    expect(answers).toEqual([expect.objectContaining({ ok: true, moved: true }), { ok: false, code: 'NO_CASH_LEG' }]);
+    expect(host.cashBack.map((cash) => cash.amountCents)).toEqual([6000]);
+    expect(host.sales.get(orderId)?.legs).toEqual([{ tender: 'CASH', amountCents: 4000 }, { tender: 'CREDIT', amountCents: 6000 }]);
+    expect(w.row('TC-B').state).toBe('UNBOUND');
   });
 });

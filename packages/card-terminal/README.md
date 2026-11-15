@@ -35,7 +35,10 @@ the tenant's.
 
 1. Open a transaction.
 2. `refund({ clientId, transactionCode, refundReason, capture?, orderId? }, tx)`.
-   `RECEIVED_TWICE` fits only an unbound capture; any other reason is yours.
+   `RECEIVED_TWICE` fits only an unbound capture: on a capture a sale already
+   holds it answers `{ ok: false, code: 'BOUND_ELSEWHERE' }` — even when the
+   holder is this very sale — so word that code as "already paid on a sale",
+   not "bound to another sale". Any other reason is yours.
 3. `{ ok: true, flagged: true, record }`: write your audit row from `record`.
    `{ ok: true, flagged: false }`: a repeat; write nothing. `{ ok: false, code }`:
    show your words for `code`.
@@ -43,11 +46,15 @@ the tenant's.
 
 ### Pay a cash leg with the capture instead (`rebind`)
 
-1. Open a transaction; read your settled sale, its payment row and its legs.
-   A sale that is not a settled sale of the tenant is your refusal, not the
-   package's.
+1. Open a transaction and LOCK the sale row (`SELECT … FOR UPDATE`) before
+   reading your settled sale, its payment row and its legs. The lock is
+   required: the engine plans from the legs you pass, so two different
+   captures rebound onto one sale without it would both plan from the same
+   cash leg and give back more cash than it held. A sale that is not a settled
+   sale of the tenant is your refusal, not the package's.
 2. `rebind({ clientId, transactionCode, orderId, paymentId, legs }, tx)`. The
-   capture binds to the payment row by compare-and-set, on `tx`.
+   capture binds to the payment row by compare-and-set, on `tx` (required: an
+   undefined handle throws, since the bind would otherwise commit alone).
 3. `{ ok: true, moved: true, legs, cashBackCents, record }`: replace the sale's
    legs with `legs`, give `cashBackCents` back from the till, write your audit
    from `record`.
@@ -61,14 +68,19 @@ the tenant's.
 1. `planExcess({ captures, dueCents, choice })` — pure.
 2. `admitExcess(plan, { buyerHoldsCredit })` before anything is written — pure;
    you answer whether the sale has an identified buyer.
-3. Open a transaction, write your sale, then `settle(plan, { clientId, orderId }, { tx, note })`.
-   It flags `REFUND_AND_RECHARGE`'s captures with the `refundReason` code you
-   configured (e.g. a reduced total) and posts `STORE_CREDIT` through the
-   `credit` port you wire to your wallet (which must dedupe per sale: it runs
-   outside your transaction).
-4. From the answer: book `cashRefundCents` in your till (`CHANGE`), charge
-   `rechargeCents` again (`REFUND_AND_RECHARGE`), write your audit from
-   `record`. On `{ ok: false }`, roll back.
+3. Open a transaction, write your sale, then `settle(plan, { clientId, orderId }, tx)`
+   (`tx` required). It flags `REFUND_AND_RECHARGE`'s captures with the
+   `refundReason` code you configured (e.g. a reduced total), on `tx`. It
+   writes nothing else.
+4. From the answer, in the same transaction: book `cashRefundCents` in your
+   till (`CHANGE`), charge `rechargeCents` again (`REFUND_AND_RECHARGE`),
+   write your audit from `record`. On `{ ok: false }`, roll back: some flags
+   may already be on `tx`.
+5. After the COMMIT, for `STORE_CREDIT`, post `credit` (`amountCents` to the
+   sale's buyer) to your wallet with `credit.dedupeKey` as its idempotency key.
+   The key is the tenant and the captures' codes, which a retry keeps (a
+   retried sale gets a new id), so a rollback and a retry credit once. Never
+   post it inside the transaction unless the wallet shares that transaction.
 
 ### Book a typed capture as a sale of its own (`createTypedCaptureClaims`)
 
@@ -82,8 +94,19 @@ the tenant's.
 3. `bind(tx, claim, { orderId, paymentId })` on that transaction → `BOOKED`
    `created: true`.
 4. A lost race throws the ledger's `CaptureError`: your transaction rolls the
-   sale back; go to step 1, which now answers the winner. Acknowledge the
-   terminal only on an answer with `ack: true`.
+   sale back; go to step 1, which now answers the winner. Decide at most three
+   times in all; still losing, answer `typedRefusalOf(error)` (`REFUSED`
+   `CONTENDED`, `ack: false`) and let the terminal report the capture again.
+5. Acknowledge the terminal only AFTER your transaction commits, and only on
+   an answer with `ack: true`. `bind`'s `ack: true` means nothing if your
+   transaction then rolls back.
+
+## Moving from the payments subpaths
+
+The deprecated `@12-apps/payments-backend/terminal` ships the same refund
+sweep: both blueprints are named `flag-unbound-captures` on the `sweeps`
+queue. While a host moves over, install exactly one of them. Two would only
+run the same idempotent flagging twice, but there is no reason to.
 
 ## Release
 
