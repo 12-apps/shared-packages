@@ -15,7 +15,7 @@
  * colour alone): a badge over a column a fifth of 260 px wide would have to
  * break "Recomendado" mid-word.
  */
-import { Fragment, type JSX } from 'react';
+import type { JSX } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -49,7 +49,8 @@ function LegendItem({
   testId: string;
 }): JSX.Element {
   return (
-    <Box sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'baseline' }}>
+    // No gap: the colon follows the badge word directly ("Seu plano: Pro").
+    <Box sx={{ display: 'inline-flex', alignItems: 'baseline' }}>
       <Text as="span" size="xs" weight="bold" data-testid={testId}>
         {text}
       </Text>
@@ -82,14 +83,15 @@ function StackedLegend({
     // columns below them, one off ("Seu plano Pro" over Gratuito, FUT-5062).
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5, px: 1, pt: 1, pb: 0.5 }}>
       {items.map((item, index) => (
-        <Fragment key={item.testId}>
+        // The dot travels with the entry it introduces, so a wrap never leaves it hanging.
+        <Box key={item.testId} sx={{ display: 'inline-flex', columnGap: 1, alignItems: 'baseline' }}>
           {index > 0 ? (
             <Text as="span" size="xs" aria-hidden="true">
               ·
             </Text>
           ) : null}
           <LegendItem {...item} />
-        </Fragment>
+        </Box>
       ))}
     </Box>
   );
