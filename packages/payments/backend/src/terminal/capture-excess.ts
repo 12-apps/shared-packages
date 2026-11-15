@@ -221,7 +221,15 @@ async function settle<TTx, TNote>(
   return { ok: true, plan, rechargeCents: plan.kind === 'REFUND_AND_RECHARGE' ? plan.rechargeCents : 0 };
 }
 
-/** The excess planner and settler over a ledger and the host's ports. */
+/**
+ * The excess planner and settler over a ledger and the host's ports.
+ *
+ * @deprecated Its ports write the host's own sale, legs, till and audit — the
+ * payment code calling into the point of sale. Use the caller-driven
+ * `createCaptureExcess` from `@12-apps/card-terminal/server`, which moves only the
+ * capture and answers what the caller writes (FUT-4996). Removal is a later
+ * major release that needs the owner's approval.
+ */
 export function createCaptureExcess<TTx = unknown, TNote = unknown>(config: CaptureExcessConfig<TTx, TNote>): CaptureExcess<TNote> {
   return {
     admit: (plan, sale) => admit(config.ports, plan, sale),

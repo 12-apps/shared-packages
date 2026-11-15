@@ -9,6 +9,11 @@
  * (Node) and the terminal app (React Native) import the same module. The
  * station's server is `@12-apps/payments-backend/terminal-station`. Not on the
  * root barrel.
+ *
+ * @deprecated Moved to `@12-apps/card-terminal/link` (FUT-4996): the terminal
+ * flow is its own package, so a storefront that loads payments pulls none of it.
+ * This copy keeps working and is no longer developed; its removal is a later
+ * major release that needs the owner's approval.
  */
 export { decodeBase64, utf8 } from "./encoding";
 export { hmacSha256, sha256, toHex } from "./hmac-sha256";

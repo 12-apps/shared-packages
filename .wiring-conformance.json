@@ -119,6 +119,10 @@
     "kind": "exempt",
     "why": "no packaged screens: the card-on-file UI is host code and the payment flows are @12-apps/payments-frontend's — this package is deliberately the API half only"
   },
+  "@12-apps/card-terminal": {
+    "kind": "exempt",
+    "why": "moved out of payments as it stood (FUT-4996), and payments' terminal subpaths declared no wiring either: the capture table is the host's own model behind a duck-typed store, the refund sweep is a dep-free job blueprint the host installs, and every act answers what the host writes instead of mounting anything. A manifest is a follow-up once a host adopts the package, not something to invent so a gate can tick."
+  },
   "@12-apps/chat :: areas": {
     "kind": "exempt",
     "why": "a thread is never a page of its own: it sits inside whichever screen shows the thing the conversation is about, which only the host knows, so there is no route or nav row to suggest"

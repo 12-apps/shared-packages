@@ -81,3 +81,7 @@ packages/marketplace
 # is an optional type-only peer), so its position is free. It sits last because
 # it is the newest.
 packages/messaging
+# `@12-apps/card-terminal` needs nothing here at runtime (no dependencies; react
+# and MUI are optional peers for its ./react half), so its position is free. It
+# sits last because it is the newest.
+packages/card-terminal

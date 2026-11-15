@@ -10,6 +10,11 @@
  * Server-safe and dependency-free: no `node:` import, no database client. The
  * host binds the ports (`./ports`) over its own tables. Deliberately NOT on the
  * root barrel — a browser build never needs a capture ledger.
+ *
+ * @deprecated Moved to `@12-apps/card-terminal/server` (FUT-4996): the terminal
+ * flow is its own package, so a storefront that loads payments pulls none of it.
+ * This copy keeps working and is no longer developed; its removal is a later
+ * major release that needs the owner's approval.
  */
 
 export {

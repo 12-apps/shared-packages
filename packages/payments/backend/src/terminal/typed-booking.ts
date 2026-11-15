@@ -126,6 +126,15 @@ function refusedAs(error: unknown): TypedBookAnswer | null {
   return null;
 }
 
+/**
+ * The typed-capture booking over a ledger and the host's ports.
+ *
+ * @deprecated Its ports create the host's sale and read its session — the
+ * payment code calling into the point of sale. Use the caller-driven
+ * `createTypedCaptureClaims` from `@12-apps/card-terminal/server`, which moves only the
+ * capture and answers what the caller writes (FUT-4996). Removal is a later
+ * major release that needs the owner's approval.
+ */
 export function createTypedCaptureBooking<TTx = unknown, TSession = unknown>(
   config: TypedCaptureBookingConfig<TTx, TSession>,
 ): TypedCaptureBooking {
