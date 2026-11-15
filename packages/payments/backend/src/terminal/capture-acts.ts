@@ -196,7 +196,9 @@ async function rebind<TTx, L extends SettledLeg, TNote>(
       if (sale !== null && capture.state === 'BOUND' && capture.orderId === orderId && capture.paymentId === sale.paymentId) return { ok: true };
       const plan = sale === null ? null : planRebind(sale.legs, capture, config.cashTender);
       if (sale === null || plan === null) return { ok: false, code: 'NO_CASH_LEG' };
-      await ledger.bind(tx, clientId, [transactionCode], { orderId, paymentId: sale.paymentId });
+      const { moved } = await ledger.bindReporting(tx, clientId, [transactionCode], { orderId, paymentId: sale.paymentId });
+      // A concurrent twin bound it between our read and our write: its act wrote the rest.
+      if (moved.length === 0) return { ok: true };
       await ports.writeLegs(tx, clientId, orderId, plan.legs);
       await ports.bookCashBack(tx, { clientId, orderId, amountCents: plan.cashBackCents, transactionCode }, note);
       const { kind, amountCents } = capture;

@@ -60,6 +60,7 @@ export {
 } from './ports';
 export {
   createTerminalCaptureLedger,
+  type BindReport,
   type CaptureDevice,
   type DeviceCaptureAnswer,
   type TerminalCaptureLedger,

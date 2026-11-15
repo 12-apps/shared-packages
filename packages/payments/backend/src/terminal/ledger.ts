@@ -140,6 +140,8 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * late, inside the window — and a flag for any other reason is `FLAGGED`.
    */
   bind(tx: TTx, clientId: string, transactionCodes: readonly string[], target: BindTarget, now?: Date): Promise<TerminalCaptureRecord[]>;
+  /** {@link bind}, also naming the codes THIS call moved (`moved`); a replay of an earlier bind is absent. */
+  bindReporting(tx: TTx, clientId: string, codes: readonly string[], target: BindTarget, now?: Date): Promise<BindReport>;
   /**
    * Flag a capture's money for a refund — at most once per real refund.
    * `flagged: false` when a flag is already live, so a caller never raises the
@@ -261,12 +263,20 @@ async function markSaleCreated<TTx>(engine: Engine<TTx>, tx: TTx, key: CaptureKe
   throw new CaptureError('CONTENDED', transactionCode, REFUSALS.CONTENDED);
 }
 
+/** What a bind did: every capture as it now stands, and the codes this call moved (not replays). */
+export interface BindReport {
+  bound: TerminalCaptureRecord[];
+  moved: string[];
+}
+
+type BindOne = { record: TerminalCaptureRecord; moved: boolean };
+
 /** Bind one capture: decided on a read, written only while that read still holds. */
-async function bindOne(store: TerminalCaptureStore, clientId: string, code: string, target: BindTarget, now: Date): Promise<TerminalCaptureRecord> {
+async function bindOne(store: TerminalCaptureStore, clientId: string, code: string, target: BindTarget, now: Date): Promise<BindOne> {
   for (let attempt = 0; attempt < MOVE_ATTEMPTS; attempt += 1) {
     const current = await readOrRefuse(store, clientId, code);
     const decision = bindDecision(current, target);
-    if (decision === 'replay') return current;
+    if (decision === 'replay') return { record: current, moved: false };
     if (typeof decision === 'string') throw new CaptureError(decision, code, REFUSALS[decision]);
     const after = await landOn(store, current, {
       state: 'BOUND',
@@ -274,7 +284,7 @@ async function bindOne(store: TerminalCaptureStore, clientId: string, code: stri
       paymentId: target.paymentId,
       ...(decision.clearFlag ? { refundClearedAt: now } : {}),
     });
-    if (after) return after;
+    if (after) return { record: after, moved: true };
     // Changed since the read (a racing bind, a flag): read and decide again.
   }
   throw new CaptureError('CONTENDED', code, REFUSALS.CONTENDED);
@@ -287,17 +297,21 @@ async function bind<TTx>(
   transactionCodes: readonly string[],
   target: BindTarget,
   now: Date,
-): Promise<TerminalCaptureRecord[]> {
+): Promise<BindReport> {
   const codes = [...new Set(transactionCodes)];
-  if (codes.length === 0) return [];
+  if (codes.length === 0) return { bound: [], moved: [] };
   if (!(await engine.sales.paymentBelongs(tx, clientId, target.orderId, target.paymentId))) {
     throw new CaptureError('SALE_MISMATCH', codes[0] ?? '', "The payment row is not this tenant's sale's.");
   }
   const store = engine.storeFor(tx);
-  const bound: TerminalCaptureRecord[] = [];
+  const report: BindReport = { bound: [], moved: [] };
   // One compare-and-set per capture leg of ONE sale.
-  for (const code of codes) bound.push(await bindOne(store, clientId, code, target, now));
-  return bound;
+  for (const code of codes) {
+    const one = await bindOne(store, clientId, code, target, now);
+    report.bound.push(one.record);
+    if (one.moved) report.moved.push(code);
+  }
+  return report;
 }
 
 async function flag<TTx>(engine: Engine<TTx>, key: CaptureKey, reason: string, now: Date, tx?: TTx): Promise<{ flagged: boolean }> {
@@ -348,7 +362,8 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
       return storeFor(tx).findUnclaimed(clientId, [...new Set(deviceIds)]);
     },
     markSaleCreated: (tx, key, orderId) => markSaleCreated(engine, tx, key, orderId),
-    bind: (tx, clientId, codes, target, now = clock()) => bind(engine, tx, clientId, codes, target, now),
+    bind: async (tx, clientId, codes, target, now = clock()) => (await bind(engine, tx, clientId, codes, target, now)).bound,
+    bindReporting: (tx, clientId, codes, target, now = clock()) => bind(engine, tx, clientId, codes, target, now),
     flag: (key, reason, now = clock(), tx) => flag(engine, key, reason, now, tx),
     async flagSale(clientId, orderId, reason, tx) {
       return storeFor(tx).flagHeldBy(clientId, orderId, { at: clock(), reason });

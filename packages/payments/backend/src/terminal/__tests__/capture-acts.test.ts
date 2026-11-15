@@ -145,6 +145,19 @@ describe('State 4: received twice — pay the leg with the capture instead of ca
     expect(bookCashBack.mock.calls.map((call) => call[2])).toEqual([NOTE]);
   });
 
+  it('B1 under concurrency: two rebinds at once both read the capture UNBOUND, and only the one that moved it writes', async () => {
+    const { w, host, acts, cashSale } = setup();
+    const { orderId } = cashSale(10_000);
+    await w.ledger.record(capture({ transactionCode: 'TC-1', amountCents: 3000 }));
+
+    const answers = await Promise.all([1, 2].map(() => acts.rebind({ clientId: TENANT, transactionCode: 'TC-1', orderId }, NOTE)));
+
+    expect(answers).toEqual([{ ok: true }, { ok: true }]);
+    expect(host.sales.get(orderId)?.legs).toEqual([{ tender: 'CASH', amountCents: 7000 }, { tender: 'CREDIT', amountCents: 3000 }]);
+    expect(host.cashBack.map((cash) => cash.amountCents)).toEqual([3000]);
+    expect(host.records).toHaveLength(1);
+  });
+
   it('R09: refused with nothing written when the sale has no cash leg that large, or the capture is owed back', async () => {
     const { w, host, acts, cashSale } = setup();
     const { orderId } = cashSale();
