@@ -19,7 +19,9 @@ for any grid of figures judged against one threshold.
   sales in the hour, no cost priced) reads `labels.unmeasured` instead, which
   joins the legend while such a cell is drawn; with no `unmeasured` words it
   reads its dash alone, never `empty`'s, so "no sale" is not said of an hour
-  that sold.
+  that sold. Both show a dash, so an unmeasured cell also carries a dashed ring
+  inside its edge (`data-reason="unmeasured"`), and its legend entry the same
+  ring on its swatch: the difference is never words alone for a sighted reader.
 - **Roles, not values**: above → `warning` tints (deeper above `strongAbove`), at
   or under → `info` tints (deeper below `strongBelow`), no figure →
   `action.disabledBackground` / `text.disabled`. Never `primary`: a red brand

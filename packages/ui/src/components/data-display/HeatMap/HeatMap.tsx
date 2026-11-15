@@ -18,7 +18,15 @@ import { useMeasuredWidth } from '../../utility/Overflow/overflow';
 import { heatMapToneColors } from './heat-map-colors';
 import { heatMapFit, heatMapGrid, heatMapTone, isAboveTone, type HeatMapFit } from './heat-map-model';
 import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
-import { headerCellSx, rowHeaderSx, SR_ONLY_SX, swatchSx, tableSx, valueCellSx } from './HeatMap.styles';
+import {
+  headerCellSx,
+  rowHeaderSx,
+  SR_ONLY_SX,
+  swatchSx,
+  tableSx,
+  unmeasuredRingSx,
+  valueCellSx,
+} from './HeatMap.styles';
 import type { HeatMapCell, HeatMapLabels, HeatMapProps, HeatMapScale } from './HeatMap.types';
 
 const EM_DASH = '—';
@@ -79,13 +87,19 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
   const above = isAboveTone(tone);
   const text = cell.value === null ? (labels.emptyValue ?? EM_DASH) : formatValue(cell.value);
   const reason = tone === 'empty' ? emptyReason(cell, labels) : undefined;
+  const unmeasured = tone === 'empty' && cell.reason === 'unmeasured';
   return (
     <Box
       component="td"
-      sx={{ ...cellSx, ...heatMapToneColors(tone, theme), ...(above ? { fontWeight: 'fontWeightBold' } : {}) }}
+      sx={{
+        ...cellSx,
+        ...heatMapToneColors(tone, theme),
+        ...(above ? { fontWeight: 'fontWeightBold' } : {}),
+        ...(unmeasured ? unmeasuredRingSx : {}),
+      }}
       data-testid={testId}
       data-tone={tone}
-      {...(tone === 'empty' && cell.reason === 'unmeasured' ? { 'data-reason': 'unmeasured' } : {})}
+      {...(unmeasured ? { 'data-reason': 'unmeasured' } : {})}
     >
       {text}
       {above ? (
@@ -139,9 +153,19 @@ function Legend({
         {`${labels.emptyValue ?? EM_DASH} ${labels.empty}`}
       </Typography>
       {unmeasured && labels.unmeasured ? (
-        <Typography variant="caption" sx={{ color: 'text.secondary' }} data-testid={`${testId}-legend-unmeasured`}>
-          {`${labels.emptyValue ?? EM_DASH} ${labels.unmeasured}`}
-        </Typography>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+          <Box
+            component="span"
+            sx={[
+              swatchSx,
+              unmeasuredRingSx,
+              { outlineOffset: 0, backgroundColor: heatMapToneColors('empty', theme).backgroundColor },
+            ]}
+          />
+          <Typography variant="caption" sx={{ color: 'text.secondary' }} data-testid={`${testId}-legend-unmeasured`}>
+            {`${labels.emptyValue ?? EM_DASH} ${labels.unmeasured}`}
+          </Typography>
+        </Box>
       ) : null}
     </Box>
   );

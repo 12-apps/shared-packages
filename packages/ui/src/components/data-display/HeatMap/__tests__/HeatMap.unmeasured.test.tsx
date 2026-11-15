@@ -47,6 +47,12 @@ describe("an unmeasured cell", () => {
     expect(screen.getByTestId("hm-cell-seg-10").textContent).toBe("— sem venda na hora");
   });
 
+  it("carries a dashed ring, so the two dashes differ without words", () => {
+    renderGrid({ ...LABELS, unmeasured: "sem custo na hora" });
+    expect(getComputedStyle(screen.getByTestId("hm-cell-seg-11")).outlineStyle).toBe("dashed");
+    expect(getComputedStyle(screen.getByTestId("hm-cell-seg-10")).outlineStyle).not.toBe("dashed");
+  });
+
   it("adds its words to the legend while such a cell is drawn", () => {
     renderGrid({ ...LABELS, unmeasured: "sem custo na hora" });
     expect(screen.getByTestId("hm-legend-unmeasured").textContent).toBe("— sem custo na hora");
