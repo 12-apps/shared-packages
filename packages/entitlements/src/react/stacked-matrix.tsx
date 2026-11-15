@@ -15,7 +15,7 @@
  * colour alone): a badge over a column a fifth of 260 px wide would have to
  * break "Recomendado" mid-word.
  */
-import type { JSX } from 'react';
+import { Fragment, type JSX } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -69,26 +69,28 @@ function StackedLegend({
 }): JSX.Element | null {
   const current = tiers.find((tier) => tier.current);
   const offered = tiers.find((tier) => !tier.current && tier.key === badges.offeredKey);
-  const currentItem =
-    current !== undefined && badges.currentLabel !== null
-      ? { text: badges.currentLabel, tier: current }
-      : null;
-  const offeredItem =
-    offered !== undefined && badges.offeredLabel !== null
-      ? { text: badges.offeredLabel, tier: offered }
-      : null;
-  if (currentItem === null && offeredItem === null) return null;
+  const items = [
+    { text: badges.currentLabel, tier: current, testId: 'plan-matrix-current' },
+    { text: badges.offeredLabel, tier: offered, testId: 'plan-matrix-offered' },
+  ].filter(
+    (item): item is { text: string; tier: ComparisonTier; testId: string } =>
+      item.text !== null && item.tier !== undefined,
+  );
+  if (items.length === 0) return null;
   return (
     // One sentence, not two labels: two words spaced like headers read as the
     // columns below them, one off ("Seu plano Pro" over Gratuito, FUT-5062).
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5, px: 1, pt: 1, pb: 0.5 }}>
-      {currentItem === null ? null : <LegendItem {...currentItem} testId="plan-matrix-current" />}
-      {currentItem !== null && offeredItem !== null ? (
-        <Text as="span" size="xs" aria-hidden="true">
-          ·
-        </Text>
-      ) : null}
-      {offeredItem === null ? null : <LegendItem {...offeredItem} testId="plan-matrix-offered" />}
+      {items.map((item, index) => (
+        <Fragment key={item.testId}>
+          {index > 0 ? (
+            <Text as="span" size="xs" aria-hidden="true">
+              ·
+            </Text>
+          ) : null}
+          <LegendItem {...item} />
+        </Fragment>
+      ))}
     </Box>
   );
 }
