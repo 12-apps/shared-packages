@@ -150,13 +150,13 @@ describe('the stacked layout', () => {
     expect(within(first).getAllByRole('img')).toHaveLength(4);
   });
 
-  it('words the current and the offered tier as text, in a legend over the columns', () => {
+  it('words the current and the offered tier as one sentence over the columns', () => {
     renderStacked(fourTiers());
     expect(screen.getByTestId('plan-matrix-tier-free').getAttribute('data-current')).toBe('true');
     const current = screen.getByTestId('plan-matrix-current');
     expect(current.textContent).toBe('Seu plano');
-    expect(current.parentElement?.textContent).toBe('Seu planoFREE');
-    expect(screen.getByTestId('plan-matrix-offered').parentElement?.textContent).toBe('RecomendadoMAX');
+    expect(current.parentElement?.textContent).toBe('Seu plano: FREE');
+    expect(screen.getByTestId('plan-matrix-offered').parentElement?.textContent).toBe('Recomendado: MAX');
   });
 });
 

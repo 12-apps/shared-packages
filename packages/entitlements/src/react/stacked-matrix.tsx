@@ -54,7 +54,7 @@ function LegendItem({
         {text}
       </Text>
       <Text as="span" size="xs">
-        {tier.name}
+        {`: ${tier.name}`}
       </Text>
     </Box>
   );
@@ -79,8 +79,15 @@ function StackedLegend({
       : null;
   if (currentItem === null && offeredItem === null) return null;
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, px: 1, pt: 1 }}>
+    // One sentence, not two labels: two words spaced like headers read as the
+    // columns below them, one off ("Seu plano Pro" over Gratuito, FUT-5062).
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5, px: 1, pt: 1, pb: 0.5 }}>
       {currentItem === null ? null : <LegendItem {...currentItem} testId="plan-matrix-current" />}
+      {currentItem !== null && offeredItem !== null ? (
+        <Text as="span" size="xs" aria-hidden="true">
+          ·
+        </Text>
+      ) : null}
       {offeredItem === null ? null : <LegendItem {...offeredItem} testId="plan-matrix-offered" />}
     </Box>
   );
