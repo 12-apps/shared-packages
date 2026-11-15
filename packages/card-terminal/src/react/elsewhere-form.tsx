@@ -1,8 +1,9 @@
 'use client';
 
-import { Alert, Button, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Alert, Stack, TextField, ToggleButton, Typography, type Theme } from '@mui/material';
 import { useState, type JSX } from 'react';
 
+import { ActionButton, ChoiceRow } from './choice-actions';
 import type { ElsewhereCopy } from './copy';
 import { ELSEWHERE_REFERENCE_MAX } from './flow-moves';
 import type { Elsewhere } from './flow-types';
@@ -39,6 +40,25 @@ type CardMethod = (typeof CARD_METHODS)[number];
 
 const cardMethodOf = (method: string | null): CardMethod => (method === 'DEBIT' ? 'DEBIT' : 'CREDIT');
 
+/**
+ * A card method's option: the label as the host wrote it (sentence case, never
+ * the theme's UPPERCASE), at the touch size of the charge's buttons. The ink
+ * is the body text's on both options, so it holds AA on the selected tint too;
+ * the chosen one is marked by a primary border, the bold weight and
+ * `aria-pressed`, never by colour alone.
+ */
+const METHOD_SX = {
+  textTransform: 'none',
+  minHeight: (theme: Theme) => theme.spacing(6),
+  color: 'text.primary',
+  '&.Mui-selected, &.Mui-selected:hover': {
+    color: 'text.primary',
+    fontWeight: 700,
+    borderColor: 'primary.main',
+    boxShadow: (theme: Theme) => `inset 0 0 0 1px ${theme.palette.primary.main}`,
+  },
+} as const;
+
 export function ElsewhereForm(props: ElsewhereFormProps): JSX.Element {
   const { via, money, preselected, methodName, issuesFiscalNote = false, copy, onConfirm, onBack, dataTestId = 'terminal-elsewhere' } = props;
   const [method, setMethod] = useState<CardMethod>(cardMethodOf(preselected));
@@ -59,20 +79,22 @@ export function ElsewhereForm(props: ElsewhereFormProps): JSX.Element {
         {copy.manualNote}
       </Typography>
       {machine ? (
-        <ToggleButtonGroup
-          exclusive
-          fullWidth
-          size="small"
-          value={method}
-          aria-label={copy.methodLabel}
-          onChange={(_event, next: CardMethod | null) => next !== null && setMethod(next)}
-        >
+        <ChoiceRow label={copy.methodLabel} dataTestId={`${dataTestId}-method`}>
           {CARD_METHODS.map((option) => (
-            <ToggleButton key={option} value={option} data-testid={`${dataTestId}-method-${option}`}>
+            <ToggleButton
+              key={option}
+              value={option}
+              color="primary"
+              size="small"
+              selected={method === option}
+              onChange={() => setMethod(option)}
+              sx={METHOD_SX}
+              data-testid={`${dataTestId}-method-${option}`}
+            >
               {methodName(option)}
             </ToggleButton>
           ))}
-        </ToggleButtonGroup>
+        </ChoiceRow>
       ) : null}
       {machine ? (
         <TextField
@@ -90,14 +112,14 @@ export function ElsewhereForm(props: ElsewhereFormProps): JSX.Element {
           {copy.fiscalNoteLine}
         </Alert>
       ) : null}
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        <Button variant="contained" onClick={confirm} data-testid={`${dataTestId}-confirm`}>
+      <ChoiceRow dataTestId={`${dataTestId}-actions`}>
+        <ActionButton rank="primary" onClick={confirm} data-testid={`${dataTestId}-confirm`}>
           {copy.confirm(money)}
-        </Button>
-        <Button variant="outlined" onClick={onBack} data-testid={`${dataTestId}-back`}>
+        </ActionButton>
+        <ActionButton rank="secondary" onClick={onBack} data-testid={`${dataTestId}-back`}>
           {copy.back}
-        </Button>
-      </Stack>
+        </ActionButton>
+      </ChoiceRow>
     </Stack>
   );
 }
