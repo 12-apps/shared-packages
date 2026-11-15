@@ -198,6 +198,15 @@ nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
   that changes the total or the buyer's document — what the DANFE the buyer
   holds prints and its QR encodes — is refused (`RESEND_CHANGES_PRINTED_FIELDS`):
   that sale needs a new note, issued by a person.
+- **A buyer's return is an NF-e of entry.** An NFC-e has no return purpose,
+  so the return is a model-55 document with `purpose: "RETURN"`,
+  `operation: "IN"` (`tpNF` 0) and the NFC-e's key in `referencedDocuments`
+  (`NFref/refNFe`). Before a number is drawn, `issue()` refuses a return on an
+  NFC-e (`RETURN_ON_NFCE`), a return quoting nothing
+  (`RETURN_NEEDS_REFERENCE`), an NFC-e of entry and a reference that is not an
+  access key (`INVALID_INPUT`). `isValidAccessKey` checks a typed key: 44
+  characters, the CNPJ inside it alphanumeric or not, the modulo-11 check
+  digit. A sale without the two fields is issued exactly as before.
 - **An authorised document always has its XML.** A lookup that finds a
   SUBMITTED document authorised joins the signed XML the service returned to
   the lookup's `protNFe`; without both, the document stays SUBMITTED (its

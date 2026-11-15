@@ -5,7 +5,10 @@
  * Money is integer CENTS, rates integer BASIS POINTS (1 bp = 0.01%) — the
  * engine's conventions (`@12-apps/fiscal/engine`) — and quantities carry at
  * most four decimals. Every field is required; an absent value is `null`,
- * never a missing key, so a host cannot forget one silently.
+ * never a missing key, so a host cannot forget one silently. The two
+ * exceptions came with the return document (FUT-2238), `operation` and
+ * `referencedDocuments`: they are optional so that a document built before
+ * them stays valid and yields the same XML, byte for byte.
  *
  * The JSON schema the service validates against is
  * `@12-apps/fiscal/sidecar/schema/sale-for-document.schema.json`; a test keeps
@@ -216,6 +219,16 @@ export interface SalePayment {
 
 /** `finNFe` 1–4. */
 export type DocumentPurpose = "NORMAL" | "COMPLEMENTARY" | "ADJUSTMENT" | "RETURN";
+/**
+ * `tpNF`: `OUT` (1) a sale or any outgoing document; `IN` (0) an entry, such as
+ * a buyer's goods coming back. An NFC-e is always `OUT`.
+ */
+export type DocumentOperation = "OUT" | "IN";
+/** `NFref/refNFe`: an earlier NF-e or NFC-e this document refers to. */
+export interface ReferencedDocument {
+  /** The 44-character access key (`isValidAccessKey` in `@12-apps/fiscal/documents`). */
+  readonly accessKey: string;
+}
 /** `idDest` 1–3. */
 export type OperationDestination = "INTERNAL" | "INTERSTATE" | "FOREIGN";
 /** `indPres` 1, 2, 3, 4, 5, 9. */
@@ -267,6 +280,16 @@ export interface SaleForDocument {
   /** `natOp`. */
   readonly operationNature: string;
   readonly purpose: DocumentPurpose;
+  /**
+   * `tpNF`. Absent is `OUT`. A buyer's return is an NF-e (model 55) with
+   * `purpose: "RETURN"` and `operation: "IN"`; an NFC-e has neither.
+   */
+  readonly operation?: DocumentOperation;
+  /**
+   * `NFref`, at most 500, in order. Absent is none. A `RETURN` quotes the
+   * document it returns here, or it is refused (`RETURN_NEEDS_REFERENCE`).
+   */
+  readonly referencedDocuments?: readonly ReferencedDocument[];
   readonly destination: OperationDestination;
   readonly presence: BuyerPresence;
   /** `indFinal`. */

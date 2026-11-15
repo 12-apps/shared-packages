@@ -74,7 +74,7 @@ const PROFILE: EmitterProfileInput = {
 
 const DRAFT = draftOf(SALE);
 
-async function setup(script: Partial<Record<Method, string[]>>, profile: Partial<EmitterProfileInput> = {}) {
+async function setup(script: Partial<Record<Method, string[]>>, profile: Partial<EmitterProfileInput> = {}, draft: SaleDraft = DRAFT) {
   const memoryStore = createMemoryFiscalStore();
   const scripted = scriptedIssuer(script);
   const objects = new Map<string, string>();
@@ -97,7 +97,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
       put: async (key, body) => void objects.set(key, body),
       get: async (key) => objects.get(key) ?? null,
     },
-    sales: { saleFor: async (): Promise<SaleDraft> => DRAFT },
+    sales: { saleFor: async (): Promise<SaleDraft> => draft },
     notify: { emit: async (event) => void emitted.push(event) },
     now: () => new Date(clock.at),
     utcOffset: () => "-03:00",
@@ -125,6 +125,10 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
 }
 
 const ISSUE = { ownerId: "owner-1", subjectId: "order-77", issuingPointId: "register-1", model: "NFCE" } as const;
+
+/** The NFC-e a return quotes: the fiscal service's own fixture, as its mapper keys it. */
+const NFCE_KEY = "35261111222333000181650010000012011482139076";
+const RETURNS_POINT = { id: "returns", model: "NFE", onlineSeries: 5, contingencySeries: null, firstOnlineNumber: 1, firstContingencyNumber: 1 } as const;
 
 describe("the document service", () => {
   it("stores only ciphertext, and answers the issuer the decrypted A1 and CSC for the call", async () => {
@@ -241,6 +245,42 @@ describe("the document service", () => {
     const platform = await setup({}, { signingIdentity: "PLATFORM" });
     await expect(platform.service.issue(ISSUE)).rejects.toThrow(expect.objectContaining({ code: "NOT_SUPPORTED" }));
     expect(platform.store.counters.get("11222333000181|homologacao|NFCE|1")).toBe(1201);
+  });
+
+  it("issues a return as an NF-e of entry quoting the NFC-e, and a sale without the new fields sends none", async () => {
+    const sale = await setup({ issue: ["nfce-issue-authorized"] });
+    await sale.service.issue(ISSUE);
+    const sent = (sale.calls[0]!.call as { document: object }).document;
+    expect(sent).toMatchObject({ purpose: "NORMAL" });
+    expect(sent).not.toHaveProperty("operation");
+    expect(sent).not.toHaveProperty("referencedDocuments");
+
+    const quoted = [{ accessKey: NFCE_KEY }];
+    const back = await setup({ issue: ["nfce-issue-authorized"] }, {}, { ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: quoted });
+    await back.service.createIssuingPoint("owner-1", RETURNS_POINT);
+    await back.service.issue({ ...ISSUE, subjectId: "return-77", issuingPointId: "returns", model: "NFE" });
+    expect(back.calls[0]!.call).toMatchObject({
+      model: "NFE",
+      document: { series: 5, purpose: "RETURN", operation: "IN", referencedDocuments: quoted },
+    });
+  });
+
+  it("refuses, before drawing a number, a return on an NFC-e and a return that quotes nothing", async () => {
+    const onNfce = await setup({}, {}, { ...DRAFT, purpose: "RETURN", referencedDocuments: [{ accessKey: NFCE_KEY }] });
+    await expect(onNfce.service.issue(ISSUE)).rejects.toThrow(expect.objectContaining({ code: "RETURN_ON_NFCE" }));
+    await expect(onNfce.service.issueOffline({ ownerId: "owner-1", subjectId: "order-77", issuingPointId: "register-1" })).rejects.toThrow(
+      expect.objectContaining({ code: "RETURN_ON_NFCE" }),
+    );
+    expect(onNfce.store.counters.get("11222333000181|homologacao|NFCE|1")).toBe(1201);
+    expect(onNfce.calls).toEqual([]);
+
+    const unquoted = await setup({}, {}, { ...DRAFT, purpose: "RETURN", operation: "IN" });
+    await unquoted.service.createIssuingPoint("owner-1", RETURNS_POINT);
+    await expect(unquoted.service.issue({ ...ISSUE, issuingPointId: "returns", model: "NFE" })).rejects.toThrow(
+      expect.objectContaining({ code: "RETURN_NEEDS_REFERENCE" }),
+    );
+    expect(unquoted.store.counters.get("11222333000181|homologacao|NFE|5")).toBe(1);
+    expect(unquoted.calls).toEqual([]);
   });
 
   it("refuses a series already held by another issuing point", async () => {

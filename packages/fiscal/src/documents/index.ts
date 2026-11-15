@@ -24,6 +24,7 @@ export {
   computeAccessKey,
   draftOf,
   drawKeyCode,
+  isValidAccessKey,
   localIso,
   xmlKeys,
 } from "./context";
