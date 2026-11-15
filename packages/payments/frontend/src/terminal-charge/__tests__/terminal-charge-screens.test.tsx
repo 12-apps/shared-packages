@@ -4,13 +4,13 @@ import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { startChargeRun } from '../charge-run';
-import type { ActConfirmCopy, ElsewhereCopy, OverCaptureCopy, ReceivedTwiceCopy, RecoveredCopy, TerminalWaitCopy } from '../copy';
 import { ElsewhereForm } from '../elsewhere-form';
 import type { HeldCapture } from '../held-captures';
 import { OverCaptureChoice, ReceivedTwiceBand } from '../money-choices';
 import { RecoveredCaptures } from '../recovered-captures';
 import { TerminalWait } from '../terminal-wait';
 import { fakeTerminal, settle } from './fake-port';
+import { CONFIRM, ELSEWHERE, OVER, RECOVERED, TWICE, WAIT, money, tenderName } from './screen-copy';
 
 /**
  * The generic screens of `terminal-charge` (FUT-4996 States 3, 4 and 5, and the wait), with
@@ -18,95 +18,6 @@ import { fakeTerminal, settle } from './fake-port';
  */
 
 afterEach(cleanup);
-
-const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
-const tenderName = (tender: string): string => tender.toLowerCase();
-
-const CONFIRM: ActConfirmCopy = {
-  reasonLabel: 'Reason',
-  reasonHint: 'At least 3 characters',
-  reasonShort: 'Say why',
-  pinLabel: 'PIN',
-  pinMissing: 'Type your PIN',
-  confirm: 'Confirm',
-  back: 'Back',
-  refused: { fallback: 'Not done', DANGER_PIN_REQUIRED: 'Wrong PIN' },
-};
-const TWICE: ReceivedTwiceCopy = {
-  title: (amount) => `Paid twice: ${amount}`,
-  lede: 'Give one back',
-  giveBack: (amount) => `Give ${amount} back in cash`,
-  refundCard: 'Refund the card',
-  done: 'Done',
-};
-const OVER: OverCaptureCopy = {
-  title: (amount) => `${amount} over`,
-  lede: 'Choose',
-  change: (amount) => `Give ${amount} change`,
-  credit: (amount, buyer) => `Keep ${amount} for ${buyer}`,
-  refundAndCharge: (refund, charge) => `Refund ${refund}, charge ${charge}`,
-};
-const ELSEWHERE: ElsewhereCopy = {
-  otherMachineTitle: 'Charged on another machine',
-  manualPixTitle: 'Manual Pix',
-  manualNote: 'Recorded as manual',
-  methodLabel: 'Method',
-  referenceLabel: 'Reference',
-  referenceHint: 'Optional',
-  fiscalNoteLine: 'The fiscal note is issued when the Pix is recorded',
-  confirm: (amount) => `Record ${amount}`,
-  back: 'Back',
-};
-const RECOVERED: RecoveredCopy = {
-  title: 'Received, no sale',
-  lede: 'A charge was interrupted',
-  line: (method, at) => `${method} · ${at}`,
-  footnote: 'Unused after 24 h, it is refunded',
-  count: (count) => `${count} with no sale`,
-};
-const WAIT: TerminalWaitCopy = {
-  where: (provider, method) => `${provider} · ${method}`,
-  part: (part, parts) => `Part ${part} of ${parts}`,
-  after: (amount) => `${amount} after`,
-  sending: 'Sending',
-  waiting: 'Waiting for the card',
-  waitingSub: 'Insert',
-  waitingPix: 'Waiting for the Pix',
-  waitingPixSub: 'Scan',
-  processing: 'Processing',
-  processingSub: '…',
-  cancelling: 'Cancelling',
-  declined: 'Declined',
-  declinedSub: 'Nothing charged',
-  cancelled: 'Cancelled',
-  cancelledSub: 'Nothing charged',
-  unknown: 'Unknown',
-  unknownSub: 'Check the terminal',
-  away: 'Away',
-  awaySub: 'Off the network',
-  unbound: 'Approved, no proof',
-  unboundSub: 'Check',
-  refused: { NOT_CONNECTED: 'The terminal is down' },
-  refusedSub: 'Charge it another way',
-  busySub: 'Another charge is open',
-  conflict: 'The charge disagrees',
-  conflictSub: 'It was charged',
-  cash: (amount) => `Take ${amount} in cash`,
-  cashSub: 'Moved to cash',
-  waitingLink: 'Waiting for the terminal',
-  waitingLinkSub: 'Or record it',
-  doneLine: (label) => `${label} done`,
-  resend: 'Send again',
-  other: 'Another tender',
-  otherLabel: 'Tenders',
-  cancel: 'Cancel on the terminal',
-  otherMachine: 'Another machine',
-  manualPix: 'Manual Pix',
-  manualLine: (label) => `${label} · manual`,
-  cashReceived: (amount) => `Received ${amount}`,
-  cancelPending: (amount) => `Cancel ${amount}`,
-  settling: 'Settling',
-};
 
 function confirmWith(prefix: string, reason: string, pin: string): void {
   fireEvent.change(screen.getByTestId(`${prefix}-reason`), { target: { value: reason } });
@@ -194,7 +105,8 @@ describe('State 6: the terminal is down', () => {
     expect(screen.getByTestId('terminal-wait-title').textContent).toBe('The terminal is down');
     expect(screen.getByTestId('terminal-wait-resend')).toBeTruthy();
     expect(screen.getByTestId('terminal-wait-other')).toBeTruthy();
-    expect(screen.getByTestId('terminal-wait-manual-exits').textContent).toBe('Another machineManual Pix');
+    // FUT-4996 D7 review: "another tender" and the two manual exits answer one question, so they are one group.
+    expect(screen.getByTestId('terminal-wait-manual-exits').textContent).toBe('Another tenderAnother machineManual Pix');
     // N6: frame 6-B draws the manual exits as text buttons under the primary row.
     expect(screen.getByTestId('terminal-wait-other-machine').className).toContain('MuiButton-text');
 

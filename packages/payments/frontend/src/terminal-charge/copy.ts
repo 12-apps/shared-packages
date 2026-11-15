@@ -34,6 +34,15 @@ export interface TerminalWaitCopy {
   /** The live leg while its terminal is off the network. */
   readonly away: string;
   readonly awaySub: string;
+  /**
+   * The leg not sent yet while the link says the terminal cannot be reached:
+   * nothing went to it, and the manual exits are offered below; the push goes
+   * out by itself when the link returns, so no resend is offered. Optional:
+   * without `down` the wait says `refused.NOT_CONNECTED` with no subtitle
+   * (`refusedSub` asks for a resend), never `sending`.
+   */
+  readonly down?: string;
+  readonly downSub?: string;
   /** Approved with no capture to bind. */
   readonly unbound: string;
   readonly unboundSub: string;

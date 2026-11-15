@@ -60,6 +60,7 @@ export {
 } from './ports';
 export {
   createTerminalCaptureLedger,
+  type BindReport,
   type CaptureDevice,
   type DeviceCaptureAnswer,
   type TerminalCaptureLedger,
@@ -100,3 +101,39 @@ export {
   type TerminalCaptureJobContext,
   type TerminalCaptureJobDeps,
 } from './job';
+export {
+  captureActRefusalOf,
+  createCaptureActs,
+  planRebind,
+  type CaptureActPorts,
+  type CaptureActRecord,
+  type CaptureActRefusal,
+  type CaptureActResult,
+  type CaptureActs,
+  type CaptureActsConfig,
+  type CaptureLeg,
+  type CashBack,
+  type RebindCaptureInput,
+  type RebindPlan,
+  type RefundCaptureInput,
+  type SettledLeg,
+  type SettledSale,
+} from './capture-acts';
+export {
+  EXCESS_CHOICES,
+  capturedAbove,
+  createCaptureExcess,
+  planExcess,
+  type CaptureExcess,
+  type CaptureExcessConfig,
+  type CaptureExcessPorts,
+  type ExcessCapture,
+  type ExcessChoice,
+  type ExcessInput,
+  type ExcessPlan,
+  type ExcessRecord,
+  type ExcessRefusal,
+  type ExcessResolution,
+  type ExcessSale,
+  type ExcessSettled,
+} from './capture-excess';

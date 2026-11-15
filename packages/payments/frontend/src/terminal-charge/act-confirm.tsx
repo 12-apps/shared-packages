@@ -1,8 +1,9 @@
 'use client';
 
-import { Alert, Box, Button, Stack, TextField } from '@mui/material';
-import { useMemo, useState, type JSX } from 'react';
+import { Alert, Stack, TextField, Typography } from '@mui/material';
+import { useMemo, useState, type FormEvent, type JSX } from 'react';
 
+import { ActionButton, ChoiceRow } from './choice-actions';
 import { createConfirmedAct, problemOf, type ConfirmedActAnswer, type ConfirmedActProblem } from './confirmed-act';
 import type { ActConfirmCopy } from './copy';
 
@@ -55,16 +56,27 @@ export function ActConfirm({ title, copy, onSend, onDone, onBack, dataTestId = '
 
   const message = messageOf(shown, copy);
   return (
-    <Stack spacing={1.5} data-testid={dataTestId}>
-      <Box component="p" sx={{ m: 0, fontWeight: 700 }}>
+    <Stack
+      component="form"
+      noValidate
+      spacing={1.5}
+      data-testid={dataTestId}
+      onSubmit={(event: FormEvent) => {
+        event.preventDefault();
+        if (!sending) void confirm();
+      }}
+    >
+      <Typography component="p" variant="subtitle1" sx={{ fontWeight: 700 }}>
         {title}
-      </Box>
+      </Typography>
       <TextField
         label={copy.reasonLabel}
         helperText={copy.reasonHint}
         value={reason}
         onChange={(event) => setReason(event.target.value)}
         inputProps={{ 'data-testid': `${dataTestId}-reason`, maxLength: 200 }}
+        // The act opens on its first question; the caixa is driven from the keyboard.
+        autoFocus
         size="small"
         fullWidth
       />
@@ -82,14 +94,14 @@ export function ActConfirm({ title, copy, onSend, onDone, onBack, dataTestId = '
           {message}
         </Alert>
       )}
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        <Button variant="contained" onClick={() => void confirm()} disabled={sending} data-testid={`${dataTestId}-confirm`}>
+      <ChoiceRow>
+        <ActionButton rank="primary" type="submit" disabled={sending} data-testid={`${dataTestId}-confirm`}>
           {copy.confirm}
-        </Button>
-        <Button variant="outlined" onClick={onBack} disabled={sending} data-testid={`${dataTestId}-back`}>
+        </ActionButton>
+        <ActionButton rank="secondary" type="button" onClick={onBack} disabled={sending} data-testid={`${dataTestId}-back`}>
           {copy.back}
-        </Button>
-      </Stack>
+        </ActionButton>
+      </ChoiceRow>
     </Stack>
   );
 }
