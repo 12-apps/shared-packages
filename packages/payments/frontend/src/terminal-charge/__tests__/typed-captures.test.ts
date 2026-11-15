@@ -19,6 +19,10 @@ interface Setup {
   dueSales?: DueSale[];
   answers?: Array<TypedBookAnswer | Error>;
   standaloneAllowed?: boolean;
+  /** Leave the optional notice out, as a host may. */
+  noOnAnswer?: boolean;
+  /** The next acknowledgements' outcomes: an Error throws; past the list every one is taken. */
+  acks?: Array<true | Error>;
 }
 
 function inbox(setup: Setup = {}) {
@@ -28,16 +32,32 @@ function inbox(setup: Setup = {}) {
     if (next instanceof Error) throw next;
     return next;
   });
-  const ack = vi.fn<(deviceId: string, codes: readonly string[]) => boolean>(() => true);
+  const acks = [...(setup.acks ?? [])];
+  const ack = vi.fn<(deviceId: string, codes: readonly string[]) => boolean>(() => {
+    const next = acks.shift() ?? true;
+    if (next instanceof Error) throw next;
+    return next;
+  });
   const onAnswer = vi.fn();
+  const due = [...(setup.dueSales ?? [])];
+  const policy = [setup.standaloneAllowed ?? true];
   const config: TypedCaptureInboxConfig = {
     book,
     ack,
-    onAnswer,
-    dueSales: () => setup.dueSales ?? [],
-    ...(setup.standaloneAllowed === undefined ? {} : { standaloneAllowed: () => setup.standaloneAllowed === true }),
+    ...(setup.noOnAnswer === true ? {} : { onAnswer }),
+    dueSales: () => due,
+    ...(setup.standaloneAllowed === undefined ? {} : { standaloneAllowed: () => policy[0] === true }),
   };
-  return { box: createTypedCaptureInbox(config), book, ack, onAnswer };
+  return {
+    box: createTypedCaptureInbox(config),
+    book,
+    ack,
+    onAnswer,
+    /** The sales due change (one was paid, another rung up). */
+    setDue: (sales: DueSale[]) => void due.splice(0, due.length, ...sales),
+    /** The host's policy changes (the owner picked a product). */
+    allow: (allowed: boolean) => void policy.splice(0, 1, allowed),
+  };
 }
 
 const typed = (amountCents: number, code = `TC-${amountCents}`) => ({ deviceId: DEVICE, captures: [trace(amountCents, 'CREDIT', code)] });
@@ -99,7 +119,10 @@ describe('the band (State 1)', () => {
     box.received(typed(4600, 'TC-B'));
     box.chooseSale('TC-A', 'sale-1');
 
-    expect(box.unanswered().map((entry) => entry.capture.transactionCode)).toEqual(['TC-B']);
+    expect(box.unanswered().map((entry) => [entry.capture.transactionCode, entry.state])).toEqual([
+      ['TC-A', 'held'],
+      ['TC-B', 'asking'],
+    ]);
   });
 
   it('D9-R10: "none of these" books it on its own', async () => {
@@ -163,16 +186,23 @@ describe('booking on its own (State 2)', () => {
     expect(ack).toHaveBeenCalledTimes(1);
   });
 
-  it('D9-R16: a refusal for a person is never acknowledged and never retried by itself', async () => {
-    const { box, book, ack } = inbox({ answers: [{ outcome: 'REFUSED', code: 'CONFLICT', ack: false }] });
+  it('D9-R16: a refusal for a person is never acknowledged, and is asked again only on retry (once it is resolved)', async () => {
+    const { box, book, ack } = inbox({ answers: [{ outcome: 'REFUSED', code: 'CONFLICT', ack: false }, { outcome: 'REFUSED', code: 'CONFLICT', ack: false }] });
     box.received(typed(2500));
     await settle();
-    box.retry();
-    await settle();
-
     expect(stateOf(box, 'TC-2500')).toMatchObject({ state: 'waiting', waitingFor: 'refused' });
     expect(book).toHaveBeenCalledTimes(1);
+
+    box.retry();
+    await settle();
+    expect(book).toHaveBeenCalledTimes(2);
     expect(ack).not.toHaveBeenCalled();
+
+    box.retry();
+    await settle();
+    expect(book).toHaveBeenCalledTimes(3);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(stateOf(box, 'TC-2500')?.state).toBe('done');
   });
 
   it('D9-R16: a contended booking waits for a retry', async () => {
@@ -234,5 +264,95 @@ describe('resends (A3)', () => {
     expect(box.entries()).toHaveLength(1);
     expect(book).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
+  });
+});
+
+describe('review round 1', () => {
+  it('B1: with no onAnswer, WAITING still waits, retry books it, and a resend is acknowledged again', async () => {
+    const { box, book, ack } = inbox({ noOnAnswer: true, answers: [{ outcome: 'WAITING', ack: false }] });
+    box.received(typed(2500));
+    await settle();
+    expect(stateOf(box, 'TC-2500')).toMatchObject({ state: 'waiting', waitingFor: 'session' });
+
+    box.retry();
+    await settle();
+    expect(stateOf(box, 'TC-2500')).toMatchObject({ state: 'done', answer: BOOKED });
+    expect(ack).toHaveBeenCalledTimes(1);
+
+    box.received(typed(2500));
+    await settle();
+    expect(book).toHaveBeenCalledTimes(2);
+    expect(ack).toHaveBeenCalledTimes(2);
+  });
+
+  it('B1: with no onAnswer, NOT_ALLOWED puts the capture on the band', async () => {
+    const { box } = inbox({ noOnAnswer: true, answers: [{ outcome: 'NOT_ALLOWED', reason: 'OFF', ack: false }] });
+    box.received(typed(2500));
+    await settle();
+    expect(stateOf(box, 'TC-2500')).toMatchObject({ state: 'asking', standalone: false });
+  });
+
+  it('N3: the matches are the sales due now, and a sale no longer due (or never matched) cannot be chosen', async () => {
+    const { box, setDue } = inbox({ dueSales: [{ key: 'sale-1', dueCents: 4600 }] });
+    box.received(typed(4600));
+    expect(box.chooseSale('TC-4600', 'anything-at-all')).toBeNull();
+
+    setDue([{ key: 'sale-2', dueCents: 4600 }]);
+    expect(stateOf(box, 'TC-4600')?.matches.map((sale) => sale.key)).toEqual(['sale-2']);
+    expect(box.chooseSale('TC-4600', 'sale-1')).toBeNull();
+    expect(box.chooseSale('TC-4600', 'sale-2')).not.toBeNull();
+  });
+
+  it('N5: a capture the policy kept off is booked on retry once the policy allows and nothing matches', async () => {
+    const { box, book, ack, allow } = inbox({ standaloneAllowed: false });
+    box.received(typed(2500));
+    box.retry();
+    await settle();
+    expect(book).not.toHaveBeenCalled();
+
+    allow(true);
+    box.retry();
+    await settle();
+    expect(book).toHaveBeenCalledTimes(1);
+    expect(ack).toHaveBeenCalledWith(DEVICE, ['TC-2500']);
+  });
+
+  it('N5: a NOT_ALLOWED capture that matches a sale is offered "on its own" again on retry, never booked by itself', async () => {
+    const { box, book } = inbox({ dueSales: [{ key: 'sale-1', dueCents: 4600 }], answers: [{ outcome: 'NOT_ALLOWED', reason: 'OFF', ack: false }] });
+    box.received(typed(4600));
+    box.chooseStandalone('TC-4600');
+    await settle();
+    expect(stateOf(box, 'TC-4600')).toMatchObject({ state: 'asking', standalone: false });
+
+    box.retry();
+    await settle();
+    expect(stateOf(box, 'TC-4600')).toMatchObject({ state: 'asking', standalone: true });
+    expect(book).toHaveBeenCalledTimes(1);
+  });
+
+  it('N6: an acknowledgement that throws leaves the capture to tell again; retry tells it', async () => {
+    const { box, ack } = inbox({ acks: [new Error('link closed')] });
+    box.received(typed(2500));
+    await settle();
+    expect(stateOf(box, 'TC-2500')).toMatchObject({ state: 'waiting', waitingFor: 'link' });
+
+    box.retry();
+    await settle();
+    expect(stateOf(box, 'TC-2500')?.state).toBe('done');
+    expect(ack).toHaveBeenCalledTimes(2);
+  });
+
+  it('N6: a settled sale whose acknowledgement throws stays held until a retry tells it', async () => {
+    const { box, ack } = inbox({ dueSales: [{ key: 'sale-1', dueCents: 4600 }], acks: [new Error('link closed')] });
+    box.received(typed(4600));
+    box.chooseSale('TC-4600', 'sale-1');
+    box.bound(['TC-4600']);
+    await settle();
+    expect(stateOf(box, 'TC-4600')).toMatchObject({ state: 'held', waitingFor: 'link' });
+
+    box.retry();
+    await settle();
+    expect(stateOf(box, 'TC-4600')?.state).toBe('done');
+    expect(ack).toHaveBeenCalledTimes(2);
   });
 });

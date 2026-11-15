@@ -121,4 +121,4 @@ export {
   type TypedEntryState,
   type TypedWait,
 } from './typed-captures';
-export { holdTaken, legsByCode, takenCaptures, type CodedLeg } from './offline-hand-off';
+export { chargedNotHeld, holdTaken, legsByCode, takenCaptures, type CodedLeg } from './offline-hand-off';

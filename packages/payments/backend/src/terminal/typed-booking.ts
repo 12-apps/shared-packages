@@ -21,6 +21,9 @@ import type { StationCaptureWire } from './readers';
  *   capture stays UNBOUND and its terminal keeps reporting it.
  * - **`ack` says whether the terminal may stop reporting it.** It is the only
  *   signal for the acknowledgement: never acknowledge on receipt.
+ * - **The terminal names the seller.** The sale is sold by, and booked on the
+ *   session of, the terminal the ledger recorded the capture for. A page that
+ *   names another terminal, or none, is `DEVICE_MISMATCH`.
  *
  * A matching sale is the page's question (`matchTypedCapture` in the frontend
  * package); this decision is asked only once nobody claims the capture.
@@ -66,6 +69,12 @@ export interface TypedBookingPorts<TTx = unknown, TSession = unknown> {
   bookedFor(clientId: string, transactionCode: string, tx?: TTx): Promise<BindTarget | null>;
   /** Write the sale and its one payment row (the capture's kind and amount). */
   createSale(tx: TTx, sale: StandaloneSale<TSession>): Promise<BindTarget>;
+  /**
+   * Whether an error the transaction threw is a race worth deciding again: the
+   * host's unique key on the booked sale, say. A {@link CaptureError} always
+   * is; any other error is thrown at once. Default: no other error.
+   */
+  isRetryable?(error: unknown): boolean;
 }
 
 export interface TypedCaptureBookingConfig<TTx = unknown, TSession = unknown> {
@@ -82,9 +91,11 @@ export interface TypedCaptureBooking {
 /** How often a booking that lost its transaction decides again: the second read sees the winner. */
 const BOOK_ATTEMPTS = 3;
 
+const mismatch = (): TypedBookAnswer => ({ outcome: 'REFUSED', code: 'DEVICE_MISMATCH', ack: false });
+
 const STOPS: ReadonlySet<string> = new Set<TypedBookRefusal>(['CONFLICT', 'DEVICE_MISMATCH']);
 
-/** A transaction that threw: decide again on what is there now. */
+/** A transaction that lost a race: decide again on what is there now. */
 interface Lost {
   lost: unknown;
 }
@@ -128,32 +139,40 @@ export function createTypedCaptureBooking<TTx = unknown, TSession = unknown>(
     return { outcome: 'BOUND', orderId, ack: true };
   }
 
+  const retryable = (error: unknown): boolean => error instanceof CaptureError || ports.isRetryable?.(error) === true;
+
   async function once(input: TypedCaptureInput): Promise<TypedBookAnswer | Lost> {
     const now = clock();
     const { clientId } = input;
     const code = input.capture.transactionCode;
     const { capture } = await ledger.record(recordInputOf(input, now));
+    // The terminal's own report names the terminal; the page may only agree with it.
+    if (capture.deviceId !== null && capture.deviceId !== input.deviceId) return mismatch();
+    const deviceId = capture.deviceId ?? input.deviceId;
     if (capture.orderId !== null) return heldAnswer(clientId, capture, capture.orderId);
     if (owedBackForGood(capture)) return { outcome: 'FLAGGED', ack: true };
     const policy = await ports.mayBook(clientId);
     if (!policy.ok) return { outcome: 'NOT_ALLOWED', reason: policy.reason, ack: false };
-    const session = await ports.openSession(clientId, input.deviceId);
+    const session = await ports.openSession(clientId, deviceId);
     if (session === null) return { outcome: 'WAITING', ack: false };
     try {
       return await ports.transaction(async (tx): Promise<TypedBookAnswer> => {
         const booked = await ports.bookedFor(clientId, code, tx);
         if (booked !== null) return { outcome: 'BOOKED', ...booked, created: false, ack: true };
-        const target = await ports.createSale(tx, { clientId, deviceId: input.deviceId, session, capture });
+        const target = await ports.createSale(tx, { clientId, deviceId, session, capture });
         await ledger.bind(tx, clientId, [code], target, now);
         return { outcome: 'BOOKED', ...target, created: true, ack: true };
       });
     } catch (lost) {
+      if (!retryable(lost)) throw lost;
       return { lost };
     }
   }
 
   return {
     async book(input) {
+      // No terminal named: the tenant check would be skipped, so nothing is recorded.
+      if (input.deviceId.trim() === '') return mismatch();
       let last: unknown = null;
       for (let attempt = 0; attempt < BOOK_ATTEMPTS; attempt += 1) {
         let answer: TypedBookAnswer | Lost;

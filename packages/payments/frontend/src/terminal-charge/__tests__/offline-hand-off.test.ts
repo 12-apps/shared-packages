@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { startChargeRun } from '../charge-run';
 import type { ChargedSplit, FlowNotice } from '../flow-types';
 import { createHeldCaptures, withHeld } from '../held-captures';
-import { holdTaken, legsByCode, takenCaptures } from '../offline-hand-off';
+import { chargedNotHeld, holdTaken, legsByCode, takenCaptures } from '../offline-hand-off';
 import { captureWireOf, type ChargeLink } from '../port';
 import { fakeTerminal, settle, trace } from './fake-port';
 
@@ -86,6 +86,37 @@ describe('the online to offline hand-off (FUT-4996 A5)', () => {
     await settle();
     expect(offline.run.current().legs[0]).toMatchObject({ status: 'approved', capture: { transactionCode: 'TX-A' } });
     expect(offline.port.charges).toEqual([expect.objectContaining({ amountCents: 3500 })]);
+  });
+
+  it('N8: a leg the server refused as disagreeing took money the hand-off cannot carry: it is refused, nothing held', async () => {
+    const online = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    online.port.status('approved', { capture: trace(TOTAL, 'CREDIT', 'TX-C') });
+    online.run.refused('CAPTURE_CONFLICT', { transactionCode: 'TX-C' });
+    const held = createHeldCaptures();
+
+    expect(chargedNotHeld(online.run.current())).toEqual([0]);
+    expect(() => holdTaken(held, KEY, online.run.current())).toThrow(/cannot carry/);
+    expect(held.heldFor(KEY)).toEqual([]);
+  });
+
+  it('N8: an approval with no capture took money with nothing to hold: the hand-off is refused', async () => {
+    const online = begin({ legs: [{ tender: 'CREDIT', amountCents: 2500 }, { tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    online.port.status('approved');
+    await settle();
+    const held = createHeldCaptures();
+
+    expect(online.run.current().legs[0]?.status).toBe('unbound');
+    expect(chargedNotHeld(online.run.current())).toEqual([0]);
+    expect(() => holdTaken(held, KEY, online.run.current())).toThrow(/cannot carry/);
+  });
+
+  it('N8: with every charged leg held, nothing refuses the hand-off', async () => {
+    const online = begin({ legs: [{ tender: 'CREDIT' }], changeCents: 0 });
+    await settle();
+    online.port.status('approved', { capture: trace(TOTAL, 'CREDIT', 'TX-D') });
+    expect(chargedNotHeld(online.run.current())).toEqual([]);
   });
 
   it('D9-R33: a capture held for another sale is never moved by the hand-off', async () => {

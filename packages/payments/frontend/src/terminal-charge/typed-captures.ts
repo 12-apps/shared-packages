@@ -18,6 +18,14 @@ import { captureWireOf, type CaptureWire, type TerminalCaptureTrace } from './po
  * - A resend of a capture already accounted for is acknowledged again from
  *   memory; one being asked or booked is not booked twice.
  *
+ * - The matches are the sales due NOW: recomputed whenever the entries are
+ *   read and when a sale is chosen, so a sale paid meanwhile is never offered.
+ *
+ * **One inbox per station.** The match is made on the page, so two pages on
+ * one station's events could answer the same capture differently (one asks,
+ * the other books it). The host runs ONE inbox per station; the server only
+ * guarantees that the capture is booked or bound once.
+ *
  * Headless: a store a screen subscribes to. The words and the band are the
  * host's.
  */
@@ -64,7 +72,7 @@ export interface TypedEntry<S extends DueSale = DueSale> {
 export interface TypedCaptureInboxConfig<S extends DueSale = DueSale> {
   /** Ask the host's server to book the capture on its own. A throw means the server could not be reached. */
   book(deviceId: string, capture: CaptureWire): Promise<TypedBookAnswer>;
-  /** Tell the terminal it may stop reporting these codes. */
+  /** Tell the terminal it may stop reporting these codes. A throw (or a rejection) leaves the capture to tell again. */
   ack(deviceId: string, transactionCodes: readonly string[]): unknown;
   /** The open sales and what is still due on each, now. */
   dueSales(): readonly S[];
@@ -83,15 +91,18 @@ export interface TypedCaptureInbox<S extends DueSale = DueSale> {
   chooseStandalone(transactionCode: string): boolean;
   /** The sales these captures were tapped onto settled with them: acknowledge them. */
   bound(transactionCodes: readonly string[]): void;
-  /** Ask the server again for every capture that waits (a session opened, the link came back). */
+  /**
+   * Ask again for everything that waits: no session, the link down, a refusal a
+   * person may since have resolved, a policy that refused (once it allows),
+   * and an acknowledgement the terminal did not take.
+   */
   retry(): void;
+  /** Every capture, its matches recomputed against the sales due now. */
   entries(): readonly TypedEntry<S>[];
-  /** What still waits for a person: shown to resolve at the end of a shift. */
+  /** What still waits for a person: on the band, or tapped onto a sale not settled yet. Shown at the end of a shift. */
   unanswered(): readonly TypedEntry<S>[];
   subscribe(listener: () => void): () => void;
 }
-
-const RETRIABLE: ReadonlySet<TypedWait> = new Set<TypedWait>(['session', 'link', 'retry']);
 
 /** Where an entry goes on an answer that did not account for it. */
 function unackedPatch<S extends DueSale>(answer: TypedBookAnswer): Partial<TypedEntry<S>> {
@@ -120,8 +131,23 @@ function entryStore<S extends DueSale>() {
   };
 }
 
+/** Tell the terminal; false when the call threw or rejected. */
+async function told(config: Pick<TypedCaptureInboxConfig<DueSale>, 'ack'>, entry: { deviceId: string; capture: CaptureWire }): Promise<boolean> {
+  try {
+    await config.ack(entry.deviceId, [entry.capture.transactionCode]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A capture on the band that the policy kept off "on its own", and nothing it matches: it may be booked once allowed. */
+const policyHeld = <S extends DueSale>(entry: TypedEntry<S>): boolean => entry.state === 'asking' && !entry.standalone;
+
 export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: TypedCaptureInboxConfig<S>): TypedCaptureInbox<S> {
   const { byCode, put, subscribe } = entryStore<S>();
+  const allowed = (): boolean => config.standaloneAllowed?.() ?? true;
+  const current = (entry: TypedEntry<S>): readonly S[] => matchTypedCapture(entry.capture, config.dueSales());
 
   async function book(entry: TypedEntry<S>): Promise<void> {
     const asked = put(entry, { state: 'booking', waitingFor: null });
@@ -132,30 +158,46 @@ export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: Typ
       put(asked, { state: 'waiting', waitingFor: 'link' });
       return;
     }
-    if (answer.ack) config.ack(asked.deviceId, [asked.capture.transactionCode]);
-    config.onAnswer?.(put(asked, answer.ack ? { state: 'done', waitingFor: null, answer } : unackedPatch<S>(answer)));
+    let patch: Partial<TypedEntry<S>> = unackedPatch<S>(answer);
+    if (answer.ack) patch = (await told(config, asked)) ? { state: 'done', waitingFor: null, answer } : { state: 'waiting', waitingFor: 'link', answer };
+    const next = put(asked, patch);
+    config.onAnswer?.(next);
+  }
+
+  /** The sale took it: done at once (so a second call tells nothing twice), held again when the terminal could not be told. */
+  async function settled(entry: TypedEntry<S>): Promise<void> {
+    const telling = put(entry, { state: 'done', waitingFor: null });
+    if (!(await told(config, telling))) put(telling, { state: 'held', waitingFor: 'link' });
   }
 
   function arrived(deviceId: string, trace: TerminalCaptureTrace): void {
     const known = byCode.get(trace.transactionCode);
     if (known !== undefined) {
       // The terminal did not hear the first acknowledgement: tell it again, book nothing.
-      if (known.state === 'done') config.ack(known.deviceId, [trace.transactionCode]);
+      if (known.state === 'done') void told(config, known);
       return;
     }
     const capture = captureWireOf(trace, deviceId);
     const matches = matchTypedCapture(capture, config.dueSales());
-    const standalone = config.standaloneAllowed?.() ?? true;
+    const standalone = allowed();
     const entry: TypedEntry<S> = { deviceId, capture, state: 'asking', matches, standalone, waitingFor: null, saleKey: null, answer: null };
     if (matches.length > 0 || !standalone) put(entry, {});
     else void book(entry);
+  }
+
+  /** A capture the policy kept off "on its own": offered again once allowed, booked when nothing matches. */
+  function reask(entry: TypedEntry<S>): void {
+    if (!allowed()) return;
+    if (current(entry).length === 0) void book(entry);
+    else put(entry, { standalone: true });
   }
 
   return {
     received: (event) => event.captures.forEach((trace) => arrived(event.deviceId, trace)),
     chooseSale(transactionCode, key) {
       const entry = byCode.get(transactionCode);
-      return entry?.state === 'asking' ? put(entry, { state: 'held', saleKey: key }).capture : null;
+      if (entry?.state !== 'asking' || !current(entry).some((sale) => sale.key === key)) return null;
+      return put(entry, { state: 'held', saleKey: key }).capture;
     },
     chooseStandalone(transactionCode) {
       const entry = byCode.get(transactionCode);
@@ -166,18 +208,18 @@ export function createTypedCaptureInbox<S extends DueSale = DueSale>(config: Typ
     bound(transactionCodes) {
       transactionCodes.forEach((code) => {
         const entry = byCode.get(code);
-        if (entry?.state !== 'held') return;
-        config.ack(entry.deviceId, [code]);
-        put(entry, { state: 'done' });
+        if (entry?.state === 'held') void settled(entry);
       });
     },
     retry() {
-      [...byCode.values()]
-        .filter((entry) => entry.state === 'waiting' && entry.waitingFor !== null && RETRIABLE.has(entry.waitingFor))
-        .forEach((entry) => void book(entry));
+      [...byCode.values()].forEach((entry) => {
+        if (entry.state === 'waiting') void book(entry);
+        else if (entry.state === 'held' && entry.waitingFor === 'link') void settled(entry);
+        else if (policyHeld(entry)) reask(entry);
+      });
     },
-    entries: () => [...byCode.values()],
-    unanswered: () => [...byCode.values()].filter((entry) => entry.state === 'asking'),
+    entries: () => [...byCode.values()].map((entry) => (entry.state === 'asking' ? { ...entry, matches: current(entry) } : entry)),
+    unanswered: () => [...byCode.values()].filter((entry) => entry.state === 'asking' || entry.state === 'held'),
     subscribe,
   };
 }

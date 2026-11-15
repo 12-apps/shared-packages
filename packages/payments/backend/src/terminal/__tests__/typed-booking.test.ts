@@ -24,6 +24,10 @@ interface HostOptions {
   barrier?: number;
   /** The host's sale write fails with this. */
   saleFails?: Error;
+  /** The host's sale write fails once with this, and the host calls it a race. */
+  saleRacesOnce?: Error;
+  /** Runs when the session is looked up: a move another request lands between the booking's read and its transaction. */
+  meanwhile?: (made: World) => Promise<void>;
 }
 
 /** The host's tables behind the ports: the sales booked per code, rolled back with the capture rows. */
@@ -32,6 +36,7 @@ function host(made: World, options: HostOptions = {}) {
   const sold: Array<StandaloneSale<SessionRow>> = [];
   const live = { session: options.session === undefined ? { id: 'session-1' } : options.session, policy: options.policy ?? { ok: true as const } };
   const order: Array<Promise<unknown>> = [];
+  const raced = new Set<Error>();
   const arrived: Array<() => void> = [];
   const gate = (): Promise<void> =>
     new Promise<void>((resolve) => {
@@ -57,10 +62,19 @@ function host(made: World, options: HostOptions = {}) {
       return run;
     },
     mayBook: vi.fn(async () => live.policy),
-    openSession: vi.fn(async () => live.session),
+    openSession: vi.fn(async () => {
+      await options.meanwhile?.(made);
+      return live.session;
+    }),
+    isRetryable: (error) => error === options.saleRacesOnce,
     bookedFor: async (_clientId, code, tx) => (options.blindKey === true && tx !== undefined ? null : (booked.get(code) ?? null)),
     createSale: vi.fn(async (_tx: unknown, sale: StandaloneSale<SessionRow>) => {
       if (options.saleFails !== undefined) throw options.saleFails;
+      const race = options.saleRacesOnce;
+      if (race !== undefined && !raced.has(race)) {
+        raced.add(race);
+        throw race;
+      }
       const target = made.sale(sale.clientId);
       sold.push(sale);
       booked.set(sale.capture.transactionCode, target);
@@ -167,6 +181,32 @@ describe('exactly once (A3)', () => {
   });
 });
 
+describe('a move that lands while the booking decides', () => {
+  it('D9-R14: a recovery binds it between the read and the transaction: BOUND, the sale rolled back', async () => {
+    const recovered = { target: { orderId: '', paymentId: '' } };
+    const { w, deviceId, booking, sold } = setUp({
+      meanwhile: async (there) => {
+        recovered.target = there.sale();
+        await there.ledger.bind(undefined, TENANT, ['TC-0001'], recovered.target);
+      },
+    });
+    const answer = await booking.book({ clientId: TENANT, deviceId, capture: wire() });
+
+    expect(answer).toEqual({ outcome: 'BOUND', orderId: recovered.target.orderId, ack: true });
+    expect(sold).toHaveLength(0);
+    expect(w.row('TC-0001').orderId).toBe(recovered.target.orderId);
+  });
+
+  it('D9-R21: a refund flag lands between the read and the bind: FLAGGED, the sale rolled back', async () => {
+    const { deviceId, booking, sold } = setUp({
+      meanwhile: (there) => there.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'RECEIVED_TWICE').then(() => undefined),
+    });
+
+    expect(await booking.book({ clientId: TENANT, deviceId, capture: wire() })).toEqual({ outcome: 'FLAGGED', ack: true });
+    expect(sold).toHaveLength(0);
+  });
+});
+
 describe('what keeps a capture waiting', () => {
   it('D9-R11: no open session: nothing is written, no acknowledgement, and it books once a session opens', async () => {
     const { w, deviceId, booking, sold, openSession } = setUp({ session: null });
@@ -203,6 +243,23 @@ describe('what keeps a capture waiting', () => {
 });
 
 describe('what refuses it', () => {
+  it('D9-R18: the terminal that reported the capture is the seller; a page naming another terminal is refused', async () => {
+    const { w, deviceId, booking, sold } = setUp();
+    const other = w.device();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+
+    expect(await booking.book({ clientId: TENANT, deviceId: other, capture: wire() })).toEqual({ outcome: 'REFUSED', code: 'DEVICE_MISMATCH', ack: false });
+    expect(sold).toHaveLength(0);
+    expect(w.row('TC-0001')).toMatchObject({ deviceId, state: 'UNBOUND' });
+  });
+
+  it('D9-R19: no terminal named is refused, and nothing is recorded', async () => {
+    const { w, booking, sold } = setUp();
+    expect(await booking.book({ clientId: TENANT, deviceId: ' ', capture: wire() })).toEqual({ outcome: 'REFUSED', code: 'DEVICE_MISMATCH', ack: false });
+    expect(sold).toHaveLength(0);
+    expect(w.rows()).toHaveLength(0);
+  });
+
   it("D9-R19: a terminal of another tenant is refused and nothing is written", async () => {
     const { w, booking, sold } = setUp();
     const foreign = w.device(OTHER_TENANT);
@@ -241,10 +298,20 @@ describe('what refuses it', () => {
     expect(w.row('TC-0001').refundClearedAt).not.toBeNull();
   });
 
-  it("D9-R13: a host error inside the transaction that is not the race propagates, with the sale rolled back", async () => {
-    const { deviceId, booking, sold } = setUp({ saleFails: new Error('disk full') });
+  it('D9-R13: a host error inside the transaction that is not a race is thrown at once, never decided again', async () => {
+    const { deviceId, booking, sold, ports } = setUp({ saleFails: new Error('disk full') });
 
     await expect(booking.book({ clientId: TENANT, deviceId, capture: wire() })).rejects.toThrow('disk full');
+    expect(ports.createSale).toHaveBeenCalledTimes(1);
     expect(sold).toHaveLength(0);
+  });
+
+  it("D9-R13: an error the host calls a race (its unique key) is decided again, and books once", async () => {
+    const { deviceId, booking, sold, ports } = setUp({ saleRacesOnce: new Error('unique violation') });
+    const answer = await booking.book({ clientId: TENANT, deviceId, capture: wire() });
+
+    expect(answer).toMatchObject({ outcome: 'BOOKED', created: true });
+    expect(ports.createSale).toHaveBeenCalledTimes(2);
+    expect(sold).toHaveLength(1);
   });
 });
