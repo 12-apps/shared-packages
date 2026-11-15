@@ -56,6 +56,19 @@ contingency could put a second document on the same sale.
 inside `vProd` and the net price travels in NT 2026.008's `vProdLiq`, which
 sped-nfe 5.2.9 cannot write.
 
+**A return document.** `operation` maps to `tpNF` (`OUT` 1, `IN` 0) and
+`referencedDocuments[].accessKey` to `NFref/refNFe`, in order. Both are
+optional: a document without them is `tpNF` 1 with no `NFref`, byte for byte
+what it built before they existed. A buyer's return is an NF-e of entry
+(`/nfe/issue`, `purpose: "RETURN"`, `operation: "IN"`) that references the
+NFC-e. `INVALID` with code `RETURN_ON_NFCE` refuses a return asked of an NFC-e
+(an NFC-e has no return purpose), and with code `RETURN_NEEDS_REFERENCE` a
+return quoting no document; an NFC-e of entry, and an NFC-e with any
+`referencedDocuments` (SEFAZ rejects `NFref` on a model 65 with 708), are
+`INVALID` too. The caller sets CFOP 1202 (within the state) or 2202 (between
+states) on every line, and a single `NO_PAYMENT` payment; the service checks
+neither.
+
 ## Errors
 
 Every failure is `{ error: { class, code, message, details, accessKey, signedXml, sefazReply, outcomeUnknown } }`:

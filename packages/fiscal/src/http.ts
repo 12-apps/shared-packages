@@ -72,6 +72,8 @@ export const FISCAL_ERROR_STATUS = {
   SUBJECT_HAS_DOCUMENT: 409,
   NOT_PRINTABLE: 409,
   RESEND_CHANGES_PRINTED_FIELDS: 422,
+  RETURN_NEEDS_REFERENCE: 422,
+  RETURN_ON_NFCE: 422,
 } as const satisfies Record<FiscalDocumentErrorCode, number>;
 
 /**

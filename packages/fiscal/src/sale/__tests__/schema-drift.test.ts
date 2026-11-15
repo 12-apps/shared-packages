@@ -2,7 +2,9 @@
  * The `SaleForDocument` type and the JSON schema the fiscal service validates
  * against are two spellings of one contract. Each record below is typed
  * `Record<keyof T, true>`, so the compiler fails it when the TYPE gains or
- * loses a field; the test then fails when the SCHEMA disagrees with it.
+ * loses a field; the test then fails when the SCHEMA disagrees with it. A
+ * field the type makes optional is listed again in `Record<OptionalKeys<T>,
+ * true>`, so the schema leaves exactly those out of `required`.
  */
 import schemaJson from "../../../sidecar/schema/sale-for-document.schema.json";
 import type {
@@ -10,6 +12,7 @@ import type {
   BuyerDocument,
   BuyerPresence,
   ContributionCst,
+  DocumentOperation,
   DocumentPurpose,
   FreightMode,
   IssuerTaxRegime,
@@ -23,6 +26,7 @@ import type {
   LineContribution,
   LineIbsCbs,
   PaymentMethod,
+  ReferencedDocument,
   SaleForDocument,
   SaleLine,
   SalePayment,
@@ -49,6 +53,10 @@ function definition(name: string): JsonSchemaNode {
 
 const fields = <T>(record: Record<keyof T, true>): string[] => Object.keys(record).sort();
 
+/** The keys `T` declares with `?`. */
+type OptionalKeys<T> = { [K in keyof T]-?: object extends Pick<T, K> ? K : never }[keyof T];
+const optional = <T>(record: Record<OptionalKeys<T>, true>): string[] => Object.keys(record).sort();
+
 function objectOf(node: JsonSchemaNode): JsonSchemaObject {
   const object = node.oneOf?.find((branch) => branch.properties !== undefined);
   return object ?? node;
@@ -62,6 +70,11 @@ function describedKeys(node: JsonSchemaNode): { required: string[]; properties: 
   };
 }
 
+/** Per case, the fields the type declares optional, which the schema leaves out of `required`. */
+const OPTIONAL: Readonly<Record<string, readonly string[]>> = {
+  SaleForDocument: optional<SaleForDocument>({ operation: true, referencedDocuments: true }),
+};
+
 const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
   [
     "SaleForDocument",
@@ -74,6 +87,8 @@ const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
       issuedAt: true,
       operationNature: true,
       purpose: true,
+      operation: true,
+      referencedDocuments: true,
       destination: true,
       presence: true,
       finalConsumer: true,
@@ -87,6 +102,11 @@ const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
       additionalInfo: true,
       technicalResponsible: true,
     }),
+  ],
+  [
+    "ReferencedDocument",
+    (schema.properties?.referencedDocuments as { readonly items?: JsonSchemaNode } | undefined)?.items ?? {},
+    fields<ReferencedDocument>({ accessKey: true }),
   ],
   [
     "Address",
@@ -192,10 +212,11 @@ const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
 ];
 
 describe("the SaleForDocument type and its JSON schema", () => {
-  it.each(cases)("%s: every field is in the schema, required, and nothing else is", (_name, node, expected) => {
+  it.each(cases)("%s: every field is in the schema, required unless optional, and nothing else is", (name, node, expected) => {
+    const optionalKeys = OPTIONAL[name] ?? [];
     const described = describedKeys(node);
     expect(described.properties).toEqual(expected);
-    expect(described.required).toEqual(expected);
+    expect(described.required).toEqual(expected.filter((key) => !optionalKeys.includes(key)));
   });
 
   it("names the same payment methods", () => {
@@ -257,6 +278,11 @@ describe("the SaleForDocument type and its JSON schema", () => {
       "DocumentPurpose",
       enumOf(schema.properties?.purpose),
       fields<Record<DocumentPurpose, true>>({ NORMAL: true, COMPLEMENTARY: true, ADJUSTMENT: true, RETURN: true }),
+    ],
+    [
+      "DocumentOperation",
+      enumOf(schema.properties?.operation),
+      fields<Record<DocumentOperation, true>>({ OUT: true, IN: true }),
     ],
     [
       "OperationDestination",

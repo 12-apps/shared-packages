@@ -100,6 +100,55 @@ function keyCheckDigit(body: string): number {
   return rest < 2 ? 0 : 11 - rest;
 }
 
+/** cUF and AAMM, the issuer's CNPJ (alphanumeric from July 2026), then model to `cDV`, all digits. */
+const ACCESS_KEY_SHAPE = /^[0-9]{6}[0-9A-Z]{12}[0-9]{26}$/;
+/** `NFref` occurs at most 500 times. */
+const MAX_REFERENCED_DOCUMENTS = 500;
+
+/**
+ * Whether `key` is an access key as the layout writes one: 44 characters, the
+ * CNPJ inside it alphanumeric or not, and its modulo-11 check digit right.
+ */
+export function isValidAccessKey(key: string): boolean {
+  if (!ACCESS_KEY_SHAPE.test(key)) return false;
+  return keyCheckDigit(key.slice(0, 43)) === Number(key.slice(43));
+}
+
+/**
+ * Refuses a sale the model cannot carry, before a number is drawn: a return on
+ * an NFC-e, an NFC-e of entry, an NFC-e quoting another document (SEFAZ
+ * rejects `NFref` on a model 65 with 708, and the number would be burned), a
+ * return quoting nothing, or a reference that is not an access key. A document without `operation` and
+ * `referencedDocuments` passes as it always did.
+ */
+export function assertDraftFits(draft: Pick<SaleDraft, "purpose" | "operation" | "referencedDocuments">, model: FiscalDocumentModel): void {
+  const references = draft.referencedDocuments ?? [];
+  if (model === "NFCE") assertNfceDraftFits(draft, references.length);
+  if (draft.purpose === "RETURN" && references.length === 0) {
+    throw new FiscalDocumentError("RETURN_NEEDS_REFERENCE", "a return must reference the document it returns (referencedDocuments).");
+  }
+  if (references.length > MAX_REFERENCED_DOCUMENTS) {
+    throw new FiscalDocumentError("INVALID_INPUT", `at most ${MAX_REFERENCED_DOCUMENTS} referenced documents, not ${references.length}.`);
+  }
+  const bad = references.findIndex((reference) => !isValidAccessKey(reference.accessKey));
+  if (bad !== -1) {
+    throw new FiscalDocumentError("INVALID_INPUT", `referencedDocuments[${bad}].accessKey is not a 44-character access key.`);
+  }
+}
+
+/** The NFC-e half of `assertDraftFits`: no return, no entry, no reference. */
+function assertNfceDraftFits(draft: Pick<SaleDraft, "purpose" | "operation">, referenceCount: number): void {
+  if (draft.purpose === "RETURN") {
+    throw new FiscalDocumentError("RETURN_ON_NFCE", "an NFC-e has no return purpose: issue an NF-e (model 55) of entry referencing it.");
+  }
+  if (draft.operation === "IN") {
+    throw new FiscalDocumentError("INVALID_INPUT", 'an NFC-e is an outgoing document: operation must be "OUT".');
+  }
+  if (referenceCount > 0) {
+    throw new FiscalDocumentError("INVALID_INPUT", "an NFC-e references no document (SEFAZ 708): referencedDocuments must be empty.");
+  }
+}
+
 /**
  * The 44-character access key a document will carry, computed as the layout
  * does: cUF, AAMM of `dhEmi`, CNPJ, model, series, number, `tpEmis` (1 online,

@@ -28,7 +28,14 @@ export type FiscalDocumentErrorCode =
    * DANFE prints and its QR encodes (the total, the buyer's document): such a
    * sale needs a new note, issued by a person.
    */
-  | "RESEND_CHANGES_PRINTED_FIELDS";
+  | "RESEND_CHANGES_PRINTED_FIELDS"
+  /** A `RETURN` quotes no document (`referencedDocuments` is absent or empty). */
+  | "RETURN_NEEDS_REFERENCE"
+  /**
+   * A `RETURN` asked of an NFC-e. An NFC-e has no return purpose: the return is
+   * an NF-e (model 55) of entry that references the NFC-e's key.
+   */
+  | "RETURN_ON_NFCE";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;
