@@ -1,9 +1,10 @@
 'use client';
 
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import { useState, type JSX } from 'react';
 
-import { currentIndex, isLive, partOf, readiness, remainingAfter } from './charge-flow';
+import { currentIndex, isLive, linkDown, partOf, readiness, remainingAfter } from './charge-flow';
+import { ActionButton, ChoiceRow, type ActionRank } from './choice-actions';
 import type { ChargeRun } from './charge-run';
 import type { ElsewhereCopy, TerminalWaitCopy } from './copy';
 import { ElsewhereForm } from './elsewhere-form';
@@ -63,13 +64,22 @@ const WORDS: Readonly<Record<LegStatus, (copy: TerminalWaitCopy, leg: FlowLeg, m
   manual: () => say(''),
 };
 
+/** A leg nothing has reached the terminal for yet. */
+const UNSENT: ReadonlySet<LegStatus> = new Set<LegStatus>(['send', 'pushing', 'queued']);
+
+/** The link is down under a leg not sent: the host's words for it, or the not-connected refusal's (nothing was charged). */
+function downSaid(copy: TerminalWaitCopy): Said {
+  if (copy.down !== undefined) return say(copy.down, copy.downSub ?? null, true);
+  return say(copy.refused.NOT_CONNECTED ?? '', copy.refusedSub, true);
+}
+
 function saidOf(flow: ChargeFlow, leg: FlowLeg, copy: TerminalWaitCopy, money: string, away: boolean): Said {
   if (readiness(flow) === 'waiting-link') return say(copy.waitingLink, copy.waitingLinkSub);
+  // The link says the terminal cannot be reached: never "sending" to it (6-B).
+  if (linkDown(flow.link) && UNSENT.has(leg.status)) return downSaid(copy);
   if (away && (leg.status === 'waiting' || leg.status === 'processing')) return say(copy.away, copy.awaySub);
   return WORDS[leg.status](copy, leg, money);
 }
-
-const BUTTON_SX = { minHeight: 48, textTransform: 'none' } as const;
 
 /** The leg's ways out, as buttons; "another tender" opens the store's tenders. */
 function LegExits(props: TerminalWaitProps & { leg: FlowLeg; onManual: (via: Elsewhere['via']) => void }): JSX.Element | null {
@@ -77,38 +87,39 @@ function LegExits(props: TerminalWaitProps & { leg: FlowLeg; onManual: (via: Els
   const [choosing, setChoosing] = useState(false);
   if (leg.exits.length === 0 && leg.status !== 'cash') return null;
   const buttons: Record<string, () => JSX.Element> = {
-    cancel: () => button('cancel', copy.cancel, () => run.cancel(), 'outlined'),
-    resend: () => button('resend', copy.resend, () => run.resend(), 'contained'),
-    'other-tender': () => button('other', copy.other, () => setChoosing((open) => !open), 'outlined'),
-    'other-machine': () => button('other-machine', copy.otherMachine, () => onManual('OTHER_MACHINE'), 'text'),
-    'manual-pix': () => button('manual-pix', copy.manualPix, () => onManual('MANUAL_PIX'), 'text'),
+    cancel: () => button('cancel', copy.cancel, () => run.cancel(), 'secondary'),
+    resend: () => button('resend', copy.resend, () => run.resend(), 'primary'),
+    'other-tender': () => button('other', copy.other, () => setChoosing((open) => !open), 'secondary'),
+    'other-machine': () => button('other-machine', copy.otherMachine, () => onManual('OTHER_MACHINE'), 'tertiary'),
+    'manual-pix': () => button('manual-pix', copy.manualPix, () => onManual('MANUAL_PIX'), 'tertiary'),
   };
-  const own = leg.exits.filter((exit) => exit !== 'other-machine' && exit !== 'manual-pix');
-  const manual = leg.exits.filter((exit) => exit === 'other-machine' || exit === 'manual-pix');
-  function button(id: string, label: string, onClick: () => void, variant: 'contained' | 'outlined' | 'text'): JSX.Element {
+  const isManual = (exit: string): boolean => exit === 'other-machine' || exit === 'manual-pix';
+  const manual = leg.exits.filter(isManual);
+  // With a manual exit offered, "another tender" answers the same question (how to take it instead): one group.
+  const instead = manual.length === 0 ? [] : leg.exits.filter((exit) => exit === 'other-tender' || isManual(exit));
+  const own = leg.exits.filter((exit) => !instead.includes(exit) && !isManual(exit));
+  function button(id: string, label: string, onClick: () => void, rank: ActionRank): JSX.Element {
     return (
-      <Button key={id} variant={variant} onClick={onClick} data-testid={`${dataTestId}-${id}`} sx={BUTTON_SX}>
+      <ActionButton key={id} rank={rank} onClick={onClick} data-testid={`${dataTestId}-${id}`}>
         {label}
-      </Button>
+      </ActionButton>
     );
   }
   return (
     <Stack spacing={1}>
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        {leg.status === 'cash' ? button('cash', copy.cashReceived(money(leg.amountCents)), () => run.cashReceived(), 'contained') : null}
+      <ChoiceRow>
+        {leg.status === 'cash' ? button('cash', copy.cashReceived(money(leg.amountCents)), () => run.cashReceived(), 'primary') : null}
         {own.map((exit) => buttons[exit]?.() ?? null)}
-      </Stack>
-      {manual.length === 0 ? null : (
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }} data-testid={`${dataTestId}-manual-exits`}>
-          {manual.map((exit) => buttons[exit]?.() ?? null)}
-        </Stack>
-      )}
+      </ChoiceRow>
+      <ChoiceRow label={instead.length === 0 ? undefined : copy.otherLabel} dataTestId={instead.length === 0 ? undefined : `${dataTestId}-manual-exits`}>
+        {instead.map((exit) => buttons[exit]?.() ?? null)}
+      </ChoiceRow>
       {choosing ? (
         <Box role="group" aria-label={copy.otherLabel} sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1 }}>
           {tenders.map((tender) => (
-            <Button key={tender.id} variant="outlined" onClick={() => run.other(tender.id)} data-testid={`${dataTestId}-other-${tender.id}`} sx={BUTTON_SX}>
+            <ActionButton key={tender.id} rank="secondary" onClick={() => run.other(tender.id)} data-testid={`${dataTestId}-other-${tender.id}`}>
               {tender.name}
-            </Button>
+            </ActionButton>
           ))}
         </Box>
       ) : null}
@@ -191,11 +202,11 @@ function LegCard({ flow, index, leg, props }: { flow: ChargeFlow; index: number;
       <Typography variant="body2" component="p" color="text.secondary">
         {copy.where(provider, tenderName(leg.tender))}
       </Typography>
-      <Typography component="p" sx={{ fontSize: '2.25rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }} data-testid={`${dataTestId}-amount`}>
+      <Typography component="p" variant="h4" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }} data-testid={`${dataTestId}-amount`}>
         {money(leg.amountCents)}
       </Typography>
       <Box role="status" aria-live="polite">
-        <Typography component="p" sx={{ fontSize: '1.25rem', fontWeight: 700, color: said.warn ? 'warning.dark' : 'text.primary' }} data-testid={`${dataTestId}-title`}>
+        <Typography component="p" variant="h6" sx={{ fontWeight: 700 }} color="text.primary" data-testid={`${dataTestId}-title`}>
           {said.title}
         </Typography>
         {said.sub === null ? null : (
@@ -232,9 +243,9 @@ export function TerminalWait(props: TerminalWaitProps): JSX.Element {
       <LegCard flow={flow} index={index} leg={leg} props={props} />
       <LegExits key={`${index}:${leg.status}`} {...props} leg={leg} onManual={setManual} />
       {pending === null ? null : (
-        <Button variant="outlined" onClick={() => run.cancelPending()} data-testid={`${dataTestId}-cancel-pending`} sx={BUTTON_SX}>
+        <ActionButton rank="secondary" onClick={() => run.cancelPending()} data-testid={`${dataTestId}-cancel-pending`}>
           {copy.cancelPending(money(pending.amountCents))}
-        </Button>
+        </ActionButton>
       )}
       <LegList flow={flow} current={index} copy={copy} tenderName={tenderName} money={money} />
     </Stack>

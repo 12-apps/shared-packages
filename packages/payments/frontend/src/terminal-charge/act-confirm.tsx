@@ -1,8 +1,9 @@
 'use client';
 
-import { Alert, Box, Button, Stack, TextField } from '@mui/material';
+import { Alert, Stack, TextField, Typography } from '@mui/material';
 import { useMemo, useState, type JSX } from 'react';
 
+import { ActionButton, ChoiceRow } from './choice-actions';
 import { createConfirmedAct, problemOf, type ConfirmedActAnswer, type ConfirmedActProblem } from './confirmed-act';
 import type { ActConfirmCopy } from './copy';
 
@@ -56,9 +57,9 @@ export function ActConfirm({ title, copy, onSend, onDone, onBack, dataTestId = '
   const message = messageOf(shown, copy);
   return (
     <Stack spacing={1.5} data-testid={dataTestId}>
-      <Box component="p" sx={{ m: 0, fontWeight: 700 }}>
+      <Typography component="p" variant="subtitle1" sx={{ fontWeight: 700 }}>
         {title}
-      </Box>
+      </Typography>
       <TextField
         label={copy.reasonLabel}
         helperText={copy.reasonHint}
@@ -82,14 +83,14 @@ export function ActConfirm({ title, copy, onSend, onDone, onBack, dataTestId = '
           {message}
         </Alert>
       )}
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-        <Button variant="contained" onClick={() => void confirm()} disabled={sending} data-testid={`${dataTestId}-confirm`}>
+      <ChoiceRow>
+        <ActionButton rank="primary" onClick={() => void confirm()} disabled={sending} data-testid={`${dataTestId}-confirm`}>
           {copy.confirm}
-        </Button>
-        <Button variant="outlined" onClick={onBack} disabled={sending} data-testid={`${dataTestId}-back`}>
+        </ActionButton>
+        <ActionButton rank="secondary" onClick={onBack} disabled={sending} data-testid={`${dataTestId}-back`}>
           {copy.back}
-        </Button>
-      </Stack>
+        </ActionButton>
+      </ChoiceRow>
     </Stack>
   );
 }

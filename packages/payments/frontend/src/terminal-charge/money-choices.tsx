@@ -1,9 +1,10 @@
 'use client';
 
-import { Box, Button, Stack } from '@mui/material';
-import { useState, type JSX } from 'react';
+import { Alert, AlertTitle, Paper } from '@mui/material';
+import { useState, type JSX, type ReactNode } from 'react';
 
 import { ActConfirm } from './act-confirm';
+import { ActionButton, ChoiceRow } from './choice-actions';
 import type { ConfirmedActAnswer } from './confirmed-act';
 import type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy } from './copy';
 
@@ -19,9 +20,29 @@ import type { ActConfirmCopy, OverCaptureCopy, ReceivedTwiceCopy } from './copy'
  *   credit (only with a buyer), or refund and charge again (a text button).
  *
  * The host sends each act through its own permission and PIN gate.
+ *
+ * The warning is the theme's warning `Alert` (amber, never red: nothing
+ * failed), and the choices sit under it on the paper, where every rank of
+ * button reads at the theme's own contrast — never on the warning's fill.
  */
 
-const BAND_SX = { p: 2, borderRadius: 2, border: 1.5, borderColor: 'warning.main', bgcolor: 'warning.light' } as const;
+/** The question in a warning, and its answers on the paper below it. */
+function Band({ dataTestId, children }: { dataTestId: string; children: ReactNode }): JSX.Element {
+  return (
+    <Paper variant="outlined" data-testid={dataTestId} sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, borderColor: 'warning.main' }}>
+      {children}
+    </Paper>
+  );
+}
+
+function Question({ title, lede }: { title: string; lede: string }): JSX.Element {
+  return (
+    <Alert severity="warning">
+      <AlertTitle>{title}</AlertTitle>
+      {lede}
+    </Alert>
+  );
+}
 
 export type ReceivedTwiceAct = 'give-back' | 'refund-card';
 
@@ -40,24 +61,19 @@ export function ReceivedTwiceBand({ money, copy, confirmCopy, onAct, onDone, dat
   const [chosen, setChosen] = useState<ReceivedTwiceAct | null>(null);
   const titleOf = (act: ReceivedTwiceAct): string => (act === 'give-back' ? copy.giveBack(money) : copy.refundCard);
   return (
-    <Box role="alert" sx={BAND_SX} data-testid={dataTestId}>
+    <Band dataTestId={dataTestId}>
       {chosen === null ? (
-        <Stack spacing={1}>
-          <Box component="p" sx={{ m: 0, fontWeight: 700 }}>
-            {copy.title(money)}
-          </Box>
-          <Box component="p" sx={{ m: 0 }}>
-            {copy.lede}
-          </Box>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-            <Button variant="contained" onClick={() => setChosen('give-back')} data-testid={`${dataTestId}-give-back`}>
+        <>
+          <Question title={copy.title(money)} lede={copy.lede} />
+          <ChoiceRow label={copy.title(money)}>
+            <ActionButton rank="primary" onClick={() => setChosen('give-back')} data-testid={`${dataTestId}-give-back`}>
               {copy.giveBack(money)}
-            </Button>
-            <Button variant="outlined" onClick={() => setChosen('refund-card')} data-testid={`${dataTestId}-refund-card`}>
+            </ActionButton>
+            <ActionButton rank="secondary" onClick={() => setChosen('refund-card')} data-testid={`${dataTestId}-refund-card`}>
               {copy.refundCard}
-            </Button>
-          </Stack>
-        </Stack>
+            </ActionButton>
+          </ChoiceRow>
+        </>
       ) : (
         <ActConfirm
           title={titleOf(chosen)}
@@ -68,7 +84,7 @@ export function ReceivedTwiceBand({ money, copy, confirmCopy, onAct, onDone, dat
           dataTestId={`${dataTestId}-confirm`}
         />
       )}
-    </Box>
+    </Band>
   );
 }
 
@@ -98,7 +114,7 @@ export function OverCaptureChoice(props: OverCaptureChoiceProps): JSX.Element {
   };
   if (chosen !== null) {
     return (
-      <Box sx={BAND_SX} data-testid={dataTestId}>
+      <Band dataTestId={dataTestId}>
         <ActConfirm
           title={labels[chosen]}
           copy={confirmCopy}
@@ -107,34 +123,25 @@ export function OverCaptureChoice(props: OverCaptureChoiceProps): JSX.Element {
           onBack={() => setChosen(null)}
           dataTestId={`${dataTestId}-confirm`}
         />
-      </Box>
+      </Band>
     );
   }
   return (
-    <Box role="alert" sx={BAND_SX} data-testid={dataTestId}>
-      <Stack spacing={1}>
-        <Box component="p" sx={{ m: 0, fontWeight: 700 }}>
-          {copy.title(excess)}
-        </Box>
-        <Box component="p" sx={{ m: 0 }}>
-          {copy.lede}
-        </Box>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-          <Button variant="contained" onClick={() => setChosen('change')} data-testid={`${dataTestId}-change`}>
-            {labels.change}
-          </Button>
-          {buyer === null ? null : (
-            <Button variant="outlined" onClick={() => setChosen('credit')} data-testid={`${dataTestId}-credit`}>
-              {labels.credit}
-            </Button>
-          )}
-        </Stack>
-        <Box>
-          <Button variant="text" onClick={() => setChosen('refund-and-charge')} data-testid={`${dataTestId}-refund-and-charge`}>
-            {labels['refund-and-charge']}
-          </Button>
-        </Box>
-      </Stack>
-    </Box>
+    <Band dataTestId={dataTestId}>
+      <Question title={copy.title(excess)} lede={copy.lede} />
+      <ChoiceRow label={copy.title(excess)}>
+        <ActionButton rank="primary" onClick={() => setChosen('change')} data-testid={`${dataTestId}-change`}>
+          {labels.change}
+        </ActionButton>
+        {buyer === null ? null : (
+          <ActionButton rank="secondary" onClick={() => setChosen('credit')} data-testid={`${dataTestId}-credit`}>
+            {labels.credit}
+          </ActionButton>
+        )}
+        <ActionButton rank="tertiary" onClick={() => setChosen('refund-and-charge')} data-testid={`${dataTestId}-refund-and-charge`}>
+          {labels['refund-and-charge']}
+        </ActionButton>
+      </ChoiceRow>
+    </Band>
   );
 }
