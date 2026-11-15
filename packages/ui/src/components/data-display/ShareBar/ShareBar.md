@@ -49,7 +49,7 @@ exported for a host that needs the same numbers elsewhere.
   part's name and percent in the bar's order, and the segments are separated by
   a 2px gap so two neighbours of close colour still read as two.
 - **Never red by default.** The default fills are roles (`info`, `secondary`,
-  `warning`, `success`, then darker steps and grey) and never `primary` or
+  `warning`, `success`, then a darker info and a muted neutral) and never `primary` or
   `error`: a red brand would paint one part as a fault. Pass `color` per
   segment to choose.
 - No default copy: every word comes from the host.

@@ -73,8 +73,8 @@ describe('Chart series stroke (FUT-145)', () => {
     const [line] = seriesOf(props, Line);
     const [bar] = seriesOf(props, Bar);
     expect(area).toMatchObject({ fillOpacity: 0.6 });
-    expect(area).not.toHaveProperty('strokeWidth');
-    expect(line).not.toHaveProperty('strokeWidth');
+    expect(area?.strokeWidth).toBeUndefined();
+    expect(line?.strokeWidth).toBeUndefined();
     expect(line).not.toHaveProperty('strokeDasharray');
     expect(bar).not.toHaveProperty('fillOpacity');
   });

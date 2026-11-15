@@ -18,12 +18,10 @@ import { useMeasuredWidth } from '../../utility/Overflow/overflow';
 import { readableInk } from '../HeatMap/heat-map-colors';
 import { shareBarPalette } from './share-bar-colors';
 import { fitsInline, shareBarParts, type ShareBarPart } from './share-bar-model';
+import { SHARE_BAR_METRICS } from './ShareBar.metrics';
 import type { ShareBarProps } from './ShareBar.types';
 
-const BAR_FONT = 12;
-const BAR_PADDING = 4;
-const SEGMENT_GAP = 2;
-const SWATCH = 10;
+const M = SHARE_BAR_METRICS;
 
 const wholePercent = (percent: number): string => `${percent}%`;
 
@@ -49,11 +47,11 @@ function Segment({
         flex: `${part.share} 1 0`,
         minWidth: 0,
         bgcolor: color,
-        color: readableInk(theme, color, [theme.palette.common.white, theme.palette.common.black]),
+        color: readableInk(theme, color, []),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: sxRem(BAR_FONT),
+        fontSize: sxRem(M.fontSize),
         fontWeight: theme.typography.fontWeightMedium,
         fontVariantNumeric: 'tabular-nums',
         whiteSpace: 'nowrap',
@@ -65,12 +63,64 @@ function Segment({
   );
 }
 
+/** The parts as a named list: what assistive tech reads, in the bar's order. */
+function ShareBarList({
+  parts,
+  label,
+  colorOf,
+  formatPercent,
+  formatValue,
+  dataTestId,
+}: {
+  parts: ShareBarPart[];
+  label: string;
+  colorOf: (index: number) => string;
+  formatPercent: (percent: number) => string;
+  formatValue?: (value: number) => string;
+  dataTestId: string;
+}): React.JSX.Element {
+  return (
+    <Box
+      component="ul"
+      aria-label={label}
+      data-testid={`${dataTestId}-list`}
+      sx={{ listStyle: 'none', m: 0, p: 0, mt: 1, display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}
+    >
+      {parts.map((part, index) => (
+        <Box
+          component="li"
+          key={part.key}
+          data-testid={`${dataTestId}-item-${part.key}`}
+          sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, overflowWrap: 'anywhere' }}
+        >
+          <Box
+            component="span"
+            aria-hidden="true"
+            sx={{ width: sxRem(M.swatch), height: sxRem(M.swatch), borderRadius: sxRem(M.swatchRadius), bgcolor: colorOf(index), flexShrink: 0 }}
+          />
+          <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
+            {part.label}
+          </Typography>
+          <Typography variant="body2" component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+            {formatPercent(part.percent)}
+          </Typography>
+          {formatValue ? (
+            <Typography variant="body2" component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+              {formatValue(part.value)}
+            </Typography>
+          ) : null}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export function ShareBar({
   segments,
   label,
   formatPercent = wholePercent,
   formatValue,
-  height = 24,
+  height = M.height,
   inlinePercent = true,
   className,
   dataTestId = 'share-bar',
@@ -80,7 +130,7 @@ export function ShareBar({
   const palette = shareBarPalette(theme);
   const parts = shareBarParts(segments);
   const drawn = parts.filter((part) => part.share > 0);
-  const gaps = Math.max(0, drawn.length - 1) * remPx(theme, SEGMENT_GAP);
+  const gaps = Math.max(0, drawn.length - 1) * remPx(theme, M.gap);
   const colorOf = (index: number): string =>
     segments[index]?.color ?? palette[index % palette.length] ?? theme.palette.info.main;
   return (
@@ -91,9 +141,9 @@ export function ShareBar({
         data-testid={`${dataTestId}-bar`}
         sx={{
           display: 'flex',
-          gap: sxRem(SEGMENT_GAP),
+          gap: sxRem(M.gap),
           height: sxRem(height),
-          borderRadius: sxRem(4),
+          borderRadius: sxRem(M.radius),
           overflow: 'hidden',
           bgcolor: 'action.disabledBackground',
         }}
@@ -111,8 +161,8 @@ export function ShareBar({
                 fitsInline(
                   (width - gaps) * part.share,
                   formatPercent(part.percent),
-                  remPx(theme, BAR_FONT),
-                  remPx(theme, BAR_PADDING),
+                  remPx(theme, M.fontSize),
+                  remPx(theme, M.padding),
                 )
               }
               testId={`${dataTestId}-segment-${part.key}`}
@@ -120,38 +170,7 @@ export function ShareBar({
           ) : null,
         )}
       </Box>
-      <Box
-        component="ul"
-        aria-label={label}
-        data-testid={`${dataTestId}-list`}
-        sx={{ listStyle: 'none', m: 0, p: 0, mt: 1, display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}
-      >
-        {parts.map((part, index) => (
-          <Box
-            component="li"
-            key={part.key}
-            data-testid={`${dataTestId}-item-${part.key}`}
-            sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, overflowWrap: 'anywhere' }}
-          >
-            <Box
-              component="span"
-              aria-hidden="true"
-              sx={{ width: sxRem(SWATCH), height: sxRem(SWATCH), borderRadius: sxRem(2), bgcolor: colorOf(index), flexShrink: 0 }}
-            />
-            <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
-              {part.label}
-            </Typography>
-            <Typography variant="body2" component="span" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {formatPercent(part.percent)}
-            </Typography>
-            {formatValue ? (
-              <Typography variant="body2" component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-                {formatValue(part.value)}
-              </Typography>
-            ) : null}
-          </Box>
-        ))}
-      </Box>
+      <ShareBarList parts={parts} label={label} colorOf={colorOf} formatPercent={formatPercent} formatValue={formatValue} dataTestId={dataTestId} />
     </Box>
   );
 }

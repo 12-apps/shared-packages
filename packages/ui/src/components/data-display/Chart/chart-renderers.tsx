@@ -90,19 +90,13 @@ function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
 }
 
 /**
- * A series' declared stroke (FUT-145): its width and dash, passed only when the
- * series declares them, so an undeclared series renders exactly as before. A
- * `defaultWidth` is the renderer's own default, kept where it always applied.
+ * A series' declared dash (FUT-145), passed only when the series declares one,
+ * so an undeclared series renders exactly as before. Its width goes on the
+ * element itself (`strokeWidth={s.strokeWidth}`): undefined there is the
+ * renderer's own default.
  */
-function seriesStroke(
-  s: ChartSeries,
-  defaultWidth?: number,
-): { strokeWidth?: number; strokeDasharray?: string } {
-  const width = s.strokeWidth ?? defaultWidth;
-  return {
-    ...(width !== undefined ? { strokeWidth: width } : {}),
-    ...(s.strokeDasharray !== undefined ? { strokeDasharray: s.strokeDasharray } : {}),
-  };
+function seriesDash(s: ChartSeries): { strokeDasharray?: string } {
+  return s.strokeDasharray !== undefined ? { strokeDasharray: s.strokeDasharray } : {};
 }
 
 /** A series' declared fill opacity, else the renderer's default (absent: none passed). */
@@ -123,7 +117,8 @@ function renderLine(ctx: ChartRenderContext): React.ReactElement {
           dataKey={s.dataKey}
           name={s.name}
           stroke={s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
-          {...seriesStroke(s, 2)}
+          strokeWidth={s.strokeWidth ?? 2}
+          {...seriesDash(s)}
           dot={s.dot !== false}
           activeDot={s.activeDot !== false ? { r: 8 } : false}
           animationDuration={ctx.animationDuration}
@@ -168,7 +163,8 @@ function renderArea(ctx: ChartRenderContext): React.ReactElement {
           stroke={s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fill={s.fill ?? s.color ?? ctx.chartColors[index % ctx.chartColors.length]}
           fillOpacity={s.fillOpacity ?? 0.6}
-          {...seriesStroke(s)}
+          strokeWidth={s.strokeWidth}
+          {...seriesDash(s)}
           stackId={ctx.props.stacked ? 'stack' : undefined}
           animationDuration={ctx.animationDuration}
         />
@@ -312,7 +308,8 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
         stroke={color}
         fill={color}
         {...seriesFillOpacity(s, 0.6)}
-        {...seriesStroke(s)}
+        strokeWidth={s.strokeWidth}
+        {...seriesDash(s)}
         animationDuration={ctx.animationDuration}
       />
     );
@@ -324,7 +321,8 @@ function composedSeries(ctx: ChartRenderContext, s: ChartSeries, index: number):
       dataKey={s.dataKey}
       name={s.name}
       stroke={color}
-      {...seriesStroke(s)}
+      strokeWidth={s.strokeWidth}
+      {...seriesDash(s)}
       animationDuration={ctx.animationDuration}
     />
   );

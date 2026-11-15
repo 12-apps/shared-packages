@@ -1,5 +1,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
+import { neutralTones } from '../../../tokens/ink';
+
 /**
  * The share bar's default fills (FUT-145): roles, and never `primary` or
  * `error` — a brand that is red would paint one part as a fault. Repeats past
@@ -12,6 +14,6 @@ export function shareBarPalette(theme: Theme): string[] {
     theme.palette.warning.main,
     theme.palette.success.main,
     theme.palette.info.dark,
-    theme.palette.grey[500] ?? theme.palette.text.secondary,
+    neutralTones(theme).muted,
   ];
 }
