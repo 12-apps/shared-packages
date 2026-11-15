@@ -165,13 +165,25 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
     kind: z.literal('heatmap'),
     rowAxis: z.array(z.object({ key: z.string(), label: z.string() })),
     columnAxis: z.array(z.object({ key: z.string(), label: z.string() })),
-    cells: z.array(z.object({ row: z.string(), column: z.string(), value: z.number().nullable() })),
+    cells: z.array(
+      z.object({
+        row: z.string(),
+        column: z.string(),
+        value: z.number().nullable(),
+        reason: z.literal('unmeasured').optional(),
+      }),
+    ),
     scale: z.object({
       target: z.number(),
       strongAbove: z.number().optional(),
       strongBelow: z.number().optional(),
     }),
-    labels: z.object({ above: z.string(), below: z.string(), empty: z.string() }),
+    labels: z.object({
+      above: z.string(),
+      below: z.string(),
+      empty: z.string(),
+      unmeasured: z.string().optional(),
+    }),
     valueFormat: reportTableColumnSchema.shape.format,
     valueDecimals: z.number().int().optional(),
     tableColumns: z.array(reportTableColumnSchema),

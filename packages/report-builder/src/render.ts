@@ -337,7 +337,7 @@ export function renderReport(
     return toKpiModel(query, presentation, catalog, rows, copy);
   }
   if (presentation.kind === 'heatmap') {
-    return toHeatmapModel(query, presentation, catalog, rows, tableColumnsFor(query, catalog, copy));
+    return toHeatmapModel(query, presentation, catalog, rows, tableColumnsFor(query, catalog, copy), copy);
   }
   const columns = tableColumnsFor(query, catalog, copy);
   return {

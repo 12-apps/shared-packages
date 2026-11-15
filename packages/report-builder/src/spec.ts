@@ -111,7 +111,14 @@ export const reportRowFlagSchema = z.strictObject({
 const heatmapLabelsSchema = z.strictObject({
   above: z.string().min(1).max(60),
   below: z.string().min(1).max(60),
+  /** A cell with no figure because its denominator is nothing ("sem venda na hora"). */
   empty: z.string().min(1).max(60),
+  /**
+   * A cell with no figure because its measure was never taken: the denominator
+   * is there, no numerator is ("sem custo na hora"). Absent: the engine copy's
+   * `labels.heatmapUnmeasured`, a neutral "not measured".
+   */
+  unmeasured: z.string().min(1).max(60).optional(),
 });
 
 /** One measure on a phone card line, with the host's words after it ("9" + " pessoas"). */
@@ -180,11 +187,12 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
     strongBelow: z.number().optional(),
     labels: heatmapLabelsSchema,
     /**
-     * Drop the leading and trailing rows and/or columns with no figure in any
-     * cell (FUT-4063): an hour axis then starts at the first hour with a figure
-     * and ends at the last, and stays contiguous between them. Absent: every
-     * present value is drawn, as always. Axes are in the data's orientation
-     * (rows = the first dimension), whichever way the grid is drawn.
+     * Drop the leading and trailing rows and/or columns with no activity in any
+     * cell (FUT-4063): no figure, and no unmeasured cell either (an hour that
+     * sold with no cost priced is activity). An hour axis then starts at the
+     * first such hour and ends at the last, and stays contiguous between them.
+     * Absent: every present value is drawn, as always. Axes are in the data's
+     * orientation (rows = the first dimension), whichever way the grid is drawn.
      */
     trimEdges: z.enum(['rows', 'columns', 'both']).optional(),
   }),

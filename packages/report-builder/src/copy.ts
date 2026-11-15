@@ -134,6 +134,14 @@ export interface RenderLabelCopy {
    * this the table would render a blank body and say nothing about why.
    */
   emptyTable: string;
+  /**
+   * What a heat map cell reads when its measure was never taken (FUT-4063): a
+   * ratio whose denominator is there and whose numerator never was — an hour
+   * that sold, with no cost priced. Used when the presentation names no
+   * `labels.unmeasured` of its own. Optional so a pack written before it still
+   * type-checks; absent, such a cell reads its dash alone.
+   */
+  heatmapUnmeasured?: string;
 }
 
 /**

@@ -94,6 +94,18 @@ describe("a heat map", () => {
     expect(screen.getByTestId("r-heatmap-cell-2-ter-11").getAttribute("data-tone")).toBe("blank");
   });
 
+  it("reads an unmeasured hour in its own words, never as no sale", () => {
+    const unmeasured: ReportRender = {
+      ...HEATMAP,
+      cells: [...HEATMAP.cells, { row: "2-ter", column: "11", value: null, reason: "unmeasured" }],
+      labels: { ...HEATMAP.labels, unmeasured: "sem custo na hora" },
+    };
+    render(<ReportRenderView render={unmeasured} dataTestId="r" caption="Custo / vendas por hora" />);
+    expect(screen.getByTestId("r-heatmap-cell-2-ter-11").textContent).toBe("— sem custo na hora");
+    expect(screen.getByTestId("r-heatmap-cell-2-ter-10").textContent).toBe("— sem venda na hora");
+    expect(screen.getByTestId("r-heatmap-legend-unmeasured").textContent).toBe("— sem custo na hora");
+  });
+
   it("exports the long form it was folded from", () => {
     const columns = exportColumnsFor(HEATMAP, PT_BR_REPORT_ENGINE_COPY.values);
     expect(columns.map((column) => column.header)).toEqual(["Dia da semana", "Hora", "Custo / vendas"]);

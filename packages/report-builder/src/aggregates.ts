@@ -201,6 +201,15 @@ function aggregateValue(aggregation: Aggregation, acc: MeasureAccumulator): Repo
 }
 
 /**
+ * A ratio that is null only because nothing was measured (FUT-4063): the
+ * denominator is there (the hour sold) but no row carried a numerator (no cost
+ * priced). Distinct from a zero denominator, which is "no sale".
+ */
+export function isUnmeasuredRatio(measure: CompiledMeasure, acc: MeasureAccumulator): boolean {
+  return measure.aggregation === 'ratio' && acc.numeratorCount === 0 && acc.denominatorSum !== 0;
+}
+
+/**
  * Resolve a group's accumulator to its cell value, applying `minSample`
  * FIRST: below the threshold the aggregate is never written into the row, so
  * no field of the response carries it and no combination reconstructs it.

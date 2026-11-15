@@ -194,7 +194,7 @@ export interface ReportHeatmapPresentationWire {
   target: number;
   strongAbove?: number;
   strongBelow?: number;
-  labels: { above: string; below: string; empty: string };
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
   /** Drop the empty leading/trailing rows and/or columns (FUT-4063). */
   trimEdges?: "rows" | "columns" | "both";
 }
@@ -211,9 +211,9 @@ export interface ReportHeatmapRender {
   kind: "heatmap";
   rowAxis: Array<{ key: string; label: string }>;
   columnAxis: Array<{ key: string; label: string }>;
-  cells: Array<{ row: string; column: string; value: number | null }>;
+  cells: Array<{ row: string; column: string; value: number | null; reason?: "unmeasured" }>;
   scale: { target: number; strongAbove?: number; strongBelow?: number };
-  labels: { above: string; below: string; empty: string };
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
   valueFormat: ReportTableColumn["format"];
   valueDecimals?: number;
   /** The long form — the dimensions, then the measure — for CSV and the table view. */

@@ -43,6 +43,16 @@ Three changes reach EVERY host, on purpose. Check them:
   that folds with `newAccumulator`/`accumulate`/`mergeAccumulator` gets this
   for free; one that builds a `MeasureAccumulator` by hand (without the new
   optional `numeratorCount`) keeps the old rule.
+  **In a heat map that null is not "no sale".** A cell whose denominator is
+  there but whose every numerator is null (an hour that SOLD, staffed only by
+  unpriced people) is marked `reason: 'unmeasured'` and reads
+  `labels.unmeasured` — set it to your own words ("sem custo na hora"); absent,
+  it reads the engine copy's neutral `labels.heatmapUnmeasured` ("não medido" /
+  "not measured"), never `labels.empty`. Your `labels.empty` keeps meaning
+  "the denominator is nothing" ("sem venda na hora"), and stays true. The
+  engine marks such a row with `row[unmeasuredKey(alias)] = true`; an adapter
+  that folds by hand marks it with `isUnmeasuredRatio(measure, acc)`, or its
+  cells read as `empty`, as before.
 
 New on the host side, all optional:
 
@@ -50,8 +60,10 @@ New on the host side, all optional:
 |---|---|
 | surface | `periodLabel(range, surface)` — `surface` is `{ kind: 'report' \| 'dashboard', key }`. Answer a label to make THAT surface's period a select reading it; answer `undefined` for every period of a surface to keep its toggle. A function that ignores `surface` labels every surface, as before. |
 | phone card part | `suffixOne` (the suffix when the value is exactly 1: `' pessoa'` beside `suffix: ' pessoas'`); `joiner` (what joins a subtitle part to the previous one, default `' · '`: `{ measure: 'sales', joiner: ' de ' }` reads "R$ 1.240 de R$ 4.960"); `emptyText` (the part's whole text when its value is empty: `'sem custo'` instead of "— das vendas") |
-| `presentation: heatmap` | `trimEdges: 'rows' \| 'columns' \| 'both'` — drop the leading and trailing rows/columns where no cell has a figure; the axis stays contiguous between the first and the last. The long form (CSV, "Ver como tabela") keeps every row. |
-| engine export | `trimAxisEdges(axis, keysWithFigure)` |
+| `presentation: heatmap` | `trimEdges: 'rows' \| 'columns' \| 'both'` — drop the leading and trailing rows/columns where no cell shows activity: no figure and no unmeasured cell. An edge hour that sold with no cost priced is KEPT (and reads `labels.unmeasured`); an auto-closed night with cost and no sale is dropped. The axis stays contiguous between the first and the last. The long form (CSV, "Ver como tabela") keeps every row. |
+| `presentation: heatmap` | `labels.unmeasured` — what a cell with sales and no priced cost reads (default: the engine copy's `heatmapUnmeasured`) |
+| engine copy | `labels.heatmapUnmeasured?` — the neutral default above; the shipped packs carry it |
+| engine export | `trimAxisEdges(axis, activeKeys)`, `unmeasuredKey(alias)`, `isUnmeasuredRatio(measure, acc)` |
 
 **Heat map orientation.** With `trimEdges: 'columns'`, a store's hours are
 usually 12–14 columns. `transpose: 'auto'` keeps weekdays as rows while every

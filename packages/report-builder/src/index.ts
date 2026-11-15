@@ -51,6 +51,7 @@ export {
 export {
   accumulate,
   finalize,
+  isUnmeasuredRatio,
   newAccumulator,
   percentileOf,
   type MeasureAccumulator,
@@ -172,4 +173,5 @@ export {
   REPORT_VALUE_FORMATS,
   SUPPRESSED,
   TIME_GRAINS,
+  unmeasuredKey,
 } from './types';
