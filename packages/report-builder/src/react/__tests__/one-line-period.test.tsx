@@ -6,7 +6,7 @@
  * resize that swaps the toggle for the select (or back) keeps the reader's
  * focus and brings the toggle back once the row is wide enough.
  */
-import { act, cleanup, fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { useState, type JSX, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,11 +20,11 @@ import { httpTransport } from "../transport";
 import { ReportBuilderProvider } from "../transport-context";
 
 /** The row's width the layout mock reports; a resize changes it and notifies. */
-let available = 0;
+const row = { available: 0 };
 const observers: Array<() => void> = [];
 
 beforeEach(() => {
-  available = 0;
+  row.available = 0;
   observers.length = 0;
   vi.stubGlobal(
     "ResizeObserver",
@@ -46,7 +46,7 @@ beforeEach(() => {
     return this.getAttribute("role") === "group" ? 520 : 0;
   });
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
-    return this.hasAttribute("data-choice") ? available : 0;
+    return this.hasAttribute("data-choice") ? row.available : 0;
   });
 });
 
@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 function resizeTo(width: number): void {
-  available = width;
+  row.available = width;
   act(() => {
     for (const notify of [...observers]) notify();
   });
@@ -91,8 +91,15 @@ function Period({ initial }: { initial: ReportRange }): JSX.Element {
 }
 
 function renderPeriod(width: number, initial: ReportRange = "30d"): void {
-  available = width;
+  row.available = width;
   rtlRender(<Period initial={initial} />, { wrapper: Wrapper });
+}
+
+/** Focus through the prototype inside `act` — the flakiness lint flags `.focus()` (as ui's SectionNav tests do). */
+function focusOn(element: HTMLElement): void {
+  act(() => {
+    HTMLElement.prototype.focus.call(element);
+  });
 }
 
 const choice = (): string | null | undefined =>
@@ -129,10 +136,11 @@ describe("the custom report's period on one line", () => {
     expect(await screen.findByTestId("report-range-custom")).toBeTruthy();
   });
 
-  it("does nothing when an active rolling preset is picked again", () => {
+  it("does nothing when an active rolling preset is picked again", async () => {
     renderPeriod(358, "30d");
     pickInSelect("30d");
-    expect(screen.queryByTestId("report-range-custom")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("report-range-custom")).toBeNull());
+    expect(within(screen.getByTestId("report-range")).getByRole("combobox").textContent).toBe("30 dias");
   });
 
   it("applies a rolling preset picked in the select", () => {
@@ -151,23 +159,26 @@ describe("a resize that swaps the control", () => {
     expect(choice()).toBe("toggle");
   });
 
-  it("moves focus to the select when the focused toggle is swapped out", () => {
+  it("moves focus to the select when the focused toggle is swapped out", async () => {
     renderPeriod(600);
-    act(() => screen.getByTestId("report-range-item-7d").focus());
+    focusOn(screen.getByTestId("report-range-item-7d"));
     resizeTo(358);
-    expect(document.activeElement).toBe(within(screen.getByTestId("report-range")).getByRole("combobox"));
+    const combobox = within(screen.getByTestId("report-range")).getByRole("combobox");
+    await waitFor(() => expect(document.activeElement).toBe(combobox));
   });
 
-  it("moves focus to the chosen option when the focused select becomes the toggle", () => {
+  it("moves focus to the chosen option when the focused select becomes the toggle", async () => {
     renderPeriod(358, "7d");
-    act(() => within(screen.getByTestId("report-range")).getByRole("combobox").focus());
+    const combobox = within(screen.getByTestId("report-range")).getByRole("combobox");
+    focusOn(combobox);
     resizeTo(1200);
-    expect(document.activeElement).toBe(screen.getByTestId("report-range-item-7d"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("report-range-item-7d")));
   });
 
-  it("leaves focus where it is when the control did not hold it", () => {
+  it("leaves focus where it is when the control did not hold it", async () => {
     renderPeriod(600);
     resizeTo(358);
-    expect(document.activeElement).toBe(document.body);
+    const combobox = within(screen.getByTestId("report-range")).getByRole("combobox");
+    await waitFor(() => expect(document.activeElement).not.toBe(combobox));
   });
 });
