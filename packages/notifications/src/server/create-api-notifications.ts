@@ -322,10 +322,11 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
 
 /**
  * The paid-channel policy of one mount: the consent engine (when `consent` is
- * configured), the gate it applies (only when `requireConsent` names a channel
- * — a mount that merely COLLECTS consent sends as before), what a provider
- * refusal of a number records, and the caps. Every part is absent unless the
- * host asked for it.
+ * configured), the gate it applies (whenever `consent` is configured: the
+ * channels in `requireConsent` need a confirmation, and EVERY paid channel
+ * stops at an opt-out — a mount that merely collects consent otherwise sends as
+ * before), what a provider refusal of a number records, and the caps. Every
+ * part is absent unless the host asked for it.
  */
 function paidPolicy(
   config: NotificationsServerConfig,
@@ -347,7 +348,7 @@ function paidPolicy(
   );
   return {
     consent,
-    ...(requireConsent.length > 0 ? { gate: consent.allowed } : {}),
+    gate: consent.allowed,
     onRejected: ({ deliveryId, ...rejection }) =>
       consent.rejected({ ...rejection, ref: `provider-refusal:${deliveryId}` }),
     ...(caps ? { caps } : {}),

@@ -98,7 +98,10 @@ rules. A mount that configures none of them behaves exactly as before.
   in the app, for a channel that cannot carry a reply; 10 min, 5 tries counted in
   the database, stored only as a salted hash). One of the host's `optOutKeywords`
   (or the provider's own stop signal) turns the channel it arrived on off for
-  every account holding the number. The gate runs when the delivery rows are
+  every account holding the number. A STOP is ALWAYS honoured: with `consent`
+  configured, an opted-out number gets nothing more on that channel even when
+  the channel is not in `requireConsent` (which only decides where a
+  CONFIRMATION is needed). The gate runs when the delivery rows are
   created AND before every send, retries included, so nothing goes out after an
   opt-out or a phone change. Confirmation sends: 60 s cooldown, 3 a day. A
   preferences save that turns a paid channel on starts the confirmation; the

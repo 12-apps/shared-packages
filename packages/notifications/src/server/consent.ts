@@ -69,7 +69,11 @@ export interface NotificationConsentApi {
 
 /** The engine, plus the things only the mount's own parts call. */
 export interface ConsentEngine extends NotificationConsentApi {
-  /** The gate: `channels` minus the required ones this number has not consented to. */
+  /**
+   * The gate: `channels` minus the required ones this number has not consented
+   * to, and minus every paid channel this number opted out of — required or
+   * not, because a STOP is always honoured.
+   */
   allowed(userId: string, phone: string | null, channels: NotificationChannel[]): Promise<NotificationChannel[]>;
   /** A preferences save turned paid channels on: ask where nothing stands. */
   startTurnedOn(userId: string, channels: readonly PaidChannel[]): Promise<void>;
@@ -231,20 +235,30 @@ async function askGrandfatheredRows(deps: ConsentDeps, take: number): Promise<{ 
   return { asked };
 }
 
-/** The gate: the required channels pass only on a consent for THIS number. */
+/**
+ * The gate: the required channels pass only on a consent for THIS number, and
+ * no paid channel passes an opt-out of this number — required or not: a STOP
+ * is honoured whether or not the host asked for confirmations on that channel.
+ * One read, and none when no paid channel is left.
+ */
 async function allowedFor(
   deps: ConsentDeps,
   required: ReadonlySet<NotificationChannel>,
   input: { userId: string; phone: string | null; channels: NotificationChannel[] },
 ): Promise<NotificationChannel[]> {
-  const gated = input.channels.filter((channel) => required.has(channel));
-  if (gated.length === 0) return input.channels;
+  const paid = input.channels.filter(isPaidChannel);
+  if (paid.length === 0) return input.channels;
   const destination = storedDestination(input.phone, deps.config.defaultCountryCode);
   const rows = destination
-    ? await (await consentStore(deps)).findMany({ where: { userId: input.userId, channel: { in: gated } } })
+    ? await (await consentStore(deps)).findMany({ where: { userId: input.userId, channel: { in: paid } } })
     : [];
   const ok = new Set(rows.filter((row) => destination && passes(row, destination)).map((row) => row.channel));
-  return input.channels.filter((channel) => !required.has(channel) || ok.has(channel));
+  const stopped = new Set(
+    rows.filter((row) => row.status === 'OPTED_OUT' && row.destination === destination).map((row) => row.channel),
+  );
+  return input.channels.filter(
+    (channel) => !stopped.has(channel) && (!required.has(channel) || ok.has(channel)),
+  );
 }
 
 /**

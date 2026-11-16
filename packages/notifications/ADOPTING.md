@@ -359,6 +359,9 @@ sweep — endpoints and screens included.
       lists — the package ships no language), `defaultCountryCode`, and
       `message(input)`: the confirmation's words, with `input.code` for a code
       and `input.firstName` when your `contacts.getContact` answers one.
+      `requireConsent` decides where a confirmation is NEEDED; an opt-out is
+      honoured on every paid channel as soon as `consent` is configured, in
+      `requireConsent` or not (a number that said stop gets nothing more there).
     - **The WhatsApp confirmation is a TEMPLATE.** Outside the 24 h window Meta
       accepts only approved templates, and the confirmation (a question with a
       reply button) is not your generic alert template. Register it with Meta
