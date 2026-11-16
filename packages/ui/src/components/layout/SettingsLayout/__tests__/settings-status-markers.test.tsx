@@ -302,3 +302,27 @@ describe('the word’s contrast', () => {
     expect(statusWordColor(theme)).toBe(theme.palette.warning.dark);
   });
 });
+
+describe('the label beside a word', () => {
+  /** The label's typography element inside a rail row. */
+  function labelOf(id: string): Element {
+    const row = screen.getByTestId(`settings-item-${id}`);
+    const label = row.querySelector('.MuiListItemText-primary');
+    if (!label) throw new Error(`no label inside ${id}`);
+    return label;
+  }
+
+  it('may take a second line on the attention row instead of being cut', () => {
+    renderRail();
+    const css = styleTextOf(labelOf('address'));
+    expect(css).toContain('-webkit-line-clamp:2');
+    expect(css).not.toContain('white-space:nowrap');
+  });
+
+  it('stays one line on every row without a word', () => {
+    renderRail();
+    for (const id of ['profile', 'hours', 'fiscal', 'domain']) {
+      expect(styleTextOf(labelOf(id))).toContain('white-space:nowrap');
+    }
+  });
+});
