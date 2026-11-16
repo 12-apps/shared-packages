@@ -8,7 +8,8 @@ import type { TerminalCaptureLedger } from './ledger';
  * host installs it with whichever runner it uses and adds its namespace.
  *
  * The POLICY is the package's: every ten minutes, at most
- * {@link UNBOUND_CAPTURE_SWEEP_BATCH} captures a tick, single-flight on the
+ * {@link UNBOUND_CAPTURE_SWEEP_BATCH} unbound captures a tick, and as many held
+ * by a sale that stayed unpaid through the window, single-flight on the
  * sweep queue. The window — how long a capture may wait for its sale — is the
  * ledger's required `unboundRefundAfterMs`, never restated here. The tick only
  * bounds how late past that window a capture is flagged.
@@ -36,7 +37,11 @@ export interface TerminalCaptureJob {
 }
 
 export interface TerminalCaptureJobDeps {
-  ledger: Pick<TerminalCaptureLedger, 'flagStaleUnbound'>;
+  /**
+   * The ledger the sweep flags through. `flagStaleHeld` is optional for a deps
+   * object written before it: without it the tick flags only UNBOUND captures.
+   */
+  ledger: Pick<TerminalCaptureLedger, 'flagStaleUnbound'> & Partial<Pick<TerminalCaptureLedger, 'flagStaleHeld'>>;
   /** Overridable clock, for a suite that drives the window deterministically. */
   now?: () => Date;
 }
@@ -55,9 +60,16 @@ export function terminalCaptureJobBlueprints(deps: TerminalCaptureJobDeps): { re
       // Short, so a crashed holder does not suppress the sweep for long.
       lease: { ttlMs: 2 * 60_000 },
       handle: async (_payload, context) => {
-        const flagged = await deps.ledger.flagStaleUnbound(clock(), UNBOUND_CAPTURE_SWEEP_BATCH);
-        if (flagged === 0) return;
-        context?.logger.info(`[card-terminal] flag-unbound-captures: flagged ${flagged} unbound terminal capture(s) for a refund.`);
+        const now = clock();
+        const unbound = await deps.ledger.flagStaleUnbound(now, UNBOUND_CAPTURE_SWEEP_BATCH);
+        // A held capture whose sale was abandoned unpaid: acked to the terminal, so nothing else owes it back.
+        const held = (await deps.ledger.flagStaleHeld?.(now, UNBOUND_CAPTURE_SWEEP_BATCH)) ?? 0;
+        if (unbound > 0) {
+          context?.logger.info(`[card-terminal] flag-unbound-captures: flagged ${unbound} unbound terminal capture(s) for a refund.`);
+        }
+        if (held > 0) {
+          context?.logger.info(`[card-terminal] flag-unbound-captures: flagged ${held} terminal capture(s) of an unpaid sale for a refund.`);
+        }
       },
     },
   };

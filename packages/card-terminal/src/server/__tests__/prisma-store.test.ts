@@ -124,6 +124,20 @@ describe('the Prisma capture store', () => {
     ]);
   });
 
+  it('reads the stale held captures on both clocks, not live, oldest first, at most `limit` (FUT-5095)', async () => {
+    const { client, delegate } = fake();
+    const cutoff = new Date(1);
+
+    await createPrismaTerminalCaptureStore(client).findStaleHeld?.(cutoff, 200);
+
+    expect(delegate.findMany).toHaveBeenCalledWith({
+      where: { state: 'ORDER_CREATED', OR: NOT_LIVE, capturedAt: { lte: cutoff }, createdAt: { lte: cutoff } },
+      orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
+      take: 200,
+      select: CAPTURE_SELECT,
+    });
+  });
+
   it("runs on the host's transaction when one is passed, on the lazily resolved root otherwise", async () => {
     const root = fake();
     const tx = fake();

@@ -19,6 +19,7 @@ import {
 } from './model';
 import type { CapturePatch, SaleDirectory, TerminalCaptureStore, TerminalCaptureStoreFor, TerminalDirectory } from './ports';
 import type { DeviceCaptureReport } from './readers';
+import { flagStaleHeld } from './held-sweep';
 import { awaitsItsReport, fillLegacyTrace } from './legacy-journal';
 
 /**
@@ -165,6 +166,14 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * each. How many this call flagged.
    */
   flagStaleUnbound(now: Date, limit: number): Promise<number>;
+  /**
+   * Flag `SALE_NOT_PAID` up to `limit` captures still ORDER_CREATED
+   * {@link unboundRefundAfterMs} after they were taken AND recorded, whose sale
+   * the host names that old and still unpaid (`SaleDirectory.staleUnpaidSales`),
+   * oldest first, once each: the terminal was told the sale holds the money,
+   * so nothing else owes it back (`./held-sweep`). How many this call flagged.
+   */
+  flagStaleHeld(now: Date, limit: number): Promise<number>;
 }
 
 function positive(name: string, value: number): number {
@@ -371,5 +380,6 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
     async flagStaleUnbound(now, limit) {
       return storeFor().flagStaleUnbound(now, new Date(now.getTime() - unboundRefundAfterMs), limit);
     },
+    flagStaleHeld: (now, limit) => flagStaleHeld(storeFor(), engine.sales, now, new Date(now.getTime() - unboundRefundAfterMs), limit),
   };
 }

@@ -90,6 +90,19 @@ function staleRows(table: Table, cutoff: Date, limit: number): Row[] {
     .slice(0, limit);
 }
 
+function staleHeldRows(table: Table, cutoff: Date, limit: number): Row[] {
+  return [...table.rows.values()]
+    .filter(
+      (row) =>
+        row.state === 'ORDER_CREATED' &&
+        !refundLive(row) &&
+        row.capturedAt.getTime() <= cutoff.getTime() &&
+        row.recordedAt.getTime() <= cutoff.getTime(),
+    )
+    .sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime() || a.id.localeCompare(b.id))
+    .slice(0, limit);
+}
+
 function insertInto(table: Table, row: NewTerminalCapture): boolean {
   const key = keyOf(row.clientId, row.transactionCode);
   if (table.rows.has(key)) return false;
@@ -142,6 +155,7 @@ function memoryStore(table: Table): TerminalCaptureStore {
       for (const row of stale) Object.assign(row, { refundFlaggedAt: now, refundReason: 'UNBOUND_TIMEOUT' });
       return stale.length;
     },
+    findStaleHeld: async (cutoff, limit) => staleHeldRows(table, cutoff, limit).map(answer),
     async findUnclaimed(clientId, deviceIds) {
       const devices = new Set(deviceIds);
       return rows()

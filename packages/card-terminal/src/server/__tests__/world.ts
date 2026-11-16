@@ -21,7 +21,9 @@ export interface World {
   ledger: TerminalCaptureLedger;
   devices: Map<string, string>;
   /** A sale and its payment row at `clientId`, as a settle path would have written them. */
-  sale(clientId?: string): { orderId: string; paymentId: string };
+  sale(clientId?: string, writtenAt?: Date): { orderId: string; paymentId: string };
+  /** The sale is paid: `staleUnpaidSales` stops naming it. */
+  pay(orderId: string): void;
   device(clientId?: string): string;
   directory: TerminalDirectory;
   sales: SaleDirectory;
@@ -41,6 +43,8 @@ export function world(options: WorldOptions = {}): World {
   const devices = new Map<string, string>();
   const orders = new Map<string, string>();
   const payments = new Map<string, string>();
+  const writtenAt = new Map<string, Date>();
+  const paid = new Set<string>();
 
   const directory: TerminalDirectory = {
     devicesBelong: async (clientId, deviceIds) => deviceIds.every((deviceId) => devices.get(deviceId) === clientId),
@@ -48,6 +52,11 @@ export function world(options: WorldOptions = {}): World {
   const sales: SaleDirectory = {
     saleBelongs: async (_tx, clientId, orderId) => orders.get(orderId) === clientId,
     paymentBelongs: async (_tx, clientId, orderId, paymentId) => payments.get(paymentId) === orderId && orders.get(orderId) === clientId,
+    staleUnpaidSales: async (asked, cutoff) =>
+      asked.filter(
+        ({ clientId, orderId }) =>
+          orders.get(orderId) === clientId && !paid.has(orderId) && (writtenAt.get(orderId)?.getTime() ?? Infinity) <= cutoff.getTime(),
+      ),
   };
   const wrapped = options.wrap ? options.wrap(captures.store) : captures.store;
   const storeFor: TerminalCaptureStoreFor = () => wrapped;
@@ -66,13 +75,15 @@ export function world(options: WorldOptions = {}): World {
     devices,
     directory,
     sales,
-    sale(clientId = TENANT) {
+    sale(clientId = TENANT, at = clock()) {
       const orderId = `order-${orders.size + 1}`;
       const paymentId = `payment-${payments.size + 1}`;
       orders.set(orderId, clientId);
+      writtenAt.set(orderId, at);
       payments.set(paymentId, orderId);
       return { orderId, paymentId };
     },
+    pay: (orderId) => void paid.add(orderId),
     device(clientId = TENANT) {
       const deviceId = `device-${devices.size + 1}`;
       devices.set(deviceId, clientId);

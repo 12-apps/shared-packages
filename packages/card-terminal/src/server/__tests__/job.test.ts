@@ -34,4 +34,22 @@ describe('the unbound-capture sweep blueprint', () => {
     expect(w.rows()[0]).toMatchObject({ refundReason: 'UNBOUND_TIMEOUT' });
     expect(info).toHaveBeenCalledTimes(1);
   });
+
+  it('also flags, in the same tick, a held capture whose sale stayed unpaid through the window (FUT-5095)', async () => {
+    const w = world();
+    const sale = w.sale('tenant-a', new Date(NOW.getTime() - DAY));
+    await w.ledger.record(capture({ capturedAt: new Date(NOW.getTime() - DAY) }));
+    w.captures.setRecordedAt('tenant-a', 'TC-0001', new Date(NOW.getTime() - DAY));
+    await w.ledger.markSaleCreated(null, { clientId: 'tenant-a', transactionCode: 'TC-0001' }, sale.orderId);
+    const info = vi.fn();
+    const spy = vi.spyOn(w.ledger, 'flagStaleHeld');
+    const { flagUnboundCaptures } = terminalCaptureJobBlueprints({ ledger: w.ledger, now: () => NOW });
+
+    await flagUnboundCaptures.handle(undefined, { logger: { info } });
+    await flagUnboundCaptures.handle(undefined, { logger: { info } });
+
+    expect(spy).toHaveBeenCalledWith(NOW, UNBOUND_CAPTURE_SWEEP_BATCH);
+    expect(w.rows()[0]).toMatchObject({ state: 'ORDER_CREATED', refundReason: 'SALE_NOT_PAID' });
+    expect(info).toHaveBeenCalledTimes(1);
+  });
 });

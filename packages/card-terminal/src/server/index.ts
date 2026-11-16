@@ -56,6 +56,7 @@ export {
   type RawSqlHandle,
   type RefundFlag,
   type SaleDirectory,
+  type SaleRef,
   type Savepoint,
   type TerminalCaptureStore,
   type TerminalCaptureStoreFor,

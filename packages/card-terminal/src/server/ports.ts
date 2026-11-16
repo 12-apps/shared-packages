@@ -83,6 +83,16 @@ export interface TerminalCaptureStore {
    * clocks: the terminal's and the store's own. Across tenants. How many.
    */
   flagStaleUnbound(now: Date, cutoff: Date, limit: number): Promise<number>;
+  /**
+   * At most `limit`, oldest capture first, the ORDER_CREATED captures whose
+   * flag is not live, taken AND recorded at or before `cutoff` (both clocks,
+   * as {@link flagStaleUnbound}). Across tenants. Read only: the sweep asks
+   * the host which of their sales are still unpaid before it flags any.
+   *
+   * Optional, so a store written before it still type-checks: without it the
+   * held sweep flags nothing. Both stores this package ships answer it.
+   */
+  findStaleHeld?(cutoff: Date, limit: number): Promise<TerminalCaptureRecord[]>;
   /** The ORDER_CREATED captures of these sales, oldest capture first. */
   findCreatedFor(clientId: string, orderIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
   /**
@@ -102,12 +112,31 @@ export interface TerminalDirectory<TTx = unknown> {
   devicesBelong(clientId: string, deviceIds: readonly string[], tx?: TTx): Promise<boolean>;
 }
 
-/** Which sales and payment rows are the tenant's. */
+/** A sale, named with its tenant: a sale id is the host's, scoped by the tenant. */
+export interface SaleRef {
+  clientId: string;
+  orderId: string;
+}
+
+/** Which sales and payment rows are the tenant's, and which are still unpaid. */
 export interface SaleDirectory<TTx = unknown> {
   /** The sale is this tenant's. */
   saleBelongs(tx: TTx, clientId: string, orderId: string): Promise<boolean>;
   /** The payment row is the sale's own, and the sale is this tenant's. */
   paymentBelongs(tx: TTx, clientId: string, orderId: string, paymentId: string): Promise<boolean>;
+  /**
+   * Of `sales` (never empty), the ones that are the tenant's, were written at
+   * or before `cutoff`, and are NOT paid: the sales a held capture's money
+   * waited on for the whole window. A sale answered here has its ORDER_CREATED
+   * captures flagged `SALE_NOT_PAID`, so a host answers only what it knows is
+   * unpaid; a sale it cannot place is left out, and its captures stay as they
+   * are.
+   *
+   * Optional, so a host written before it still type-checks: without it the
+   * held sweep flags nothing, and a held capture is flagged only when the host
+   * cancels its sale (`flagSale`), as before.
+   */
+  staleUnpaidSales?(sales: readonly SaleRef[], cutoff: Date, tx?: TTx): Promise<readonly SaleRef[]>;
 }
 
 /**

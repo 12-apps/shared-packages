@@ -41,6 +41,10 @@ export type CaptureState = 'UNBOUND' | 'ORDER_CREATED' | 'BOUND';
  * - `UNBOUND_TIMEOUT`: no sale claimed the capture within the window (the sweep).
  * - `SALE_NOT_CREATED`: the sale the capture was taken for was never written.
  * - `SALE_CANCELLED`: the sale holding the capture was cancelled.
+ * - `SALE_NOT_PAID`: the sale was written and took the capture (ORDER_CREATED),
+ *   then was never paid nor cancelled within the window (the sweep). Only a
+ *   capture a sale holds; a bind does not clear it, since the terminal was
+ *   already told the sale holds the money and nothing else will claim it.
  * - `PAYMENT_UNDONE`: the payment holding the capture was undone.
  * - `RECEIVED_TWICE`: the terminal approved a leg the sale had already received
  *   another way (in cash), and the operator chose to give the card capture
@@ -54,6 +58,7 @@ export const PACKAGE_REFUND_REASONS = [
   'UNBOUND_TIMEOUT',
   'SALE_NOT_CREATED',
   'SALE_CANCELLED',
+  'SALE_NOT_PAID',
   'PAYMENT_UNDONE',
   'RECEIVED_TWICE',
   'JOURNAL_CONFLICT',
