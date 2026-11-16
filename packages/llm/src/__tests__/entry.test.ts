@@ -10,4 +10,12 @@ describe("the published entry", () => {
       expect(typeof entry[name]).toBe("function");
     }
   });
+
+  it("exports the support ladder, its MCP tool source and its typed error", () => {
+    expect(typeof entry.createSupportLadder).toBe("function");
+    expect(typeof entry.mcpTools).toBe("function");
+    expect(entry.WITH_PERSON).toBe("person");
+    expect(entry.ESCALATE_TOOL).toBe("escalate");
+    expect(new entry.SupportLadderError("empty_tiers", "x")).toBeInstanceOf(entry.InvalidRequestError);
+  });
 });

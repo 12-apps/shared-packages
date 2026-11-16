@@ -14,7 +14,7 @@ function setup(script: Parameters<typeof scriptedAdapter>[0]) {
   return { client, calls };
 }
 
-const call = (id: string) => ({ id, name: "search_menu", input: { query: id, limit: null } });
+const call = (id: string) => ({ id, name: "lookup", input: { query: id, limit: null } });
 
 /** Every assistant tool call is answered by the tool message right after it. */
 function expectEveryCallAnswered(messages: Message[]): void {
@@ -35,7 +35,7 @@ describe("runToolLoop", () => {
     const result = await runToolLoop({
       client,
       request: sampleRequest({ messages: [{ role: "user", text: "go" }] }),
-      executors: { search_menu: search },
+      executors: { lookup: search },
       onUsage: (usage, turn) => {
         seen.push([usage, turn]);
       },
@@ -53,8 +53,8 @@ describe("runToolLoop", () => {
       {
         role: "tool",
         results: [
-          { callId: "a", name: "search_menu", output: "found a" },
-          { callId: "b", name: "search_menu", output: "found b" },
+          { callId: "a", name: "lookup", output: "found a" },
+          { callId: "b", name: "lookup", output: "found b" },
         ],
       },
     ]);
@@ -64,7 +64,7 @@ describe("runToolLoop", () => {
     const { client, calls } = setup([{ toolCalls: [call("x")] }]);
     const search = vi.fn(() => "ok");
     const onUsage = vi.fn();
-    const result = await runToolLoop({ client, request: sampleRequest(), executors: { search_menu: search }, maxTurns: 2, onUsage });
+    const result = await runToolLoop({ client, request: sampleRequest(), executors: { lookup: search }, maxTurns: 2, onUsage });
     expect(result.status).toBe("max_turns");
     expect(result.turns).toBe(2);
     expect(calls).toHaveLength(2);
@@ -84,7 +84,7 @@ describe("runToolLoop", () => {
       const result = await original(request);
       return { ...result, message: { ...result.message, raw } };
     } };
-    const result = await runToolLoop({ client: withRaw, request: sampleRequest(), executors: { search_menu: () => "ok" } });
+    const result = await runToolLoop({ client: withRaw, request: sampleRequest(), executors: { lookup: () => "ok" } });
     expect(result.status).toBe("max_tokens");
     expect(result.messages.at(-1)).toEqual({ role: "assistant", text: "Let me check the menu", toolCalls: [] });
     expectEveryCallAnswered(result.messages);
@@ -106,7 +106,7 @@ describe("runToolLoop", () => {
   it("stops on a refusal with a typed result, after metering the refused turn", async () => {
     const { client } = setup([{ toolCalls: [call("a")] }, { stopReason: "refusal" }]);
     const onUsage = vi.fn();
-    const result = await runToolLoop({ client, request: sampleRequest(), executors: { search_menu: () => "ok" }, onUsage });
+    const result = await runToolLoop({ client, request: sampleRequest(), executors: { lookup: () => "ok" }, onUsage });
     expect(result.status).toBe("refused");
     expect(result.refusal).toEqual({ category: "test", explanation: "declined" });
     expect(onUsage).toHaveBeenCalledTimes(2);
@@ -118,7 +118,7 @@ describe("runToolLoop", () => {
       client,
       request: sampleRequest({ messages: [{ role: "user", text: "go" }] }),
       executors: {
-        search_menu: () => {
+        lookup: () => {
           throw new Error("catalog offline");
         },
       },
@@ -126,10 +126,31 @@ describe("runToolLoop", () => {
     expect(calls[1]?.request.messages.at(-1)).toEqual({
       role: "tool",
       results: [
-        { callId: "a", name: "search_menu", output: "catalog offline", isError: true },
+        { callId: "a", name: "lookup", output: "catalog offline", isError: true },
         { callId: "z", name: "nope", output: "This tool does not exist.", isError: true },
       ],
     });
+  });
+
+  it("halts when an executor asks to, after answering every call of the turn, with no further model call", async () => {
+    const { client, calls } = setup([{ toolCalls: [call("a"), { id: "h", name: "leave", input: {} }] }, { text: "never" }]);
+    const result = await runToolLoop({
+      client,
+      request: sampleRequest({ messages: [{ role: "user", text: "go" }] }),
+      executors: { lookup: () => "ok", leave: () => ({ output: "left", halt: true }) },
+    });
+    expect(result.status).toBe("halted");
+    expect(result.turns).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(result.refusal).toBeNull();
+    expect(result.messages.at(-1)).toEqual({
+      role: "tool",
+      results: [
+        { callId: "a", name: "lookup", output: "ok" },
+        { callId: "h", name: "leave", output: "left" },
+      ],
+    });
+    expectEveryCallAnswered(result.messages);
   });
 
   it("reports a max_tokens stop", async () => {
