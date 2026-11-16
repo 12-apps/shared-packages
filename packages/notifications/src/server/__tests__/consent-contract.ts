@@ -14,193 +14,55 @@ import {
   type ApiNotifications,
   type NotificationsServerConfig,
 } from '../create-api-notifications';
-import type { NotificationsDb, NotificationsDbClient } from '../db';
+import type { NotificationConsentApi } from '../consent';
+import type { NotificationConsentConfig, ConfirmationMessageInput } from '../consent-types';
+import type { PaidChannel } from '../consent-text';
+import type { NotificationDeliveryRow, NotificationsDb, NotificationsDbClient } from '../db';
 
 import type { MemoryDb } from './memory-db';
 
 /**
- * FUT-285 (W14 PR-A): the CONTRACT's surface, written before the code.
+ * FUT-285 (W14 PR-A): the contract suites' shared fixtures.
  *
- * Every name below is what the implementation must expose. The suites reach it
- * through the accessors here rather than through direct imports so that the
- * contract compiles and RUNS against `main` and fails there for the missing
- * behaviour — a missing export is reported per case ("not implemented: …"),
- * never as a file that does not load. When the implementation lands, the
- * accessors can be replaced by direct imports; the assertions stay as written.
+ * Written before the code, this file used to DECLARE the surface the suites
+ * expected and reach it through accessors that failed per case on `main`. The
+ * surface exists now, so the shapes are the package's own (imported below) and
+ * the accessors are plain reads that still name what is missing if a mount
+ * without `consent` is handed to them.
  *
  * Paid channels: SMS and WHATSAPP. A "destination" is the E.164 number the
  * consent was given for — consent belongs to a NUMBER on ONE channel, not to a
  * person, and never to both channels at once (owner, 2026-11-16).
  */
 
-export type PaidChannel = 'SMS' | 'WHATSAPP';
+export type { PaidChannel } from '../consent-text';
+export type {
+  ConfirmationMessageInput,
+  ConsentStatus,
+  NotificationConsentConfig as ConsentConfig,
+} from '../consent-types';
+export type { NotificationCapsConfig as CapsConfig } from '../caps';
+export type { AppliedDeliveryReceipt as AppliedReceipt } from '../receipts';
 
-/** How a channel is confirmed: a reply on the channel, or a code typed in the app. */
-export type ConfirmMethod = 'REPLY' | 'CODE';
+/** The mount config the suites pass: any subset of the server config. */
+export type ContractConfig = Partial<NotificationsServerConfig>;
 
-export type ConsentStatus = 'NONE' | 'PENDING' | 'CONFIRMED' | 'GRANDFATHERED' | 'OPTED_OUT';
-
-/** One (user, channel) as `api.consent.get` reports it. */
-interface ConsentView {
-  status: ConsentStatus;
-  method: ConfirmMethod | 'GRANDFATHERED' | null;
-  /** E.164, or null when there is no row. */
-  destination: string | null;
-  confirmedAt: Date | null;
-  optedOutAt: Date | null;
-  /** The consent RECORD a reply leaves: what was typed, its provider id, when. */
-  record: { text: string | null; externalId: string | null; at: Date } | null;
-}
-
-/** What the host's copy builder is asked for — the package names no product. */
-export interface ConfirmationMessageInput {
-  channel: PaidChannel;
-  method: ConfirmMethod;
-  /** The plain code, for the CODE method only. Never stored. */
-  code?: string;
-  /** The account's first name, when the contact directory gives one. */
-  firstName?: string | null;
-  locale?: string | null;
-  reason: 'REQUEST' | 'RESEND' | 'GRANDFATHERED';
-}
-
-interface ConfirmationResult {
-  status: 'SENT' | 'COOLDOWN' | 'DAILY_LIMIT' | 'CAP' | 'NO_PHONE' | 'ALREADY_CONFIRMED';
-  /** With COOLDOWN (and SENT): how long until the next send is allowed. */
-  retryAfterMs?: number;
-}
-
-interface CodeResult {
-  status: 'CONFIRMED' | 'WRONG' | 'EXPIRED' | 'TOO_MANY_ATTEMPTS' | 'NO_PENDING';
-  attemptsLeft?: number;
-}
-
-interface InboundInput {
-  channel: PaidChannel;
-  /** The sender, as the provider reports it: E.164 or bare digits. */
-  from: string;
-  /** What the person typed, or the title of the reply button they tapped. */
-  text?: string;
-  /** A provider's own stop signal (Meta `user_preferences: stop`). */
-  optOut?: boolean;
-  at: Date;
-  /** The provider's id for the inbound message. */
-  externalId: string;
-}
-
-interface InboundResult {
-  outcome: 'CONFIRMED' | 'OPTED_OUT' | 'IGNORED';
-  /** Every account whose (channel, destination) row the message changed. */
-  userIds: string[];
-}
-
-interface ConsentApi {
-  get(userId: string): Promise<Record<PaidChannel, ConsentView>>;
-  request(userId: string, channel: PaidChannel): Promise<ConfirmationResult>;
-  resend(userId: string, channel: PaidChannel): Promise<ConfirmationResult>;
-  confirmCode(userId: string, channel: PaidChannel, code: string): Promise<CodeResult>;
-  applyInbound(input: InboundInput): Promise<InboundResult>;
-  forgetDestination(userId: string): Promise<void>;
-  grandfather(entries: { userId: string; channel: PaidChannel }[]): Promise<{ created: number }>;
-  askGrandfathered(options?: { take?: number }): Promise<{ asked: number }>;
-}
-
-export interface ConsentConfig {
-  methods: Partial<Record<PaidChannel, ConfirmMethod>>;
-  confirmKeywords: readonly string[];
-  optOutKeywords: readonly string[];
-  /** Digits only — the package assumes no country (see `../../phone.ts`). */
-  defaultCountryCode: string;
-  message: (input: ConfirmationMessageInput) => NotificationContent;
-  resendCooldownMs?: number;
-  maxSendsPerDay?: number;
-  codeTtlMs?: number;
-  maxCodeAttempts?: number;
-}
-
-export interface CapsConfig {
-  channels?: readonly PaidChannel[];
-  perRecipientDaily?: () => number | Promise<number>;
-  perTenantMonthly?: (tenantId: string) => number | Promise<number>;
-  /** The person's day is counted in this zone. Required: no market is assumed. */
-  timeZone: string;
-  /** The tenant's month is counted in ITS zone; absent = `timeZone`. */
-  timeZoneOf?: (tenantId: string) => string | Promise<string>;
-  onTenantCapReached?: (tenantId: string, period: string) => void | Promise<void>;
-}
-
-type ReceiptStatus = 'SENT' | 'DELIVERED' | 'READ' | 'UNDELIVERED';
-
-interface DeliveryReceiptInput {
-  channel: PaidChannel;
-  providerMessageId: string;
-  status: ReceiptStatus;
-  at: Date;
-  error?: string | null;
-  /** The provider said the number itself is bad (invalid, landline, unknown). */
-  permanent?: boolean;
-}
-
-export interface AppliedReceipt {
-  deliveryId: string;
-  notificationId: string;
-  userId: string;
-  channel: PaidChannel;
-  status: 'DELIVERED' | 'UNDELIVERED';
-  at: Date;
-  error: string | null;
-  permanent: boolean;
-}
-
-/** The mount config the contract adds to `NotificationsServerConfig`. */
-export interface ContractConfig extends Partial<NotificationsServerConfig> {
-  requireConsent?: readonly PaidChannel[];
-  consent?: ConsentConfig;
-  caps?: CapsConfig;
-  onDeliveryReceipt?: (receipt: AppliedReceipt) => void;
-}
-
-/** The delivery row with the two columns the contract adds. */
-interface ContractDeliveryRow {
-  id: string;
-  notificationId: string;
-  channel: string;
-  status: string;
-  error: string | null;
-  attempts: number;
-  sentAt: Date | null;
-  updatedAt: Date;
-  providerMessageId?: string | null;
-  deliveredAt?: Date | null;
-}
+/** The delivery row with the two receipt columns. */
+type ContractDeliveryRow = NotificationDeliveryRow;
 
 function missing(name: string): Error {
   return new Error(`FUT-285 contract: ${name} is not implemented`);
 }
 
-/** `api.consent`, or a failure naming what is missing. */
-export function consentOf(api: ApiNotifications): ConsentApi {
-  const consent = (api as unknown as { consent?: ConsentApi }).consent;
-  if (!consent) throw missing('api.consent');
-  return consent;
+/** `api.consent`, or a failure naming what is missing (a mount with no `consent`). */
+export function consentOf(api: ApiNotifications): NotificationConsentApi {
+  if (!api.consent) throw missing('api.consent');
+  return api.consent;
 }
 
-/** `api.applyDeliveryReceipt`, or a failure naming what is missing. */
-export function receiptsOf(
-  api: ApiNotifications,
-): (input: DeliveryReceiptInput) => Promise<{ applied: boolean }> {
-  const apply = (api as unknown as {
-    applyDeliveryReceipt?: (input: DeliveryReceiptInput) => Promise<{ applied: boolean }>;
-  }).applyDeliveryReceipt;
-  if (!apply) throw missing('api.applyDeliveryReceipt');
-  return apply;
-}
-
-/** One named export of a module, or a failure naming what is missing. */
-export function exportOf<T>(module: object, name: string): T {
-  const value = (module as Record<string, unknown>)[name];
-  if (value === undefined) throw missing(`the export \`${name}\``);
-  return value as T;
+/** `api.applyDeliveryReceipt`. */
+export function receiptsOf(api: ApiNotifications): ApiNotifications['applyDeliveryReceipt'] {
+  return api.applyDeliveryReceipt;
 }
 
 const silentLogger = { info: () => undefined, error: () => undefined };
@@ -306,7 +168,9 @@ export function clinicConfirmation(input: ConfirmationMessageInput): Notificatio
 }
 
 /** The consent block every consent suite mounts with. */
-export function clinicConsent(overrides: Partial<ConsentConfig> = {}): ConsentConfig {
+export function clinicConsent(
+  overrides: Partial<NotificationConsentConfig> = {},
+): NotificationConsentConfig {
   return {
     methods: { SMS: 'CODE', WHATSAPP: 'REPLY' },
     confirmKeywords: ['SIM'],
@@ -317,7 +181,7 @@ export function clinicConsent(overrides: Partial<ConsentConfig> = {}): ConsentCo
   };
 }
 
-/** Mount with the contract's extra config keys (ignored by `main`, so it fails there). */
+/** Mount with the suites' defaults, overridden by `config`. */
 export function mountContract(db: NotificationsDb, config: ContractConfig): ApiNotifications {
   return createApiNotifications({
     categories: ['orders', 'payments'],
@@ -327,7 +191,7 @@ export function mountContract(db: NotificationsDb, config: ContractConfig): ApiN
     generators: [ORDER_PAID as never],
     logger: silentLogger,
     ...config,
-  } as NotificationsServerConfig);
+  });
 }
 
 /** The 6-digit code inside the last CODE confirmation sent on `channel`. */

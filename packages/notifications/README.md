@@ -56,10 +56,10 @@ channels.
 ## The delivery lifecycle
 
 ```
-QUEUED ──claim──▶ SENDING ──▶ SENT
+QUEUED ──claim──▶ SENDING ──▶ SENT ──receipt──▶ DELIVERED | UNDELIVERED   (terminal)
                      │
                      ├──▶ FAILED ──sweep──▶ QUEUED   (attempts < max)
-                     └──▶ DEAD                        (attempts = max, terminal)
+                     └──▶ DEAD                        (attempts = max, or consent withdrawn)
 ```
 
 Every send is **claimed** first: one conditional `UPDATE` moves the row out of
@@ -77,6 +77,46 @@ conditional shape — so it can never drag a committed `SENT` row back. Each cla
 spends one of `maxDeliveryAttempts` (default 5); the last failure writes `DEAD`,
 which no sweep selects again.
 
+A transport's `send` may answer `{ providerMessageId }` (the built-in Twilio,
+Meta and `log` drivers do); the dispatcher keeps it on the row with `SENT`, and
+`api.applyDeliveryReceipt({ channel, providerMessageId, status, at, error,
+permanent })` later moves that row FORWARD only, in one guarded `UPDATE`: the
+first terminal answer wins, `READ` folds into `DELIVERED`, and a receipt that
+finds no `SENT` row answers `{ applied: false }` (a duplicate, an unknown id, or
+one that raced its own `SENT` write — retry that one). `onDeliveryReceipt` is told
+once per receipt that moved a row.
+
+## Paid channels: consent, opt-out and caps (all opt-in)
+
+SMS and WhatsApp are billed per message, so a mount can hold them to three
+rules. A mount that configures none of them behaves exactly as before.
+
+- **`requireConsent: ['SMS', 'WHATSAPP']` + `consent`** — a paid channel is used
+  only for a NUMBER that consented on THAT channel. `consent.methods` says how
+  each channel confirms: `REPLY` (a question the person answers with one of the
+  host's `confirmKeywords`, or the reply button) or `CODE` (a 6-digit code typed
+  in the app, for a channel that cannot carry a reply; 10 min, 5 tries counted in
+  the database, stored only as a salted hash). One of the host's `optOutKeywords`
+  (or the provider's own stop signal) turns the channel it arrived on off for
+  every account holding the number. The gate runs when the delivery rows are
+  created AND before every send, retries included, so nothing goes out after an
+  opt-out or a phone change. Confirmation sends: 60 s cooldown, 3 a day. A
+  preferences save that turns a paid channel on starts the confirmation; the
+  preferences answer `consent`; `POST /phone-confirmation/resend` and
+  `POST /phone-confirmation/code` are mounted. `api.consent` is the engine
+  (`request`, `resend`, `confirmCode`, `applyInbound`, `forgetDestination`,
+  `grandfather`, `askGrandfathered`, `get`).
+- **`caps`** — paid messages per person per day (default
+  `DEFAULT_PER_RECIPIENT_DAILY_CAP`, 10, in `caps.timeZone`) and per tenant per
+  month (default `DEFAULT_PER_TENANT_MONTHLY_CAP`, 500, in the tenant's zone),
+  counted at creation by an atomic increment-below-cap. At a cap only the paid
+  channel is skipped; `onTenantCapReached(tenantId, 'YYYY-MM')` fires once per
+  period, on the first refused message.
+- **Twilio helpers** — `verifyTwilioSignature` and `parseTwilioCallback` for the
+  host's webhook route, and `statusCallbackUrl` on the SMS declaration.
+
+Setup, and what stays the host's: ADOPTING rule 16.
+
 ## The endpoints
 
 Mounted under whatever prefix the host chooses (the origin host: `/api/account`):
@@ -89,6 +129,8 @@ Mounted under whatever prefix the host chooses (the origin host: `/api/account`)
 | `POST /notifications/delete` | soft delete, 1..100 ids; the delivery trail survives |
 | `GET` / `PUT /notification-preferences` | the category × channel matrix, plus per-channel AVAILABILITY (destination on file + channel declared) so dead toggles render disabled with a hint |
 | `GET` / `POST` / `DELETE /push-subscriptions` | the VAPID public key + device count; register / drop this browser. `GET ?endpoint=…` also answers whether the server still has THAT endpoint under the caller |
+| `POST /phone-confirmation/resend` | `{ channel }`: send the caller's confirmation again — only with `consent` configured |
+| `POST /phone-confirmation/code` | `{ channel, code }`: check the caller's 6-digit code — only with `consent` configured |
 
 Success is `{ data }`; a denial is `{ error }`, unwrapped. Every endpoint takes its
 subject from the actor and never from the request — and eight of the nine are
@@ -426,7 +468,8 @@ where the app would draw them.
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,
-`NotificationPreference`, `PushSubscription` — plus this package's own
+`NotificationPreference`, `PushSubscription`, `NotificationChannelConsent`,
+`NotificationSendCounter` — plus this package's own
 migrations, COPIED into a host's schema folder (never symlinked). See ADOPTING.
 
 `notification_preferences.channels` is a JSON map rather than a boolean column

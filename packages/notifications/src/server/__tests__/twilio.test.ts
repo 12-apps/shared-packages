@@ -7,8 +7,6 @@ import type { TransportRecipient } from '../../types';
 import type { FetchImpl } from '../transports/drivers';
 import { smsTransport, type SmsDriverDeclaration } from '../transports/sms';
 
-import { exportOf } from './consent-contract';
-
 /**
  * FUT-285 contract — the Twilio helpers, the twin of `@12-apps/messaging`'s
  * Meta ones (`verifyMetaSignature`, `parseWhatsAppStatuses`).
@@ -37,8 +35,8 @@ type TwilioCallback =
 
 type Parse = (params: Record<string, string>) => TwilioCallback;
 
-const verify = (): Verify => exportOf<Verify>(server, 'verifyTwilioSignature');
-const parse = (): Parse => exportOf<Parse>(server, 'parseTwilioCallback');
+const verify = (): Verify => server.verifyTwilioSignature;
+const parse = (): Parse => server.parseTwilioCallback;
 
 const AUTH_TOKEN = 'twilio-auth-token';
 const URL_ = 'https://api.example.test/api/webhooks/platform-notifications/twilio';

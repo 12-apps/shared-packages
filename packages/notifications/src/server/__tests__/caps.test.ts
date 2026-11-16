@@ -11,7 +11,6 @@ import {
   clinicConsent,
   consentOf,
   emailTransport,
-  exportOf,
   mountContract,
   phoneTransport,
   type CapsConfig,
@@ -96,8 +95,8 @@ const paid = (channels: readonly string[]): string[] =>
 
 describe('defaults', () => {
   it('the package defaults are 10 a person a day and 500 a tenant a month', () => {
-    expect(exportOf<number>(server, 'DEFAULT_PER_RECIPIENT_DAILY_CAP')).toBe(10);
-    expect(exportOf<number>(server, 'DEFAULT_PER_TENANT_MONTHLY_CAP')).toBe(500);
+    expect(server.DEFAULT_PER_RECIPIENT_DAILY_CAP).toBe(10);
+    expect(server.DEFAULT_PER_TENANT_MONTHLY_CAP).toBe(500);
   });
 
   it('with no resolver, the 11th paid message of a person\'s day is refused', async () => {

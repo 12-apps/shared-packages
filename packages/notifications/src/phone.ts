@@ -16,10 +16,11 @@
  * omission is a compile error rather than a wrong number. the origin passes
  * `'55'` explicitly.
  *
- * NOTE: "verified phone" is approximated by "has a normalizable phone on
- * file" — a host with a real verification flow should tighten its contact
- * directory to only return verified numbers, which is the single seam both
- * transports funnel through.
+ * A normalizable phone is only ADDRESSABLE, not consented to. A host that
+ * must not send a billed message to a number nobody confirmed mounts with
+ * `requireConsent` + `consent` (`./server/consent.ts`): the number is then
+ * confirmed per channel (a reply, or a code), an opt-out reply turns the
+ * channel off, and the gate runs before every send.
  */
 
 /** Options for {@link normalizePhoneE164}. */

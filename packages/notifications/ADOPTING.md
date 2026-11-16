@@ -341,6 +341,54 @@ sweep — endpoints and screens included.
     `WebPushSubscriptionSource.list` that drops the field makes every device
     read as "all".
 
+16. **Paid channels: consent, opt-out, caps and receipts are opt-in, and the
+    words are yours.** None of the four changes anything until configured.
+
+    - **The schema first.** `20261116190000_paid_channel_consent` is additive
+      (two nullable columns, two tables, a widened status CHECK): sync,
+      regenerate and migrate BEFORE the bumped package serves a request. A
+      HAND-WRITTEN adapter (rule 4) fills `notificationChannelConsent` and
+      `notificationSendCounter` — and every conditional write there must be ONE
+      statement whose WHERE is the precondition (`count < cap`, `askedAt IS
+      NULL`, `code_attempts < max`, the resend slot): a read-then-write passes
+      the cap under concurrency. Add the FK `user_id → users(id) ON DELETE
+      CASCADE` in your own migration, as for the other tables.
+    - **`requireConsent` + `consent`.** `methods` (per channel: `REPLY` where
+      the channel carries replies, `CODE` where it cannot), `confirmKeywords`
+      and `optOutKeywords` (whole-reply words, folded; the mount refuses empty
+      lists — the package ships no language), `defaultCountryCode`, and
+      `message(input)`: the confirmation's words, with `input.code` for a code
+      and `input.firstName` when your `contacts.getContact` answers one.
+    - **The WhatsApp confirmation is a TEMPLATE.** Outside the 24 h window Meta
+      accepts only approved templates, and the confirmation (a question with a
+      reply button) is not your generic alert template. Register it with Meta
+      and answer it from `consent.whatsAppTemplate(input)` as `{ name,
+      language?, bodyParameters, quickReplyPayloads? }`; the reply button's
+      TITLE (fixed in the template) arrives as the reply's text, so make it one
+      of your `confirmKeywords`. Any notification can name its own template the
+      same way, under `data.whatsappTemplate` (`WHATSAPP_TEMPLATE_DATA_KEY`).
+    - **The inbound route is yours.** Verify and parse (Meta: `@12-apps/messaging`,
+      whose `hooks.onUnclaimedEvents` hands you the events of YOUR number on a
+      shared app; Twilio: `verifyTwilioSignature` + `parseTwilioCallback`), then
+      call `api.consent.applyInbound({ channel, from, text | optOut, at,
+      externalId })` for a reply and `api.applyDeliveryReceipt(...)` for a
+      status. Retry a receipt that answered `applied: false` later: it may have
+      raced its own SENT write.
+    - **A phone change** calls `api.consent.forgetDestination(userId)`. Even
+      without it a changed number is unconfirmed (every check compares the
+      stored number with the current one), but the call clears the stale rows.
+    - **Numbers already receiving** before you turned consent on:
+      `api.consent.grandfather([{ userId, channel }])` keeps them receiving, and
+      `api.consent.askGrandfathered({ take })`, from a job, asks each one once.
+      A permanent delivery failure on a grandfathered number drops it.
+    - **`caps`** takes RESOLVERS (`perRecipientDaily()`,
+      `perTenantMonthly(tenantId)`, `timeZoneOf(tenantId)`), read per emit, a
+      required `timeZone`, and `onTenantCapReached(tenantId, period)`. A
+      resolver that throws drops the paid channels of that emit.
+    - **Two more routes** (`/phone-confirmation/resend`, `/phone-confirmation/code`)
+      are mounted when `consent` is configured; they are cookie-authenticated
+      writes like the rest (rule 13).
+
 ## The minimum host
 
 ```ts
