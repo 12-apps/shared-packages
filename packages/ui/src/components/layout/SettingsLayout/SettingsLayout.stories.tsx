@@ -236,43 +236,6 @@ export const Responsive: Story = {
 };
 
 /**
- * Host-resolved situation markers.
- *
- * The dot never means anything on its own — every marker carries its meaning as
- * text a screen reader reads out with the row, and a plan-locked entry gets a
- * padlock instead of a colour, because "not in your plan" is not a shade of
- * "off".
- */
-export const SituationMarkers: Story = {
-  render: () => {
-    const marked: SettingsNavGroup[] = [
-      {
-        id: 'store',
-        label: 'Loja',
-        items: [
-          { id: 'profile', label: 'Perfil e marca', status: 'ok', statusLabel: 'Ligado' },
-          { id: 'security', label: 'Endereço', status: 'off', statusLabel: 'Desligado' },
-          { id: 'notifications', label: 'Horários', status: 'new', statusLabel: 'Não visitado' },
-          {
-            id: 'appearance',
-            label: 'Domínio e app',
-            status: 'locked',
-            statusLabel: 'Incluído no plano Pro',
-          },
-        ],
-      },
-    ];
-    return (
-      <Box sx={{ p: 3, minHeight: 420 }}>
-        <SettingsLayout title="Configuração" groups={marked} activeItemId="profile">
-          <ExamplePanel itemId="profile" />
-        </SettingsLayout>
-      </Box>
-    );
-  },
-};
-
-/**
  * `drilldown` at the area's index: on a phone the LIST is the page. The panel is
  * still mounted — only `display` moved — so the wide width shows it instead.
  */

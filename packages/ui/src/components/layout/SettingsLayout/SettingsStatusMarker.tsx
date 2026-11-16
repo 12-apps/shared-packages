@@ -81,7 +81,8 @@ export function statusWordSurfaces(theme: Theme): string[] {
  * on a dark one, since `warning.main` itself is tuned to be a FILL. A theme
  * whose step still reads under 4.5:1 on any surface the word sits on (MUI's
  * default `warning.dark`, #e65100, is 3.79:1 on white) gets it moved towards
- * black, or white in dark mode, until it passes on all of them.
+ * black, or white in dark mode, until it passes on all of them, and falls back
+ * to the body text colour if no step does.
  */
 export function statusWordColor(theme: Theme): string {
   const dark = theme.palette.mode === 'dark';
@@ -94,7 +95,8 @@ export function statusWordColor(theme: Theme): string {
       const ink = step === 0 ? start : dark ? lighten(start, step * 0.05) : darken(start, step * 0.05);
       if (passes(ink)) return ink;
     }
-    return dark ? '#fff' : '#000';
+    // Nothing on the ramp passes: the body text colour, which the theme already pairs with the panel.
+    return theme.palette.text.primary;
   } catch {
     // A colour this cannot decompose (a CSS variable): trust the theme's step.
     return start;
