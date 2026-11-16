@@ -1,3 +1,4 @@
+import { escapeHtml, safeHref } from './escape';
 import { renderEmailText } from './text';
 import {
   EMAIL_CONTENT_WIDTH,
@@ -59,7 +60,7 @@ import {
  *   the message rather than announcing a five-column grid.
  */
 
-export { safeHref } from "./escape";
+export { safeHref } from './escape';
 
 /** The words the LAYOUT itself needs — never the message's own sentences. */
 export interface EmailChromeCopy {

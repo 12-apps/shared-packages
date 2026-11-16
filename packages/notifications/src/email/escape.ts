@@ -12,7 +12,7 @@
  * none of them can close a tag. Single quotes are escaped too: attribute values
  * below are double-quoted, but a caller reading this should not have to check.
  */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
