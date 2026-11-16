@@ -29,6 +29,7 @@ import { notificationRoutes } from './routes';
 import {
   createNotificationRouter,
   type NotificationChannelPolicy,
+  type NotificationEmitChannelFilter,
   type NotificationCommittedListener,
   type NotificationDispatchScheduler,
   type NotificationRouter,
@@ -65,6 +66,7 @@ import {
  *  - **Which vendors carry which channel** — `transports`, one declaration per
  *    channel. An undeclared channel is off; a second vendor is a config entry.
  *  - **Billing** — `channelPolicy`, the plan gate answered per emit.
+ *  - **One event's own channels** — `emitChannelFilter`, which sees the event.
  *  - **Its authorization engine** — `audience`, for the permission fan-out.
  *  - **Its domain events** — `generators`, registered from the outside.
  */
@@ -94,6 +96,11 @@ export interface NotificationsServerConfig {
   channelDefaults?: Partial<ChannelRow>;
   /** The tenant plan gate, answered per emit. */
   channelPolicy?: NotificationChannelPolicy;
+  /**
+   * The per-emit hook: given the event and its surviving channels, the ones
+   * this emit keeps. Narrow-only; see {@link NotificationEmitChannelFilter}.
+   */
+  emitChannelFilter?: NotificationEmitChannelFilter;
   /**
    * Which SIDE each notification type is for (`customer`, `staff` — your
    * vocabulary). Stored on every row, it lets an actor's `scopeSide` narrow the
@@ -235,6 +242,7 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     // ABSENT key rather than an explicit `undefined`.
     ...present({
       channelPolicy: config.channelPolicy,
+      emitChannelFilter: config.emitChannelFilter,
       scheduleDispatch: config.scheduleDispatch,
       onCommitted: config.onCommitted,
       sideOf: config.sideOf,

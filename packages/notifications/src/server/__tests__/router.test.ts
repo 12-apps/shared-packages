@@ -498,6 +498,88 @@ describe('the host seams around the router', () => {
     expect(db.rows.deliveries.map((row) => row.channel).sort()).toEqual(['EMAIL', 'WEB_PUSH']);
   });
 
+  it('lets the per-emit hook drop a channel for ONE event, seeing its type and payload', async () => {
+    // The case it exists for: an order already told on another path skips one
+    // channel, while the same type for another order keeps it.
+    const seen: { type: string; payload: unknown; channels: readonly NotificationChannel[] }[] = [];
+    const api = mount({
+      emitChannelFilter: (event, channels) => {
+        seen.push({ type: event.type, payload: event.payload, channels });
+        const told = (event.payload as { code: string }).code === 'TOLD';
+        return told ? channels.filter((channel) => channel !== 'WHATSAPP') : channels;
+      },
+    });
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('WHATSAPP'));
+    await api.preferences.save('u1', { orders: { WHATSAPP: true } });
+
+    const told = await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'TOLD' } },
+      { sync: true },
+    );
+    const plain = await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'B9' } },
+      { sync: true },
+    );
+
+    expect(told.channels).toEqual(['EMAIL']);
+    expect(plain.channels.slice().sort()).toEqual(['EMAIL', 'WHATSAPP']);
+    expect(seen[0]).toMatchObject({ type: 'order.paid', payload: { code: 'TOLD' } });
+    // The inbox record is written either way: the hook narrows channels only.
+    expect(db.rows.notifications).toHaveLength(2);
+  });
+
+  it('runs the per-emit hook AFTER the plan gate, and on platform emits too', async () => {
+    const hook = vi.fn((_event: unknown, channels: readonly NotificationChannel[]) => channels);
+    const api = mount({
+      channelPolicy: (_clientId, channels) => channels.filter((channel) => channel !== 'WHATSAPP'),
+      emitChannelFilter: hook,
+    });
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('WHATSAPP'));
+    await api.preferences.save('u1', { orders: { WHATSAPP: true } });
+
+    await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'B10' } },
+      { sync: true },
+    );
+    await api.notify({ type: 'order.paid', recipient: { userId: 'u1' }, payload: { code: 'B11' } }, { sync: true });
+
+    expect(hook.mock.calls.map(([, channels]) => [...channels].sort())).toEqual([['EMAIL'], ['EMAIL', 'WHATSAPP']]);
+  });
+
+  it('never lets the per-emit hook ADD a channel it was not given', async () => {
+    const api = mount({
+      channelPolicy: (_clientId, channels) => channels.filter((channel) => channel !== 'WHATSAPP'),
+      emitChannelFilter: () => ['EMAIL', 'WHATSAPP', 'SMS'] as NotificationChannel[],
+    });
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('WHATSAPP'));
+    await api.preferences.save('u1', { orders: { WHATSAPP: true } });
+
+    const result = await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'B12' } },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['EMAIL']);
+  });
+
+  it('degrades to the FREE channels when the per-emit hook throws', async () => {
+    const api = mount({
+      emitChannelFilter: () => {
+        throw new Error('attribution lookup failed');
+      },
+    });
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('WHATSAPP'), fakeTransport('WEB_PUSH'));
+    await api.preferences.save('u1', { orders: { WHATSAPP: true } });
+
+    const result = await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1', clientId: 'c1' }, payload: { code: 'B13' } },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['EMAIL', 'WEB_PUSH']);
+    expect(db.rows.notifications).toHaveLength(1);
+  });
+
   it('tells the commit observer AFTER the row exists, with the tenant', async () => {
     const seen: { notificationId: string; userId: string; clientId: string | null }[] = [];
     const api = mount({
