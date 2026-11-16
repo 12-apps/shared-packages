@@ -31,6 +31,22 @@ The ledger's ports are the capture table (`TerminalCaptureStore`) and two
 read-only directories that say whether a terminal, a sale or a payment row is
 the tenant's.
 
+### The refund sweep
+
+`flag-unbound-captures` flags, every ten minutes, the captures whose money
+nothing will claim once the ledger's `unboundRefundAfterMs` has passed:
+
+- `UNBOUND_TIMEOUT`: no sale took the capture. A late bind clears it.
+- `SALE_NOT_PAID`: a sale took it (ORDER_CREATED, so the terminal was
+  acknowledged and never reports it again) and then was abandoned, neither
+  paid nor cancelled. Implement `SaleDirectory.staleUnpaidSales(sales, cutoff)`
+  to answer, of the sales asked, those written at or before `cutoff` and not
+  paid. Name only what you know is unpaid: every sale you answer has its held
+  captures flagged, and a bind does not clear that flag. Without the method
+  the sweep leaves held captures alone, as before. Your table needs a
+  `created_at` beside `captured_at`; a partial index on the ORDER_CREATED rows
+  by `captured_at` keeps the read cheap.
+
 ### Refund a capture (`createCaptureActs(...).refund`)
 
 1. Open a transaction.
