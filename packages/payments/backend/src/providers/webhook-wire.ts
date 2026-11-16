@@ -3,9 +3,11 @@ import { z } from 'zod';
 /**
  * Each provider's strict WIRE schema for the webhook payload it posts: the
  * documented envelope at the depths the adapters read. Every object is a plain
- * `z.object` (a host that walks the zod definition can name the keys a payload
- * carries that the schema does not declare, and one that parses strictly can
- * refuse them), and every sub-object a provider documents as free-form, or that
+ * `z.object` with no catchall, so a host that walks the zod definition can name
+ * the keys a payload carries that the schema does not declare (and refuse a
+ * delivery for them). Walk the definition; do not `parse` a payload with these:
+ * every documented key is required at parse time, and a real delivery may omit
+ * one. Every sub-object a provider documents as free-form, or that
  * varies by event type, is a `z.unknown()` that is not entered. Declaring a key
  * as `z.unknown()` says "known, shape not pinned"; leaving it out says "the
  * provider did not document it".

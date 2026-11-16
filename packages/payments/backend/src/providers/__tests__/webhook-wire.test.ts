@@ -64,6 +64,21 @@ describe('webhook wire schemas', () => {
     expect(Object.keys(stripeWireSchema.shape.data.shape)).toEqual(['object', 'previous_attributes']);
   });
 
+  it('declares no catchall on any object, so a walker can name an undeclared key', () => {
+    const objects = [
+      pagbankOrderWireSchema,
+      pagbankChargeWireSchema,
+      pagbankLegacyWireSchema,
+      stoneWireSchema,
+      stripeWireSchema,
+      stripeWireSchema.shape.data,
+      infinitepayWireSchema,
+      itauWireSchema,
+      itauWireSchema.shape.pix.element,
+    ];
+    for (const schema of objects) expect(schema._zod.def.catchall).toBeUndefined();
+  });
+
   it('picks the legacy schema for a notificationCode payload and Order for an object', () => {
     expect(webhookWireSchema('pagbank', samples.pagbankLegacy)).toBe(pagbankLegacyWireSchema);
     expect(webhookWireSchema('pagbank', order)).toBe(pagbankOrderWireSchema);
