@@ -50,7 +50,7 @@ function RecipientRow({
         }
         label={
           <Stack>
-            <Text variant="body" size="sm" color={person.canReceive ? "primary" : "secondary"}>
+            <Text variant="body" size="sm" color={person.canReceive ? undefined : "secondary"}>
               {person.name}
             </Text>
             {line ? (

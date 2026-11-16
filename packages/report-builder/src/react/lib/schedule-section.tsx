@@ -76,7 +76,6 @@ function LockedRow({ reason, testId }: { reason: string; testId: string }): JSX.
  */
 const FREQUENCY_SX = {
   width: "100%",
-  height: CONTROL_HEIGHT,
   boxSizing: "border-box",
   flexWrap: "nowrap",
   p: 0.25,
@@ -88,8 +87,9 @@ const FREQUENCY_SX = {
     minWidth: 0,
     m: 0,
     px: 0.25,
-    height: "100%",
-    minHeight: 0,
+    // Each part keeps the full control height as its touch target; the frame grows round it.
+    height: CONTROL_HEIGHT,
+    minHeight: CONTROL_HEIGHT,
     whiteSpace: "nowrap",
     typography: "caption",
     borderRadius: `${CONTROL_RADIUS_PX}px !important`,
