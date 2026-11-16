@@ -20,6 +20,16 @@ function clientFor(adapter: ReturnType<typeof scriptedAdapter>["adapter"], extra
   });
 }
 
+
+/** A promise and its resolver, built without reassigning a closed-over binding. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  const handle: { promise?: Promise<void>; resolve?: () => void } = {};
+  handle.promise = new Promise<void>((resolve) => {
+    handle.resolve = resolve;
+  });
+  return handle as { promise: Promise<void>; resolve: () => void };
+}
+
 describe("the factory and the registry", () => {
   it("ships the four built-in adapters, Anthropic defaulting to Claude Haiku 5.5", () => {
     const registry = createAdapterRegistry(builtInAdapters());
@@ -175,16 +185,15 @@ describe("credentials", () => {
   });
 
   it("stamps a token with the generation seen BEFORE a slow token() read (B1)", async () => {
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let reads = 0;
-    const token = vi.fn(async () => {
-      reads += 1;
-      if (reads === 2) await gate;
-      return { accessToken: "old" };
-    });
+    const gate = deferred();
+    const release = () => gate.resolve();
+    const token = vi
+      .fn(async () => ({ accessToken: "old" }))
+      .mockImplementationOnce(async () => ({ accessToken: "old" }))
+      .mockImplementationOnce(async () => {
+        await gate.promise; // the second read is the slow one
+        return { accessToken: "old" };
+      });
     const refresh = vi.fn(async () => ({ accessToken: "renewed" }));
     const session = createCredentialSession({ kind: "oauth", token, refresh });
     const first = await session.current();
