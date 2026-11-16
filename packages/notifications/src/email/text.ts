@@ -1,3 +1,4 @@
+import { assertSafeUnsubscribe } from './escape';
 import type { EmailDocument } from './template';
 
 /**
@@ -32,10 +33,10 @@ export function renderEmailText(document: EmailDocument): string {
     ...textFacts(document),
     ...textAction(document),
     ...textNotes(document),
+    ...textUnsubscribe(document),
     "--",
     document.chrome.tagline(document.brand),
     document.chrome.automated,
-    ...textUnsubscribe(document),
   ];
   return `${blocks.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
 }
@@ -62,7 +63,10 @@ function textNotes(document: EmailDocument): string[] {
 }
 
 
-/** The opt-out as label + URL, last, where a footer's small print sits. */
+/** The opt-out: the reason, when there is one, then label and URL; the same refusal as the html. */
 function textUnsubscribe(document: EmailDocument): string[] {
-  return document.unsubscribe ? [`${document.unsubscribe.label}: ${document.unsubscribe.href}`] : [];
+  const link = document.unsubscribe;
+  if (!link) return [];
+  assertSafeUnsubscribe(link);
+  return [...(link.reason ? [link.reason] : []), `${link.label}: ${link.href}`, ""];
 }

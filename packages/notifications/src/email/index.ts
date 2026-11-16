@@ -27,6 +27,7 @@ export {
   renderEmailHtml,
   safeHref,
   type EmailAction,
+  type EmailUnsubscribe,
   type EmailChromeCopy,
   type EmailDocument,
   type EmailFact,

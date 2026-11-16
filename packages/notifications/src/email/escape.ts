@@ -46,3 +46,10 @@ export function safeHref(href: string): string {
     return "#";
   }
 }
+
+/** Refuse an opt-out link the layout would print as a dead `#`: an unsafe scheme or no address at all. */
+export function assertSafeUnsubscribe(link: { href: string }): void {
+  if (safeHref(link.href) === '#') {
+    throw new Error('EmailDocument.unsubscribe.href must be an http(s) or mailto URL, or a path.');
+  }
+}

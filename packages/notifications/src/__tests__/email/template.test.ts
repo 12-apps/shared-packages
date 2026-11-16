@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PT_BR_EMAIL_CHROME } from '../../email/chrome.pt-BR';
+import { NEUTRAL_EMAIL_THEME } from '../../email/theme';
 import { renderEmail, renderEmailHtml, safeHref, type EmailDocument } from '../../email/template';
 import { renderEmailText } from '../../email/text';
 
@@ -205,42 +206,69 @@ describe('the hero image', () => {
   });
 });
 
-describe('the unsubscribe link', () => {
-  const unsubscribe = { label: 'Stop receiving this report', href: 'https://app.test/unsubscribe?t=a1&u=2' };
+describe('the unsubscribe line', () => {
+  const unsubscribe = {
+    label: 'Stop receiving',
+    href: 'https://app.test/unsubscribe?t=a1&u=2',
+    reason: 'You receive this because Ana included you.',
+  };
 
-  it('is a footer link in the html, below the automated line', () => {
+  it('closes the body, inline after the reason and in the link colour', () => {
+    const html = renderEmailHtml(documentOf({ notes: ['Sent on Monday.'], unsubscribe }));
+    expect(html).toContain('You receive this because Ana included you. <a href="https://app.test/unsubscribe?t=a1&amp;u=2"');
+    expect(html).toContain('>Stop receiving</a>');
+    expect(html).toContain(`color:${NEUTRAL_EMAIL_THEME.accent};text-decoration:underline`);
+    // After the notes, before the footer's rule and its legal line.
+    expect(html.indexOf('Sent on Monday.')).toBeLessThan(html.indexOf('Stop receiving'));
+    expect(html.indexOf('Stop receiving')).toBeLessThan(html.indexOf(PT_BR_EMAIL_CHROME.automated));
+  });
+
+  it('keeps a 40px tap target without moving the line', () => {
     const html = renderEmailHtml(documentOf({ unsubscribe }));
-    expect(html).toContain('href="https://app.test/unsubscribe?t=a1&amp;u=2"');
-    expect(html).toContain('Stop receiving this report</a>');
-    expect(html.indexOf(PT_BR_EMAIL_CHROME.automated)).toBeLessThan(html.indexOf('Stop receiving this report'));
-    expect(html.indexOf('Stop receiving this report')).toBeLessThan(html.indexOf('</body>'));
+    const style = /<a href="[^"]*" style="([^"]*)">Stop receiving/.exec(html)?.[1] ?? '';
+    expect(style).toContain('display:inline-block');
+    const padding = Number(/padding:(\d+)px/.exec(style)?.[1]);
+    expect(padding * 2 + 13 * 1.5).toBeGreaterThanOrEqual(40);
+    expect(style).toContain(`margin:-${padding}px`);
   });
 
-  it('is the last line of the text twin, as label and address', () => {
-    const text = renderEmailText(documentOf({ unsubscribe }));
-    expect(text.trimEnd().split('\n').pop()).toBe('Stop receiving this report: https://app.test/unsubscribe?t=a1&u=2');
+  it('is the link alone when there is no reason', () => {
+    const html = renderEmailHtml(documentOf({ unsubscribe: { label: unsubscribe.label, href: unsubscribe.href } }));
+    expect(html).toContain('<p style="margin:16px 0 8px;font-size:13px;line-height:1.5;color:#');
+    expect(html).not.toContain('You receive this');
   });
 
-  it('is independent of the call to action: both can be present, and neither stands in for the other', () => {
+  it('is the reason, then label and address, in the text twin, before the footer', () => {
+    const lines = renderEmailText(documentOf({ unsubscribe })).split('\n');
+    const at = lines.indexOf('You receive this because Ana included you.');
+    expect(lines[at + 1]).toBe('Stop receiving: https://app.test/unsubscribe?t=a1&u=2');
+    expect(at).toBeLessThan(lines.indexOf('--'));
+  });
+
+  it('is independent of the call to action: both can be present', () => {
     const action = { label: 'Open', href: 'https://app.test/r/1' };
     const html = renderEmailHtml(documentOf({ action, unsubscribe }));
     expect(html).toContain('>Open</a>');
-    expect(html).toContain('>Stop receiving this report</a>');
+    expect(html).toContain('>Stop receiving</a>');
     expect(renderEmailText(documentOf({ action }))).not.toContain('Stop receiving');
   });
 
-  it('escapes its label and refuses an unsafe scheme like every other link', () => {
-    const html = renderEmailHtml(
-      documentOf({ unsubscribe: { label: '<b>Stop</b>', href: 'javascript:alert(1)' } }),
-    );
+  it('escapes its label and reason', () => {
+    const html = renderEmailHtml(documentOf({ unsubscribe: { ...unsubscribe, label: '<b>Stop</b>', reason: 'A & B' } }));
     expect(html).toContain('&lt;b&gt;Stop&lt;/b&gt;');
-    expect(html).not.toContain('javascript:');
+    expect(html).toContain('A &amp; B ');
+  });
+
+  it.each(['javascript:alert(1)', '', 'not a url'])('refuses an unsafe address loudly, in both halves: %j', (href) => {
+    const document = documentOf({ unsubscribe: { label: 'Stop', href } });
+    expect(() => renderEmailHtml(document)).toThrow(/unsubscribe/);
+    expect(() => renderEmailText(document)).toThrow(/unsubscribe/);
   });
 
   it('leaves both halves exactly as they were without one', () => {
     expect(renderEmailHtml(documentOf({ unsubscribe: undefined }))).toBe(renderEmailHtml(documentOf()));
     expect(renderEmailText(documentOf({ unsubscribe: undefined }))).toBe(renderEmailText(documentOf()));
-    expect(renderEmail(documentOf({ unsubscribe })).html).toContain('Stop receiving this report');
+    expect(renderEmail(documentOf({ unsubscribe })).html).toContain('Stop receiving');
     expect(renderEmail(documentOf()).text).not.toContain('Stop receiving');
   });
 });

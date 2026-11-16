@@ -1,4 +1,4 @@
-import { escapeHtml, safeHref } from './escape';
+import { assertSafeUnsubscribe, escapeHtml, safeHref } from './escape';
 import { renderEmailText } from './text';
 import {
   EMAIL_CONTENT_WIDTH,
@@ -78,6 +78,11 @@ export interface EmailAction {
   readonly href: string;
 }
 
+/** The opt-out line: the link, and the sentence that says why the reader is getting the mail. */
+export interface EmailUnsubscribe extends EmailAction {
+  readonly reason?: string;
+}
+
 /** One row of the facts panel — a receipt's total, an order's reference. */
 export interface EmailFact {
   readonly label: string;
@@ -124,16 +129,17 @@ export interface EmailDocument {
   /** Small print under the CTA — a deadline, a "you can ignore this". */
   readonly notes?: readonly string[];
   /**
-   * A way to stop receiving THIS mail, as a link in the footer: "Stop
-   * receiving this report". It sits with the footer's other small print rather
-   * than beside the CTA, because it is not an action the message asks for.
+   * A way to stop receiving THIS mail. It closes the body, after the notes, as one line: the reason
+   * the reader got it (optional) and the link, inline and in the link colour — "You receive this
+   * because Ana included you. Stop receiving". It is not an action the message asks for, so it is
+   * not a button; its tap target is still 40px tall.
    *
-   * The `href` is the host's own — usually a per-recipient signed URL — and the
-   * layout only prints it. Pair it with `List-Unsubscribe` headers on the
-   * driver: a mail client's own "unsubscribe" button reads those, not this.
-   * Absent, the footer is exactly what it was.
+   * The `href` is the host's own (usually a per-recipient signed URL) and must be an absolute
+   * `https:`/`http:`/`mailto:` URL or a path: an unsafe one THROWS when the mail is rendered, since
+   * a dead opt-out link is worse than a failed render. Pair it with `List-Unsubscribe` headers on
+   * the driver: a mail client's own button reads those, not this. Absent, nothing changes.
    */
-  readonly unsubscribe?: EmailAction;
+  readonly unsubscribe?: EmailUnsubscribe;
   /**
    * The layout's own words, in the recipient's language.
    *
@@ -246,12 +252,14 @@ function header(document: EmailDocument, theme: EmailTheme): string {
   ].join("");
 }
 
-/** The footer's opt-out link, when the message carries one. */
-function unsubscribeLink(link: EmailAction | undefined, theme: EmailTheme): string[] {
-  if (!link) return [];
-  return [
-    `<p style="margin:8px 0 0;font-size:12px;line-height:1.5"><a href="${safeHref(link.href)}" style="color:${theme.muted};text-decoration:underline">${escapeHtml(link.label)}</a></p>`,
-  ];
+/**
+ * The opt-out line: the reason, then the link inline in the link colour. The anchor is padded
+ * and pulled back by the same amount so its tap target is 40px tall without moving the line.
+ */
+function unsubscribeLine(link: EmailUnsubscribe, theme: EmailTheme): string {
+  assertSafeUnsubscribe(link);
+  const reason = link.reason ? `${escapeHtml(link.reason)} ` : '';
+  return `<p style="margin:16px 0 8px;font-size:13px;line-height:1.5;color:${theme.muted}">${reason}<a href="${safeHref(link.href)}" style="display:inline-block;padding:13px 4px;margin:-13px -4px;color:${theme.accent};text-decoration:underline">${escapeHtml(link.label)}</a></p>`;
 }
 
 /** The footer: the tagline, the "do not reply" line, and nothing else. */
@@ -264,7 +272,6 @@ function footer(document: EmailDocument, theme: EmailTheme): string {
     `<tr><td style="border-top:1px solid ${theme.border};padding-top:20px">`,
     `<p style="margin:0 0 6px;font-size:13px;line-height:1.5;color:${theme.muted}">${escapeHtml(chrome.tagline(brand))}</p>`,
     `<p style="margin:0;font-size:12px;line-height:1.5;color:${theme.muted}">${escapeHtml(chrome.automated)}</p>`,
-    ...unsubscribeLink(document.unsubscribe, theme),
     `</td></tr>`,
     `</table>`,
     `</td>`,
@@ -329,6 +336,7 @@ export function renderEmailHtml(document: EmailDocument): string {
       (note) =>
         `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${theme.muted}">${escapeHtml(note)}</p>`,
     ),
+    ...(document.unsubscribe ? [unsubscribeLine(document.unsubscribe, theme)] : []),
   ].join("\n      ");
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

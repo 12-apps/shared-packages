@@ -149,16 +149,18 @@ rather than divs (Outlook lays HTML out with Word), inline styles only (Gmail
 strips `<style>`), no web fonts or `color-mix()` or CSS variables, a hidden
 preheader, a `bgcolor` attribute **and** a background style on the CTA.
 
-**An opt-out link** goes in `document.unsubscribe` (`{ label, href }`): a small
-link at the end of the footer, and the last line of the text twin as `label:
-href`. The host words the label and signs the URL (per recipient, so it can name
-nobody else); the layout only prints it, and refuses an unsafe scheme like every
-other link. A mail client's own "unsubscribe" button reads `List-Unsubscribe` /
-`List-Unsubscribe-Post` headers, which belong to the host's driver, not to this
-document. Absent, both halves are byte-for-byte what they were.
+**An opt-out line** goes in `document.unsubscribe` (`{ label, href, reason? }`): one line that
+closes the body after the notes, the reason the reader got the mail (optional) and the link inline in
+the link colour, as "You receive this because Ana included you. Stop receiving". The text twin carries
+the reason, then `label: href`, in the same place. The host words it and signs the URL (per recipient,
+so it can name nobody else); the layout prints it, with a 40px tap target. An `href` that is not an
+http(s) or mailto URL, or a path, **throws** when the mail is rendered: a dead opt-out link is worse
+than a failed render. A mail client's own "unsubscribe" button reads `List-Unsubscribe` /
+`List-Unsubscribe-Post` headers, which belong to the host's driver, not to this document. Absent, both
+halves are byte-for-byte what they were.
 
 ```ts
-renderEmail({ ...document, unsubscribe: { label: 'Parar de receber', href: signedUrl } });
+renderEmail({ ...document, unsubscribe: { label: 'Parar de receber', reason, href: signedUrl } });
 ```
 
 **The EMAIL transport opts in.** Declare `layout` on the driver declaration and
