@@ -70,7 +70,7 @@ const list = (value: unknown): Json[] => entriesOf(value).entries;
 export const availableOf = (status: unknown): boolean => status !== "UNAVAILABLE";
 
 /** The four lists of one category's answer, each by id. */
-export interface IfoodCatalogueIndex {
+interface IfoodCatalogueIndex {
   products: Map<string, Json>;
   optionGroups: Map<string, Json>;
   options: Map<string, Json>;
@@ -107,7 +107,7 @@ export function photoOf(imagePath: unknown, subject: string | null): { url: stri
  * (a space, a quote, a non-ASCII letter) is encoded, and a `%` that starts no
  * escape becomes `%25`.
  */
-export function urlSafePath(path: string): string {
+function urlSafePath(path: string): string {
   return path
     .replace(/%(?![0-9A-Fa-f]{2})/g, "%25")
     .replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@/%]/g, (character) => encodeURIComponent(character));
