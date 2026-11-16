@@ -65,13 +65,22 @@ export interface HeatMapProps {
   scale: HeatMapScale;
   /** A cell's figure as text ("54%"); the component never formats numbers itself. */
   formatValue: (value: number) => string;
+  /**
+   * A shorter figure for the DENSE step, the narrowest the grid is drawn at
+   * (24 hour columns in about 500px): "54" for "54%", so a three-digit figure
+   * still fits a 17px cell. Absent, `formatValue` is drawn at the dense step
+   * too. The cell is still READ with `formatValue`'s full text.
+   */
+  formatValueDense?: (value: number) => string;
   labels: HeatMapLabels;
   /** The table's accessible name, visually hidden (the card's title is usually beside it). */
   caption?: string;
   /**
    * Swap rows and columns. `'auto'` (the default) transposes below the theme's
-   * `md` breakpoint: seven weekday columns fit a phone where twenty-four hour
-   * columns do not.
+   * `md` breakpoint (seven weekday columns fit a phone where twenty-four hour
+   * columns do not), and at any width where even the dense step cannot hold
+   * the preferred way round. At a computer width it does NOT turn round
+   * before the dense step: the grid keeps its orientation and narrows.
    */
   transpose?: boolean | 'auto';
   /** Draw the legend under the grid. Default true. */

@@ -6,7 +6,7 @@
  */
 import { cleanup, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PT_BR_REPORT_ENGINE_COPY } from "../../pt-BR";
 import { blockNotes, figureHints, isNoteShown, noteText } from "../lib/report-notes";
@@ -18,6 +18,7 @@ import { renderWithCopy as render } from "./with-copy";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 const COPY = PT_BR_REPORT_SCREENS_COPY.system;
@@ -104,6 +105,28 @@ describe("a heat map", () => {
     expect(screen.getByTestId("r-heatmap-cell-2-ter-11").textContent).toBe("— sem custo na hora");
     expect(screen.getByTestId("r-heatmap-cell-2-ter-10").textContent).toBe("— sem venda na hora");
     expect(screen.getByTestId("r-heatmap-legend-unmeasured").textContent).toBe("— sem custo na hora");
+  });
+
+  it("keeps weekdays as rows at 575px and draws a percent without its sign, read whole", () => {
+    const hours = Array.from({ length: 24 }, (_, hour) => ({ key: `${hour}`, label: `${hour}h` }));
+    const wide: ReportRender = {
+      ...HEATMAP,
+      columnAxis: hours,
+      cells: [{ row: "1-seg", column: "16", value: 9.02 }],
+    };
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 575, height: 100 } as DOMRect);
+    // A canvas that measures every character as 5px: "902" is 15px, "1.250" 25px.
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
+      font: "",
+      measureText: (text: string) => ({ width: text.length * 5 }),
+    })) as unknown as HTMLCanvasElement["getContext"]);
+    render(<ReportRenderView render={wide} dataTestId="r" caption="Custo / vendas por hora" />);
+    const root = screen.getByTestId("r-heatmap");
+    expect(root.getAttribute("data-transposed")).toBe("false");
+    expect(root.getAttribute("data-dense")).toBe("true");
+    const cell = screen.getByTestId("r-heatmap-cell-1-seg-16");
+    expect(cell.textContent).toBe("902");
+    expect(within(root).getByRole("cell", { name: "902% acima da meta" })).toBeTruthy();
   });
 
   it("exports the long form it was folded from", () => {

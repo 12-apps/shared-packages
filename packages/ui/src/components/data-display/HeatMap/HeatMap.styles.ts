@@ -9,50 +9,72 @@ import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
  * scrolls sideways. That alone could clip a figure, so `heatMapFit` picks the
  * orientation and type step at which every figure fits whole.
  */
-export const tableSx = {
-  width: '100%',
-  tableLayout: 'fixed',
-  borderCollapse: 'separate',
-  borderSpacing: sxRem(M.gap),
-  fontVariantNumeric: 'tabular-nums',
-} satisfies SxProps<Theme>;
+export function tableSx(dense: boolean) {
+  return {
+    width: '100%',
+    tableLayout: 'fixed',
+    borderCollapse: 'separate',
+    borderSpacing: sxRem(dense ? M.denseGap : M.gap),
+    fontVariantNumeric: 'tabular-nums',
+  } satisfies SxProps<Theme>;
+}
 
-/** The figures' type step: regular, or compact where the regular cannot fit. */
-export function figureSize(compact: boolean): (theme: Theme) => string {
+/** What the type step looks like: regular, compact where regular cannot fit, dense below that. */
+export interface FigureStep {
+  compact: boolean;
+  dense: boolean;
+}
+
+/** The figures' type step. */
+export function figureSize({ compact, dense }: FigureStep): (theme: Theme) => string {
+  if (dense) return sxRem(M.denseFontSize);
   return sxRem(compact ? M.compactFontSize : M.fontSize);
 }
 
-export function headerCellSx(compact: boolean) {
+export function headerCellSx(step: FigureStep) {
   return {
     p: 0,
-    fontSize: figureSize(compact),
+    fontSize: figureSize(step),
     fontWeight: 'fontWeightMedium',
     color: 'text.secondary',
     textAlign: 'center',
     whiteSpace: 'nowrap',
-    overflow: 'hidden',
+    // A dense label is centred on its column and may reach over the columns
+    // beside it, whose own labels are not drawn.
+    overflow: step.dense ? 'visible' : 'hidden',
+    position: 'relative',
+    ...(step.dense ? { height: sxRem(M.denseHeaderHeight) } : {}),
   };
 }
 
-export function rowHeaderSx(compact: boolean) {
+/** A dense column label, centred on its column whatever its width. */
+export const denseLabelSx = {
+  position: 'absolute',
+  top: 0,
+  left: '50%',
+  transform: 'translateX(-50%)',
+} satisfies SxProps<Theme>;
+
+export function rowHeaderSx(step: FigureStep) {
   return {
     p: 0,
-    pr: sxRem(4),
-    fontSize: figureSize(compact),
+    pr: sxRem(step.dense ? 2 : 4),
+    fontSize: figureSize(step),
     fontWeight: 'fontWeightMedium',
     color: 'text.secondary',
     textAlign: 'left',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
+    textOverflow: 'ellipsis',
   };
 }
 
-export function valueCellSx(compact: boolean, transposed: boolean) {
+export function valueCellSx(step: FigureStep, transposed: boolean) {
   return {
     p: 0,
     height: sxRem(transposed ? M.cellHeightTransposed : M.cellHeight),
     borderRadius: sxRem(M.radius),
-    fontSize: figureSize(compact),
+    fontSize: figureSize(step),
     textAlign: 'center',
     whiteSpace: 'nowrap',
     overflow: 'hidden',

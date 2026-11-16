@@ -17,6 +17,9 @@ import { useReportEngineCopy } from "./transport-context";
 
 const WHOLE_PERCENT = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 0 });
 
+/** A percent's figure without its sign: "54" for "54%" (the dense step's three-digit cell). */
+const WHOLE_PERCENT_NUMBER = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+
 export function ReportHeatmapView({
   render,
   caption,
@@ -33,6 +36,13 @@ export function ReportHeatmapView({
     render.valueDecimals === undefined && render.valueFormat === "percent"
       ? WHOLE_PERCENT.format(value)
       : formatReportValue(value, render.valueFormat, copy.values, render.valueDecimals);
+  // At the HeatMap's narrowest step (24 hours in ~500px) the cell is about 17px:
+  // a percent is drawn without its sign there ("902", not "902%") and read
+  // whole. The unit is the card's title's ("Custo / vendas") and the cell's name.
+  const formatValueDense =
+    render.valueDecimals === undefined && render.valueFormat === "percent"
+      ? (value: number): string => WHOLE_PERCENT_NUMBER.format(value * 100)
+      : undefined;
   return (
     <HeatMap
       rows={render.rowAxis}
@@ -40,6 +50,7 @@ export function ReportHeatmapView({
       cells={render.cells}
       scale={render.scale}
       formatValue={formatValue}
+      formatValueDense={formatValueDense}
       labels={render.labels}
       caption={caption}
       dataTestId={`${dataTestId}-heatmap`}

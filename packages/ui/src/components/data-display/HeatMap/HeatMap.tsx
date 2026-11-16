@@ -10,15 +10,16 @@
 import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import React from 'react';
 
-import { remPx, sxRem } from '../../../tokens/relative';
+import { sxRem } from '../../../tokens/relative';
 import { useMeasuredWidth } from '../../utility/Overflow/overflow';
 import { heatMapToneColors } from './heat-map-colors';
-import { heatMapFit, heatMapGrid, heatMapTone, isAboveTone, type HeatMapFit } from './heat-map-model';
+import { EM_DASH, useHeatMapLayout } from './heat-map-layout';
+import { heatMapGrid, heatMapTone, isAboveTone, type HeatMapFit } from './heat-map-model';
 import { HEAT_MAP_METRICS as M } from './HeatMap.metrics';
 import {
+  denseLabelSx,
   headerCellSx,
   rowHeaderSx,
   SR_ONLY_SX,
@@ -27,34 +28,43 @@ import {
   unmeasuredRingSx,
   valueCellSx,
 } from './HeatMap.styles';
-import type { HeatMapCell, HeatMapLabels, HeatMapProps, HeatMapScale } from './HeatMap.types';
+import type { HeatMapAxisItem, HeatMapCell, HeatMapLabels, HeatMapProps, HeatMapScale } from './HeatMap.types';
 
-const EM_DASH = '—';
+/** The row-label column's width at a step. */
+function columnWidth({ transposed, dense }: HeatMapFit): number {
+  if (dense) return M.denseLabelColumn;
+  return transposed ? M.labelColumnTransposed : M.labelColumn;
+}
 
 /**
- * How the grid is drawn: which way round and at which type step. `'auto'`
- * prefers the transposed grid below the theme's `md`; at any width the fit
- * moves to the compact step, then to the other way round, before it would clip
- * a figure.
+ * A column's label. At the dense step only every Nth is drawn; the others are
+ * still READ (visually hidden), so each column keeps its name for a screen
+ * reader and a script.
  */
-function useFit(transpose: HeatMapProps['transpose'], width: number, rows: number, columns: number): HeatMapFit {
-  const theme = useTheme();
-  const narrow = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
-  const fixed = transpose === true || transpose === false;
-  const prefer = fixed ? transpose : narrow;
-  return heatMapFit(
-    width,
-    rows,
-    columns,
-    {
-      labelPx: remPx(theme, M.labelColumn),
-      labelTransposedPx: remPx(theme, M.labelColumnTransposed),
-      spacingPx: remPx(theme, M.gap),
-      minCellPx: remPx(theme, M.minCell),
-      compactMinCellPx: remPx(theme, M.compactMinCell),
-    },
-    prefer,
-    fixed,
+function ColumnLabel({ label, drawn, dense }: { label: string; drawn: boolean; dense: boolean }): React.JSX.Element {
+  if (!drawn) return <Box component="span" sx={SR_ONLY_SX}>{label}</Box>;
+  return dense ? <Box component="span" sx={denseLabelSx}>{label}</Box> : <>{label}</>;
+}
+
+/** The column headers: every label drawn, or, where they would touch, every Nth. */
+function HeaderRow({
+  fit,
+  columns,
+  labelEvery,
+}: {
+  fit: HeatMapFit;
+  columns: readonly HeatMapAxisItem[];
+  labelEvery: number;
+}): React.JSX.Element {
+  return (
+    <tr>
+      <Box component="td" sx={headerCellSx(fit)} />
+      {columns.map((column, index) => (
+        <Box component="th" scope="col" key={column.key} sx={headerCellSx(fit)}>
+          <ColumnLabel label={column.label} drawn={index % labelEvery === 0} dense={fit.dense} />
+        </Box>
+      ))}
+    </tr>
   );
 }
 
@@ -64,6 +74,7 @@ interface ValueCellProps {
   scale: HeatMapScale;
   labels: HeatMapLabels;
   formatValue: (value: number) => string;
+  formatValueDense: ((value: number) => string) | undefined;
   testId: string;
 }
 
@@ -90,21 +101,37 @@ function hiddenWords(tone: ReturnType<typeof heatMapTone>, cell: HeatMapCell, la
   return tone === 'empty' ? emptyReason(cell, labels) : undefined;
 }
 
+/** The figure drawn at the dense step: the host's shorter one, else the full text. */
+function denseText(
+  fit: HeatMapFit,
+  cell: HeatMapCell,
+  text: string,
+  formatValueDense: ((value: number) => string) | undefined,
+): string {
+  return fit.dense && cell.value !== null && formatValueDense ? formatValueDense(cell.value) : text;
+}
+
 /** One figure cell: blank, "—", or the figure on its side's tint. */
-function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellProps): React.JSX.Element {
+function ValueCell({ fit, cell, scale, labels, formatValue, formatValueDense, testId }: ValueCellProps): React.JSX.Element {
   const theme = useTheme();
-  const cellSx = valueCellSx(fit.compact, fit.transposed);
+  const cellSx = valueCellSx(fit, fit.transposed);
   if (!cell) {
     return <Box component="td" sx={cellSx} data-testid={testId} data-tone="blank" />;
   }
   const tone = heatMapTone(cell.value, scale);
   const above = isAboveTone(tone);
   const text = cell.value === null ? (labels.emptyValue ?? EM_DASH) : formatValue(cell.value);
+  const shortText = denseText(fit, cell, text, formatValueDense);
   const words = hiddenWords(tone, cell, labels);
   const unmeasured = isUnmeasured(cell);
+  // A shorter figure is the cell's only text; its full name (the host's
+  // figure and the words) is the cell's `aria-label`, so no script reads the
+  // figure twice and a screen reader still hears "902% acima da meta".
+  const shortened = shortText !== text;
   return (
     <Box
       component="td"
+      aria-label={shortened ? [text, words].filter(Boolean).join(' ') : undefined}
       sx={{
         ...cellSx,
         ...heatMapToneColors(tone, theme),
@@ -115,8 +142,8 @@ function ValueCell({ fit, cell, scale, labels, formatValue, testId }: ValueCellP
       data-tone={tone}
       {...(unmeasured ? { 'data-reason': 'unmeasured' } : {})}
     >
-      {text}
-      {words ? (
+      {shortText}
+      {words && !shortened ? (
         <Box component="span" sx={SR_ONLY_SX}>
           {` ${words}`}
         </Box>
@@ -186,6 +213,7 @@ export function HeatMap({
   cells,
   scale,
   formatValue,
+  formatValueDense,
   labels,
   caption,
   transpose = 'auto',
@@ -201,8 +229,11 @@ export function HeatMap({
   React.useLayoutEffect(() => {
     if (ref.current) setFirstWidth(ref.current.getBoundingClientRect().width);
   }, [ref]);
-  const fit = useFit(transpose, width || firstWidth, rows.length, columns.length);
-  const { transposed, compact } = fit;
+  const { fit, labelEvery } = useHeatMapLayout(
+    { ref, containerPx: width || firstWidth, transpose, formatValue, formatValueDense },
+    { rows, columns, cells, labels },
+  );
+  const { transposed, compact, dense } = fit;
   const grid = heatMapGrid(rows, columns, cells, transposed);
   return (
     <Box
@@ -211,30 +242,24 @@ export function HeatMap({
       data-testid={dataTestId}
       data-transposed={transposed ? 'true' : 'false'}
       data-compact={compact ? 'true' : 'false'}
+      data-dense={dense ? 'true' : 'false'}
     >
-      <Box component="table" sx={tableSx} data-testid={`${dataTestId}-table`}>
+      <Box component="table" sx={tableSx(dense)} data-testid={`${dataTestId}-table`}>
         {caption ? (
           <Box component="caption" sx={SR_ONLY_SX}>
             {caption}
           </Box>
         ) : null}
         <colgroup>
-          <Box component="col" sx={{ width: sxRem(transposed ? M.labelColumnTransposed : M.labelColumn) }} />
+          <Box component="col" sx={{ width: sxRem(columnWidth(fit)) }} />
         </colgroup>
         <thead>
-          <tr>
-            <Box component="td" sx={headerCellSx(compact)} />
-            {grid.columns.map((column) => (
-              <Box component="th" scope="col" key={column.key} sx={headerCellSx(compact)}>
-                {column.label}
-              </Box>
-            ))}
-          </tr>
+          <HeaderRow fit={fit} columns={grid.columns} labelEvery={labelEvery} />
         </thead>
         <tbody>
           {grid.rows.map((row) => (
             <tr key={row.key}>
-              <Box component="th" scope="row" sx={rowHeaderSx(compact)}>
+              <Box component="th" scope="row" sx={rowHeaderSx(fit)}>
                 {row.label}
               </Box>
               {grid.columns.map((column) => (
@@ -245,6 +270,7 @@ export function HeatMap({
                   scale={scale}
                   labels={labels}
                   formatValue={formatValue}
+                  formatValueDense={formatValueDense}
                   // Named in the DATA's orientation, so a script finds the same
                   // cell whichever way the grid is drawn.
                   testId={`${dataTestId}-cell-${transposed ? column.key : row.key}-${transposed ? row.key : column.key}`}
