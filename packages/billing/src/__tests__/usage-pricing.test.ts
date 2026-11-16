@@ -275,16 +275,15 @@ describe("currency and rounding, in centavos", () => {
   });
 
   it("refuses an overage that would leave safe integers", () => {
-    const pricing = createUsagePricing(POLICY);
-    expect(thrownName(() => pricing.compose(input({ readings: [reading({ used: Number.MAX_SAFE_INTEGER })] })))).toBe(
+    const used = Number.MAX_SAFE_INTEGER;
+    expect(thrownName(() => createUsagePricing(POLICY).compose(input({ readings: [reading({ used })] })))).toBe(
       "BillingUsageError",
     );
   });
 
   it("refuses a base in another currency than the policy's", () => {
-    const pricing = createUsagePricing(POLICY);
     const base = { amountCents: 29_900, currency: "USD", period: NEXT };
-    expect(thrownName(() => pricing.compose(input({ base })))).toBe("BillingUsageError");
+    expect(thrownName(() => createUsagePricing(POLICY).compose(input({ base })))).toBe("BillingUsageError");
   });
 
   it.each([
