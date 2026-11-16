@@ -34,7 +34,7 @@ export interface ShortPaymentPorts {
 }
 
 /** The facts of one order, once a settled answer for it was read. */
-export interface KnownStatusFacts {
+interface KnownStatusFacts {
   orderId: string;
   shortfall?: PaymentShortfall;
   stockGone?: PaymentStockGone;

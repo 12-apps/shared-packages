@@ -47,7 +47,7 @@ const ACTION_MIN_PX = 224;
 /** Which face a shortfall shows, from the server's facts alone. */
 type ShortFace = "OPEN" | "REVIEWING" | "REFUNDED" | "REFUND_PENDING" | "SETTLED";
 
-export function shortFaceOf(shortfall: PaymentShortfall): ShortFace {
+function shortFaceOf(shortfall: PaymentShortfall): ShortFace {
   if (shortfall.resolution !== null) return shortfall.resolution;
   // Nothing left to ask of the buyer — a person moved the total under it —
   // so no "pay" is offered: the store is checking (contract C13).
@@ -141,7 +141,7 @@ function ShortReceipt({ copy, shortfall }: { copy: ShortPaymentCopy; shortfall: 
   );
 }
 
-export interface ShortOutcomeProps {
+interface ShortOutcomeProps {
   copy: ShortPaymentCopy;
   shortfall: PaymentShortfall;
   /** Pay only what is missing — the host opens its method sheet for the balance. */

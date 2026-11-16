@@ -37,7 +37,7 @@ import type { ChargeSnapshot, ChargeStatus, MerchantRef } from './types';
  */
 
 /** Which reference, and the charges of it the raise already accounts for. */
-export interface BalanceScope {
+interface BalanceScope {
   merchant: MerchantRef;
   reference: string;
   /**
@@ -57,7 +57,7 @@ function worthRetiring(snapshot: ChargeSnapshot): boolean {
 }
 
 /** The reference's other live charges, for the raise's moved-past list. Never throws. */
-export async function otherLiveCharges(
+async function otherLiveCharges(
   charges: Pick<ChargeQueryStore, 'listPayable'>,
   scope: BalanceScope,
   log: { error(message: string): void },
