@@ -239,6 +239,20 @@ export const SituationMarkers: Story = {
       await expect(canvas.getByTestId('settings-status-text-contact')).toBeVisible();
     });
 
+    await step('A section not opened yet is a hollow ring; one that is off stays a filled dot', async () => {
+      const markOf = (id: string): HTMLElement => {
+        const mark = canvas.getByTestId(`settings-status-${id}`).querySelector('[data-status-mark]');
+        if (!(mark instanceof HTMLElement)) throw new Error(`no status mark on ${id}`);
+        return mark;
+      };
+      const ring = getComputedStyle(markOf('hours'));
+      await expect(ring.borderTopStyle).toBe('solid');
+      await expect(ring.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+      const off = getComputedStyle(markOf('address'));
+      await expect(off.borderTopStyle).not.toBe('solid');
+      await expect(off.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    });
+
     await step('Colour is never the only carrier: the meaning is in the row name', async () => {
       // Reached by accessible name rather than by test id on purpose — this is
       // the assertion that a screen reader hears the situation at all.

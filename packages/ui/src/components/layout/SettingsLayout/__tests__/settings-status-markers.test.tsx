@@ -13,7 +13,14 @@ import { describe, expect, it } from 'vitest';
 
 import { SettingsLayout } from '../SettingsLayout';
 import type { SettingsNavItem } from '../SettingsLayout.types';
-import { SettingsStatusMarker, visibleStatusWord } from '../SettingsStatusMarker';
+import { getContrastRatio } from '../../../../tokens/color';
+import {
+  SettingsStatusMarker,
+  STATUS_WORD_MIN_CONTRAST,
+  statusWordColor,
+  statusWordSurfaces,
+  visibleStatusWord,
+} from '../SettingsStatusMarker';
 
 const theme = createTheme({
   palette: {
@@ -271,5 +278,27 @@ describe('the phone chip', () => {
     expect(screen.getByTestId('settings-chip-address')).toHaveAccessibleName(
       'Pending: the tax id is missing Address',
     );
+  });
+});
+
+describe('the word’s contrast', () => {
+  const themes = {
+    'MUI’s default light theme (warning.dark #e65100 is 3.79:1 on white)': createTheme(),
+    'MUI’s default dark theme': createTheme({ palette: { mode: 'dark' } }),
+    'a host palette': theme,
+    'a host palette in dark mode': createTheme({ palette: { mode: 'dark', primary: { main: '#EE7B1F' }, warning: { main: '#CF960C' } } }),
+  };
+
+  for (const [name, subject] of Object.entries(themes)) {
+    it(`reads at 4.5:1 or more on every surface it sits on, in ${name}`, () => {
+      const ink = statusWordColor(subject);
+      for (const surface of statusWordSurfaces(subject)) {
+        expect(getContrastRatio(ink, surface)).toBeGreaterThanOrEqual(STATUS_WORD_MIN_CONTRAST);
+      }
+    });
+  }
+
+  it('keeps the theme’s own step when it already passes', () => {
+    expect(statusWordColor(theme)).toBe(theme.palette.warning.dark);
   });
 });

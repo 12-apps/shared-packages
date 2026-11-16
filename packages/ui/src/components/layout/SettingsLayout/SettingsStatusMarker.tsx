@@ -7,7 +7,9 @@ import React from 'react';
 
 import { SR_ONLY_SX, STATUS_COLOR } from './SettingsLayout.styles';
 import type { SettingsNavItem, SettingsNavStatus } from './SettingsLayout.types';
+import { blend, darken, getContrastRatio, lighten } from '../../../tokens/color';
 import { rem, sxRem } from '../../../tokens/relative';
+import { softSignal } from '../../../tokens/surfaces';
 
 export interface SettingsStatusMarkerProps {
   /** Which situation to draw. */
@@ -62,13 +64,41 @@ export function visibleStatusWord(
   return word ? word : undefined;
 }
 
+/** The contrast WCAG asks of 13px text. */
+export const STATUS_WORD_MIN_CONTRAST = 4.5;
+
+/**
+ * The surfaces the word can sit on: the panel, the attention chip's soft
+ * warning fill, and the selected row's primary wash, each as one opaque colour.
+ */
+export function statusWordSurfaces(theme: Theme): string[] {
+  const paper = theme.palette.background.paper;
+  return [paper, softSignal(theme, 'warning'), blend(paper, theme.palette.primary.main, 0.18)];
+}
+
 /**
  * The word's ink: the darker step of `warning` on a light surface, the lighter
- * on a dark one, since `warning.main` itself is tuned to be a FILL and can read
- * under 4.5:1 as 13px text.
+ * on a dark one, since `warning.main` itself is tuned to be a FILL. A theme
+ * whose step still reads under 4.5:1 on any surface the word sits on (MUI's
+ * default `warning.dark`, #e65100, is 3.79:1 on white) gets it moved towards
+ * black, or white in dark mode, until it passes on all of them.
  */
 export function statusWordColor(theme: Theme): string {
-  return theme.palette.mode === 'dark' ? theme.palette.warning.light : theme.palette.warning.dark;
+  const dark = theme.palette.mode === 'dark';
+  const start = dark ? theme.palette.warning.light : theme.palette.warning.dark;
+  try {
+    const surfaces = statusWordSurfaces(theme);
+    const passes = (ink: string): boolean =>
+      surfaces.every((surface) => getContrastRatio(ink, surface) >= STATUS_WORD_MIN_CONTRAST);
+    for (let step = 0; step <= 20; step += 1) {
+      const ink = step === 0 ? start : dark ? lighten(start, step * 0.05) : darken(start, step * 0.05);
+      if (passes(ink)) return ink;
+    }
+    return dark ? '#fff' : '#000';
+  } catch {
+    // A colour this cannot decompose (a CSS variable): trust the theme's step.
+    return start;
+  }
 }
 
 /**
