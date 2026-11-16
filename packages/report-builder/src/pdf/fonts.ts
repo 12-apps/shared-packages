@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
  * SUBSET per document, so nothing is fetched and a file carries only the
  * glyphs it uses.
  */
-export interface FontFiles {
+interface FontFiles {
   regular: Uint8Array;
   bold: Uint8Array;
 }

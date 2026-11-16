@@ -1,0 +1,10 @@
+Noto Sans Regular and Bold from the Noto Project (npm: @expo-google-fonts/noto-sans 0.4.2),
+under the SIL Open Font License 1.1 (OFL.txt).
+
+Reduced with fonttools:
+  pyftsubset NotoSans_<weight>.ttf --no-hinting --layout-features='kern,liga' --unicodes=
+    U+0020-007E,U+00A0-024F,U+0370-03FF,U+0400-04FF,U+1E00-1EFF,U+2000-206F,U+20A0-20CF,U+2100-214F,U+2190-21FF,U+2200-22FF
+(Basic Latin, Latin-1, Latin Extended A/B, Greek, Cyrillic, Latin Extended Additional, general punctuation,
+currency, letterlike and arrows/math blocks; the face has no glyph for most of the last two). Each PDF embeds
+only the glyphs it uses. Kept as a pre-reduced copy because pdf-lib's own subsetter drops glyphs from the
+unreduced face.
