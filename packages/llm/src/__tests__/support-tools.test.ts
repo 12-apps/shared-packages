@@ -24,13 +24,13 @@ function ladderOf(tiers: Array<{ script: Script; tools: SupportToolEntry<Tenant,
   const clients = tiers.map((tier, index) =>
     Array.isArray(tier.script) ? tierClient(`provider-${index}`, tier.script) : { client: tier.script as ModelClient, calls: [] },
   );
-  const ladder = createSupportLadder<Tenant, null>({
+  const built = createSupportLadder<Tenant, null>({
     tiers: tiers.map((tier, index) => ({ id: `tier-${index}`, client: clients[index]?.client as ModelClient, instructions: "help", tools: tier.tools })),
     person: { handOff: vi.fn() },
     state: memoryState(),
     scopeFields,
   });
-  return { ladder, calls: clients.map((client) => client.calls) };
+  return { ladder: built, calls: clients.map((client) => client.calls) };
 }
 
 /** A fake MCP server with paging, recording every call and the scope it was connected for. */
@@ -77,6 +77,32 @@ describe("support tools: least privilege per tier", () => {
   it("drops a host tool's halt: only the ladder ends a tier", async () => {
     const { ladder } = ladderOf([{ script: [{ toolCalls: [toolCall("read_knowledge", { query: "x" })] }, { text: "answered" }], tools: [tool("read_knowledge", () => ({ output: "x", halt: true }))] }]);
     expect(await ladder.handle(request({ tenantId: "a" }))).toMatchObject({ kind: "model", reply: "answered" });
+  });
+});
+
+describe("support tools: a turn that escalates", () => {
+  it("does not run the host tools called in the same turn as escalate", async () => {
+    const run = vi.fn(() => "ok");
+    const { ladder, calls } = ladderOf([
+      { script: [{ toolCalls: [toolCall("read_knowledge", { query: "x" }), toolCall("escalate", { to: "next", reason: "hard" }, "esc")] }], tools: [tool("read_knowledge", run)] },
+      { script: [{ text: "Handled." }], tools: [] },
+    ]);
+    const result = await ladder.handle(request({ tenantId: "a" }));
+    expect(result).toMatchObject({ kind: "model", tier: "tier-1", escalations: [{ from: "tier-0", to: "tier-1", reason: "hard" }] });
+    expect(run).not.toHaveBeenCalled();
+    expect(calls[0]).toHaveLength(1);
+  });
+
+  it("takes the FIRST escalate call of a turn and ignores the rest", async () => {
+    const { ladder } = ladderOf([
+      {
+        script: [{ toolCalls: [toolCall("escalate", { to: "next", reason: "first" }, "e1"), toolCall("escalate", { to: "person", reason: "second" }, "e2")] }],
+        tools: [],
+      },
+      { script: [{ text: "Handled." }], tools: [] },
+    ]);
+    const result = await ladder.handle(request({ tenantId: "a" }));
+    expect(result).toMatchObject({ kind: "model", tier: "tier-1", escalations: [{ from: "tier-0", to: "tier-1", reason: "first" }] });
   });
 });
 
@@ -148,10 +174,11 @@ describe("mcpTools", () => {
     await expect(source.resolve({ tenantId: "a" })).rejects.toMatchObject({ code: "tool_missing" });
   });
 
-  it("refuses an allowed server tool whose schema exposes a scope-bound field", async () => {
+  it("refuses an allowed server tool whose schema exposes a scope-bound field: the model never sees it, a person gets the conversation", async () => {
     const leaky: McpToolInfo = { name: "lookup", inputSchema: objectSchema("tenantId") };
-    const { ladder } = ladderOf([{ script: [{ text: "x" }], tools: [mcpTools({ connect: fakeServer([leaky]).connect, allow: ["lookup"] })] }]);
-    await expect(ladder.handle(request({ tenantId: "a" }))).rejects.toMatchObject({ code: "scope_exposed" });
+    const { ladder, calls } = ladderOf([{ script: [{ text: "x" }], tools: [mcpTools({ connect: fakeServer([leaky]).connect, allow: ["lookup"] })] }]);
+    await expect(ladder.handle(request({ tenantId: "a" }))).resolves.toMatchObject({ kind: "person", reason: "tool_error" });
+    expect(calls[0]).toHaveLength(0);
   });
 
   it("applies a host override to an allowed tool's definition", async () => {
@@ -159,6 +186,39 @@ describe("mcpTools", () => {
     const source = mcpTools<Tenant>({ connect: fakeServer([loose]).connect, allow: ["faq_search"], overrides: { faq_search: { description: "FAQ.", inputSchema: objectSchema("query") } } });
     const [resolved] = await source.resolve({ tenantId: "a" });
     expect(resolved?.definition).toEqual({ name: "faq_search", description: "FAQ.", inputSchema: objectSchema("query") });
+  });
+
+  it("binds a host-supplied argument after the model's input, and hides it from the model", async () => {
+    const tenantArg: McpToolInfo = {
+      name: "faq_search",
+      inputSchema: { type: "object", properties: { tenantId: { type: "string" }, query: { type: "string" } }, required: ["tenantId", "query"], additionalProperties: false },
+    };
+    const server = fakeServer([tenantArg]);
+    const source = mcpTools<Tenant>({ connect: server.connect, allow: ["faq_search"], bindArgs: (scope) => ({ tenantId: scope.tenantId }) });
+    const { ladder, calls } = ladderOf([{ script: reactiveClient(toolCall("faq_search", { query: "q" })), tools: [source] }]);
+    await Promise.all([ladder.handle(request({ tenantId: "a" }, "q", "c-a")), ladder.handle(request({ tenantId: "b" }, "q", "c-b"))]);
+    expect(server.called.map((call) => [call.tenant, call.arguments]).sort()).toEqual([
+      ["a", { query: "q", tenantId: "a" }],
+      ["b", { query: "q", tenantId: "b" }],
+    ]);
+    expect(calls).toHaveLength(1);
+    const [resolved] = await source.resolve({ tenantId: "a" });
+    expect(resolved?.definition.inputSchema).toEqual(objectSchema("query"));
+  });
+
+  it("refuses a model value for a bound argument without reaching the server, even outside scopeFields", async () => {
+    const tenantArg: McpToolInfo = {
+      name: "faq_search",
+      inputSchema: { type: "object", properties: { accountId: { type: "string" }, query: { type: "string" } }, required: ["accountId", "query"], additionalProperties: false },
+    };
+    const server = fakeServer([tenantArg]);
+    const source = mcpTools<Tenant>({ connect: server.connect, allow: ["faq_search"], bindArgs: (scope) => ({ accountId: scope.tenantId }) });
+    const { ladder, calls } = ladderOf([
+      { script: [{ toolCalls: [toolCall("faq_search", { query: "q", accountId: "b" })] }, { text: "done" }], tools: [source] },
+    ]);
+    await ladder.handle(request({ tenantId: "a" }));
+    expect(server.called).toEqual([]);
+    expect(calls[0]?.[1]?.request.messages.at(-1)).toMatchObject({ role: "tool", results: [{ isError: true, output: expect.stringContaining('"accountId"') }] });
   });
 
   it("turns an MCP result into tool output", () => {

@@ -312,7 +312,11 @@ const ladder = createSupportLadder<{ accountId: string }, { locale: string }>({
     },
   ],
   person: { handOff: ({ conversationId, reason, fromTier }) => queue.push({ conversationId, reason, fromTier }) },
-  state: { get: (id) => levels.get(id), set: (id, level) => levels.set(id, level) },
+  state: {
+    get: (id) => levels.get(id),
+    // ATOMIC compare-and-set: store `to` only while the level is still `from`.
+    raise: (id, from, to) => levels.compareAndSet(id, from, to),         // true when it moved
+  },
   scopeFields: ["accountId"],                 // the model may never set these
   onUsage: (tier, usage) => meter.record(tier, usage),
 });
@@ -337,34 +341,73 @@ result.escalations;  // [{ from, to, reason }]
 - **Each tier answers or escalates.** Every tier gets the ladder's `escalate`
   tool, `{ to: "next" | "person", reason }`; `"next"` is not offered on the last
   tier. A refusal escalates with reason `"refused"`, and a turn with no words
-  with `"no_answer"`: to the next tier, or to a person from the last.
+  with `"no_answer"`: to the next tier, or to a person from the last. A turn
+  that calls `escalate` leaves the tier: the other tools it called in that
+  turn are answered "not run" and never execute, and when it calls `escalate`
+  more than once, the FIRST call (in the model's order) decides and the rest
+  are ignored.
+- **The next tier hears why.** The escalating tier's reason reaches the next
+  tier as a delimited USER-role note just before the customer's message
+  (`<handover from="…">…</handover>`, at most 500 characters, angle brackets
+  removed), never as a system block: it is the prior model's words, derived
+  from the customer's. The note is left out of the `messages` a result returns.
 - **A conversation stays where it reached.** The `state` port stores the tier
   that answered, or `"person"` (`WITH_PERSON`). The next message goes straight
   to that tier; automation is consulted only before a conversation reached a
   tier. Once a person has it, `handle` returns `{ kind: "person", handedOff:
-  false }` and never calls a model or `handOff` again. The host resets the
-  level when it decides the conversation is over.
+  false }` and never calls a model or `handOff` again.
+- **Two messages in flight.** A customer can send two lines before the first
+  is answered, so the ladder never writes a level blindly. The port's one
+  write is `raise(conversationId, from, to) → boolean`, which the host makes
+  ATOMIC (a conditional `UPDATE … WHERE level = $from`, a Redis `WATCH`/Lua
+  compare-and-set, a Map on one event loop). The ladder only raises: an answer
+  from a lower tier leaves a higher stored level alone, and an answer that
+  finishes after the conversation reached a person returns `{ kind: "person",
+  handedOff: false, fromTier: null }` instead of the model's reply. Only the
+  call whose raise to `"person"` wins calls `handOff`, once, after the raise.
+  A raise that loses re-reads and retries; a port whose level keeps moving
+  is refused (`state_conflict`).
+- **Resetting a conversation.** The host resets one by deleting its stored
+  level, so `get` returns nothing: the next message starts at automation and
+  the first tier again. The ladder has no reset of its own and never lowers a
+  level. A conversation stored on a tier id that no longer exists (a tier
+  renamed or removed) starts again at the first tier, skipping automation.
 - **Least privilege per tier.** A tier's model sees exactly that tier's tools
   plus `escalate`. A call to another tier's tool is answered as an unknown
   tool and never runs.
 - **Tools from MCP.** `mcpTools({ connect, allow, overrides? })` connects for
   each call's scope and offers ONLY the allow-listed tools; the rest of the
   server's list is never shown, and a call to one never reaches the server.
-  An allowed tool the server lacks is refused (`tool_missing`). The client is
+  An allowed tool the server lacks is refused (`tool_missing`; the
+  conversation then goes to a person, see "A tool source that fails"). The client is
   structural (`listTools`, `callTool`, as the official MCP SDK's `Client`), so
   the package depends on no MCP SDK. Tool schemas must be strict; `overrides`
   replaces a description or schema the server ships loose.
+- **What `mcpTools` costs.** Every `handle` call, for every tier that runs,
+  calls `connect(scope)` and lists the server's tools (every page). Nothing is
+  cached inside the package, on purpose, so one scope's client never serves
+  another's. Cache on the host's side, keyed by the scope: have `connect`
+  return a client kept per scope (an LRU of connections, with the scope's own
+  credentials), and close it when the scope's session ends.
+- **A tool source that fails.** When a source throws (`connect` fails, an
+  allowed tool is missing, a server tool clashes with `escalate` or exposes a
+  scope field), the conversation goes to a person with reason
+  `"tool_error"`, and `usage` still lists the tiers that already ran.
 - **Scope binding.** `scope` is opaque to the ladder. Every tool's `run` gets
   it in its context, and an MCP server gets it through the host's `connect`,
-  never through the model. A tool whose schema declares a `scopeFields` name
-  is refused (`scope_exposed`), and a model call whose arguments carry one is
+  never through the model. For a server whose tools take the tenant as an
+  ARGUMENT, `mcpTools({ …, bindArgs: (scope, toolName) => ({ tenantId:
+  scope.tenantId }) })` merges those arguments AFTER the model's input (the
+  host's value wins), removes their names from the schema the model sees, and
+  refuses, without reaching the server, a model call that sets one. A tool
+  whose schema declares a `scopeFields` name is refused (`scope_exposed`), and a model call whose arguments carry one is
   refused without running, so a conversation for one account cannot reach
   another's data even when both use the same tools.
 - **Refused configurations** throw `SupportLadderError` (an
-  `InvalidRequestError`) with a `code`: `empty_tiers`, `escalation_loop` (a tier
-  id listed twice), `reserved_tier` (a tier named `"person"`), `unknown_tier`
-  (a level from the state port that is no tier), `tool_conflict`,
-  `tool_missing`, `scope_exposed`.
+  `InvalidRequestError`) with a `code`: `empty_tiers`, `duplicate_tier` (a tier
+  id listed twice), `reserved_tier` (a tier named `"person"`), `tool_conflict`,
+  `tool_missing`, `scope_exposed`; and `state_conflict` when the state port's
+  level keeps changing while the ladder raises it.
 
 ## Errors and retries
 

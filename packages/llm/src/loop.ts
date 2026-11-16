@@ -28,7 +28,11 @@ import type { AssistantMessage, ChatRequest, ChatResult, Message, Refusal, ToolC
  */
 export type ToolOutput = string | { output: string; isError?: boolean; halt?: boolean };
 
-export type ToolExecutor = (input: unknown, context: { call: ToolCall; turn: number }) => Promise<ToolOutput> | ToolOutput;
+/** `calls` is every call of the same turn, `call` among them, in the model's order. */
+export type ToolExecutor = (
+  input: unknown,
+  context: { call: ToolCall; turn: number; calls: readonly ToolCall[] },
+) => Promise<ToolOutput> | ToolOutput;
 
 export interface ToolLoopOptions {
   client: ModelClient;
@@ -72,11 +76,11 @@ interface CallOutcome {
   halt: boolean;
 }
 
-async function runCall(call: ToolCall, turn: number, executors: ToolLoopOptions["executors"]): Promise<CallOutcome> {
+async function runCall(call: ToolCall, turn: number, calls: readonly ToolCall[], executors: ToolLoopOptions["executors"]): Promise<CallOutcome> {
   const executor = Object.hasOwn(executors, call.name) ? executors[call.name] : undefined;
   if (!executor) return { result: { callId: call.id, name: call.name, output: UNKNOWN_TOOL, isError: true }, halt: false };
   try {
-    const out = await executor(call.input, { call, turn });
+    const out = await executor(call.input, { call, turn, calls });
     if (typeof out === "string") return { result: { callId: call.id, name: call.name, output: out }, halt: false };
     const result = { callId: call.id, name: call.name, output: out.output, ...(out.isError ? { isError: true } : {}) };
     return { result, halt: out.halt === true };
@@ -126,7 +130,7 @@ export async function runToolLoop(options: ToolLoopOptions): Promise<ToolLoopRes
     if (status) return ended(status, messages, final, turn, usage);
     messages.push(final.message);
 
-    const outcomes = await Promise.all(final.toolCalls.map((call) => runCall(call, turn, options.executors)));
+    const outcomes = await Promise.all(final.toolCalls.map((call) => runCall(call, turn, final.toolCalls, options.executors)));
     messages.push({ role: "tool", results: outcomes.map((outcome) => outcome.result) });
     // Every call of the turn is answered, so the transcript stays a valid request.
     if (outcomes.some((outcome) => outcome.halt)) return { status: "halted", messages, final, turns: turn, usage, refusal: null };

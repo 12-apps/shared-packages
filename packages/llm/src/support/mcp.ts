@@ -7,6 +7,9 @@
  * tier ONLY the tools named in `allow`. The rest of the server's list is never
  * shown to the model, and a call to a tool outside it never reaches the server.
  *
+ * A server whose tools take the tenant as an ARGUMENT gets it from `bindArgs`
+ * (host-supplied, merged after the model's input, hidden from the model).
+ *
  * The client is structural (`listTools` / `callTool`, as the official MCP SDK's
  * `Client` has them), so this package depends on no MCP SDK.
  */
@@ -45,6 +48,14 @@ export interface McpToolsOptions<Scope> {
    * whose schema is not strict (every tool schema must be; see `assertStrictTools`).
    */
   overrides?: Readonly<Record<string, Partial<Pick<ToolDefinition, "description" | "inputSchema">>>>;
+  /**
+   * Arguments the HOST supplies, for a server whose tools take the tenant (or
+   * any scope field) as an argument. They are merged AFTER the model's input,
+   * so the host's value always wins; their names are removed from the schema
+   * the model sees, and a model call that sets one is refused without
+   * reaching the server.
+   */
+  bindArgs?(scope: Scope, toolName: string): Readonly<Record<string, unknown>>;
 }
 
 async function listAll(client: McpClientLike, cursor?: string, found: McpToolInfo[] = []): Promise<McpToolInfo[]> {
@@ -66,13 +77,30 @@ export function mcpResultToOutput(result: unknown): ToolOutput {
   return shape.isError === true ? { output, isError: true } : output;
 }
 
-function definitionOf(info: McpToolInfo, override: McpToolsOptions<unknown>["overrides"]): ToolDefinition {
+/** A schema without the host-bound property names, at its top level. */
+function withoutFields(schema: JsonSchema, fields: readonly string[]): JsonSchema {
+  if (fields.length === 0) return schema;
+  const properties = (schema.properties ?? {}) as Record<string, unknown>;
+  const kept = Object.fromEntries(Object.entries(properties).filter(([key]) => !fields.includes(key)));
+  const required = Array.isArray(schema.required) ? schema.required.filter((key) => !fields.includes(key as string)) : schema.required;
+  return { ...schema, properties: kept, ...(required === undefined ? {} : { required }) };
+}
+
+function definitionOf(info: McpToolInfo, override: McpToolsOptions<unknown>["overrides"], bound: readonly string[]): ToolDefinition {
   const own = override?.[info.name] ?? {};
   return {
     name: info.name,
     description: own.description ?? info.description ?? info.name,
-    inputSchema: own.inputSchema ?? info.inputSchema,
+    inputSchema: withoutFields(own.inputSchema ?? info.inputSchema, bound),
   };
+}
+
+/** Run one allowed tool: the model's object input, then the host's bound arguments over it. */
+async function callAllowed(client: McpClientLike, name: string, input: unknown, bound: Readonly<Record<string, unknown>>): Promise<ToolOutput> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { output: "The arguments must be an object.", isError: true };
+  const set = Object.keys(bound).find((key) => Object.hasOwn(input, key));
+  if (set) return { output: `Refused: "${set}" is set by the host, never by the assistant.`, isError: true };
+  return mcpResultToOutput(await client.callTool({ name, arguments: { ...(input as Record<string, unknown>), ...bound } }));
 }
 
 export function mcpTools<Scope = unknown, Context = unknown>(options: McpToolsOptions<Scope>): SupportToolSource<Scope, Context> {
@@ -86,13 +114,13 @@ export function mcpTools<Scope = unknown, Context = unknown>(options: McpToolsOp
       if (missing.length > 0) {
         throw new SupportLadderError("tool_missing", `the MCP server has no tool named ${missing.map((name) => `"${name}"`).join(", ")}.`);
       }
-      return offered.map((info): SupportTool<Scope, Context> => ({
-        definition: definitionOf(info, options.overrides),
-        async run(input) {
-          if (!input || typeof input !== "object" || Array.isArray(input)) return { output: "The arguments must be an object.", isError: true };
-          return mcpResultToOutput(await client.callTool({ name: info.name, arguments: input as Record<string, unknown> }));
-        },
-      }));
+      return offered.map((info): SupportTool<Scope, Context> => {
+        const bound = options.bindArgs?.(scope, info.name) ?? {};
+        return {
+          definition: definitionOf(info, options.overrides, Object.keys(bound)),
+          run: (input) => callAllowed(client, info.name, input, bound),
+        };
+      });
     },
   };
 }

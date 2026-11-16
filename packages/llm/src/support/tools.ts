@@ -8,6 +8,8 @@
  *   fields; a tool whose schema exposes one is refused when the ladder is
  *   built (or when a source resolves it), and a call whose arguments carry one
  *   is refused without running.
+ * - A turn that calls `escalate` leaves the tier: its other tool calls are
+ *   answered "not run" and never reach a host tool.
  */
 import { SupportLadderError } from "../errors";
 import type { ToolExecutor, ToolOutput } from "../loop";
@@ -111,7 +113,7 @@ function presentKeys(value: unknown): Set<string> {
 }
 
 /** The first scope-bound field among a model call's arguments, if any. */
-export function scopeFieldIn(input: unknown, scopeFields: readonly string[]): string | undefined {
+function scopeFieldIn(input: unknown, scopeFields: readonly string[]): string | undefined {
   if (scopeFields.length === 0) return undefined;
   const keys = presentKeys(input);
   return scopeFields.find((field) => keys.has(field));
@@ -154,6 +156,11 @@ function withoutHalt(out: ToolOutput): ToolOutput {
   return typeof out === "string" ? out : { output: out.output, ...(out.isError ? { isError: true } : {}) };
 }
 
+/** True when a turn calls `escalate`: the turn leaves the tier, so its host tools are not run. */
+function escalatesIn(calls: readonly ToolCall[]): boolean {
+  return calls.some((call) => call.name === ESCALATE_TOOL);
+}
+
 /** The loop's executors for a tier's tools, each bound to the host's scope. */
 export function bindExecutors<S, C>(
   tools: readonly SupportTool<S, C>[],
@@ -162,7 +169,8 @@ export function bindExecutors<S, C>(
 ): Record<string, ToolExecutor> {
   const executors: Record<string, ToolExecutor> = {};
   tools.forEach((tool) => {
-    executors[tool.definition.name] = async (input, { call }) => {
+    executors[tool.definition.name] = async (input, { call, calls }) => {
+      if (escalatesIn(calls)) return { output: "Not run: this turn escalated the conversation.", isError: true };
       const leaked = scopeFieldIn(input, scopeFields);
       if (leaked) return { output: `Refused: "${leaked}" is set by the host, never by the assistant.`, isError: true };
       return withoutHalt(await tool.run(input, { ...bound, call }));

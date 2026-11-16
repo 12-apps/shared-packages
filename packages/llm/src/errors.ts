@@ -104,19 +104,18 @@ export class UnsupportedError extends LlmError {
 /** Why a support ladder refused its configuration or a state it was handed. */
 export type SupportLadderErrorCode =
   | "empty_tiers"
-  | "escalation_loop"
-  | "unknown_tier"
+  | "duplicate_tier"
+  | "state_conflict"
   | "reserved_tier"
   | "tool_conflict"
   | "tool_missing"
   | "scope_exposed";
 
 /**
- * A support ladder refused a configuration (no tier, a tier id used twice so a
- * tier would escalate to itself or backwards, a tier named like the person
- * level, a tool name clash, a tool whose
- * schema exposes a scope-bound field, an allow-listed tool the source does not
- * have) or a state the host's port returned (a tier id it does not know).
+ * A support ladder refused a configuration (no tier, a tier id used twice, a
+ * tier named like the person level, a tool name clash, a tool whose schema
+ * exposes a scope-bound field, an allow-listed tool the source does not have),
+ * or the host's state port kept moving a level while the ladder raised it.
  */
 export class SupportLadderError extends InvalidRequestError {
   readonly code: SupportLadderErrorCode;

@@ -1,7 +1,7 @@
 import { createAdapterRegistry } from "../adapter";
 import type { ModelClient } from "../client";
 import { createModelClient } from "../client";
-import type { SupportStatePort } from "../support/ladder";
+import type { SupportStatePort } from "../support/state";
 import type { ToolCall } from "../types";
 import { scriptedAdapter, turnResult } from "./fake-adapter";
 
@@ -12,14 +12,19 @@ export function tierClient(id: string, script: Parameters<typeof scriptedAdapter
   return { client, calls };
 }
 
-/** The state port over a Map, so a test can read and seed it. */
+/**
+ * The state port over a Map, so a test can read and seed it. `raise` checks
+ * and writes with no await in between, so on one event loop it is atomic.
+ */
 export function memoryState(initial: Array<[string, string]> = []): SupportStatePort & { levels: Map<string, string> } {
   const levels = new Map(initial);
   return {
     levels,
     get: (conversationId) => levels.get(conversationId),
-    set: (conversationId, level) => {
-      levels.set(conversationId, level);
+    raise: (conversationId, from, to) => {
+      if ((levels.get(conversationId) ?? null) !== from) return false;
+      levels.set(conversationId, to);
+      return true;
     },
   };
 }

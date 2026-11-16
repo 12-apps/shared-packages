@@ -72,11 +72,11 @@ export type {
   SupportPerson,
   SupportRequest,
   SupportResult,
-  SupportStatePort,
   SupportTier,
   TierUsage,
 } from "./support/ladder";
 export { WITH_PERSON, createSupportLadder } from "./support/ladder";
+export type { SupportStatePort } from "./support/state";
 export type { McpClientLike, McpListToolsResult, McpToolInfo, McpToolsOptions } from "./support/mcp";
 export { mcpResultToOutput, mcpTools } from "./support/mcp";
 export type {
