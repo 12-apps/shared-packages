@@ -77,6 +77,22 @@ export class InvalidRequestError extends LlmError {
   }
 }
 
+/** The recording is longer than the host allows; it will fail again as is. */
+export class AudioTooLongError extends InvalidRequestError {
+  readonly durationSeconds: number;
+  readonly maxDurationSeconds: number;
+  /** True when the refusal came before anything was sent. */
+  readonly beforeSending: boolean;
+
+  constructor(provider: string, durationSeconds: number, maxDurationSeconds: number, beforeSending: boolean) {
+    super(provider, `The audio lasts ${durationSeconds}s, over the ${maxDurationSeconds}s limit.`);
+    this.name = "AudioTooLongError";
+    this.durationSeconds = durationSeconds;
+    this.maxDurationSeconds = maxDurationSeconds;
+    this.beforeSending = beforeSending;
+  }
+}
+
 /** The provider is down, overloaded or unreachable (5xx, 529, network). */
 export class ProviderUnavailableError extends LlmError {
   constructor(provider: string, message: string, status?: number) {

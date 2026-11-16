@@ -19,8 +19,11 @@ interface onto the provider's official SDK and maps the answer back.
 - **A support ladder**: automation, then model tiers that escalate, then a
   person, with least-privilege tools per tier bound to the host's scope.
 
-Only chat ships today. The `Capability` union leaves room for others (a
-transcription capability is planned), and an adapter declares what it can do.
+- **Speech to text** behind the same shape: `createTranscriber`, a registry
+  of transcription adapters, ElevenLabs' Scribe built in (see
+  [Speech to text](#speech-to-text)).
+
+Chat and transcription ship today; an adapter declares what it can do.
 
 ## Install
 
@@ -409,6 +412,46 @@ result.escalations;  // [{ from, to, reason }]
   `tool_missing`, `scope_exposed`; and `state_conflict` when the state port's
   level keeps changing while the ladder raises it.
 
+## Speech to text
+
+`createTranscriber` is `createModelClient`'s sibling for recordings: one
+interface, one normalized result, an adapter per provider picked by id from a
+registry the host can extend. ElevenLabs' speech-to-text ("Scribe") is built in,
+over a direct `fetch` (no SDK to install).
+
+```ts
+import { createTranscriber } from "@12-apps/llm";
+
+const transcriber = createTranscriber({
+  provider: "elevenlabs",
+  credentials: { kind: "apiKey", apiKey: () => readKeyFromYourVault() },
+  // model defaults to "scribe_v1"; retry takes the same hook as the chat client
+});
+
+const result = await transcriber.transcribe({
+  audio: bytes, // Uint8Array | Blob
+  mimeType: "audio/ogg",
+  languageHint: "pt", // optional: the provider detects the language otherwise
+  maxDurationSeconds: 120, // optional
+  durationSeconds: 37, // optional: the length, when the host already knows it
+});
+// { provider, model, text, language?, durationSeconds, usage: { audioSeconds } }
+```
+
+- **Duration limit.** A recording longer than `maxDurationSeconds` throws
+  `AudioTooLongError` (an `InvalidRequestError`, so never retried). It is
+  refused before anything is sent when the host passes `durationSeconds`, and
+  after the call when the provider reports a longer `audioSeconds`
+  (`beforeSending` says which).
+- **Credentials:** API keys only. The adapter's calls go through the same
+  sealed edge as chat: one allowed route, no redirects, only the call's own key,
+  nothing from the platform's environment.
+- **Errors** are the table below: 401/403 `AuthError`, 429 `RateLimitError`,
+  5xx and network failures `ProviderUnavailableError`, 4xx `InvalidRequestError`.
+- **A second provider** is one `TranscriptionAdapter` (`id`, `credentialKinds`,
+  `transcribe(call)`) registered with `createTranscriptionRegistry(...)` and
+  passed as `registry`.
+
 ## Errors and retries
 
 | class | when |
@@ -417,6 +460,7 @@ result.escalations;  // [{ from, to, reason }]
 | `RateLimitError` | 429; `retryAfterMs` comes from `retry-after-ms` or `retry-after` |
 | `InvalidRequestError` | 400, 404, 413 or 422, a non-strict tool schema, too many breakpoints |
 | `ProviderUnavailableError` | 5xx, 529, 408, network failures |
+| `AudioTooLongError` | a recording over `maxDurationSeconds`; an `InvalidRequestError` |
 | `InvalidResponseError` | an answer the adapter cannot read (tool arguments that are not JSON) |
 | `RefusalError` | thrown only by `ensureNotRefused` |
 | `UnsupportedError` | an unknown provider, an undeclared credential kind, a missing optional SDK |
