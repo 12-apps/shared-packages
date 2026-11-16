@@ -105,6 +105,18 @@ export interface TypedCaptureClaims<TTx = unknown> {
    * `REFUSED` `CONTENDED` (`ack: false`) and let the terminal report it again.
    */
   bind(tx: TTx, claim: Extract<TypedClaim, { claim: 'FREE' }>, target: BindTarget): Promise<Extract<TypedBookAnswer, { outcome: 'BOOKED' }>>;
+  /**
+   * D9-R22 on the sale route: a person tapped a typed capture onto one of the
+   * caller's sales ("Is it this sale?"). Before the caller's settle binds it to
+   * that sale, ask this with the page's `confirmedFlaggedAt`. It records the
+   * capture like {@link claimable}; a `FREE` capture flagged `UNBOUND_TIMEOUT`
+   * whose flag the person has not confirmed answers `FLAGGED_TIMEOUT`, and the
+   * caller binds nothing (the general bind would clear the flag, booking money
+   * that may already be refunded) and hands the answer to the page
+   * (`inbox.pickRefused`). Null otherwise: any other claim is left to the
+   * caller's own binder, which refuses what it must.
+   */
+  pickHold(input: TypedCaptureInput, confirmedFlaggedAt: string | null): Promise<Extract<TypedBookAnswer, { outcome: 'FLAGGED_TIMEOUT' }> | null>;
 }
 
 const STOPS: ReadonlySet<string> = new Set<TypedBookRefusal>(['CONFLICT', 'DEVICE_MISMATCH', 'CONTENDED']);
@@ -177,17 +189,23 @@ export function createTypedCaptureClaims<TTx = unknown>(config: TypedCaptureClai
     return { claim: 'FREE', clientId: input.clientId, deviceId: capture.deviceId ?? input.deviceId, capture, timeoutFlaggedAt };
   }
 
+  async function claimable(input: TypedCaptureInput): Promise<TypedClaim> {
+    // No terminal named: the tenant check would be skipped, so nothing is recorded.
+    if (input.deviceId.trim() === '') return { claim: 'REFUSED', code: 'DEVICE_MISMATCH' };
+    try {
+      return await decide(input);
+    } catch (error) {
+      const refused = typedRefusalOf(error);
+      if (refused !== null) return refused;
+      throw error;
+    }
+  }
+
   return {
-    async claimable(input) {
-      // No terminal named: the tenant check would be skipped, so nothing is recorded.
-      if (input.deviceId.trim() === '') return { claim: 'REFUSED', code: 'DEVICE_MISMATCH' };
-      try {
-        return await decide(input);
-      } catch (error) {
-        const refused = typedRefusalOf(error);
-        if (refused !== null) return refused;
-        throw error;
-      }
+    claimable,
+    async pickHold(input, confirmedFlaggedAt) {
+      const claim = await claimable(input);
+      return claim.claim === 'FREE' ? timeoutHold(claim, confirmedFlaggedAt) : null;
     },
     async bind(tx, claim, target) {
       await ledger.bind(tx, claim.clientId, [claim.capture.transactionCode], target, clock());

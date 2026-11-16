@@ -115,4 +115,73 @@ describe('P-TYPED R22: a capture flagged for the timeout is booked only on a per
     expect(made.stateOf('TC-4600')).toMatchObject({ state: 'asking', flaggedAt: FLAGGED_AT });
     expect(made.ack).not.toHaveBeenCalled();
   });
+  it('a confirmed booking that waited for a session is booked by the retry, with no second confirmation', async () => {
+    const made = inbox();
+    made.box.received(typed(4600));
+    await settle();
+    made.answerNext({ outcome: 'WAITING', ack: false });
+
+    made.box.chooseStandalone('TC-4600');
+    await settle();
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'waiting', waitingFor: 'session', confirmedFlaggedAt: FLAGGED_AT });
+
+    made.box.retry();
+    await settle();
+
+    expect(made.book).toHaveBeenCalledTimes(3);
+    expect(made.book).toHaveBeenLastCalledWith(DEVICE, expect.anything(), FLAGGED_AT);
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'done', flaggedAt: null, confirmedFlaggedAt: null });
+  });
+
+  it('a new flag date drops the old confirmation: the retry does not book, a person answers again', async () => {
+    const made = inbox();
+    made.box.received(typed(4600));
+    await settle();
+    const reflagged = '2026-11-15T12:00:00.000Z';
+    made.answerNext({ outcome: 'FLAGGED_TIMEOUT', flaggedAt: reflagged, ack: false });
+
+    made.box.chooseStandalone('TC-4600');
+    await settle();
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'asking', flaggedAt: reflagged, confirmedFlaggedAt: null });
+
+    made.box.retry();
+    await settle();
+    expect(made.book).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('P-TYPED R22: a flagged capture picked onto a sale', () => {
+  it('a pick the server refuses goes back to asking with the flag, unacknowledged; a confirmed pick binds it', async () => {
+    const made = inbox([{ key: 'sale-1', dueCents: 4600 }]);
+    made.box.received(typed(4600));
+    expect(made.box.chooseSale('TC-4600', 'sale-1')).not.toBeNull();
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'held', confirmedFlaggedAt: null });
+
+    made.box.pickRefused('TC-4600', FLAGGED);
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'asking', saleKey: null, flaggedAt: FLAGGED_AT, confirmedFlaggedAt: null, answer: FLAGGED });
+    expect(made.box.unanswered()).toHaveLength(1);
+
+    expect(made.box.chooseSale('TC-4600', 'sale-1')).not.toBeNull();
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'held', saleKey: 'sale-1', confirmedFlaggedAt: FLAGGED_AT });
+    made.box.bound(['TC-4600']);
+    await settle();
+
+    expect(made.stateOf('TC-4600')?.state).toBe('done');
+    expect(made.ack).toHaveBeenCalledTimes(1);
+    expect(made.book).not.toHaveBeenCalled();
+  });
+
+  it('pickRefused leaves a capture that is not held, or already settled, as it is', async () => {
+    const made = inbox([{ key: 'sale-1', dueCents: 4600 }]);
+    made.box.received(typed(4600));
+    made.box.pickRefused('TC-4600', FLAGGED);
+    made.box.pickRefused('TC-UNKNOWN', FLAGGED);
+    expect(made.stateOf('TC-4600')).toMatchObject({ state: 'asking', flaggedAt: null });
+
+    made.box.chooseSale('TC-4600', 'sale-1');
+    made.box.bound(['TC-4600']);
+    await settle();
+    made.box.pickRefused('TC-4600', FLAGGED);
+    expect(made.stateOf('TC-4600')?.state).toBe('done');
+  });
 });

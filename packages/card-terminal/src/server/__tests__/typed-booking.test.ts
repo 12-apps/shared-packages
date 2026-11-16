@@ -366,6 +366,38 @@ describe('what refuses it', () => {
     expect(w.row('TC-0001').refundClearedAt).not.toBeNull();
   });
 
+  it('P-BOOK R22: a flagged capture picked onto a sale unconfirmed is refused by pickHold, and nothing is written', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+    await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString();
+    const input = { clientId: TENANT, deviceId, capture: wire() };
+
+    expect(await claims.pickHold(input, null)).toEqual({ outcome: 'FLAGGED_TIMEOUT', flaggedAt, ack: false });
+    expect(await claims.pickHold(input, '2020-01-01T00:00:00.000Z')).toMatchObject({ outcome: 'FLAGGED_TIMEOUT' });
+    expect(w.row('TC-0001')).toMatchObject({ state: 'UNBOUND', orderId: null, refundClearedAt: null });
+  });
+
+  it('P-BOOK R22: a confirmed pick passes pickHold, and binding it to the sale clears the flag', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+    await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString() ?? null;
+
+    expect(await claims.pickHold({ clientId: TENANT, deviceId, capture: wire() }, flaggedAt)).toBeNull();
+    const target = w.sale();
+    await w.ledger.bind(null, TENANT, ['TC-0001'], target);
+    expect(w.row('TC-0001')).toMatchObject({ state: 'BOUND', orderId: target.orderId });
+    expect(w.row('TC-0001').refundClearedAt).not.toBeNull();
+  });
+
+  it('P-BOOK R22: pickHold lets an unflagged capture through', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+
+    expect(await claims.pickHold({ clientId: TENANT, deviceId, capture: wire() }, null)).toBeNull();
+  });
+
   it('D9-R13: a host error inside the transaction that is not a race is thrown at once, never decided again', async () => {
     const { deviceId, booking, sold, ports } = setUp({ saleFails: new Error('disk full') });
 

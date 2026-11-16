@@ -95,8 +95,11 @@ the tenant's.
    refund sweep flagged `UNBOUND_TIMEOUT` ("A estornar") may already have been
    refunded on the terminal, so it is booked only once a person confirmed that
    very flag: pass the `flaggedAt` the inbox's `book` hands you (null unless a
-   person chose "on its own" on an entry showing the flag). Not null: answer it
-   (`FLAGGED_TIMEOUT`, `flaggedAt` as ISO, `ack: false`) and write nothing.
+   person answered an entry showing the flag), unchanged: it is compared byte
+   for byte with the flag's `toISOString()`, so never reformat it. Not null:
+   answer it (`FLAGGED_TIMEOUT`, `flaggedAt` as ISO, `ack: false`) and write
+   nothing. `timeoutHold` runs before your policy, so a store whose policy
+   refuses "on its own" first shows the flag and only then `NOT_ALLOWED`.
    `claim.timeoutFlaggedAt` carries the flag date (D9-R22).
 3. Then, if your policy and an open session allow it — otherwise answer your
    own `NOT_ALLOWED` / `WAITING` with `ack: false`, and the capture stays
@@ -117,8 +120,38 @@ the tenant's.
 On the inbox, a `FLAGGED_TIMEOUT` answer puts the entry back on the band as
 `asking`, with `entry.flaggedAt` (ISO) for the line "marcado para estorno em
 {data}; confirme que não foi estornado na maquininha". An arrival, a resend or
-`retry` never books it; only `chooseStandalone` does, calling your `book` with
-that `flaggedAt` as its third argument (every other call passes null).
+`retry` never confirms a flag. A person does, by answering while the flag is
+shown: `chooseStandalone`, or `chooseSale`. The confirmation is kept on the
+entry (`entry.confirmedFlaggedAt`) until the capture is accounted for, so every
+`book` sends it as its third argument, a `retry` after `WAITING` or a dropped
+link included. A new `FLAGGED_TIMEOUT` (a re-flag, another date) clears it,
+and a person answers again.
+
+**The sale route.** A typed capture may match a due sale before anyone knows it
+is flagged, and the general bind clears a timeout flag. So when you settle a
+sale with a capture a person picked (`chooseSale`), first ask
+`claims.pickHold({ clientId, deviceId, capture }, entry.confirmedFlaggedAt)`.
+`FLAGGED_TIMEOUT`: do not bind that capture; hand the answer to the page,
+`inbox.pickRefused(code, answer)`, which puts the entry back to `asking` with
+the flag, unacknowledged. A person's second pick confirms it, and `pickHold`
+answers null; your bind then clears the flag.
+
+### Upgrading to 1.1.0
+
+The additions are new fields and a new answer, so a host that builds these
+objects by hand, or switches over them exhaustively, has to follow:
+
+- `TypedBookAnswer` has a new member, `FLAGGED_TIMEOUT` (`flaggedAt`, `ack:
+  false`): an exhaustive `switch` on `outcome` must handle it (answer it, write
+  nothing, do not acknowledge).
+- `TypedClaim`'s `FREE` carries `timeoutFlaggedAt`; `TypedCaptureClaims` gains
+  `pickHold`. Test doubles of either need them.
+- `TypedEntry` carries `unheldFrom`, `flaggedAt` and `confirmedFlaggedAt`;
+  `TypedCaptureInbox` gains `unhold` and `pickRefused`. Hand-built entries and
+  inbox doubles need them.
+- `TypedCaptureInboxConfig.book` receives a third argument,
+  `confirmedFlaggedAt`; an implementation that ignores it still compiles, but
+  must pass it to `timeoutHold` for a flagged capture ever to be booked.
 
 ### A tapped sale that left without its capture (`inbox.unhold`)
 
