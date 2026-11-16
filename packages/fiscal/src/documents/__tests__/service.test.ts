@@ -123,7 +123,12 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     firstContingencyNumber: 1,
   });
   const later = (ms: number) => void (clock.at += ms);
-  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later, sources };
+  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later,
+    returnDraft: () => sources.returnDraft,
+    setReturnDraft: (next: SaleDraft | null) => {
+      sources.returnDraft = next;
+    },
+  };
 }
 
 const ISSUE = { ownerId: "owner-1", subjectId: "order-77", issuingPointId: "register-1", model: "NFCE" } as const;
@@ -247,7 +252,7 @@ describe("the document service", () => {
       const env = await setup({ issue: ["nfce-issue-authorized", ...(script.issue ?? [])], cancel: script.cancel ?? [] });
       await env.service.createIssuingPoint("owner-1", RETURNS_POINT);
       const document = await env.service.issue(ISSUE);
-      env.sources.returnDraft = { ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [{ accessKey: document.accessKey! }] };
+      env.setReturnDraft({ ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [{ accessKey: document.accessKey! }] });
       return { ...env, document };
     }
 
@@ -275,8 +280,8 @@ describe("the document service", () => {
     });
 
     it("refuses, before drawing a number, a return the sale source does not quote", async () => {
-      const { service, document, store, sources } = await authorised({ cancel: ["nfce-cancel-late"] });
-      sources.returnDraft = { ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [] };
+      const { service, document, store, setReturnDraft } = await authorised({ cancel: ["nfce-cancel-late"] });
+      setReturnDraft({ ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [] });
       await expect(
         service.cancelOrReturn({ ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" }),
       ).rejects.toThrow(expect.objectContaining({ code: "INVALID_INPUT" }));
@@ -295,13 +300,13 @@ describe("the document service", () => {
     });
 
     it("a subject already holding another live NF-e: refused, never answered as its return", async () => {
-      const { service, document, calls, store, sources } = await authorised({ issue: ["nfce-issue-authorized"], cancel: ["nfce-cancel-late"] });
-      const returnDraft = sources.returnDraft;
+      const { service, document, calls, store, returnDraft: currentReturnDraft, setReturnDraft } = await authorised({ issue: ["nfce-issue-authorized"], cancel: ["nfce-cancel-late"] });
+      const returnDraft = currentReturnDraft();
       // A sale NF-e on the same subject (no return), issued before the late cancel.
-      sources.returnDraft = null;
+      setReturnDraft(null);
       const other = await service.issue({ ...ISSUE, issuingPointId: "returns", model: "NFE" });
       expect(other).toMatchObject({ model: "NFE", sale: { purpose: "NORMAL" } });
-      sources.returnDraft = returnDraft;
+      setReturnDraft(returnDraft);
       const before = calls.length;
       await expect(
         service.cancelOrReturn({ ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" }),
