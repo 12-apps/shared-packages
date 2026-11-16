@@ -1001,7 +1001,7 @@ describe('the e-mail delivery schedule (FUT-776)', () => {
     const harness = setup({ seed: [] });
     await harness.call('POST', '/reports/custom', { body });
     const id = harness.stored()[0]?.id ?? '';
-    const { schedule: _omitted, ...withoutSchedule } = body;
+    const withoutSchedule = { name: body.name, spec: body.spec };
     await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: withoutSchedule });
     expect(harness.stored()[0]?.schedule).toMatchObject({ enabled: true });
     await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: { ...withoutSchedule, schedule: null } });

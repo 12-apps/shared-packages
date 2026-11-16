@@ -18,6 +18,25 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Scheduled e-mail delivery of a saved report (FUT-776, minor)
+
+This package keeps the schedule and draws the control; **the host sends the e-mail**. Nothing changes for a
+host that does nothing except run the migration: the old "Em breve" row is gone and the control stays hidden
+until the host passes `surface.schedule`.
+
+| Piece | What it is |
+|---|---|
+| Column | `saved_reports.schedule` (nullable `jsonb`, migration `20261116120000_add_report_schedule`). Run `prisma:sync` and let the host's migration sync pick it up. |
+| Wire | `schedule` on the save body, on the working copy, and echoed on a saved view **to authors only** (it names people). Omitted keeps the stored one, `null` removes it. The server stamps `timeZone` (from `config.timeZone`) and `startsOn` (the date fortnights count from; kept while the cadence and weekday do not change). A client cannot send either. |
+| Shape | `{ enabled, cadence: 'daily' \| 'weekly' \| 'biweekly' \| 'monthly', weekday? (0 Sunday), dayOfMonth?, time: 'HH:MM', timeZone, recipients: string[] (host user ids, at most 50), startsOn }`. An enabled schedule needs a recipient. |
+| Reading it | `readSchedule(record.schedule)` from `/server` answers a `ReportSchedule` or `null` for anything a job could not fully understand. A job must treat `null` as "do not send". |
+| Next run | `nextOccurrences(schedule, after, count)` and `occurrenceKey(schedule, occurrence)` from the root export. Pure. Wall clock in the schedule's zone; a skipped hour fires just after the gap, a repeated hour fires once at the first; Quinzenal counts every other week from `startsOn`; Mensal on the 29th to 31st fires on the last day of a shorter month. `occurrenceKey` (`YYYY-MM-DDTHH:MM`) is the idempotency key per (report, occurrence). |
+| Control | Pass `surface.schedule = { recipients({ tenantSlug, entities }) }` where each person is `{ id, name, detail?, canReceive, reason?, preselected? }`. The HOST decides `canReceive` from the entities the report reads; the package only renders a refused person disabled with the reason. Set `lockedReason` (a sentence in your words) to show the control locked, for a plan that excludes it. The package never gates a plan. |
+
+What the package does **not** do: send, render a PDF, check who may receive at send time (re-check it in the
+job: a person's access can change after they were ticked), or stop the schedule when a report is archived or
+deleted. Those are the host's.
+
 ## Next minor — neutral choices, a period label per surface, null ratios (FUT-4063)
 
 Three changes reach EVERY host, on purpose. Check them:

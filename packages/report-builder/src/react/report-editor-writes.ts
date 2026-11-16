@@ -14,6 +14,7 @@ import {
   type ReportWorkingCopyWire,
 } from "./custom-reports-api";
 import type { Result } from "./lib/rest-result";
+import { wireFromDraft } from "./lib/schedule-draft";
 import type { PersistedEditorState } from "./report-editor-source";
 import type { ReportBuilderPanelCopy, ReportEditorCopy } from "./screens-copy";
 import { documentFromDraft } from "./report-model";
@@ -30,6 +31,7 @@ function toSaveInput(state: PersistedEditorState): ReportWorkingCopyWire {
     visibility: state.publish.visibility,
     visibilityRoles: state.publish.visibility === "roles" ? state.publish.visibilityRoles : [],
     defaultRange: state.defaultRange,
+    schedule: wireFromDraft(state.schedule),
   };
 }
 
@@ -48,6 +50,7 @@ export function documentGuardError(
 ): string | null {
   if (state.draft.name.trim() === "") return copy.needsName;
   if (state.draft.blocks.length === 0) return copy.needsBlock;
+  if (state.schedule?.enabled && state.schedule.recipients.length === 0) return copy.needsRecipient;
   return publishGuardError(state.publish, builderCopy);
 }
 

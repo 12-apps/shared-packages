@@ -16,6 +16,7 @@ import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './sa
 import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
+import type { ReportSchedule } from '../schedule';
 import { readSchedule, resolveSchedule } from './schedule';
 import { saveReportBody } from './wire';
 import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
@@ -63,21 +64,13 @@ function parseSaveBody(body: unknown, messages: ReportServerMessages): SaveBody 
 function lifecycleFor(
   body: SaveBody,
   current: SavedReportRecord | null,
-  config: ReportBuilderServerConfig,
-): Pick<
-  SavedReportInput,
-  'status' | 'visibility' | 'visibilityRoles' | 'defaultRange' | 'schedule'
-> {
+): Pick<SavedReportInput, 'status' | 'visibility' | 'visibilityRoles' | 'defaultRange'> {
   return {
     status: body.status ?? current?.status ?? 'published',
     visibility: body.visibility ?? current?.visibility ?? 'tenant',
     visibilityRoles:
       body.visibilityRoles ?? (current ? visibilityRoleIds(current.visibilityRoles) : []),
     defaultRange: defaultRangeFor(body, current),
-    schedule: resolveSchedule(body.schedule, readSchedule(current?.schedule), {
-      timeZone: config.timeZone,
-      now: config.now ? config.now() : new Date(),
-    }),
   };
 }
 
@@ -93,6 +86,18 @@ function defaultRangeFor(body: SaveBody, current: SavedReportRecord | null): str
   return current?.defaultRange ?? null;
 }
 
+/** The schedule after a write: omitted keeps, null removes, else stamped (FUT-776). */
+function scheduleFor(
+  body: SaveBody,
+  current: SavedReportRecord | null,
+  config: ReportBuilderServerConfig,
+): ReportSchedule | null {
+  return resolveSchedule(body.schedule, readSchedule(current?.schedule), {
+    timeZone: config.timeZone,
+    now: config.now ? config.now() : new Date(),
+  });
+}
+
 function toInput(
   body: SaveBody,
   current: SavedReportRecord | null,
@@ -102,7 +107,8 @@ function toInput(
     name: body.name,
     description: body.description ?? null,
     spec: body.spec,
-    ...lifecycleFor(body, current, config),
+    ...lifecycleFor(body, current),
+    schedule: scheduleFor(body, current, config),
   };
 }
 

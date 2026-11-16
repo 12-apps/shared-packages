@@ -8,11 +8,10 @@
  * them behind one ⚙ and leaves the page to the report: the header carries the
  * name (editable in place) and everything else is one click away.
  *
- * Nothing here invents storage. Name, description, status, visibility and the
- * period the report opens on are all real columns with the existing save path
- * behind them. The one control the prototype shows that this product has no
- * schema for — the weekly e-mail — is rendered REFUSED-with-a-reason rather
- * than faked (see {@link ComingSoonRow}).
+ * Nothing here invents storage. Name, description, status, visibility, the
+ * period the report opens on and the e-mail delivery schedule (FUT-776, in
+ * `lib/schedule-section`) are all real columns with the existing save path
+ * behind them.
  */
 import type { JSX } from "react";
 
@@ -27,9 +26,11 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportStatusWire, ReportVisibilityWire } from "./custom-reports-api";
 import { RolesAllowlist, type PublishDraft } from "./lib/publish-section";
+import { ScheduleSection } from "./lib/schedule-section";
+import type { ScheduleDraft } from "./lib/schedule-draft";
 import { DefaultRangeField, Field } from "./lib/settings-fields";
 import type { ReportRollingRange } from "./reports-api";
-import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./lib/report-surface";
+import { CONTAINER_RADIUS_PX } from "./lib/report-surface";
 import type { ReportSettingsCopy } from "./screens-copy";
 import { useReportCopy } from "./transport-context";
 
@@ -103,53 +104,6 @@ function RadioCard({
   );
 }
 
-/**
- * A control the prototype shows and this product cannot yet honour.
- *
- * `aria-disabled` rather than `disabled`: a disabled control is unfocusable and
- * has no hover, so the very sentence explaining WHY it does nothing would be
- * the one thing a keyboard user could never reach.
- */
-function ComingSoonRow({
-  label,
-  value,
-  reason,
-  testId,
-}: {
-  label: string;
-  /** What it will say when it works — shown, inert, so the shape is honest. */
-  value: string;
-  /** Why it does nothing, naming the ticket that will make it do something. */
-  reason: string;
-  testId: string;
-}): JSX.Element {
-  return (
-    <Field label={label}>
-      <Box
-        role="group"
-        aria-disabled="true"
-        aria-describedby={`${testId}-reason`}
-        tabIndex={0}
-        data-testid={testId}
-        sx={{
-          p: 1.25,
-          border: "1px dashed",
-          borderColor: "divider",
-          borderRadius: `${CONTROL_RADIUS_PX}px`,
-          color: "text.disabled",
-        }}
-      >
-        <Text variant="body" size="sm" color="secondary">
-          {value}
-        </Text>
-      </Box>
-      <Text variant="body" size="xs" color="secondary" id={`${testId}-reason`}>
-        {reason}
-      </Text>
-    </Field>
-  );
-}
-
 interface ChoiceCard<T> {
   value: T;
   title: string;
@@ -178,6 +132,8 @@ interface ReportSettingsValue {
   publish: PublishDraft;
   /** The period the saved report opens on — a real column (FUT-755). */
   defaultRange: ReportRollingRange;
+  /** The e-mail delivery schedule; null when the report has none (FUT-776). */
+  schedule: ScheduleDraft | null;
 }
 
 /** The two radio groups, so the dialog's own body stays a list of fields. */
@@ -304,16 +260,18 @@ export function ReportSettingsDialog({
   value,
   onChange,
   onClose,
+  entities = [],
   testId = "report-settings",
 }: {
   open: boolean;
   tenantSlug: string;
+  /** The entities the report reads, which the host judges each recipient against. */
+  entities?: string[];
   value: ReportSettingsValue;
   onChange: (next: ReportSettingsValue) => void;
   onClose: () => void;
   testId?: string;
 }): JSX.Element {
-  const copy = useReportCopy().screens.settings;
   const builder = useReportCopy().screens.builder;
   return (
     <Modal open={open} onClose={onClose} size="sm" dataTestId={testId}>
@@ -335,15 +293,12 @@ export function ReportSettingsDialog({
             testId={`${testId}-default-range`}
           />
 
-          {/* FUT-776 — scheduled e-mail delivery of a saved report. Shown
-              because the setting belongs here and hiding it would make the
-              dialog disagree with the design; inert because there is no
-              column, no job and no address list behind it yet. */}
-          <ComingSoonRow
-            label={copy.scheduleLabel}
-            value={copy.scheduleValue}
-            reason={copy.scheduleReason}
-            testId={`${testId}-schedule`}
+          <ScheduleSection
+            value={value.schedule}
+            onChange={(schedule) => onChange({ ...value, schedule })}
+            tenantSlug={tenantSlug}
+            entities={entities}
+            testId={testId}
           />
 
           <Button

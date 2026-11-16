@@ -21,6 +21,7 @@
 import type { BreadcrumbCopy } from "@12-apps/ui/copy";
 
 import type { ReportSystemCopy } from "./system-copy";
+import type { ReportScheduleCopy } from "./schedule-copy";
 
 export type { ReportSystemCopy };
 
@@ -132,6 +133,8 @@ export interface ReportEditorCopy {
   discardConfirm: string;
   /** Why a save is refused. */
   needsName: string;
+  /** The automatic delivery is on and nobody is ticked (FUT-776). */
+  needsRecipient: string;
   needsBlock: string;
   /** The canvas: adding a block, and removing one. */
   addBlock: string;
@@ -351,10 +354,8 @@ export interface ReportSettingsCopy {
   statusCards: Readonly<Record<string, ReportChoiceCardCopy>>;
   /** The audience cards, keyed by the stored visibility. */
   visibilityCards: Readonly<Record<string, ReportChoiceCardCopy>>;
-  /** The inert scheduled-delivery row (FUT-776). */
-  scheduleLabel: string;
-  scheduleValue: string;
-  scheduleReason: string;
+  /** The scheduled e-mail delivery section (FUT-776). */
+  schedule: ReportScheduleCopy;
   /** The audience field's own label, above the cards. */
   visibilityLabel: string;
   /** The dialog's dismiss, which carries no visible label. */

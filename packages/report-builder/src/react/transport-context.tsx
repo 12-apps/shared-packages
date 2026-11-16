@@ -10,6 +10,7 @@ import type {
 } from "../server/system-reports";
 
 import type { BlockTemplateGroup } from "../server/block-templates";
+import type { ReportScheduleSurface } from "./schedule-surface";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
 import type { BucketFormatter } from "./lib/column-value";
 import type { ReportRange } from "./reports-api";
@@ -67,6 +68,11 @@ export interface ReportBuilderSurface {
    * the server sent it.
    */
   formatBucket?: BucketFormatter;
+  /**
+   * Scheduled e-mail delivery of a saved report (FUT-776). Absent: the
+   * "Envio automático" control is not shown at all, rather than shown dead.
+   */
+  schedule?: ReportScheduleSurface;
 }
 
 /**

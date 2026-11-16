@@ -200,17 +200,23 @@ export function occurrenceKey(schedule: ReportSchedule, occurrence: Date): strin
   return `${pad(civil.year, 4)}-${pad(civil.month)}-${pad(civil.day)}T${schedule.time}`;
 }
 
+function inRange(value: number | undefined, min: number, max: number): boolean {
+  return value !== undefined && Number.isInteger(value) && value >= min && value <= max;
+}
+
 /** Whether every field the cadence reads is present and real. */
 export function isRunnable(schedule: ReportSchedule): boolean {
   if (!SCHEDULE_TIME_PATTERN.test(schedule.time) || !isValidTimeZone(schedule.timeZone)) return false;
-  if (schedule.cadence === 'daily') return true;
-  if (schedule.cadence === 'monthly') {
-    return Number.isInteger(schedule.dayOfMonth) && (schedule.dayOfMonth ?? 0) >= 1 && (schedule.dayOfMonth ?? 0) <= 31;
+  switch (schedule.cadence) {
+    case 'daily':
+      return true;
+    case 'monthly':
+      return inRange(schedule.dayOfMonth, 1, 31);
+    case 'weekly':
+      return inRange(schedule.weekday, 0, 6);
+    case 'biweekly':
+      return inRange(schedule.weekday, 0, 6) && isValidCivilDate(schedule.startsOn);
   }
-  const weekdayOk =
-    Number.isInteger(schedule.weekday) && (schedule.weekday ?? -1) >= 0 && (schedule.weekday ?? 7) <= 6;
-  if (!weekdayOk) return false;
-  return schedule.cadence === 'weekly' || isValidCivilDate(schedule.startsOn);
 }
 
 /** The local calendar date (`YYYY-MM-DD`) of an instant in a zone. */

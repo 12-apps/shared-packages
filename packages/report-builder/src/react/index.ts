@@ -40,6 +40,7 @@ export {
  * travel INTO the surface rather than out of it.
  */
 export type { ReportBuilderSurface, ReportPeriodSurface } from './transport-context';
+export type { ReportScheduleSurface, ScheduleRecipient } from "./schedule-surface";
 export type {
   ReportNote,
   SystemDashboardDef,

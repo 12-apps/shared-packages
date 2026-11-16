@@ -67,6 +67,12 @@ const storedSchedule = z.strictObject({
 /** The wire shape echoed to an author — the stored one. */
 export const reportScheduleView = storedSchedule;
 
+/** Spread into the save body: omitted keeps the stored schedule, `null` removes it. */
+export const scheduleBodyFields = { schedule: reportScheduleInput.nullish() } as const;
+
+/** Spread into a saved view: echoed ONLY to a caller who may author, since it names people. */
+export const scheduleViewFields = { schedule: reportScheduleView.nullish() } as const;
+
 /**
  * The stored JSON column, read back. Unreadable or unrunnable JSON is `null`:
  * a delivery job must never fire from a value it could not fully understand.
@@ -76,6 +82,12 @@ export function readSchedule(value: unknown): ReportSchedule | null {
   if (!parsed.success) return null;
   const schedule = parsed.data as ReportSchedule;
   return isRunnable(schedule) ? schedule : null;
+}
+
+/** Only the day the cadence reads is kept, so a stored row never holds a stale one. */
+function dayFields(input: ReportScheduleInput): { weekday?: number; dayOfMonth?: number } {
+  if (input.cadence === 'monthly') return { dayOfMonth: input.dayOfMonth };
+  return input.cadence === 'daily' ? {} : { weekday: input.weekday };
 }
 
 /**
@@ -104,8 +116,7 @@ export function resolveSchedule(
   return {
     enabled: input.enabled,
     cadence: input.cadence,
-    ...(input.cadence === 'monthly' ? {} : input.cadence === 'daily' ? {} : { weekday: input.weekday }),
-    ...(input.cadence === 'monthly' ? { dayOfMonth: input.dayOfMonth } : {}),
+    ...dayFields(input),
     time: input.time,
     timeZone: clock.timeZone,
     recipients: [...new Set(input.recipients)],

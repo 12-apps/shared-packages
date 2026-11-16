@@ -17,6 +17,7 @@ import type {
 import { adminReportsPath } from "./custom-reports-api";
 import type { ReportRollingRange } from "./reports-api";
 import type { Result } from "./lib/rest-result";
+import type { ReportScheduleField } from "./lib/schedule-draft";
 import type { ReportBuilderTransport } from "./transport";
 
 /**
@@ -34,7 +35,7 @@ import type { ReportBuilderTransport } from "./transport";
  * is being retyped; the strict check happens where it decides something — on
  * publish. Omitted lifecycle fields keep their stored values server-side.
  */
-export interface ReportWorkingCopyWire {
+export interface ReportWorkingCopyWire extends ReportScheduleField {
   name: string;
   description?: string | null;
   spec: ReportDocumentWire;
