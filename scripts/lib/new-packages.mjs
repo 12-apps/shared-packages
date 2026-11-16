@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 /** `{ name, private }` of a package directory, or null when it has no readable manifest. */
-export function readManifest(dir) {
+function readManifest(dir) {
   try {
     const { name, private: isPrivate } = JSON.parse(
       readFileSync(join(resolve(dir), "package.json"), "utf8"),
