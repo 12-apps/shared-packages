@@ -1,6 +1,6 @@
-import { formatReportValue } from '../format';
 import type { ReportTableColumn } from '../render';
 import type { ReportRow } from '../types';
+import { pdfValue } from './money';
 import type { PdfPaintContext } from './types';
 
 export type CellColumn = Pick<ReportTableColumn, 'format' | 'decimals' | 'valueLabels' | 'bucketFormat' | 'grain'>;
@@ -17,7 +17,7 @@ export function cellText(value: ReportRow[string] | undefined, column: CellColum
       ...(column.grain ? { grain: column.grain } : {}),
     });
   }
-  return formatReportValue(value ?? null, column.format, ctx.values, column.decimals);
+  return pdfValue(value, column.format, ctx.values, column.decimals);
 }
 
 export function isNumericFormat(format: ReportTableColumn['format']): boolean {

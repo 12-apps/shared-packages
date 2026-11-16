@@ -2,7 +2,7 @@ import type { Color } from 'pdf-lib';
 
 import type { ReportRenderModel } from '../render';
 import { cellText } from './cell';
-import { accent, DEFAULT_CHART_SCHEME } from './theme';
+import { DEFAULT_CHART_SCHEME } from './theme';
 import type { PdfPaintContext } from './types';
 
 type ChartModel = Extract<ReportRenderModel, { kind: 'chart' }>;
@@ -10,6 +10,8 @@ type ChartModel = Extract<ReportRenderModel, { kind: 'chart' }>;
 export interface ChartSeriesData {
   label: string;
   color: Color;
+  /** Every second series is hatched, so two accents differ by more than hue on a grey print. */
+  hatched: boolean;
   values: (number | null)[];
 }
 
@@ -42,7 +44,8 @@ export function chartData(ctx: PdfPaintContext, model: ChartModel): ChartData {
     }),
     series: spec.series.map((series, index) => ({
       label: series.label ?? series.key,
-      color: accent(series.color ?? scheme[index % scheme.length] ?? 'primary'),
+      hatched: index % 2 === 1,
+      color: ctx.canvas.accent(series.color ?? scheme[index % scheme.length] ?? 'primary'),
       values: rows.map((row) => numberOrNull(row[series.key])),
     })),
   };
@@ -53,7 +56,7 @@ export function hasPoints(data: ChartData): boolean {
 }
 
 /** The colours a pie's slices cycle through: the spec's scheme, else the default one. */
-export function slicePalette(model: ChartModel): Color[] {
+export function slicePalette(ctx: PdfPaintContext, model: ChartModel): Color[] {
   const { colorScheme } = model.chartSpec;
-  return (colorScheme && colorScheme.length > 0 ? colorScheme : DEFAULT_CHART_SCHEME).map(accent);
+  return (colorScheme && colorScheme.length > 0 ? colorScheme : DEFAULT_CHART_SCHEME).map((token) => ctx.canvas.accent(token));
 }

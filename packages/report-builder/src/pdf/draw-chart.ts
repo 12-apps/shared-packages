@@ -4,7 +4,6 @@ import { niceScale, tickText, type Scale } from './chart-scale';
 import type { TextStyle } from './canvas';
 import { drawLegend, LEGEND_LINE, legendLines, type LegendEntry } from './draw-legend';
 import { drawPie, pieHeight } from './draw-pie';
-import { GRID, INK_MUTED, RULE } from './theme';
 import type { PdfPaintContext } from './types';
 
 type ChartModel = Extract<ReportRenderModel, { kind: 'chart' }>;
@@ -14,8 +13,8 @@ const LABEL_BAND = 16;
 const AXIS_TITLE_BAND = 10;
 const EMPTY_HEIGHT = 36;
 const NOTE_HEIGHT = 12;
-const TICK: TextStyle = { size: 7, color: INK_MUTED };
-const TITLE: TextStyle = { size: 7.5, color: INK_MUTED };
+const TICK: TextStyle = { size: 7, color: 'muted' };
+const TITLE: TextStyle = { size: 7.5, color: 'muted' };
 const MARKER = 2.4;
 
 function isPie(model: ChartModel): boolean {
@@ -27,6 +26,7 @@ function legendEntries(ctx: PdfPaintContext, data: ChartData, width: number): Le
   return data.series.map((series) => ({
     label: ctx.canvas.fit(series.label, style, width - 24),
     color: series.color,
+    hatched: series.hatched,
   }));
 }
 
@@ -79,7 +79,7 @@ function yOf(plot: Plot, value: number): number {
 function drawGrid(ctx: PdfPaintContext, plot: Plot, format: ChartModel['chartSpec']['numberFormat']): void {
   for (const tick of plot.scale.ticks) {
     const y = yOf(plot, tick);
-    ctx.canvas.line({ x: plot.left, top: y }, { x: plot.left + plot.width, top: y }, tick === 0 ? RULE : GRID, 0.5);
+    ctx.canvas.line({ x: plot.left, top: y }, { x: plot.left + plot.width, top: y }, tick === 0 ? 'rule' : 'grid', 0.5);
     ctx.canvas.text(tickText(tick, format), plot.left - 4, y - TICK.size / 2, TICK, { align: 'right' });
   }
 }
@@ -109,7 +109,9 @@ function drawBars(ctx: PdfPaintContext, plot: Plot, data: ChartData, stacked: bo
       const from = stacked ? end - value : 0;
       const x = plot.left + slot * index + (slot - group) / 2 + (stacked ? 0 : each * seriesAt);
       const [a, b] = [yOf(plot, from), yOf(plot, end)];
-      ctx.canvas.rect(x, Math.min(a, b), Math.max(each - 1, 1), Math.max(Math.abs(a - b), 0.6), series.color);
+      const box = { x, top: Math.min(a, b), width: Math.max(each - 1, 1), height: Math.max(Math.abs(a - b), 0.6) };
+      ctx.canvas.rect(box.x, box.top, box.width, box.height, series.color);
+      if (series.hatched) ctx.canvas.hatch(box.x, box.top, box.width, box.height, 'white');
     });
   });
 }
@@ -132,7 +134,7 @@ function drawLines(ctx: PdfPaintContext, plot: Plot, data: ChartData, mode: { ar
     }
     points.forEach((point, index) => {
       const next = points[index + 1];
-      if (point && next) ctx.canvas.line(point, next, series.color, 1.5);
+      if (point && next) ctx.canvas.line(point, next, series.color, 1.5, series.hatched ? [4, 2] : undefined);
     });
     if (data.categories.length <= 30) {
       for (const point of drawn) ctx.canvas.rect(point.x - MARKER / 2, point.top - MARKER / 2, MARKER, MARKER, series.color);

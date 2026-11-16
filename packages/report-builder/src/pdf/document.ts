@@ -3,13 +3,12 @@ import { PDFName, PDFString } from 'pdf-lib';
 import type { PdfCanvas, TextStyle } from './canvas';
 import { CONTENT_WIDTH, MARGIN_X, PAGE_HEIGHT, PAGE_WIDTH } from './canvas';
 import type { ReportPdfCopy } from './copy';
-import { INK, INK_MUTED, RULE } from './theme';
 
 const PRODUCER = '@12-apps/report-builder';
 
-const TITLE: TextStyle = { size: 18, bold: true, color: INK };
-const META: TextStyle = { size: 9, color: INK_MUTED };
-const FOOT: TextStyle = { size: 7.5, color: INK_MUTED };
+const TITLE: TextStyle = { size: 18, bold: true, color: 'ink' };
+const META: TextStyle = { size: 9, color: 'muted' };
+const FOOT: TextStyle = { size: 7.5, color: 'muted' };
 
 export interface DocumentFacts {
   title: string;
@@ -69,7 +68,7 @@ export function drawTitleBlock(canvas: PdfCanvas, facts: DocumentFacts, copy: Re
     canvas.cursor += META.size * 1.2;
   }
   canvas.cursor += 6;
-  canvas.line({ x: MARGIN_X, top: canvas.cursor }, { x: MARGIN_X + CONTENT_WIDTH, top: canvas.cursor }, RULE, 0.75);
+  canvas.line({ x: MARGIN_X, top: canvas.cursor }, { x: MARGIN_X + CONTENT_WIDTH, top: canvas.cursor }, 'rule', 0.75);
   canvas.cursor += 14;
 }
 
@@ -79,8 +78,8 @@ export function drawFooters(canvas: PdfCanvas, facts: DocumentFacts, copy: Repor
   const top = PAGE_HEIGHT - 30;
   for (let index = 0; index < total; index += 1) {
     const page = canvas.pageAt(index);
-    canvas.line({ x: MARGIN_X, top: top - 6 }, { x: PAGE_WIDTH - MARGIN_X, top: top - 6 }, RULE, 0.5, undefined, page);
-    const left = canvas.fit(`${facts.storeName} - ${facts.title}`, FOOT, CONTENT_WIDTH - 90);
+    canvas.line({ x: MARGIN_X, top: top - 6 }, { x: PAGE_WIDTH - MARGIN_X, top: top - 6 }, 'rule', 0.5, undefined, page);
+    const left = canvas.fit(`${facts.storeName} | ${facts.title}`, FOOT, CONTENT_WIDTH - 90);
     canvas.text(left, MARGIN_X, top, FOOT, { page });
     canvas.text(copy.page(index + 1, total), PAGE_WIDTH - MARGIN_X, top, FOOT, { page, align: 'right' });
   }

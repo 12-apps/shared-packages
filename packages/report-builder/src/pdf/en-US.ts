@@ -10,5 +10,7 @@ export const EN_US_REPORT_PDF_COPY: ReportPdfCopy = {
   defaultAppName: 'the app',
   moreRows: (count, appName) => `and ${count} more ${count === 1 ? 'row' : 'rows'} — see them in ${appName}`,
   chartTruncated: (shown, total) => `Showing the first ${shown} of ${total} points.`,
+  attachedLine: 'The full report is attached as a PDF.',
+  missingLine: 'The PDF could not be generated this time.',
   otherSlices: 'Other',
 };

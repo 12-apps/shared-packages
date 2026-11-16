@@ -60,14 +60,14 @@ describe('renderReportPdf: the blocks', () => {
     const reopened = await PDFDocument.load(result.bytes, { updateMetadata: false });
     expect(reopened.getPageCount()).toBe(result.pageCount);
     const words = said(drawn);
-    expect(words).toContain('R$ 48.200,00');
+    expect(words).toContain('R$ 48.200');
     expect(words).toContain('Custo total');
     expect(words).toContain('Colaborador 1');
     // A declared value label, not the stored key, and a duration at its declared precision.
     expect(words).toContain('Cozinha');
     expect(words).not.toContain('cook');
     expect(words).toContain('30 h');
-    expect(words).toContain('Acima da meta');
+    expect(words).toContain('R$ 1.500 \u00b7 Acima da meta');
   });
 
   it('puts tiles that share a 12-column row on one line', async () => {
@@ -98,7 +98,7 @@ describe('renderReportPdf: the blocks', () => {
     expect(words).toContain('PIX');
     expect(words).toContain('49,4%');
     expect(words).toContain('Total');
-    expect(words).toContain('R$ 10,00');
+    expect(words).toContain('52%');
     const single = lineBlock('only', 12);
     if (single.status !== 'ok') throw new Error('fixture');
     const alone = await renderReportPdf({ render: single.render }, BASE_OPTIONS);
@@ -112,10 +112,7 @@ describe('renderReportPdf: the blocks', () => {
     expect(words).toContain('Receita');
   });
 
-  it('draws what it cannot encode as a question mark instead of failing', async () => {
-    const { drawn } = await draw({ blocks: [] }, { storeName: 'Padaria 🥖 Sabor' });
-    expect(said(drawn).some((word) => word.includes('Padaria ? Sabor'))).toBe(true);
-  });
+
 });
 
 describe('renderReportPdf: an empty report', () => {

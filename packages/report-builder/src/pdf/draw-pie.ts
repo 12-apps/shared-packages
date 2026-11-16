@@ -4,7 +4,6 @@ import { formatKpiFigure } from '../format';
 import type { ReportRenderModel } from '../render';
 import { slicePalette, type ChartData } from './chart-data';
 import type { TextStyle } from './canvas';
-import { INK, INK_MUTED, WHITE } from './theme';
 import type { PdfPaintContext } from './types';
 
 type ChartModel = Extract<ReportRenderModel, { kind: 'chart' }>;
@@ -16,8 +15,8 @@ const MAX_SLICES = 9;
 const STEP = Math.PI / 45;
 const HOLE = 0.56;
 const LEGEND_ROW = 13;
-const LABEL: TextStyle = { size: 8, color: INK };
-const SHARE: TextStyle = { size: 8, bold: true, color: INK_MUTED };
+const LABEL: TextStyle = { size: 8, color: 'ink' };
+const SHARE: TextStyle = { size: 8, bold: true, color: 'muted' };
 
 interface Slice {
   label: string;
@@ -27,14 +26,14 @@ interface Slice {
 
 /** Positive values of the first series, the tail folded into one "other" slice. */
 function slicesOf(ctx: PdfPaintContext, model: ChartModel, data: ChartData): Slice[] {
-  const palette = slicePalette(model);
+  const palette = slicePalette(ctx, model);
   const values = data.categories
     .map((label, index) => ({ label, value: data.series[0]?.values[index] ?? 0 }))
     .filter((slice) => slice.value > 0);
   const head = values.slice(0, MAX_SLICES);
   const rest = values.slice(MAX_SLICES).reduce((sum, slice) => sum + slice.value, 0);
   const all = rest > 0 ? [...head, { label: ctx.copy.otherSlices, value: rest }] : head;
-  return all.map((slice, index) => ({ ...slice, color: palette[index % palette.length] ?? INK }));
+  return all.map((slice, index) => ({ ...slice, color: palette[index % palette.length] ?? ctx.canvas.tone('ink') }));
 }
 
 function arc(center: { x: number; top: number }, radius: number, from: number, to: number): { x: number; top: number }[] {
@@ -59,16 +58,16 @@ function drawSlices(ctx: PdfPaintContext, slices: Slice[], center: { x: number; 
 function centreValueStyle(ctx: PdfPaintContext, value: string, width: number): TextStyle {
   let size = 11;
   while (size > 6 && ctx.canvas.width(value, { size, bold: true }) > width) size -= 0.5;
-  return { size, bold: true, color: INK };
+  return { size, bold: true, color: 'ink' };
 }
 
 function drawHole(ctx: PdfPaintContext, model: ChartModel, center: { x: number; top: number }, radius: number): void {
   const hole = radius * HOLE;
-  ctx.canvas.polygon(arc(center, hole, 0, Math.PI * 2), WHITE);
+  ctx.canvas.polygon(arc(center, hole, 0, Math.PI * 2), 'white');
   const label = model.chartSpec.centerLabel;
   if (!label) return;
   const [caption, value] = typeof label === 'string' ? [label, null] : [label.label, String(label.value)];
-  const style: TextStyle = { size: 8, color: INK_MUTED };
+  const style: TextStyle = { size: 8, color: 'muted' };
   ctx.canvas.text(ctx.canvas.fit(caption, style, hole * 1.7), center.x, center.top - (value ? 9 : 4), style, { align: 'center' });
   if (value) ctx.canvas.text(value, center.x, center.top + 1, centreValueStyle(ctx, value, hole * 1.7), { align: 'center' });
 }
@@ -111,7 +110,7 @@ export function drawPie(
 ): void {
   const slices = slicesOf(ctx, model, data);
   if (slices.length === 0) {
-    ctx.canvas.text(ctx.copy.empty, box.x, box.top + 8, { size: 7.5, color: INK_MUTED });
+    ctx.canvas.text(ctx.copy.empty, box.x, box.top + 8, { size: 7.5, color: 'muted' });
     return;
   }
   const layout = layoutFor(box.width, slices.length);

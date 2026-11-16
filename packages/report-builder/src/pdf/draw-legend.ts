@@ -1,15 +1,15 @@
 import type { Color } from 'pdf-lib';
 
 import type { TextStyle } from './canvas';
-import { INK_MUTED } from './theme';
 import type { PdfPaintContext } from './types';
 
 export interface LegendEntry {
   label: string;
   color: Color;
+  hatched?: boolean;
 }
 
-const STYLE: TextStyle = { size: 8, color: INK_MUTED };
+const STYLE: TextStyle = { size: 8, color: 'muted' };
 const SWATCH = 7;
 const GAP = 12;
 export const LEGEND_LINE = 12;
@@ -38,6 +38,7 @@ export function drawLegend(ctx: PdfPaintContext, lines: LegendEntry[][], x: numb
     for (const entry of line) {
       const y = top + row * LEGEND_LINE;
       ctx.canvas.rect(left, y + 1, SWATCH, SWATCH, entry.color);
+      if (entry.hatched) ctx.canvas.hatch(left, y + 1, SWATCH, SWATCH, 'white', 2.5);
       ctx.canvas.text(entry.label, left + SWATCH + 4, y, STYLE);
       left += SWATCH + 4 + ctx.canvas.width(entry.label, STYLE) + GAP;
     }

@@ -22,6 +22,13 @@ export interface ReportPdfCopy {
   moreRows(count: number, appName: string): string;
   /** A chart that drew only its first points. */
   chartTruncated(shown: number, total: number): string;
+  /**
+   * For the e-mail that carries the file (the host writes the body, these are its two sentences): the
+   * line to use when the PDF is attached, and the line to use INSTEAD when {@link ReportPdfError} was
+   * thrown, so a body never says "attached" about a file that is not there.
+   */
+  attachedLine: string;
+  missingLine: string;
   /** The folded remainder of a pie. */
   otherSlices: string;
 }

@@ -6,14 +6,14 @@ import { PdfCanvas, CONTENT_WIDTH, MARGIN_X } from './canvas';
 import type { ReportPdfCopy } from './copy';
 import { CHART_TYPES } from './chart-data';
 import { drawChart, chartHeight } from './draw-chart';
-import { heatmapTable } from './draw-heatmap';
+import { drawHeatmap } from './draw-heatmap';
 import { drawKpi, kpiHeight } from './draw-kpi';
 import { drawTable, type PdfTableData } from './draw-table';
 import { drawFooters, drawTitleBlock, setMetadata, type DocumentFacts } from './document';
 import { ReportPdfError, toReportPdfError } from './errors';
 import { drawHeader, headerFor } from './header';
 import { reportPdfCopyFor } from './packs';
-import { INK_MUTED } from './theme';
+import type { ReportPdfTheme } from './theme';
 import type { PdfPaintContext, ReportPdfBlock, ReportPdfBucketFormatter, ReportPdfView } from './types';
 
 export interface ReportPdfLimits {
@@ -29,7 +29,7 @@ export interface ReportPdfLimits {
   maxChartPoints?: number;
 }
 
-export interface ReportPdfOptions {
+export interface ReportPdfOptions extends ReportPdfTheme {
   /** The report's name: the page heading, the footer and the file's title. */
   title: string;
   /** The period as a person reads it ("9 a 15/11"). The host words it, on its own clock. */
@@ -116,12 +116,13 @@ function drawInlineRow(ctx: PdfPaintContext, row: readonly ReportPdfBlock[]): vo
     return {
       block,
       x: MARGIN_X + (CONTENT_WIDTH * before) / GRID,
-      width: (CONTENT_WIDTH * spanOf(block)) / GRID - (row.length > 1 ? COLUMN_GAP : 0),
+      // Every tile but the last leaves a gutter; the last reaches the content edge.
+      width: (CONTENT_WIDTH * spanOf(block)) / GRID - (index < row.length - 1 ? COLUMN_GAP : 0),
     };
   });
   const measured = columns.map((column) => {
-    const header = headerFor(ctx, column.block, column.width);
     const render = column.block.status === 'ok' ? column.block.render : null;
+    const header = headerFor(ctx, column.block, column.width, { sentence: render?.kind !== 'kpi' });
     return { ...column, header, body: render ? bodyHeight(ctx, render, column.width) : 0 };
   });
   const height = Math.max(...measured.map((entry) => entry.header.height + entry.body));
@@ -145,24 +146,27 @@ function drawErrorBlock(ctx: PdfPaintContext, block: ReportPdfBlock): void {
   ctx.canvas.ensure(header.height + 20);
   drawHeader(ctx, header, MARGIN_X, ctx.canvas.cursor);
   ctx.canvas.cursor += header.height;
-  ctx.canvas.text(ctx.copy.blockError, MARGIN_X, ctx.canvas.cursor, { size: 8.5, color: INK_MUTED });
+  ctx.canvas.text(ctx.copy.blockError, MARGIN_X, ctx.canvas.cursor, { size: 8.5, color: 'muted' });
   ctx.canvas.cursor += 12 + BLOCK_GAP;
 }
 
-function tableOf(ctx: PdfPaintContext, block: ReportPdfBlock): PdfTableData {
-  if (block.status !== 'ok') return { columns: [], rows: [] };
-  const { render } = block;
-  if (render.kind === 'heatmap') return heatmapTable(ctx, render);
-  if (render.kind === 'table') {
-    return {
-      columns: render.columns,
-      rows: render.rows,
-      ...(render.flag ? { flag: { label: render.flag.label, rows: new Set(render.flag.rows) } } : {}),
-    };
-  }
-  throw new ReportPdfError('unsupported_block', `Block "${block.id}" has a render this PDF cannot draw.`, {
+function unsupported(block: ReportPdfBlock): ReportPdfError {
+  return new ReportPdfError('unsupported_block', `Block "${block.id}" has a render this PDF cannot draw.`, {
     blockId: block.id,
   });
+}
+
+function drawFullWidth(ctx: PdfPaintContext, block: ReportPdfBlock): void {
+  if (block.status !== 'ok') throw unsupported(block);
+  const { render } = block;
+  if (render.kind === 'heatmap') return drawHeatmap(ctx, block, render, CONTENT_WIDTH);
+  if (render.kind !== 'table') throw unsupported(block);
+  const data: PdfTableData = {
+    columns: render.columns,
+    rows: render.rows,
+    ...(render.flag ? { flag: { column: render.flag.column, label: render.flag.label, rows: new Set(render.flag.rows) } } : {}),
+  };
+  drawTable(ctx, block, data, CONTENT_WIDTH);
 }
 
 function drawBlockRow(ctx: PdfPaintContext, row: readonly ReportPdfBlock[]): void {
@@ -170,7 +174,7 @@ function drawBlockRow(ctx: PdfPaintContext, row: readonly ReportPdfBlock[]): voi
   if (!first) return;
   if (first.status === 'error') drawErrorBlock(ctx, first);
   else if (isInline(first)) drawInlineRow(ctx, row);
-  else drawTable(ctx, first, tableOf(ctx, first), CONTENT_WIDTH);
+  else drawFullWidth(ctx, first);
 }
 
 function assertDrawable(blocks: readonly ReportPdfBlock[]): void {
@@ -179,12 +183,13 @@ function assertDrawable(blocks: readonly ReportPdfBlock[]): void {
     const { render } = block;
     const kinds = ['table', 'heatmap', 'kpi', 'chart'];
     const known = kinds.includes(render.kind) && (render.kind !== 'chart' || CHART_TYPES.includes(render.chartSpec.type));
-    if (!known) {
-      throw new ReportPdfError('unsupported_block', `Block "${block.id}" has a render this PDF cannot draw.`, {
-        blockId: block.id,
-      });
-    }
+    if (!known) throw unsupported(block);
   }
+}
+
+/** A limit left `undefined` keeps its default instead of replacing it with nothing. */
+function definedOnly(limits: ReportPdfLimits | undefined): Partial<ReportPdfLimits> {
+  return Object.fromEntries(Object.entries(limits ?? {}).filter(([, value]) => value !== undefined));
 }
 
 function yieldToLoop(): Promise<void> {
@@ -192,11 +197,14 @@ function yieldToLoop(): Promise<void> {
 }
 
 async function build(view: ReportPdfView, options: ReportPdfOptions): Promise<ReportPdfResult> {
-  const limits = { ...DEFAULT_PDF_LIMITS, ...options.limits };
+  const limits = { ...DEFAULT_PDF_LIMITS, ...definedOnly(options.limits) };
   const clock = options.clock ?? Date.now;
   const blocks = blocksOf(view);
   assertDrawable(blocks);
-  const canvas = await PdfCanvas.create(limits, clock);
+  const canvas = await PdfCanvas.create(limits, clock, {
+    ...(options.theme ? { theme: options.theme } : {}),
+    ...(options.brand ? { brand: options.brand } : {}),
+  });
   const copy = { ...reportPdfCopyFor(options.locale), ...options.copy };
   const ctx: PdfPaintContext = {
     canvas,
@@ -210,7 +218,7 @@ async function build(view: ReportPdfView, options: ReportPdfOptions): Promise<Re
   const facts: DocumentFacts = { ...options };
   setMetadata(canvas, facts);
   drawTitleBlock(canvas, facts, copy);
-  if (blocks.length === 0) canvas.text(copy.empty, MARGIN_X, canvas.cursor, { size: 11, color: INK_MUTED });
+  if (blocks.length === 0) canvas.text(copy.empty, MARGIN_X, canvas.cursor, { size: 11, color: 'muted' });
   for (const row of layoutRows(blocks)) {
     canvas.tick();
     drawBlockRow(ctx, row);

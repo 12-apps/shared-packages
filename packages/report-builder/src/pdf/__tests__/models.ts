@@ -120,19 +120,32 @@ export function donutBlock(id: string, span: number): ReportPdfBlock {
 export function heatmapBlock(id: string): ReportPdfBlock {
   const hours = ['10h', '11h', '12h', '13h'];
   const days = ['Seg', 'Ter', 'Qua'];
+  const values: (number | null | 'unmeasured')[][] = [
+    [0.52, 0.28, 0.31, 0.12],
+    [0.3, 0.64, 0.2, null],
+    [0.09, 0.41, 'unmeasured', 0.05],
+  ];
+  const cells = days.flatMap((day, di) =>
+    hours.map((hour, hi) => {
+      const value = values[di]?.[hi] ?? null;
+      return value === 'unmeasured'
+        ? { row: day, column: hour, value: null, reason: 'unmeasured' as const }
+        : { row: day, column: hour, value };
+    }),
+  );
   return {
     id,
     span: 12,
     status: 'ok',
-    title: 'Vendas por hora',
+    title: 'Custo sobre vendas por hora',
     render: {
       kind: 'heatmap',
       rowAxis: days.map((label) => ({ key: label, label })),
       columnAxis: hours.map((label) => ({ key: label, label })),
-      cells: days.flatMap((day, di) => hours.map((hour, hi) => ({ row: day, column: hour, value: hi === 3 && di === 2 ? null : 1000 * (di + 1) * (hi + 1) }))),
-      scale: { target: 3000 },
-      labels: { above: 'acima', below: 'abaixo', empty: 'sem venda' },
-      valueFormat: 'brl',
+      cells,
+      scale: { target: 0.3, strongAbove: 0.5 },
+      labels: { above: 'acima da meta', below: 'na meta ou abaixo', empty: 'sem venda', unmeasured: 'sem custo na hora' },
+      valueFormat: 'percent',
       tableColumns: [{ key: 'day', label: 'Dia', format: 'text' }],
       rows: [],
     },

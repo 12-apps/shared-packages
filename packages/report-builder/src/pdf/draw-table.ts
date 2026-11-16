@@ -2,7 +2,6 @@ import type { ReportRow } from '../types';
 import { cellText, isNumericFormat, type CellColumn } from './cell';
 import { MARGIN_X, type TextStyle } from './canvas';
 import { drawHeader, headerFor } from './header';
-import { CARD, FLAGGED, INK, INK_MUTED, RULE, WARNING, ZEBRA } from './theme';
 import type { PdfPaintContext, ReportPdfBlock } from './types';
 
 export interface PdfTableColumn extends CellColumn {
@@ -16,7 +15,7 @@ export interface PdfTableData {
   columns: readonly PdfTableColumn[];
   rows: readonly ReportRow[];
   /** Rows the presentation's flag marks, with the words that say why. */
-  flag?: { label: string; rows: ReadonlySet<number> };
+  flag?: { column: string; label: string; rows: ReadonlySet<number> };
 }
 
 const ROW_HEIGHT = 15;
@@ -25,11 +24,27 @@ const PAD = 4;
 const SAMPLE_ROWS = 60;
 const MIN_COLUMN = 34;
 const MAX_COLUMN = 220;
-const NOTE: TextStyle = { size: 8, color: INK_MUTED };
-const FLAG_NOTE: TextStyle = { size: 7.5, bold: true, color: WARNING };
+const NOTE: TextStyle = { size: 8, color: 'muted' };
+/** Text this long already fills the widest column. */
+const WIDTH_PROBE_CHARS = 160;
 
 function bodyStyle(columns: number): TextStyle {
-  return { size: columns > 8 ? 7 : 8, color: INK };
+  return { size: columns > 8 ? 7 : 8, color: 'ink' };
+}
+
+/**
+ * A cell's words. On a flagged row the judged cell says WHY it is marked, in
+ * words and bold ("34% · acima da meta"), so the mark survives a black-and-white print.
+ */
+function cellOf(
+  ctx: PdfPaintContext,
+  data: PdfTableData,
+  rowIndex: number,
+  column: PdfTableColumn,
+): { text: string; bold: boolean } {
+  const text = cellText(data.rows[rowIndex]?.[column.key], column, ctx);
+  const marked = data.flag?.rows.has(rowIndex) === true && data.flag.column === column.key;
+  return marked && data.flag ? { text: `${text} \u00b7 ${data.flag.label}`, bold: true } : { text, bold: false };
 }
 
 /** Column widths that share `width` in proportion to what each column's text needs. */
@@ -39,8 +54,8 @@ function columnWidths(ctx: PdfPaintContext, data: PdfTableData, width: number): 
   const natural = data.columns.map((column) => {
     const cells = data.rows
       .slice(0, SAMPLE_ROWS)
-      .map((row) => ctx.canvas.width(cellText(row[column.key], column, ctx), body));
-    const widest = Math.max(ctx.canvas.width(column.label, head), ...cells);
+      .map((_, index) => ctx.canvas.width(cellOf(ctx, data, index, column).text.slice(0, WIDTH_PROBE_CHARS), head));
+    const widest = Math.max(ctx.canvas.width(column.label.slice(0, WIDTH_PROBE_CHARS), head), ...cells);
     return Math.min(MAX_COLUMN, Math.max(MIN_COLUMN, widest + PAD * 3));
   });
   const total = natural.reduce((sum, value) => sum + value, 0);
@@ -67,14 +82,14 @@ function drawCellText(
 function drawColumnHead(ctx: PdfPaintContext, data: PdfTableData, widths: number[], x: number, width: number): void {
   const { canvas } = ctx;
   const style: TextStyle = { ...bodyStyle(data.columns.length), bold: true };
-  canvas.rect(x, canvas.cursor, width, HEAD_HEIGHT, CARD);
+  canvas.rect(x, canvas.cursor, width, HEAD_HEIGHT, 'card');
   let left = x;
   data.columns.forEach((column, index) => {
     const box = { x: left, width: widths[index] ?? 0, top: canvas.cursor + (HEAD_HEIGHT - ROW_HEIGHT) / 2 };
     drawCellText(ctx, column.label, column, box, style);
     left += box.width;
   });
-  canvas.line({ x, top: canvas.cursor + HEAD_HEIGHT }, { x: x + width, top: canvas.cursor + HEAD_HEIGHT }, RULE);
+  canvas.line({ x, top: canvas.cursor + HEAD_HEIGHT }, { x: x + width, top: canvas.cursor + HEAD_HEIGHT }, 'rule');
   canvas.cursor += HEAD_HEIGHT;
 }
 
@@ -86,24 +101,15 @@ function drawRow(
   box: { x: number; width: number },
 ): void {
   const { canvas } = ctx;
-  const row = data.rows[index] ?? {};
-  const flagged = data.flag?.rows.has(index) === true;
-  if (flagged) canvas.rect(box.x, canvas.cursor, box.width, ROW_HEIGHT, FLAGGED);
-  else if (index % 2 === 1) canvas.rect(box.x, canvas.cursor, box.width, ROW_HEIGHT, ZEBRA);
+  if (index % 2 === 1) canvas.rect(box.x, canvas.cursor, box.width, ROW_HEIGHT, 'zebra');
   let left = box.x;
   data.columns.forEach((column, at) => {
     const cell = { x: left, width: widths[at] ?? 0, top: canvas.cursor };
-    drawCellText(ctx, cellText(row[column.key], column, ctx), column, cell, bodyStyle(data.columns.length));
+    const { text, bold } = cellOf(ctx, data, index, column);
+    drawCellText(ctx, text, column, cell, { ...bodyStyle(data.columns.length), bold });
     left += cell.width;
   });
   canvas.cursor += ROW_HEIGHT;
-}
-
-function drawFlagCaption(ctx: PdfPaintContext, flag: NonNullable<PdfTableData['flag']>, x: number): void {
-  const { canvas } = ctx;
-  canvas.rect(x, canvas.cursor + 1, 8, 8, FLAGGED);
-  canvas.text(flag.label, x + 12, canvas.cursor, FLAG_NOTE);
-  canvas.cursor += FLAG_NOTE.size * 1.5 + 2;
 }
 
 function drawNote(ctx: PdfPaintContext, text: string, x: number): void {
@@ -133,10 +139,9 @@ export function drawTable(ctx: PdfPaintContext, block: ReportPdfBlock, data: Pdf
   const { canvas } = ctx;
   const x = MARGIN_X;
   const header = headerFor(ctx, block, width);
-  canvas.ensure(header.height + HEAD_HEIGHT + ROW_HEIGHT * 2 + (data.flag ? 14 : 0));
+  canvas.ensure(header.height + HEAD_HEIGHT + ROW_HEIGHT * 2);
   drawHeader(ctx, header, x, canvas.cursor);
   canvas.cursor += header.height;
-  if (data.flag) drawFlagCaption(ctx, data.flag, x);
   const widths = columnWidths(ctx, data, width);
   const redraw = (): void => drawColumnHead(ctx, data, widths, x, width);
   redraw();
@@ -149,7 +154,7 @@ export function drawTable(ctx: PdfPaintContext, block: ReportPdfBlock, data: Pdf
   while (drawn < limit && placeRow(ctx, redraw, drawn + 1 < data.rows.length)) {
     drawRow(ctx, data, widths, drawn, { x, width });
     drawn += 1;
-    if (drawn % 25 === 0) canvas.tick();
+    canvas.tick();
   }
   if (drawn < data.rows.length) drawNote(ctx, ctx.copy.moreRows(data.rows.length - drawn, ctx.appName), x);
   canvas.cursor += 10;
