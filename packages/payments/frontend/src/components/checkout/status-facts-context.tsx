@@ -1,4 +1,4 @@
-import { createContext, useContext, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, type JSX, type ReactNode } from "react";
 
 import { ok, type Result } from "../../result";
 
@@ -22,7 +22,14 @@ import type { OrderStatus } from "./types";
  */
 export type StatusFactsReporter = (orderId: string, detail: CheckoutStatusDetail) => void;
 
-const StatusFactsReporterContext = createContext<StatusFactsReporter | null>(null);
+/** The reporter, and the last settled answer it was handed — read back by the card's poll path. */
+interface StatusFactsChannel {
+  report: StatusFactsReporter;
+  /** The last settled detail reported for `orderId`, or null when none was. */
+  known(orderId: string): CheckoutStatusDetail | null;
+}
+
+const StatusFactsReporterContext = createContext<StatusFactsChannel | null>(null);
 
 export function StatusFactsReporterProvider({
   report,
@@ -31,12 +38,35 @@ export function StatusFactsReporterProvider({
   report: StatusFactsReporter;
   children: ReactNode;
 }): JSX.Element {
-  return <StatusFactsReporterContext.Provider value={report}>{children}</StatusFactsReporterContext.Provider>;
+  // A ref, not state: the card's poll path reads it in the same effect that
+  // sees the poll's FAILED, which the facts reached first (`askStatus`).
+  const last = useRef<{ orderId: string; detail: CheckoutStatusDetail } | null>(null);
+  const channel = useMemo<StatusFactsChannel>(
+    () => ({
+      report: (orderId, detail) => {
+        last.current = { orderId, detail };
+        report(orderId, detail);
+      },
+      known: (orderId) => (last.current?.orderId === orderId ? last.current.detail : null),
+    }),
+    [report],
+  );
+  return <StatusFactsReporterContext.Provider value={channel}>{children}</StatusFactsReporterContext.Provider>;
 }
 
 /** The flow's reporter, or null outside a flow. */
 export function useStatusFactsReporter(): StatusFactsReporter | null {
-  return useContext(StatusFactsReporterContext);
+  return useContext(StatusFactsReporterContext)?.report ?? null;
+}
+
+/** What the flow's polls last reported for an order, or null (none reported, or outside a flow). */
+export function useKnownStatusFacts(): ((orderId: string) => CheckoutStatusDetail | null) | null {
+  return useContext(StatusFactsReporterContext)?.known ?? null;
+}
+
+/** Whether a settled answer states a money fact. */
+export function statesMoneyFact(detail: CheckoutStatusDetail | null): boolean {
+  return detail !== null && (detail.shortfall !== undefined || detail.stockGone !== undefined);
 }
 
 /**
@@ -59,23 +89,39 @@ export async function askStatus(
 }
 
 /**
- * A card the server answered FAILED (FUT-612, contract C2 and C7 by card): a
- * capture can come back short, and a refusal beside the card form would then
- * tell somebody whose money arrived that nothing was charged. So inside a flow
- * the card path asks `/status` ONCE — only on FAILED — and answers whether the
- * server stated a money fact. When it did, the fact is reported to the flow and
- * the caller resolves to the confirmation step; when it did not (a real
- * decline), or nothing listens, or the read fails, the caller refuses exactly
- * as before.
+ * How long the card's direct-FAILED path waits for its one `/status` read
+ * before refusing as it always did: a hung `/status` must never leave the card
+ * busy where today's screen refused at once.
+ */
+export const FAILURE_FACTS_TIMEOUT_MS = 4000;
+
+/**
+ * A card the server answered FAILED in the charge's OWN answer (FUT-612,
+ * contract C2 and C7 by card): a capture can come back short, and a refusal
+ * beside the card form would then tell somebody whose money arrived that
+ * nothing was charged. So inside a flow this asks `/status` ONCE, within
+ * {@link FAILURE_FACTS_TIMEOUT_MS}, and answers whether the server stated a
+ * money fact. When it did, the fact is reported and the caller resolves to the
+ * confirmation step; when it did not (a real decline), nothing listens, the
+ * read fails or it runs out of time, the caller refuses exactly as before.
+ *
+ * The card's POLL path never calls this: its own read already went through
+ * `getStatusDetail` and reported, so it reads {@link useKnownStatusFacts}.
  */
 export async function moneyFactOnFailure(
   client: Pick<CheckoutClient, "getStatusDetail">,
   orderId: string,
   report: StatusFactsReporter | null,
+  timeoutMs: number = FAILURE_FACTS_TIMEOUT_MS,
 ): Promise<boolean> {
   if (!report || !client.getStatusDetail) return false;
-  const answered = await client.getStatusDetail(orderId);
-  if (!answered.ok || (!answered.data.shortfall && !answered.data.stockGone)) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  const answered = await Promise.race([client.getStatusDetail(orderId), late]);
+  clearTimeout(timer);
+  if (!answered?.ok || !statesMoneyFact(answered.data)) return false;
   report(orderId, answered.data);
   return true;
 }

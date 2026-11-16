@@ -14,6 +14,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import type { PaymentShortfall } from "@12-apps/payments-backend";
 
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
+import { FAILURE_FACTS_TIMEOUT_MS } from "../status-facts-context";
 import type { CheckoutStatusDetail } from "../status-detail";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
 import { SAVED_VISA, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
@@ -44,11 +45,11 @@ async function payByPix(): Promise<void> {
 }
 
 /** Press the bar and let the pane's first poll answer. */
-async function pressBar(): Promise<void> {
+async function pressBar(extraMs = 0): Promise<void> {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   fireEvent.click(screen.getByTestId("list-pay"));
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS + 3000);
+    await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS + 3000 + extraMs);
   });
   vi.useRealTimers();
 }
@@ -190,5 +191,74 @@ describe("a card answered FAILED inside the flow (FUT-612, C2 and C7 by card)", 
     await screen.findByTestId("payment-receipt");
     expect(charge).toHaveBeenCalledTimes(1);
     expect(getStatusDetail).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The card's POLL path (FUT-4401's late decline): the charge is accepted, then
+ * the card's wait reads `/status` and finds it FAILED. `poll` is what that read
+ * answers — through `getStatusDetail` when given, else the bare `getStatus`.
+ */
+async function acceptedThenPolled(poll: CheckoutStatusDetail | "bare") {
+  const base = stubClient([SAVED_VISA]);
+  base.charge.mockResolvedValue({ ok: true, data: { status: "AWAITING_PAYMENT" } } as never);
+  base.getStatus.mockResolvedValue({ ok: true, data: "FAILED" } as never);
+  const getStatusDetail = vi.fn(async () => ({ ok: true as const, data: poll === "bare" ? { status: "FAILED" as const } : poll }));
+  const client = poll === "bare" ? base : { ...base, getStatusDetail };
+  renderList({ config: onPageStore(), client: client as never, flow: { payDifference: vi.fn(), requestShortRefund: vi.fn() } });
+  await waitFor(() => expect((screen.getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
+  await pressBar(5000);
+  return { getStatusDetail };
+}
+
+describe("a card accepted, then polled FAILED (FUT-612 round 3)", () => {
+  it("shows option C from the poll's own read, with ONE getStatusDetail call", async () => {
+    const { getStatusDetail } = await acceptedThenPolled({ status: "FAILED", shortfall: { ...SHORT, paidMethod: "CARD" } });
+
+    const open = await screen.findByTestId("payment-short-open");
+    expect(normalized(open)).toContain("Já pago (Cartão)");
+    expect(getStatusDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("with no fact, keeps today's late-decline refusal word for word", async () => {
+    await acceptedThenPolled("bare");
+    const today = (await screen.findByTestId("card-error")).textContent;
+    cleanup();
+
+    const { getStatusDetail } = await acceptedThenPolled({ status: "FAILED" });
+    const now = (await screen.findByTestId("card-error")).textContent;
+
+    expect(now).toBe(today);
+    expect(getStatusDetail).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the direct-FAILED read that never answers (FUT-612 round 3)", () => {
+  it("falls back to today's refusal once the read runs out of time", async () => {
+    await payBySavedCard("FAILED", null);
+    const today = (await screen.findByTestId("card-error")).textContent;
+    cleanup();
+
+    const base = stubClient([SAVED_VISA]);
+    base.charge.mockResolvedValue({ ok: true, data: { status: "FAILED" } } as never);
+    const getStatusDetail = vi.fn(() => new Promise<never>(() => undefined));
+    renderList({ config: onPageStore(), client: { ...base, getStatusDetail } as never, flow: { payDifference: vi.fn() } });
+    await waitFor(() => expect((screen.getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
+    // Fake timers stay on until the read's own deadline has passed: the
+    // deadline is a timer created on the fake clock, mid-charge.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS + 3000);
+    });
+    await waitFor(() => expect(getStatusDetail).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FAILURE_FACTS_TIMEOUT_MS + 500);
+    });
+    vi.useRealTimers();
+
+    const now = (await screen.findByTestId("card-error")).textContent;
+    expect(now).toBe(today);
+    expect(getStatusDetail).toHaveBeenCalledTimes(1);
   });
 });

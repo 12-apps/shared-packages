@@ -34,7 +34,7 @@ import {
 import { useCardPublicKey } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
-import { moneyFactOnFailure, useStatusFactsReporter } from "./status-facts-context";
+import { moneyFactOnFailure, statesMoneyFact, useKnownStatusFacts, useStatusFactsReporter } from "./status-facts-context";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, ChargeCardInput, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
 import { authenticateDebit, type DebitAuthentication } from "./debit-charge";
@@ -252,12 +252,12 @@ export function useCardSubmit(
 
   const { status, ...wait } = useCardWait(order.orderId, ending.state.submitted, pollIntervalMs);
   const failed = useCardFailure(client, order.orderId, refuse, onResolved);
-  const latestFailed = useRef(failed);
-  latestFailed.current = failed;
+  const latestFailed = useRef(failed.polled);
+  latestFailed.current = failed.polled;
   useEffect(() => {
     // A refusal that arrived after the charge was accepted: the poll carries no
     // classification, and the server closed the order (`cardRefusalOf()`).
-    if (status === "FAILED") void latestFailed.current(cardRefusalOf());
+    if (status === "FAILED") latestFailed.current(cardRefusalOf());
     else if (status && status !== "AWAITING_PAYMENT") onResolved(status);
   }, [status, onResolved]);
 
@@ -290,7 +290,7 @@ export function useCardSubmit(
     // A refusal stays beside the card, worded by the reason the server
     // classified (FUT-1145, FUT-4401); any other business outcome shows the
     // status screen; an accepted charge begins polling.
-    if (charged.data.status === "FAILED") await failed(cardRefusalOf(charged.data));
+    if (charged.data.status === "FAILED") await failed.direct(cardRefusalOf(charged.data));
     else if (charged.data.status !== "AWAITING_PAYMENT") reportResolved(charged.data, onResolved);
     else setSubmitted(true);
   };
@@ -302,16 +302,33 @@ export function useCardSubmit(
  * A card answered FAILED: the confirmation step when `/status` states a money
  * fact (a capture short of the total, or a full one with an item gone —
  * FUT-612), else the refusal beside the card, exactly as before (FUT-4401).
+ * At most ONE `/status` read per failure, whichever path reaches it:
+ *
+ *  - `direct`, the charge's own answer: no read happened yet, so it asks once
+ *    (`moneyFactOnFailure`, bounded by its timeout);
+ *  - `polled`, a late FAILED from the card's wait: the poll's own read already
+ *    went through `getStatusDetail` and reported its facts, so it reads those
+ *    back and asks nothing.
  */
 function useCardFailure(
   client: CheckoutClient,
   orderId: string,
   refuse: (refusal: ReturnType<typeof cardRefusalOf>) => void,
   onResolved: OnCheckoutResolved,
-): (refusal: ReturnType<typeof cardRefusalOf>) => Promise<void> {
+): {
+  direct: (refusal: ReturnType<typeof cardRefusalOf>) => Promise<void>;
+  polled: (refusal: ReturnType<typeof cardRefusalOf>) => void;
+} {
   const report = useStatusFactsReporter();
-  return async (refusal) => {
-    if (await moneyFactOnFailure(client, orderId, report)) onResolved("FAILED");
-    else refuse(refusal);
+  const known = useKnownStatusFacts();
+  return {
+    direct: async (refusal) => {
+      if (await moneyFactOnFailure(client, orderId, report)) onResolved("FAILED");
+      else refuse(refusal);
+    },
+    polled: (refusal) => {
+      if (known && statesMoneyFact(known(orderId))) onResolved("FAILED");
+      else refuse(refusal);
+    },
   };
 }
