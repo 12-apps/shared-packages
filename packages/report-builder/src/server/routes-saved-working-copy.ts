@@ -15,6 +15,7 @@ import {
   type ReportRoute,
 } from './context';
 import type { SavedReportRecord, SavedReportStore } from './saved';
+import { scheduleTimeZoneOf } from './schedule-zone';
 import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
@@ -128,7 +129,7 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
       const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
       try {
-        const input = parsePublishBody(body, record, messagesOf(config, locale), config);
+        const input = await parsePublishBody(body, record, messagesOf(config, locale), config, actor);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const saved = await store.publishWorkingCopy(actor.clientId, record.id, input);
         return saved ? ok(toSummary(saved, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
@@ -171,12 +172,13 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
  * Lifecycle fields fall back to the stored record, matching the omitted-keeps
  * rule the ordinary save follows.
  */
-function parsePublishBody(
+async function parsePublishBody(
   body: unknown,
   current: SavedReportRecord,
   messages: ReportServerMessages,
   config: ReportBuilderServerConfig,
-): {
+  actor: ReportActor,
+): Promise<{
   name: string;
   description: string | null;
   spec: unknown;
@@ -185,7 +187,7 @@ function parsePublishBody(
   visibilityRoles: string[];
   defaultRange: string | null;
   schedule: ReportSchedule | null | undefined;
-} {
+}> {
   const parsed = reportWorkingCopySchema.safeParse(body);
   if (!parsed.success) {
     throw invalidInputError(parsed.error, messages.invalidBody);
@@ -200,7 +202,7 @@ function parsePublishBody(
     visibility: input.visibility ?? current.visibility,
     visibilityRoles: input.visibilityRoles ?? visibilityRoleIds(current.visibilityRoles),
     defaultRange: input.defaultRange ?? current.defaultRange,
-    schedule: publishSchedule(input.schedule, current, messages, config),
+    schedule: await publishSchedule(input.schedule, current, messages, config, actor),
   };
 }
 
@@ -209,16 +211,18 @@ function parsePublishBody(
  * it meets the STRICT rule here (an enabled schedule needs a recipient) before
  * it can start sending anything.
  */
-function publishSchedule(
+async function publishSchedule(
   parked: ReportWorkingCopy['schedule'],
   current: SavedReportRecord,
   messages: ReportServerMessages,
   config: ReportBuilderServerConfig,
-): ReportSchedule | null | undefined {
+  actor: ReportActor,
+): Promise<ReportSchedule | null | undefined> {
   const strict = parked ? reportScheduleInput.safeParse(parked) : null;
   if (strict && !strict.success) throw invalidInputError(strict.error, messages.invalidBody);
+  const timeZone = parked ? await scheduleTimeZoneOf(config, actor) : config.timeZone;
   return resolveSchedule(strict?.data ?? parked, readSchedule(current.schedule), {
-    timeZone: config.timeZone,
+    timeZone,
     now: config.now ? config.now() : new Date(),
   });
 }

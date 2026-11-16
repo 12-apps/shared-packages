@@ -9,9 +9,11 @@ import {
   isDuplicateName,
   mayAuthor,
   ok,
+  type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
+import { scheduleTimeZoneOf } from './schedule-zone';
 import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './saved';
 import { invalidInputError } from './problems';
 import { toSummary } from './summary';
@@ -87,28 +89,32 @@ function defaultRangeFor(body: SaveBody, current: SavedReportRecord | null): str
 }
 
 /** The schedule after a write: omitted keeps, null removes, else stamped (FUT-776). */
-function scheduleFor(
+async function scheduleFor(
   body: SaveBody,
   current: SavedReportRecord | null,
   config: ReportBuilderServerConfig,
-): ReportSchedule | null | undefined {
+  actor: ReportActor,
+): Promise<ReportSchedule | null | undefined> {
+  // The host is asked for a zone only when a schedule is actually being written.
+  const timeZone = body.schedule ? await scheduleTimeZoneOf(config, actor) : config.timeZone;
   return resolveSchedule(body.schedule, readSchedule(current?.schedule), {
-    timeZone: config.timeZone,
+    timeZone,
     now: config.now ? config.now() : new Date(),
   });
 }
 
-function toInput(
+async function toInput(
   body: SaveBody,
   current: SavedReportRecord | null,
   config: ReportBuilderServerConfig,
-): SavedReportInput {
+  actor: ReportActor,
+): Promise<SavedReportInput> {
   return {
     name: body.name,
     description: body.description ?? null,
     spec: body.spec,
     ...lifecycleFor(body, current),
-    schedule: scheduleFor(body, current, config),
+    schedule: await scheduleFor(body, current, config, actor),
   };
 }
 
@@ -127,7 +133,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         // Authorship comes from the ACTOR, never from the body — a client
         // that could name its own `createdBy` could author as someone else,
         // and authorship is what `visibility: 'private'` is judged on.
-        const record = await store.create(actor.clientId, toInput(input, null, config), actor.userId);
+        const record = await store.create(actor.clientId, await toInput(input, null, config, actor), actor.userId);
         return ok(toSummary(record, actor.userId));
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);
@@ -155,7 +161,7 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         // author-permission holder learns nothing here they could not learn
         // from `GET /reports/custom/:id`.
         if (!current || !canViewSavedReport(current, actor)) return fail(404, messagesOf(config, locale).notFound);
-        const record = await store.update(actor.clientId, id, toInput(input, current, config));
+        const record = await store.update(actor.clientId, id, await toInput(input, current, config, actor));
         return record ? ok(toSummary(record, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);

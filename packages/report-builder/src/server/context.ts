@@ -139,14 +139,14 @@ export interface ReportBuilderServerConfig {
   /**
    * Tenant IANA zone for date buckets AND for the window's day boundaries.
    *
-   * REQUIRED. It used to be optional and fall through to the engine's
-   * `America/Sao_Paulo`, so a host that never mentioned a clock ran every
-   * report on a Brazilian trading day: "hoje" opened at 03:00 UTC and a
-   * midnight sale landed in yesterday's report. There is no neutral answer
-   * here — only the host knows what its tenants call a day — so it is asked
-   * for rather than guessed, and validated as an IANA name at assembly.
+   * REQUIRED. It used to be optional and fall through to the engine's `America/Sao_Paulo`, so a host
+   * that never mentioned a clock ran every report on a Brazilian trading day: "hoje" opened at 03:00
+   * UTC and a midnight sale landed in yesterday's report. There is no neutral answer here — only the
+   * host knows what its tenants call a day — so it is asked for rather than guessed, and validated
+   * as an IANA name at assembly.
    */
   timeZone: string;
+  resolveTimeZone?: (actor: ReportActor) => string | Promise<string>; // the zone a SCHEDULE is stamped in, per tenant
   /** The `week` preset's first day (FUT-4063): 1 Monday (default), 0 Sunday. The week GRAIN stays ISO. */
   weekStartsOn?: 0 | 1;
   /** A built-in's failed `derive` (FUT-4063): the block still draws; this hears why. Absent: console. */
