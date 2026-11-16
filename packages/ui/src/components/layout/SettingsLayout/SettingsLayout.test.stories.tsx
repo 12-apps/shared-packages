@@ -175,7 +175,7 @@ export const KeyboardNavigation: Story = {
   },
 };
 
-/** The four sections of a Loja rail, one per situation the host can resolve. */
+/** The five sections of a Loja rail, one per situation the host can resolve. */
 const MARKED: SettingsNavGroup[] = [
   {
     id: 'store',
@@ -184,6 +184,13 @@ const MARKED: SettingsNavGroup[] = [
       { id: 'profile', label: 'Perfil e marca', status: 'ok', statusLabel: 'Ligado' },
       { id: 'address', label: 'Endereço', status: 'off', statusLabel: 'Desligado' },
       { id: 'hours', label: 'Horários', status: 'new', statusLabel: 'Não visitado' },
+      {
+        id: 'contact',
+        label: 'Contato',
+        status: 'attention',
+        statusText: 'Pendente',
+        statusLabel: 'Pendente: falta o telefone',
+      },
       {
         id: 'domain',
         label: 'Domínio e app',
@@ -221,6 +228,29 @@ export const SituationMarkers: Story = {
         'data-status',
         'locked',
       );
+      await expect(canvas.getByTestId('settings-status-contact')).toHaveAttribute(
+        'data-status',
+        'attention',
+      );
+    });
+
+    await step('Only the attention row carries a visible word, the caller’s', async () => {
+      await expect(canvas.getByTestId('settings-status-text-contact')).toHaveTextContent('Pendente');
+      await expect(canvas.getByTestId('settings-status-text-contact')).toBeVisible();
+    });
+
+    await step('A section not opened yet is a hollow ring; one that is off stays a filled dot', async () => {
+      const markOf = (id: string): HTMLElement => {
+        const mark = canvas.getByTestId(`settings-status-${id}`).querySelector('[data-status-mark]');
+        if (!(mark instanceof HTMLElement)) throw new Error(`no status mark on ${id}`);
+        return mark;
+      };
+      const ring = getComputedStyle(markOf('hours'));
+      await expect(ring.borderTopStyle).toBe('solid');
+      await expect(ring.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+      const off = getComputedStyle(markOf('address'));
+      await expect(off.borderTopStyle).not.toBe('solid');
+      await expect(off.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
     });
 
     await step('Colour is never the only carrier: the meaning is in the row name', async () => {
