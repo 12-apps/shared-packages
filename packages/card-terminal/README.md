@@ -51,7 +51,10 @@ nothing will claim once the ledger's `unboundRefundAfterMs` has passed:
 The held read pages on, by `(captured_at, id)`, past the rows you do not name
 (a paid sale's leftover capture, a sale still inside the window), a few pages a
 tick, and keeps its place between ticks, so such rows never hide a newer
-abandoned capture. Two things it does not judge: a sale paid by another tender
+abandoned capture. Its place lives in memory, on the ledger you create: create
+the ledger once per process and run the job in a long-lived worker. A process
+started fresh for every tick starts from the oldest rows every time and never
+reaches past the first pages. Two things it does not judge: a sale paid by another tender
 between your answer and the flag is still flagged, and a sale you leave open
 (to be received later) past the window is flagged for good, so a receive after
 it charges again.
