@@ -14,7 +14,7 @@ import { SYSTEM_STARTUP_SETTINGS_URL, type Autostart } from "../autostart";
  *    startup settings instead; `onToggled` is not called, since nothing was
  *    chosen here.
  */
-export interface AutostartToggleOptions {
+interface AutostartToggleOptions {
   autostart: Autostart;
   /** Electron's `shell.openExternal`. */
   openExternal: (url: string) => Promise<void>;
