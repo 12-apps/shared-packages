@@ -48,7 +48,7 @@ export interface AppliedDeliveryReceipt {
   permanent: boolean;
 }
 
-export interface ReceiptDeps {
+interface ReceiptDeps {
   db: NotificationsDbProvider;
   logger: NotificationLogger;
   onDeliveryReceipt?: (receipt: AppliedDeliveryReceipt) => void;

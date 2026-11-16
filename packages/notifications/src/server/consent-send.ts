@@ -29,7 +29,7 @@ const DAY_MS = 24 * 60 * 60_000;
 
 type Contact = NonNullable<Awaited<ReturnType<ConsentDeps['contacts']['getContact']>>>;
 
-export function methodOf(deps: ConsentDeps, channel: PaidChannel): ConfirmMethod {
+function methodOf(deps: ConsentDeps, channel: PaidChannel): ConfirmMethod {
   const method = deps.config.methods[channel];
   if (!method) throw new Error(`@12-apps/notifications: consent.methods has no method for ${channel}.`);
   return method;
@@ -131,7 +131,7 @@ async function rowFor(
 }
 
 /** Build the host's message and hand it to the channel's transport. */
-export async function deliverConfirmation(
+async function deliverConfirmation(
   deps: ConsentDeps,
   contact: Contact,
   input: ConfirmationMessageInput & { userId: string },
@@ -156,7 +156,7 @@ export async function deliverConfirmation(
 }
 
 /** The message input for one send, without the keys an absent value must not carry. */
-export function messageInput(
+function messageInput(
   channel: PaidChannel,
   method: ConfirmMethod,
   contact: Contact,

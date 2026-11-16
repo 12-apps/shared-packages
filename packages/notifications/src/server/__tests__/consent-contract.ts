@@ -36,11 +36,7 @@ import type { MemoryDb } from './memory-db';
  */
 
 export type { PaidChannel } from '../consent-text';
-export type {
-  ConfirmationMessageInput,
-  ConsentStatus,
-  NotificationConsentConfig as ConsentConfig,
-} from '../consent-types';
+export type { ConfirmationMessageInput, ConsentStatus } from '../consent-types';
 export type { NotificationCapsConfig as CapsConfig } from '../caps';
 export type { AppliedDeliveryReceipt as AppliedReceipt } from '../receipts';
 

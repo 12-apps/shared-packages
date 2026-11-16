@@ -34,12 +34,12 @@ function channelOf(record: Record<string, unknown>, messages: NotificationWireMe
 }
 
 /** `{ channel }` — a paid channel, spelled exactly. */
-export function parseResendBody(body: unknown, messages: NotificationWireMessages): PaidChannel {
+function parseResendBody(body: unknown, messages: NotificationWireMessages): PaidChannel {
   return channelOf(bodyRecord(body, messages), messages);
 }
 
 /** `{ channel, code }` — the code is exactly six digits. */
-export function parseCodeBody(
+function parseCodeBody(
   body: unknown,
   messages: NotificationWireMessages,
 ): { channel: PaidChannel; code: string } {
