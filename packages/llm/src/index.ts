@@ -47,6 +47,7 @@ export { ResolvedCredential, createCredentialSession } from "./credentials";
 export type { LlmErrorKind } from "./errors";
 export {
   AuthError,
+  CredentialRevokedError,
   InvalidRequestError,
   InvalidResponseError,
   LlmError,

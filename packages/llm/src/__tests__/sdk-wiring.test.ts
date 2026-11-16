@@ -7,17 +7,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAdapterRegistry } from "../adapter";
-import { anthropicAdapter } from "../adapters/anthropic";
-import { geminiAdapter } from "../adapters/gemini";
-import { openaiAdapter } from "../adapters/openai";
+import { ANTHROPIC_BASE_URL, ANTHROPIC_ROUTES, anthropicAdapter } from "../adapters/anthropic";
+import { GEMINI_BASE_URL, GEMINI_ROUTES, geminiAdapter } from "../adapters/gemini";
+import { OPENAI_BASE_URL, OPENAI_ROUTES, openaiAdapter } from "../adapters/openai";
 import { sealedFetch } from "../adapters/sealed-fetch";
-import { xaiAdapter } from "../adapters/xai";
+import { XAI_BASE_URL, xaiAdapter } from "../adapters/xai";
 import { createModelClient } from "../client";
 import { AuthError, InvalidRequestError } from "../errors";
 import anthropicEnd from "./fixtures/anthropic/end-turn-cached.response.json";
 import geminiCall from "./fixtures/gemini/function-call.response.json";
 import openaiCalls from "./fixtures/openai/tool-calls.response.json";
 import { sampleRequest } from "./helpers";
+
+const OPENAI_TEST_ROUTES = [{ method: "POST", path: "/chat/completions" }] as const;
 
 interface Seen {
   url: string;
@@ -260,7 +262,7 @@ describe("a store's own key reaches its provider alone (B3)", () => {
 
   it("the sealed fetch refuses a request outside the adapter's base URL", async () => {
     const { fetch, seen } = recordingFetch({});
-    const sealed = sealedFetch({ provider: "openai", baseURL: "https://api.openai.com/v1", auth: { authorization: "Bearer k" }, fetch });
+    const sealed = sealedFetch({ provider: "openai", baseURL: "https://api.openai.com/v1", routes: OPENAI_TEST_ROUTES, auth: { authorization: "Bearer k" }, fetch });
     await expect(sealed("https://platform-proxy.example/v1/chat/completions", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(
       InvalidRequestError,
     );
@@ -303,5 +305,55 @@ describe("custom-header variables (R1, R2)", () => {
     });
     await client.chat(sampleRequest());
     expect(only(seen).headers.get("anthropic-beta")).toBe("oauth-2025-04-20");
+  });
+});
+
+describe("redirects and the path allow-list (round 4)", () => {
+  const routes = OPENAI_TEST_ROUTES;
+
+  it("never follows a redirect: the other origin is not requested and no key leaves for it", async () => {
+    const requested: Array<{ url: string; headers: Headers }> = [];
+    // A double that behaves like fetch with redirect "follow": it chases a 302 and keeps x-api-key.
+    const doubleFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = String(input instanceof Request ? input.url : input);
+      requested.push({ url, headers: new Headers(init?.headers) });
+      if (url.startsWith("https://api.openai.com/")) {
+        const location = { location: "https://evil.example/steal" };
+        if (init?.redirect === "manual") return new Response(null, { status: 302, headers: location });
+        return doubleFetch("https://evil.example/steal", init);
+      }
+      return new Response("{}", { status: 200 });
+    };
+    const sealed = sealedFetch({ provider: "openai", baseURL: "https://api.openai.com/v1", routes, auth: { "x-api-key": "sk-secret" }, fetch: doubleFetch as typeof globalThis.fetch });
+    await expect(sealed("https://api.openai.com/v1/chat/completions", { method: "POST", body: "{}" })).rejects.toMatchObject({
+      name: "InvalidRequestError",
+      status: 302,
+    });
+    expect(requested.map((entry) => new URL(entry.url).origin)).toEqual(["https://api.openai.com"]);
+    expect(requested.some((entry) => entry.url.includes("evil.example"))).toBe(false);
+  });
+
+  it("refuses another path or method under the base URL", async () => {
+    const { fetch, seen } = recordingFetch({});
+    const sealed = sealedFetch({ provider: "openai", baseURL: "https://api.openai.com/v1", routes, auth: { authorization: "Bearer k" }, fetch });
+    await expect(sealed("https://api.openai.com/v1/files", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(sealed("https://api.openai.com/v1/chat/completions", { method: "GET" })).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(sealed("https://api.openai.com/v1/chat/completions", { method: "DELETE" })).rejects.toBeInstanceOf(InvalidRequestError);
+    expect(seen).toHaveLength(0);
+  });
+
+  it("each adapter's allow-list refuses /files under its own base, and the real SDK call still passes", async () => {
+    const cases = [
+      { provider: "anthropic", base: ANTHROPIC_BASE_URL, routes: ANTHROPIC_ROUTES, other: "https://api.anthropic.com/v1/files" },
+      { provider: "gemini", base: GEMINI_BASE_URL, routes: GEMINI_ROUTES, other: "https://generativelanguage.googleapis.com/v1beta/files" },
+      { provider: "openai", base: OPENAI_BASE_URL, routes: OPENAI_ROUTES, other: "https://api.openai.com/v1/files" },
+      { provider: "xai", base: XAI_BASE_URL, routes: OPENAI_ROUTES, other: "https://api.x.ai/v1/files" },
+    ];
+    for (const { provider, base, routes: own, other } of cases) {
+      const { fetch, seen } = recordingFetch({});
+      const sealed = sealedFetch({ provider, baseURL: base, routes: own, auth: { authorization: "Bearer k" }, fetch });
+      await expect(sealed(other, { method: "POST", body: "{}" })).rejects.toBeInstanceOf(InvalidRequestError);
+      expect(seen).toHaveLength(0);
+    }
   });
 });

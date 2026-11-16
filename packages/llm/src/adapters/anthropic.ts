@@ -21,7 +21,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidRequestError, InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Message, StopReason, SystemBlock, ToolCall, Usage } from "../types";
 import { loadSdk } from "./load";
-import { sealedFetch } from "./sealed-fetch";
+import { sealedFetch, type SealRoute } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 export const ANTHROPIC_PROVIDER = "anthropic";
@@ -52,6 +52,9 @@ export interface AnthropicAdapterOptions {
 /** Where Anthropic's API lives; never read from the environment (B3). */
 export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 
+/** The one endpoint the adapter calls. */
+export const ANTHROPIC_ROUTES: readonly SealRoute[] = [{ method: "POST", path: "/v1/messages" }];
+
 /**
  * Both credential options are passed, the unused one as `null`: an option left
  * unset is read from `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, and a
@@ -65,7 +68,7 @@ async function defaultClient(credential: ResolvedCredential, options: AnthropicA
   const baseURL = options.baseURL ?? ANTHROPIC_BASE_URL;
   const apiKey = credential.kind === "apiKey";
   const auth: Record<string, string> = apiKey ? { "x-api-key": credential.secret } : { authorization: `Bearer ${credential.secret}` };
-  const common = { baseURL, fetch: sealedFetch({ provider: ANTHROPIC_PROVIDER, baseURL, auth, fetch: options.fetch }), maxRetries: 0 };
+  const common = { baseURL, fetch: sealedFetch({ provider: ANTHROPIC_PROVIDER, baseURL, routes: ANTHROPIC_ROUTES, auth, fetch: options.fetch }), maxRetries: 0 };
   return apiKey
     ? new Client({ ...common, apiKey: credential.secret, authToken: null })
     : new Client({ ...common, apiKey: null, authToken: credential.secret, defaultHeaders: { "anthropic-beta": OAUTH_BETA } });

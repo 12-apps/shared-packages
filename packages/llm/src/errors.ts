@@ -39,6 +39,14 @@ export class AuthError extends LlmError {
   }
 }
 
+/** The host revoked the credential (the account was disconnected): nothing is sent or refreshed with it. */
+export class CredentialRevokedError extends AuthError {
+  constructor(provider = "credential") {
+    super(provider, "The credential was revoked by the host.");
+    this.name = "CredentialRevokedError";
+  }
+}
+
 /** Too many requests. `retryAfterMs` is the provider's own hint, when given. */
 export class RateLimitError extends LlmError {
   readonly retryAfterMs: number | undefined;

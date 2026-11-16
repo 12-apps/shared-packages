@@ -19,6 +19,8 @@
  * (`ProviderAdapter.credentialKinds`), checked when the client is created.
  */
 
+import { CredentialRevokedError } from "./errors";
+
 export type CredentialKind = "apiKey" | "oauth";
 
 type MaybePromise<T> = T | Promise<T>;
@@ -48,6 +50,13 @@ export interface OAuthCredentials {
   refresh: (reason: RefreshReason) => MaybePromise<OAuthToken>;
   /** How close to expiry a token is refreshed first. Default 60 s. */
   refreshSkewMs?: number;
+  /**
+   * The host's "this account was disconnected" check, called before a token is
+   * handed out and again after a refresh lands. Once it returns true,
+   * `current()` and `afterUnauthorized()` throw `CredentialRevokedError`, and a
+   * refresh that was in flight is discarded: never returned, never cached.
+   */
+  isRevoked?: () => MaybePromise<boolean>;
 }
 
 export type Credentials = ApiKeyCredentials | OAuthCredentials;
@@ -128,6 +137,14 @@ export function createCredentialSession(
   let generation = 0;
   let latest: ResolvedCredential | null = null;
   let inFlight: Promise<ResolvedCredential> | null = null;
+  let revoked = false;
+  const assertLive = async (): Promise<void> => {
+    if (revoked || (await oauth.isRevoked?.())) {
+      revoked = true;
+      latest = null;
+      throw new CredentialRevokedError();
+    }
+  };
   const stamped = (secret: string, of: number): ResolvedCredential => {
     const credential = new ResolvedCredential("oauth", secret);
     generations.set(credential, of);
@@ -136,7 +153,9 @@ export function createCredentialSession(
   // One refresh at a time: every caller that needs one while it runs awaits the same promise.
   const refresh = (reason: RefreshReason): Promise<ResolvedCredential> => {
     inFlight ??= (async () => {
+      await assertLive();
       const secret = nonEmpty((await oauth.refresh(reason)).accessToken, "OAuth refresh");
+      await assertLive(); // disconnected while the refresh ran: its result is discarded
       generation += 1;
       latest = stamped(secret, generation);
       return latest;
@@ -148,6 +167,7 @@ export function createCredentialSession(
   return {
     kind: "oauth",
     async current() {
+      await assertLive();
       if (inFlight) return inFlight;
       const of = generation; // before the await: a refresh that lands meanwhile makes this token older
       const token = await oauth.token();
@@ -155,10 +175,11 @@ export function createCredentialSession(
       if (expiring) return refresh("expiring");
       return stamped(nonEmpty(token.accessToken, "OAuth token provider"), of);
     },
-    afterUnauthorized(used) {
+    async afterUnauthorized(used) {
+      await assertLive();
       if (inFlight) return inFlight;
       // A refresh finished after this call's token was read: that token is the answer, not another rotation.
-      if (latest && (generations.get(used) ?? 0) < generation) return Promise.resolve(latest);
+      if (latest && (generations.get(used) ?? 0) < generation) return latest;
       return refresh("unauthorized");
     },
   };

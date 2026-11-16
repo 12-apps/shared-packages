@@ -180,6 +180,7 @@ loop. Any other adapter rebuilds the turn from `text` and `toolCalls`.
     return next;
   },
   refreshSkewMs: 60_000,                    // refresh this close to expiry (default 60 s)
+  isRevoked: () => accounts.isDisconnected(id), // optional: the host's "account disconnected" check
 }
 ```
 
@@ -194,6 +195,11 @@ loop. Any other adapter rebuilds the turn from `text` and `toolCalls`.
   the refresh token on use, and two refreshes racing can revoke the login. A
   401 on a token older than the last refresh takes that refresh's token
   instead of rotating again.
+- **Revoking an OAuth credential**: pass `isRevoked` and return true once the
+  account is disconnected. From then on `current()` and `afterUnauthorized()`
+  throw `CredentialRevokedError` (an `AuthError`, no status), and a refresh
+  that was in flight when the host revoked is discarded: its waiters get the
+  same error and its token is neither returned nor cached.
 - **Which strategies a provider accepts is the adapter's declaration**:
   Anthropic `apiKey`, `oauth`; OpenAI `apiKey`; Gemini `apiKey`, `oauth`;
   xAI `apiKey`. The
@@ -209,8 +215,13 @@ loop. Any other adapter rebuilds the turn from `text` and `toolCalls`.
   explicitly: the base URL, a `null` organisation and project, a `null` second
   credential, and `vertexai: false`. And every request goes through a sealed
   `fetch`, the shape of a credential gateway. It refuses any URL outside the
-  adapter's base URL, drops every auth and account header the SDK set, and
-  sets only the call's own credential. A `baseURL` the host passes is honoured.
+  adapter's base URL, **and any path or method the adapter does not use**
+  (Anthropic `POST /v1/messages`, OpenAI and xAI `POST /chat/completions`,
+  Gemini `POST /v1[beta]/models/<model>:generateContent`; `InvalidRequestError`
+  otherwise), drops every auth and account header the SDK set, and sets only
+  the call's own credential. It never follows a redirect: a 3xx from the
+  provider is thrown as an `InvalidRequestError` carrying its status, so a key
+  header cannot ride to another origin. A `baseURL` the host passes is honoured.
 - Gemini's SDK prefers `GOOGLE_API_KEY` or `GEMINI_API_KEY` over an OAuth
   token, so the Gemini adapter refuses an OAuth call while either is set.
 - **The tool loop's transcript is always a valid next request.** A turn the
