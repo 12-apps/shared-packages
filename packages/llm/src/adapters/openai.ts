@@ -24,7 +24,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Message, StopReason, ToolCall, Usage } from "../types";
 import { loadSdk } from "./load";
-import { sealedFetch } from "./sealed-fetch";
+import { sealedFetch, type SealRoute } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 type ChatParams = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
@@ -37,6 +37,9 @@ export const OPENAI_PROVIDER = "openai";
 
 /** Where OpenAI's API lives; never read from the environment (B3). */
 export const OPENAI_BASE_URL = "https://api.openai.com/v1";
+
+/** The one endpoint the adapter calls (relative to the base URL), for OpenAI and xAI alike. */
+export const OPENAI_ROUTES: readonly SealRoute[] = [{ method: "POST", path: "/chat/completions" }];
 
 /**
  * The slice of the SDK client this adapter calls. `params` is the SDK's
@@ -84,7 +87,7 @@ async function defaultClient(credential: ResolvedCredential, options: OpenAIComp
     project: null,
     adminAPIKey: null,
     baseURL,
-    fetch: sealedFetch({ provider: options.id, baseURL, auth: { authorization: `Bearer ${credential.secret}` }, fetch: options.fetch }),
+    fetch: sealedFetch({ provider: options.id, baseURL, routes: OPENAI_ROUTES, auth: { authorization: `Bearer ${credential.secret}` }, fetch: options.fetch }),
     maxRetries: 0,
   });
 }

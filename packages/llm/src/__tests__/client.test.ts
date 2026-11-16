@@ -4,7 +4,7 @@ import { createAdapterRegistry } from "../adapter";
 import { builtInAdapters } from "../adapters";
 import { createModelClient, retryTransient } from "../client";
 import { ResolvedCredential, createCredentialSession } from "../credentials";
-import { AuthError, InvalidRequestError, ProviderUnavailableError, RateLimitError, UnsupportedError } from "../errors";
+import { AuthError, CredentialRevokedError, InvalidRequestError, ProviderUnavailableError, RateLimitError, UnsupportedError } from "../errors";
 import { scriptedAdapter } from "./fake-adapter";
 import { sampleRequest, searchMenu } from "./helpers";
 
@@ -246,5 +246,46 @@ describe("the retry policy hook", () => {
     const policy = retryTransient({ maxAttempts: 5 });
     expect(policy(new InvalidRequestError("fake", "bad", 400), 1)).toBeNull();
     expect(policy(new ProviderUnavailableError("fake", "down"), 5)).toBeNull();
+  });
+});
+
+describe("revoking an OAuth credential (round 4)", () => {
+  it("revoke during an in-flight refresh: waiters get the typed error, nothing is cached", async () => {
+    let revoked = false;
+    const release: { open: () => void } = { open: () => undefined };
+    const gate = new Promise<void>((resolve) => {
+      release.open = resolve;
+    });
+    const refresh = vi.fn(async () => {
+      await gate;
+      return { accessToken: "fresh-after-disconnect" };
+    });
+    const session = createCredentialSession({
+      kind: "oauth",
+      token: () => ({ accessToken: "old" }),
+      refresh,
+      isRevoked: () => revoked,
+    });
+    const used = await session.current();
+    const waiting = [session.afterUnauthorized(used), session.afterUnauthorized(used)].map((p) => p.catch((error: unknown) => error));
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1)); // the refresh is in flight
+    revoked = true;
+    release.open();
+    for (const outcome of await Promise.all(waiting)) expect(outcome).toBeInstanceOf(CredentialRevokedError);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await expect(session.current()).rejects.toBeInstanceOf(CredentialRevokedError);
+    // `latest` was never set: a later 401 adopts nothing and refreshes nothing.
+    await expect(session.afterUnauthorized(used)).rejects.toBeInstanceOf(CredentialRevokedError);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("current() after revoke throws, and the token is not read", async () => {
+    let revoked = false;
+    const token = vi.fn(() => ({ accessToken: "t" }));
+    const session = createCredentialSession({ kind: "oauth", token, refresh: () => ({ accessToken: "r" }), isRevoked: () => revoked });
+    expect((await session.current()).secret).toBe("t");
+    revoked = true;
+    await expect(session.current()).rejects.toBeInstanceOf(CredentialRevokedError);
+    expect(token).toHaveBeenCalledTimes(1);
   });
 });

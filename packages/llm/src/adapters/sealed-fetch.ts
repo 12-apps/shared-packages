@@ -55,10 +55,19 @@ function dropPlatformHeaders(headers: Headers): void {
   }
 }
 
+/** One request an adapter makes: its method and its path under the base URL (exact string or pattern). */
+export interface SealRoute {
+  method: "GET" | "POST";
+  /** Relative to the base URL's path, e.g. `/v1/messages`. */
+  path: string | RegExp;
+}
+
 export interface SealOptions {
   provider: string;
   /** The only origin and path prefix a request may go to. */
   baseURL: string;
+  /** The only requests the adapter makes; any other path or method under the base URL is refused. */
+  routes: readonly SealRoute[];
   /** The call's own credential headers, set last. */
   auth: Readonly<Record<string, string>>;
   /** The host's `fetch` (a proxy, a test double); the global one otherwise. */
@@ -70,6 +79,16 @@ function within(url: URL, base: URL): boolean {
   return url.origin === base.origin && (url.pathname === base.pathname || url.pathname.startsWith(prefix));
 }
 
+/** The URL's path relative to the base URL's path (`within` already holds). */
+function relativePath(url: URL, base: URL): string {
+  const root = base.pathname.replace(/\/$/, "");
+  return url.pathname.slice(root.length) || "/";
+}
+
+function allowed(routes: readonly SealRoute[], method: string, path: string): boolean {
+  return routes.some((route) => route.method === method && (typeof route.path === "string" ? route.path === path : route.path.test(path)));
+}
+
 export function sealedFetch(options: SealOptions): typeof globalThis.fetch {
   const base = new URL(options.baseURL);
   const send = options.fetch ?? globalThis.fetch;
@@ -78,12 +97,20 @@ export function sealedFetch(options: SealOptions): typeof globalThis.fetch {
     if (!within(new URL(outgoing.url), base)) {
       throw new InvalidRequestError(options.provider, `Refused a request outside the adapter's base URL (${base.origin}${base.pathname}).`);
     }
+    if (!allowed(options.routes, outgoing.method, relativePath(new URL(outgoing.url), base))) {
+      throw new InvalidRequestError(options.provider, `Refused a ${outgoing.method} request to a path the adapter does not use.`);
+    }
     const headers = new Headers(outgoing.headers);
     for (const name of ACCOUNT_HEADERS) headers.delete(name);
     dropPlatformHeaders(headers);
     for (const [name, value] of Object.entries(options.auth)) headers.set(name, value);
     const body = outgoing.method === "GET" || outgoing.method === "HEAD" ? undefined : await outgoing.arrayBuffer();
-    return send(outgoing.url, { method: outgoing.method, headers, body, signal: outgoing.signal, redirect: outgoing.redirect });
+    // Never followed: a redirect would carry the call's credential headers to another origin.
+    const response = await send(outgoing.url, { method: outgoing.method, headers, body, signal: outgoing.signal, redirect: "manual" });
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      throw new InvalidRequestError(options.provider, "The provider answered with a redirect, which is never followed.", response.status);
+    }
+    return response;
   };
   return sealed as typeof globalThis.fetch;
 }

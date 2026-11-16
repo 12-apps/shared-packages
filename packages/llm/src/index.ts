@@ -49,6 +49,7 @@ export { ResolvedCredential, createCredentialSession } from "./credentials";
 export type { LlmErrorKind, SupportLadderErrorCode } from "./errors";
 export {
   AuthError,
+  CredentialRevokedError,
   InvalidRequestError,
   InvalidResponseError,
   LlmError,

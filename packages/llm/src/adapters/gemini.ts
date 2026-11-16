@@ -25,7 +25,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidRequestError, InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Effort, Message, StopReason, ToolCall, ToolChoice, Usage } from "../types";
 import { loadSdk } from "./load";
-import { sealedFetch } from "./sealed-fetch";
+import { sealedFetch, type SealRoute } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 export const GEMINI_PROVIDER = "gemini";
@@ -58,6 +58,9 @@ function bearerAuthClient(token: string) {
 /** Where the Gemini API lives; never read from the environment (B3). */
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/";
 
+/** The one endpoint the adapter calls: `models.generateContent`. */
+export const GEMINI_ROUTES: readonly SealRoute[] = [{ method: "POST", path: /^\/v1(?:beta)?\/models\/[^/:]+:generateContent$/ }];
+
 /**
  * `vertexai: false` and the base URL are explicit: unset, the SDK reads
  * `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT` and
@@ -69,7 +72,7 @@ async function defaultClient(credential: ResolvedCredential, options: GeminiAdap
   const baseUrl = options.baseURL ?? GEMINI_BASE_URL;
   const auth: Record<string, string> =
     credential.kind === "apiKey" ? { "x-goog-api-key": credential.secret } : { authorization: `Bearer ${credential.secret}` };
-  const httpOptions = { baseUrl, fetch: sealedFetch({ provider: GEMINI_PROVIDER, baseURL: baseUrl, auth, fetch: options.fetch }) };
+  const httpOptions = { baseUrl, fetch: sealedFetch({ provider: GEMINI_PROVIDER, baseURL: baseUrl, routes: GEMINI_ROUTES, auth, fetch: options.fetch }) };
   if (credential.kind === "apiKey") return new sdk.GoogleGenAI({ vertexai: false, apiKey: credential.secret, httpOptions });
   const client = new sdk.GoogleGenAI({
     vertexai: false,
