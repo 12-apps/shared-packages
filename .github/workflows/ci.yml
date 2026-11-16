@@ -1373,6 +1373,42 @@ jobs:
       - name: Build the image
         run: docker build --tag fiscal-sidecar:ci .
 
+  # A reminder, never a gate (FUT-5105). A package this PR adds to
+  # release-packages.txt publishes once on the NPM_TOKEN bootstrap, and its NEXT
+  # release is refused by OIDC until a Trusted Publisher is registered on
+  # npmjs.com; the release run's summary says so only after the merge. This says
+  # it on the PR: a `::warning::` per package, a step-summary section with the
+  # steps, and ONE sticky comment (edited in place, removed when the PR no longer
+  # adds a package).
+  #
+  # Deliberately NOT in `ci-success`'s needs, and `continue-on-error` besides:
+  # nothing here may turn a PR red. A fork's token cannot write the comment, so
+  # the script swallows that refusal and the annotation and summary remain.
+  trusted-publisher-reminder:
+    name: Trusted Publisher Reminder
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 5
+    # `pull-requests: write` is the comment, nothing else.
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Fetch the base's package list
+        run: git fetch --no-tags --depth=1 origin "$BASE_REF"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - name: Remind about new packages
+        run: node scripts/trusted-publisher-reminder.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
   # What this PR's CI has cost, as one comment that is edited in place on every
   # push rather than a new comment per run.
   #
@@ -1439,6 +1475,12 @@ jobs:
           node-version: 24
       - name: Wiring conformance (selftest + gate)
         run: pnpm quality:wiring
+      # The Trusted Publisher reminder's selftest (FUT-5105) runs HERE for the
+      # same reason: plain node, no install, and on every PR. The reminder job
+      # itself never fails a PR, so its logic would otherwise land as a file
+      # nothing runs.
+      - name: Trusted Publisher reminder selftest
+        run: pnpm quality:trusted-publisher
       - name: Verify all required jobs passed
         shell: bash
         run: |
