@@ -57,7 +57,9 @@ import type { BillingPlatformDeps, CycleStore, CycleStoreFactory, InstrumentLook
  * the breakdown passes `checkBreakdown` AND states the very amount and
  * currency the row will charge. Otherwise `BillingBreakdownError` is THROWN
  * and nothing reaches the provider: a row whose lines and amount disagree is
- * a deployment bug, and a skip would hide it. A null breakdown (every cycle
+ * a deployment bug, and a skip would hide it. The check runs only for a row that would actually be
+ * charged (no provider charge yet): a row the collector skips as already
+ * charged keeps being skipped, never thrown on. A null breakdown (every cycle
  * before FUT-5094) charges exactly as before. The amount charged is always
  * the row's, unchanged.
  *
@@ -128,6 +130,8 @@ function guarded(store: CycleStore, breakdowns: CycleBreakdownLookup | undefined
     async read(cycleId) {
       const row = await store.read(cycleId);
       if (typeof row === "string") return row;
+      // A row the collector skips as already charged stays a skip.
+      if (row.providerChargeId !== null) return row;
       const breakdown = await breakdowns(cycleId);
       if (breakdown) assertBreakdownCharges(cycleId, breakdown, row.cycle.amount);
       return row;

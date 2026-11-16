@@ -93,6 +93,9 @@ function assertMeter(meter: MeteredAllowance): void {
 }
 
 function assertBase(base: ComposeBase | null, usagePeriod: UsagePeriod, currency: string): void {
+  if (usagePeriod.start.getTime() >= usagePeriod.end.getTime()) {
+    throw new BillingUsageError("the usage period must start before it ends");
+  }
   if (!base) return;
   if (base.currency !== currency) {
     throw new BillingUsageError(`the base is in ${base.currency}, the policy in ${currency}`);

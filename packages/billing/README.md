@@ -72,7 +72,9 @@ const result = pricing.compose({
 // { ready: false, waitingFor: ["units"] } while a billed count is not final
 // { ready: true, charge: null } when there is nothing to bill — never a zero charge
 
-checkBreakdown(charge); // before persisting, and on every read back
+if (result.ready && result.charge) {
+  checkBreakdown(result.charge); // before persisting, and on every read back
+}
 ```
 
 The rules it holds:
@@ -84,6 +86,7 @@ The rules it holds:
   unknown, repeated or mis-dated reading, a count that is not a whole number,
   a base in another currency, an amount past safe integers:
   `BillingUsageError`. A missing count is never zero.
+- **A usage period must start before it ends**, or `BillingUsageError`.
 - **At most once.** One overage line per (meter, period), never one listed in
   `alreadyBilled`, and the same input always composes the same charge.
 - **`checkBreakdown`** refuses (`BillingBreakdownError`) a charge whose
@@ -118,7 +121,9 @@ its policy and passes no reading for it.
 — the breakdown the host persisted for a cycle, or `null` for a cycle that
 has none (every cycle before usage pricing, charged exactly as before). With
 it, a cycle is charged only when its breakdown passes `checkBreakdown` and
-states the very amount and currency the cycle row will charge; otherwise
+states the very amount and currency the cycle row will charge (a row that
+already carries a provider charge is skipped by the collector and never
+checked); otherwise
 `BillingBreakdownError` is thrown and nothing reaches the provider. The amount
 charged is always the row's, unchanged. `./server` re-exports
 `BillingBreakdownError` for the host's catch.
@@ -253,6 +258,10 @@ before any host sees it.
 
 Everything below is a required argument, with no default to fall back to
 silently:
+
+- **what `charge: null` means.** `{ ready: true, charge: null }` is "nothing
+  to bill for this composition" (for example a base of 0 with no overage). It
+  is never "cancel the cycle": the host must not read it as an instruction.
 
 - **the two lifecycle windows** — how long before a late payer is penalised,
   and how long before they are suspended. One platform chases for a week and
