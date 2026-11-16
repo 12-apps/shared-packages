@@ -35,6 +35,7 @@ export function renderEmailText(document: EmailDocument): string {
     "--",
     document.chrome.tagline(document.brand),
     document.chrome.automated,
+    ...textUnsubscribe(document),
   ];
   return `${blocks.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
 }
@@ -60,3 +61,8 @@ function textNotes(document: EmailDocument): string[] {
   return notes.length === 0 ? [] : [...notes, ""];
 }
 
+
+/** The opt-out as label + URL, last, where a footer's small print sits. */
+function textUnsubscribe(document: EmailDocument): string[] {
+  return document.unsubscribe ? [`${document.unsubscribe.label}: ${document.unsubscribe.href}`] : [];
+}

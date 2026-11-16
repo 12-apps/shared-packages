@@ -149,6 +149,14 @@ rather than divs (Outlook lays HTML out with Word), inline styles only (Gmail
 strips `<style>`), no web fonts or `color-mix()` or CSS variables, a hidden
 preheader, a `bgcolor` attribute **and** a background style on the CTA.
 
+**An opt-out link** goes in `document.unsubscribe` (`{ label, href }`): a small
+link at the end of the footer, and the last line of the text twin as `label:
+href`. The host words the label and signs the URL (per recipient, so it can name
+nobody else); the layout only prints it, and refuses an unsafe scheme like every
+other link. A mail client's own "unsubscribe" button reads `List-Unsubscribe` /
+`List-Unsubscribe-Post` headers, which belong to the host's driver, not to this
+document. Absent, both halves are byte-for-byte what they were.
+
 **The EMAIL transport opts in.** Declare `layout` on the driver declaration and
 `formatEmail` renders the shared document; omit it and you keep the previous
 rendering byte for byte. Opt-in rather than automatic because `brand` and

@@ -47,7 +47,52 @@ What the package does **not** do, and the host must:
   picker only unticks people the host refuses the next time the list is edited.
 - **Not forward `schedule` blindly from MCP.** `saveReportBody` is also the MCP author's body, so it now accepts
   `schedule` (any recipient id, any plan). Apply the same plan and recipient checks to that tool.
-- Send, render a PDF, and stop the schedule when a report is archived or deleted.
+- Send, and stop the schedule when a report is archived or deleted. The PDF itself is drawn by `/pdf` (below).
+
+### The store's own zone, per tenant (minor)
+
+`timeZone` stays required and stays the answer. A host that wants each tenant's schedule stamped on that tenant's
+clock adds `resolveTimeZone: (actor) => string | Promise<string>` to the server config (it receives the saving
+`ReportActor`, whose `clientId` is the tenant). It is asked only when a save, or a publish, actually writes a
+schedule, and its answer becomes `schedule.timeZone` and the clock `startsOn` is read on. An answer that is not an IANA
+zone this runtime knows falls back to `timeZone`. It does not move the report window or the date buckets, which have
+no actor to ask: those still read `timeZone`.
+
+### `@12-apps/report-builder/pdf`: the report as an attachment (minor)
+
+A server renderer for the e-mail: pdf-lib, vector shapes, no browser and no network. It draws the same render model the
+screen uses (KPI tiles, tables, bar, line, area, pie and donut charts, heat maps as grids), so it is close to
+"Exportar PDF" and not pixel-identical. Node only: it is its own entry so a browser bundle never pulls pdf-lib in.
+
+```ts
+import { renderReportPdf, ReportPdfError } from '@12-apps/report-builder/pdf';
+
+try {
+  const { bytes, pageCount, sizeBytes } = await renderReportPdf(
+    { blocks: run.blocks },            // a dashboard run; or { render } for one report
+    { title, periodLabel, storeName, locale, timeZone, generatedAt, appName: 'My App' },
+  );
+} catch (error) {
+  if (error instanceof ReportPdfError) error.code; // 'timeout' | 'too_large' | 'unsupported_block' | 'render_failed'
+}
+```
+
+- **Typed, fast failure.** `timeout` (budget 60 s, checked between blocks and every 25 table rows), `too_large` (more than
+  `maxPages` = 40, or a file over `maxBytes` = 7 000 000; `error.sizeBytes` / `error.pageCount` say how far), `unsupported_block`
+  (a render kind or chart type it cannot draw; `error.blockId`), `render_failed` (anything else, with the cause). A job that
+  sends the mail without the attachment on any of them needs nothing else. Every limit is under `options.limits`.
+- **Deterministic.** The same input gives the same bytes; the only dates in the file are `generatedAt`. The only clock it
+  reads is for the time budget, and nothing from it reaches the file (a test can pass `clock`).
+- **Words.** The page furniture and the cut-table note come from `REPORT_PDF_COPY['pt-BR' | 'en-US']`, chosen by
+  `locale` (`en*` is English, everything else Portuguese); override any member with `options.copy`. `appName` fills the
+  note "e mais N linhas — veja no <appName>". Labels, headings and figures are the render model's own (the engine copy).
+  A bucketed date reads through `options.formatBucket`, the same hook the screen takes.
+- **Ceilings.** A table draws at most `maxTableRows` (300) rows, and is cut early if the page ceiling is reached, each time
+  with that note. A chart draws at most `maxChartPoints` (120).
+- **Fonts.** The standard Helvetica faces, which every reader carries: nothing is fetched or embedded. A character outside
+  Latin-1 (an emoji in a store name) is written as `?` rather than failing the render.
+- **Layout.** Tiles and charts share a 12-column row by `span`; tables and heat maps take the width. A heat map is its grid
+  as a table (no colour ramp). Colours are the light values of the theme tokens.
 
 ## Next minor — neutral choices, a period label per surface, null ratios (FUT-4063)
 

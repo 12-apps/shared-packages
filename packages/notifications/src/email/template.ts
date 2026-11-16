@@ -59,6 +59,8 @@ import {
  *   the message rather than announcing a five-column grid.
  */
 
+export { safeHref } from "./escape";
+
 /** The words the LAYOUT itself needs — never the message's own sentences. */
 export interface EmailChromeCopy {
   /** "If the button does not work, paste this address into your browser:" */
@@ -121,6 +123,17 @@ export interface EmailDocument {
   /** Small print under the CTA — a deadline, a "you can ignore this". */
   readonly notes?: readonly string[];
   /**
+   * A way to stop receiving THIS mail, as a link in the footer: "Stop
+   * receiving this report". It sits with the footer's other small print rather
+   * than beside the CTA, because it is not an action the message asks for.
+   *
+   * The `href` is the host's own — usually a per-recipient signed URL — and the
+   * layout only prints it. Pair it with `List-Unsubscribe` headers on the
+   * driver: a mail client's own "unsubscribe" button reads those, not this.
+   * Absent, the footer is exactly what it was.
+   */
+  readonly unsubscribe?: EmailAction;
+  /**
    * The layout's own words, in the recipient's language.
    *
    * REQUIRED, with no default in any language — the copy-portability doctrine.
@@ -138,49 +151,6 @@ export interface EmailDocument {
   readonly locale: string;
   /** Defaults to {@link NEUTRAL_EMAIL_THEME} — see `./theme` for why this one may. */
   readonly theme?: EmailTheme;
-}
-
-/**
- * Escape everything that reaches the HTML body.
- *
- * A store name, a buyer's display name and a product title are all user input
- * that reaches a mail, and the ONE thing a shared layout must guarantee is that
- * none of them can close a tag. Single quotes are escaped too: attribute values
- * below are double-quoted, but a caller reading this should not have to check.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-/**
- * The schemes a link in a mail may use.
- *
- * `javascript:` is inert in every mail client, so this is not the XSS guard it
- * would be on a page — it is the guard for the PREVIEW, which renders the same
- * HTML in a browser, and for the day some part of this markup is reused on a
- * screen. A rejected href drops to `#`, which fails visibly rather than
- * silently linking somewhere unexpected.
- */
-const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
-
-/** A URL as an attribute value, or `#` when it is not one this layout will emit. */
-export function safeHref(href: string): string {
-  const trimmed = href.trim();
-  // A relative link is fine and common — every caller that has an origin
-  // resolves it before it gets here, and one that does not is better off with
-  // a path than with nothing.
-  if (trimmed.startsWith("/")) return escapeHtml(trimmed);
-  try {
-    const url = new URL(trimmed);
-    return SAFE_LINK_SCHEMES.has(url.protocol) ? escapeHtml(url.toString()) : "#";
-  } catch {
-    return "#";
-  }
 }
 
 /** The message's own first sentence, when the caller named no preheader. */
@@ -275,6 +245,14 @@ function header(document: EmailDocument, theme: EmailTheme): string {
   ].join("");
 }
 
+/** The footer's opt-out link, when the message carries one. */
+function unsubscribeLink(link: EmailAction | undefined, theme: EmailTheme): string[] {
+  if (!link) return [];
+  return [
+    `<p style="margin:8px 0 0;font-size:12px;line-height:1.5"><a href="${safeHref(link.href)}" style="color:${theme.muted};text-decoration:underline">${escapeHtml(link.label)}</a></p>`,
+  ];
+}
+
 /** The footer: the tagline, the "do not reply" line, and nothing else. */
 function footer(document: EmailDocument, theme: EmailTheme): string {
   const { chrome, brand } = document;
@@ -285,6 +263,7 @@ function footer(document: EmailDocument, theme: EmailTheme): string {
     `<tr><td style="border-top:1px solid ${theme.border};padding-top:20px">`,
     `<p style="margin:0 0 6px;font-size:13px;line-height:1.5;color:${theme.muted}">${escapeHtml(chrome.tagline(brand))}</p>`,
     `<p style="margin:0;font-size:12px;line-height:1.5;color:${theme.muted}">${escapeHtml(chrome.automated)}</p>`,
+    ...unsubscribeLink(document.unsubscribe, theme),
     `</td></tr>`,
     `</table>`,
     `</td>`,

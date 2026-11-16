@@ -204,3 +204,43 @@ describe('the hero image', () => {
     expect(renderEmailHtml(documentOf())).not.toContain('<img');
   });
 });
+
+describe('the unsubscribe link', () => {
+  const unsubscribe = { label: 'Stop receiving this report', href: 'https://app.test/unsubscribe?t=a1&u=2' };
+
+  it('is a footer link in the html, below the automated line', () => {
+    const html = renderEmailHtml(documentOf({ unsubscribe }));
+    expect(html).toContain('href="https://app.test/unsubscribe?t=a1&amp;u=2"');
+    expect(html).toContain('Stop receiving this report</a>');
+    expect(html.indexOf(PT_BR_EMAIL_CHROME.automated)).toBeLessThan(html.indexOf('Stop receiving this report'));
+    expect(html.indexOf('Stop receiving this report')).toBeLessThan(html.indexOf('</body>'));
+  });
+
+  it('is the last line of the text twin, as label and address', () => {
+    const text = renderEmailText(documentOf({ unsubscribe }));
+    expect(text.trimEnd().split('\n').pop()).toBe('Stop receiving this report: https://app.test/unsubscribe?t=a1&u=2');
+  });
+
+  it('is independent of the call to action: both can be present, and neither stands in for the other', () => {
+    const action = { label: 'Open', href: 'https://app.test/r/1' };
+    const html = renderEmailHtml(documentOf({ action, unsubscribe }));
+    expect(html).toContain('>Open</a>');
+    expect(html).toContain('>Stop receiving this report</a>');
+    expect(renderEmailText(documentOf({ action }))).not.toContain('Stop receiving');
+  });
+
+  it('escapes its label and refuses an unsafe scheme like every other link', () => {
+    const html = renderEmailHtml(
+      documentOf({ unsubscribe: { label: '<b>Stop</b>', href: 'javascript:alert(1)' } }),
+    );
+    expect(html).toContain('&lt;b&gt;Stop&lt;/b&gt;');
+    expect(html).not.toContain('javascript:');
+  });
+
+  it('leaves both halves exactly as they were without one', () => {
+    expect(renderEmailHtml(documentOf({ unsubscribe: undefined }))).toBe(renderEmailHtml(documentOf()));
+    expect(renderEmailText(documentOf({ unsubscribe: undefined }))).toBe(renderEmailText(documentOf()));
+    expect(renderEmail(documentOf({ unsubscribe })).html).toContain('Stop receiving this report');
+    expect(renderEmail(documentOf()).text).not.toContain('Stop receiving');
+  });
+});
