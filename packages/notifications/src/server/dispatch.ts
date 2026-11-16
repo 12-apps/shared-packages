@@ -202,25 +202,53 @@ async function sendClaimed(
   if (claimed.count !== 1) return false;
 
   const transport = deps.transports.get(delivery.channel as NotificationChannel);
+  let providerMessageId: string | undefined;
   try {
     if (!transport) throw new Error(`No transport declared for ${delivery.channel}.`);
     const result = await transport.send(transport.format(content) as never, recipient);
-    // The provider's id, when the transport answered one: what a receipt finds
-    // the row by. Absent, the key is not written at all.
-    const providerMessageId = result?.providerMessageId;
-    await client.notificationDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: 'SENT',
-        sentAt: new Date(),
-        error: null,
-        ...(providerMessageId ? { providerMessageId } : {}),
-      },
-    });
+    providerMessageId = result?.providerMessageId;
   } catch (error) {
     await failed(deps, client, delivery, recipient, error);
+    return true;
   }
+  await markSent(deps, client, delivery.id, providerMessageId);
   return true;
+}
+
+/**
+ * The provider took the message: write SENT. The provider's id (what a receipt
+ * finds the row by) is written BEST-EFFORT, with SENT when it can be: a write
+ * that fails over it — a unique clash, a host whose client predates the column
+ * — is retried as a plain SENT, and a failure here never reaches `settle()`.
+ * The message WENT; a FAILED row would be re-queued by the sweep and sent
+ * twice, a second billed message to a real phone.
+ */
+async function markSent(
+  deps: NotificationDispatchDeps,
+  client: NotificationsDb,
+  deliveryId: string,
+  providerMessageId: string | undefined,
+): Promise<void> {
+  const sent = { status: 'SENT' as const, sentAt: new Date(), error: null };
+  try {
+    await client.notificationDelivery.update({
+      where: { id: deliveryId },
+      // Absent, the id key is not written at all.
+      data: { ...sent, ...(providerMessageId ? { providerMessageId } : {}) },
+    });
+    return;
+  } catch (error) {
+    if (!providerMessageId) {
+      deps.logger.error(`[notifications] delivery ${deliveryId} was sent, but SENT could not be written:`, error);
+      return;
+    }
+    deps.logger.error(`[notifications] delivery ${deliveryId} was sent; its provider id could not be kept:`, error);
+  }
+  try {
+    await client.notificationDelivery.update({ where: { id: deliveryId }, data: sent });
+  } catch (error) {
+    deps.logger.error(`[notifications] delivery ${deliveryId} was sent, but SENT could not be written:`, error);
+  }
 }
 
 /**
