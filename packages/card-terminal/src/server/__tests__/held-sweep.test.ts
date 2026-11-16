@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { HELD_SWEEP_PAGES } from '../held-sweep';
 import { createTerminalCaptureLedger } from '../ledger';
 import type { SaleDirectory } from '../ports';
 import { DAY, NOW, OTHER_TENANT, TENANT, capture, refusal, world, type World } from './world';
@@ -145,5 +146,34 @@ describe('the held-capture sweep', () => {
     });
 
     await expect(ledger.flagStaleHeld(NOW, 100)).resolves.toBe(0);
+  });
+
+  it('reads on past a head of `limit` captures it will never flag (a paid sale, a young sale) to an abandoned one', async () => {
+    const w = world();
+    for (let i = 0; i < 2; i += 1) w.pay((await held(w, `PAID-${i}`, ago(3 * DAY + i * 60_000))).orderId);
+    await held(w, 'YOUNG-SALE', ago(3 * DAY + 3 * 60_000), { saleAt: ago(60_000) });
+    await held(w, 'ABANDONED', ago(2 * DAY));
+
+    await expect(w.ledger.flagStaleHeld(NOW, 2)).resolves.toBe(1);
+    expect(w.row('ABANDONED')).toMatchObject({ refundReason: 'SALE_NOT_PAID' });
+    for (const code of ['PAID-0', 'PAID-1', 'YOUNG-SALE']) expect(w.row(code), code).toMatchObject({ refundFlaggedAt: null });
+  });
+
+  it('walks a head longer than one tick reads over the next ticks, then starts again from the oldest', async () => {
+    const w = world();
+    const head = HELD_SWEEP_PAGES * 2 + 1;
+    for (let i = 0; i < head; i += 1) w.pay((await held(w, `PAID-${String(i).padStart(3, '0')}`, ago(3 * DAY - i * 1000))).orderId);
+    await held(w, 'ABANDONED', ago(2 * DAY));
+    await held(w, 'YOUNG-THEN', ago(4 * DAY), { saleAt: ago(60_000) });
+
+    const ticks: number[] = [];
+    for (let tick = 0; tick < 2; tick += 1) ticks.push(await w.ledger.flagStaleHeld(NOW, 2));
+
+    // The first tick reads its pages of leftovers; the second goes on from there to the abandoned capture.
+    expect(ticks).toEqual([0, 1]);
+    expect(w.row('ABANDONED')).toMatchObject({ refundReason: 'SALE_NOT_PAID' });
+    // It reached the end, so it starts again from the oldest: the sale that was young there is a window old now.
+    await expect(w.ledger.flagStaleHeld(new Date(NOW.getTime() + DAY), 2)).resolves.toBe(1);
+    expect(w.row('YOUNG-THEN')).toMatchObject({ refundReason: 'SALE_NOT_PAID' });
   });
 });

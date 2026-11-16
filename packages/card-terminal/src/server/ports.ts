@@ -50,6 +50,12 @@ export interface CapturePatch extends CaptureTrace {
   refundClearedAt?: Date | null;
 }
 
+/** Where the held sweep's read resumes: strictly after this capture, in (`capturedAt`, `id`) order. */
+export interface StaleHeldCursor {
+  capturedAt: Date;
+  id: string;
+}
+
 /** A refund flag as it is written: the time and why. */
 export interface RefundFlag {
   at: Date;
@@ -84,15 +90,18 @@ export interface TerminalCaptureStore {
    */
   flagStaleUnbound(now: Date, cutoff: Date, limit: number): Promise<number>;
   /**
-   * At most `limit`, oldest capture first, the ORDER_CREATED captures whose
-   * flag is not live, taken AND recorded at or before `cutoff` (both clocks,
-   * as {@link flagStaleUnbound}). Across tenants. Read only: the sweep asks
-   * the host which of their sales are still unpaid before it flags any.
+   * At most `limit`, oldest capture first (`capturedAt`, then `id`), the
+   * ORDER_CREATED captures whose flag is not live, taken AND recorded at or
+   * before `cutoff` (both clocks, as {@link flagStaleUnbound}), strictly after
+   * `after` when it is given. Across tenants. Read only: the sweep asks the
+   * host which of their sales are still unpaid before it flags any, and pages
+   * on with `after` past the rows the host did not name, so a head of rows
+   * that are never flagged (a paid sale's leftover) never hides a newer one.
    *
    * Optional, so a store written before it still type-checks: without it the
    * held sweep flags nothing. Both stores this package ships answer it.
    */
-  findStaleHeld?(cutoff: Date, limit: number): Promise<TerminalCaptureRecord[]>;
+  findStaleHeld?(cutoff: Date, limit: number, after?: StaleHeldCursor): Promise<TerminalCaptureRecord[]>;
   /** The ORDER_CREATED captures of these sales, oldest capture first. */
   findCreatedFor(clientId: string, orderIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
   /**

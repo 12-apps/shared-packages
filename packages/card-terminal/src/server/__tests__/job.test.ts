@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SWEEP_QUEUE } from '../cadence';
-import { UNBOUND_CAPTURE_SWEEP_BATCH, terminalCaptureJobBlueprints } from '../job';
+import { HELD_SWEEP_OFF_WARNING, UNBOUND_CAPTURE_SWEEP_BATCH, terminalCaptureJobBlueprints } from '../job';
 import { DAY, NOW, capture, world } from './world';
 
 /** The sweep blueprint: the package's cadence and batch, the ledger's window. */
@@ -51,5 +51,23 @@ describe('the unbound-capture sweep blueprint', () => {
     expect(spy).toHaveBeenCalledWith(NOW, UNBOUND_CAPTURE_SWEEP_BATCH);
     expect(w.rows()[0]).toMatchObject({ state: 'ORDER_CREATED', refundReason: 'SALE_NOT_PAID' });
     expect(info).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns once a tick while the held half cannot run, so a host without the port does not look fixed', async () => {
+    const warn = vi.fn();
+    const info = vi.fn();
+    const off = terminalCaptureJobBlueprints({ ledger: { flagStaleUnbound: vi.fn(async () => 0) } }).flagUnboundCaptures;
+    const unready = terminalCaptureJobBlueprints({
+      ledger: { flagStaleUnbound: vi.fn(async () => 0), flagStaleHeld: vi.fn(async () => 0), heldSweepReady: false },
+    }).flagUnboundCaptures;
+    const ready = terminalCaptureJobBlueprints({ ledger: world().ledger, now: () => NOW }).flagUnboundCaptures;
+
+    await off.handle(undefined, { logger: { info, warn } });
+    await unready.handle(undefined, { logger: { info, warn } });
+    await ready.handle(undefined, { logger: { info, warn } });
+    await off.handle(undefined, { logger: { info } });
+
+    expect(warn.mock.calls).toEqual([[HELD_SWEEP_OFF_WARNING], [HELD_SWEEP_OFF_WARNING]]);
+    expect(info.mock.calls).toEqual([[HELD_SWEEP_OFF_WARNING]]);
   });
 });

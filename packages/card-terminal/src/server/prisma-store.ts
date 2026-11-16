@@ -1,5 +1,5 @@
 import type { CaptureKind, CaptureState, StoredCaptureSource, TerminalCaptureRecord } from './model';
-import type { CapturePatch, CaptureVersion, NewTerminalCapture, TerminalCaptureStore, TerminalCaptureStoreFor } from './ports';
+import type { CapturePatch, CaptureVersion, NewTerminalCapture, StaleHeldCursor, TerminalCaptureStore, TerminalCaptureStoreFor } from './ports';
 
 /**
  * The capture table over a host's Prisma `terminalCapture` model. Duck-typed
@@ -61,7 +61,15 @@ type CaptureFindManyWhere =
   | { clientId: string; transactionCode: { in: string[] } }
   | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' }
   | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK }
-  | { state: 'ORDER_CREATED'; OR: typeof NOT_LIVE; capturedAt: { lte: Date }; createdAt: { lte: Date } };
+  | {
+      state: 'ORDER_CREATED';
+      capturedAt: { lte: Date };
+      createdAt: { lte: Date };
+      AND: readonly [{ OR: typeof NOT_LIVE }, ...{ OR: readonly StaleHeldAfter[] }[]];
+    };
+
+/** Strictly after a (`captured_at`, `id`) cursor. */
+type StaleHeldAfter = { capturedAt: { gt: StaleHeldCursor['capturedAt'] } } | { capturedAt: Date; id: { gt: string } };
 
 type CaptureUpdateWhere =
   | CaptureVersion
@@ -165,10 +173,11 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
       return flagged.count;
     },
     flagStaleUnbound: async (now, cutoff, limit) => flagStaleUnbound(await client(), now, cutoff, limit),
-    async findStaleHeld(cutoff, limit) {
+    async findStaleHeld(cutoff, limit, after) {
       // Both clocks, as the unbound sweep: the terminal's `captured_at` and the database's `created_at`.
+      const past = after ? [{ OR: [{ capturedAt: { gt: after.capturedAt } }, { capturedAt: after.capturedAt, id: { gt: after.id } }] }] : [];
       const rows = await (await client()).terminalCapture.findMany({
-        where: { state: 'ORDER_CREATED', OR: NOT_LIVE, capturedAt: { lte: cutoff }, createdAt: { lte: cutoff } },
+        where: { state: 'ORDER_CREATED', capturedAt: { lte: cutoff }, createdAt: { lte: cutoff }, AND: [{ OR: NOT_LIVE }, ...past] },
         orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
         take: limit,
         select: CAPTURE_SELECT,
