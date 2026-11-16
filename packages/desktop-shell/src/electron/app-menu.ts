@@ -27,6 +27,8 @@ export interface AppMenu {
 export interface AppMenuOptions {
   copy: MenuCopy;
   updates: UpdateManager;
+  /** The Store updates the app: no check, no install, no status line. */
+  updatesManagedBy?: "store";
   /** The host's own File entries, placed before Quit. */
   extraMenuItems?: readonly AppMenuItem[];
   /** The menu opening and closing — a breadcrumb for the crash reports. */
@@ -48,6 +50,7 @@ export function installAppMenu(options: AppMenuOptions): AppMenu {
         version: app.getVersion(),
         updates: state,
         platform: process.platform,
+        ...(options.updatesManagedBy === undefined ? {} : { updatesManagedBy: options.updatesManagedBy }),
         ...(options.extraMenuItems === undefined ? {} : { extraMenuItems: options.extraMenuItems }),
         actions: {
           // Caught: a rejected check in a tray process is an unhandled

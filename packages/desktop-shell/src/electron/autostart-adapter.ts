@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import type { app as ElectronApp } from "electron";
 
 import { createAutostart, type Autostart } from "../autostart";
+import { isWindowsStoreApp } from "../store-mode";
 
 /**
  * The platform ports `../autostart` asks for, filled from Electron and Node.
@@ -18,6 +19,8 @@ export function createShellAutostart(options: {
   app: typeof ElectronApp;
   entry: { name: string; comment?: string };
   backgroundArgs: readonly string[];
+  /** Whether this is a Microsoft Store install. Default: read from `process`. */
+  windowsStore?: boolean;
 }): Autostart {
   const { app } = options;
   return createAutostart({
@@ -29,6 +32,7 @@ export function createShellAutostart(options: {
       ...(options.entry.comment === undefined ? {} : { comment: options.entry.comment }),
     },
     backgroundArgs: options.backgroundArgs,
+    managedBySystem: options.windowsStore ?? isWindowsStoreApp(),
     loginItem: {
       // `identity` forwarded, never dropped: on Windows the read is matched on
       // the executable and its arguments (see `LoginItemPort`).

@@ -9,6 +9,7 @@ import {
   type UpdateManager,
   type UpdateState,
 } from "../updates";
+import { isWindowsStoreApp } from "../store-mode";
 import { installAppMenu, type AppMenu } from "./app-menu";
 
 /**
@@ -51,6 +52,14 @@ export interface WireUpdatesBaseOptions {
    * run once per process.
    */
   onWindowShown?: (listener: () => void) => void;
+  /**
+   * Whether this is a Microsoft Store (MSIX) install, where the Store updates
+   * the app. Default: read from `process.windowsStore`. In Store mode nothing
+   * is checked, downloaded or installed: `create` is never called (so no timer
+   * exists), `onWindowShown` is not listened to, the menu offers no check or
+   * install, and the manager handed back is inert (`unsupported`).
+   */
+  windowsStore?: boolean;
 }
 
 /** The window strip: its words and the way it reaches the host's window, together. */
@@ -95,7 +104,16 @@ export interface WireUpdatesNoMenuOptions {
   extraMenuItems?: never;
 }
 
+/** The manager of a Store install: it never asks, never installs, has no timer. */
+const STORE_MANAGED: UpdateManager = {
+  state: { kind: "unsupported" },
+  check: () => Promise.resolve(),
+  install: () => undefined,
+  stop: () => undefined,
+};
+
 export function wireUpdates(options: WireUpdatesOptions): UpdateManager {
+  if (options.windowsStore ?? isWindowsStoreApp()) return wireStoreManaged(options);
   const { telemetry } = options;
   const menuRef: { current: AppMenu | null } = { current: null };
   const last = { crumb: "" };
@@ -146,6 +164,21 @@ export function wireUpdates(options: WireUpdatesOptions): UpdateManager {
     void updates.check();
   });
   return updates;
+}
+
+/** Store mode: the menu bar (version only) and nothing else — the Store updates the app. */
+function wireStoreManaged(options: WireUpdatesOptions): UpdateManager {
+  options.telemetry.breadcrumb("updates managed by the store");
+  if (options.menu !== false) {
+    installAppMenu({
+      copy: options.menuCopy,
+      updates: STORE_MANAGED,
+      updatesManagedBy: "store",
+      ...(options.extraMenuItems === undefined ? {} : { extraMenuItems: options.extraMenuItems }),
+      onMenu: (open) => options.telemetry.breadcrumb(open ? "menu open" : "menu closed"),
+    });
+  }
+  return STORE_MANAGED;
 }
 
 /** A download reported in tens, so a breadcrumb trail is not thirty percents. */

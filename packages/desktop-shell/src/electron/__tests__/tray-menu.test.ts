@@ -68,6 +68,33 @@ describe("buildTrayMenu", () => {
   });
 });
 
+describe("buildTrayMenu where the system owns autostart", () => {
+  it("offers a plain item, no checkbox and no checked state, that keeps its click", () => {
+    const menu = buildTrayMenu({
+      status: "online",
+      copy,
+      autostartEnabled: false,
+      autostartManagedBySystem: true,
+      actions,
+    });
+    const item = menu.find((entry) => entry.label === "at-login");
+    expect(item).toEqual({ label: "at-login", click: actions.toggleAutostart });
+    expect(item).not.toHaveProperty("type");
+    expect(item).not.toHaveProperty("checked");
+  });
+
+  it("keeps the checkbox when the flag is false", () => {
+    const menu = buildTrayMenu({
+      status: "online",
+      copy,
+      autostartEnabled: true,
+      autostartManagedBySystem: false,
+      actions,
+    });
+    expect(menu.find((entry) => entry.label === "at-login")).toMatchObject({ type: "checkbox", checked: true });
+  });
+});
+
 describe("startedInBackground", () => {
   it("reads the flag the autostart entry was registered with", () => {
     expect(startedInBackground(["/opt/agent", "--background"])).toBe(true);

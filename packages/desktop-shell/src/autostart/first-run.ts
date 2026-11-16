@@ -16,7 +16,9 @@ import type { Autostart } from "./index";
  *   silently (a policy, a read-only home), so the step learns what actually
  *   happened rather than what was asked for.
  * - **Only where the question means something.** Windows and Linux; on any
- *   other platform nothing is asked and nothing is changed.
+ *   other platform nothing is asked and nothing is changed. Nor where the
+ *   system owns the switch (`Autostart.managedBySystem`, a Microsoft Store
+ *   install): it counts as answered and `set` is never called.
  *
  * Framework-free: the app draws the step in its own first-time flow, with
  * its own words, and calls {@link FirstRunAutostart.answer} from its button.
@@ -27,7 +29,7 @@ const ASKING_PLATFORMS: ReadonlySet<string> = new Set(["linux", "win32"]);
 
 export interface FirstRunAutostartOptions {
   /** The shell's autostart (or any port with the same two calls). */
-  autostart: Pick<Autostart, "set" | "isEnabled">;
+  autostart: Pick<Autostart, "set" | "isEnabled" | "managedBySystem">;
   /** `process.platform`. */
   platform: string;
   /** What the step preselects, and so what one tap on its confirm button keeps. The APP's call. */
@@ -57,7 +59,7 @@ export interface FirstRunAutostart {
 }
 
 export function createFirstRunAutostart(options: FirstRunAutostartOptions): FirstRunAutostart {
-  const asks = ASKING_PLATFORMS.has(options.platform);
+  const asks = ASKING_PLATFORMS.has(options.platform) && options.autostart.managedBySystem !== true;
   const noteChosen = async (): Promise<void> => {
     if (!options.chosen()) await options.remember();
   };
@@ -65,7 +67,7 @@ export function createFirstRunAutostart(options: FirstRunAutostartOptions): Firs
     shouldAsk: () => asks && !options.chosen(),
     preselected: options.defaultOn,
     answer: async (next) => {
-      await options.autostart.set(next);
+      if (options.autostart.managedBySystem !== true) await options.autostart.set(next);
       const now = await options.autostart.isEnabled();
       await noteChosen();
       return now;
@@ -90,6 +92,7 @@ export function observeAutostart(autostart: Autostart, onChange: () => void | Pr
       await onChange();
     };
   return {
+    ...(autostart.managedBySystem === undefined ? {} : { managedBySystem: autostart.managedBySystem }),
     isEnabled: () => autostart.isEnabled(),
     enable: after(() => autostart.enable()),
     disable: after(() => autostart.disable()),
