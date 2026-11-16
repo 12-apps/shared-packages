@@ -1,4 +1,5 @@
 import { declineLeavesPayableOpen } from '../core/decline-verdict';
+import { balanceSettlementOf } from './correlation-port';
 import { attachedChargeOf } from './runtime';
 import type { ChargeSnapshot, DeclineReason } from '../core/types';
 import type { ChargeCorrelationPort, Payable } from './types';
@@ -63,6 +64,7 @@ export function cardOutcomeOf(
     amount: payable.amount,
     ...(refusal.retriable === undefined ? {} : { retriable: refusal.retriable }),
     ...(approved ? {} : { keepsPayableOpen: keepsOpen(refusal) }),
+    ...balanceSettlementOf(payable),
   };
 }
 

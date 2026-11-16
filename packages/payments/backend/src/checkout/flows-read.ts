@@ -5,6 +5,8 @@ import { reportProviderFailure } from '../core/provider-failure';
 
 import { checkoutCardProvider } from './card-provider';
 import { buyerCheckoutConfig } from './config';
+import { balanceSettlementOf } from './correlation-port';
+import { checkoutStatusBody } from './status-facts';
 import {
   attachedChargeOf,
   loadPayable,
@@ -130,6 +132,7 @@ async function offlineSettle<C, V extends object, D>(
     charge: attachedChargeOf(charge.snapshot),
     capturedAmount: payable.amount,
     method: charge.snapshot.method,
+    ...balanceSettlementOf(payable),
   });
 }
 
@@ -180,6 +183,7 @@ export async function reconcilePaid<C, V extends object, D>(
     charge: attachedChargeOf(snapshot),
     capturedAmount: snapshot.amount,
     method: snapshot.method,
+    ...balanceSettlementOf(payable),
   });
 }
 
@@ -209,6 +213,23 @@ function lapsed(charge: StoredCharge): boolean {
   return !Number.isNaN(deadline) && deadline <= Date.now();
 }
 
+/**
+ * A settled or closed payable's answer: its token, and the fact the host states
+ * beside it when there is one (FUT-612, `status-facts.ts`). The facts are read
+ * here only, so an `OPEN` poll — the waiting loop — costs exactly what it did.
+ */
+async function settledAnswer<C, V extends object, D>(
+  runtime: Runtime<C, V, D>,
+  payable: Payable,
+  token: string,
+): Promise<Response> {
+  const read = runtime.config.payables.statusFacts;
+  const facts = read ? await read.call(runtime.config.payables, payable) : null;
+  const body = checkoutStatusBody(token, facts);
+  if (!body.shortfall && !body.stockGone) return runtime.respond.ok(token);
+  return runtime.respond.status ? runtime.respond.status(body) : Response.json(body);
+}
+
 /** `GET /status` — poll a payable, settling it when the provider says so. */
 export async function getStatus<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
@@ -226,7 +247,7 @@ export async function getStatus<C, V extends object, D>(
   if ('response' in loaded) return loaded.response;
   const { payable } = loaded;
   const unchanged = runtime.config.payables.stateToken(payable);
-  if (payable.state !== 'OPEN') return runtime.respond.ok(unchanged);
+  if (payable.state !== 'OPEN') return settledAnswer(runtime, payable, unchanged);
 
   const charge = await latestCharge(runtime, payable);
   if (!charge) return runtime.respond.ok(unchanged);

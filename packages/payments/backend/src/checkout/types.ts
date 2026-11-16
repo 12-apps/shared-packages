@@ -1,5 +1,7 @@
 import type { PaymentsRouteParams } from '../http/route-table';
 
+import type { CheckoutStatusBody, CheckoutStatusFacts } from './status-facts';
+
 import type {
   CardDetails,
   ChargeConfirmation,
@@ -64,6 +66,15 @@ export interface Payable {
    * has become an order.
    */
   state: 'OPEN' | 'SETTLED' | 'CLOSED';
+  /**
+   * `amount` is a BALANCE (FUT-612): the host's payable already holds a capture
+   * and asks only for what is still missing. NOT a fourth state — the payable is
+   * `OPEN` and chargeable as ever. A raise on it voids every other live charge
+   * of the payable (`core/balance-supersede.ts`), and every settlement the
+   * library reports for it carries `settlesBalance: true`, untouched: what the
+   * earlier capture counts for is the host's decision, never this library's.
+   */
+  balance?: true;
 }
 
 /**
@@ -238,6 +249,13 @@ export interface PayablePort<Caller, View extends object> {
   view?(ref: string): Promise<View | null>;
   /** The host's own state token for a poll answer when nothing changed. */
   stateToken(payable: Payable): string;
+  /**
+   * What a SETTLED or CLOSED payable's token cannot say (FUT-612): a capture
+   * that arrived short, or a full one the host could not fulfil. Asked only on
+   * that branch — never on an `OPEN` poll — so the waiting loop pays nothing
+   * for it. Omit it, or answer null, and `/status` answers the token alone.
+   */
+  statusFacts?(payable: Payable): Promise<CheckoutStatusFacts | null>;
 }
 
 /**
@@ -306,6 +324,12 @@ export interface CheckoutErrorBody {
 
 export interface CheckoutResponder {
   ok(data: unknown, status?: number): Response;
+  /**
+   * A `/status` answer that carries facts beside its token (FUT-612). Omitted,
+   * the body is sent as JSON as it stands — `{ data, shortfall | stockGone }`,
+   * the shape `@12-apps/payments-frontend`'s `getStatusDetail` reads.
+   */
+  status?(body: CheckoutStatusBody): Response;
   fail(body: CheckoutErrorBody, status: number): Response;
 }
 

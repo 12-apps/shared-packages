@@ -99,3 +99,25 @@ export type { CheckoutCard } from './reuse';
 export { chargeDraftOf } from './draft';
 
 export { platformGooglePayMerchant } from './google-pay-merchant';
+/**
+ * What a terminal `/status` answer may carry beside its token (FUT-612): a
+ * capture that arrived short, or a full one the host could not fulfil — and
+ * the body builder every host answers it with.
+ */
+export {
+  checkoutStatusBody,
+  shortfallFact,
+  type CheckoutStatusBody,
+  type CheckoutStatusFacts,
+  type PaymentShortfall,
+  type PaymentStockGone,
+  type ShortfallResolution,
+} from './status-facts';
+export { balanceSettlementOf, type BalanceSettlement } from './correlation-port';
+/** A balance raise's void, for a host composing its own raise (FUT-612). */
+export {
+  voidOtherLiveCharges,
+  type BalanceVoidDeps,
+  type BalanceVoidGateway,
+  type BalanceVoidScope,
+} from '../core/balance-supersede';

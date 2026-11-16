@@ -7,6 +7,8 @@ import type { ChargeQueryStore } from '../core/ports';
 import { attemptIdempotencyKey, attemptReference } from '../core/reference';
 import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
 
+import { voidOtherLiveCharges } from '../core/balance-supersede';
+
 import { parkedHostedCharges, reusablePixCharge, type CheckoutCard } from './reuse';
 import { voidSupersededPixCharges } from './supersede';
 import type { CheckoutLogger, Payable } from './types';
@@ -147,8 +149,14 @@ export async function raiseCharge(
   request: RaiseChargeRequest,
 ): Promise<HeldAnswer> {
   const { live, movedPast } = await liveChargeFor(deps, payable, request);
-  const answer = (held: ChargeSnapshot) =>
-    answerHeld(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, held });
+  const answer = async (held: ChargeSnapshot) => {
+    // A balance retires every other live charge, on a reuse too (FUT-612).
+    if (payable.balance) {
+      const keep = new Set([held.providerChargeId, ...movedPast.map((link) => link.providerChargeId)]);
+      await voidOtherLiveCharges(deps, { merchant: payable.merchant, reference: payable.ref, keep });
+    }
+    return answerHeld(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, held });
+  };
   if (live) return answer(live);
 
   const attempt = await deps.charges.countByReference(payable.merchant, payable.ref);
@@ -180,6 +188,6 @@ export async function raiseCharge(
 
   // Only once THIS attempt's charge is proven good: the buyer must never be
   // left with the old code voided and no new one to pay.
-  await voidSupersededPixCharges(deps, payable);
+  if (!payable.balance) await voidSupersededPixCharges(deps, payable);
   return answer(stored.snapshot);
 }
