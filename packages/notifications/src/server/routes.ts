@@ -213,11 +213,17 @@ function preferenceRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
         // The dispatch pipeline reads these on every emit, so a save takes
         // effect immediately — no cache to invalidate.
         const saved = parsePreferencesBody(body, messagesOf(deps, locale));
+        // What the person had, read only when a paid switch is ON in the
+        // payload: the confirmation is asked on a false → true change only.
+        const before =
+          deps.consent && paidChannelsTurnedOn(saved).length > 0
+            ? await deps.preferences.get(actor.userId)
+            : null;
         await deps.preferences.save(actor.userId, saved);
         // A paid channel switched on starts its confirmation — the same flow
         // for a person's switch and an agent's, one ask per number and channel
         // however many categories turned it on.
-        await deps.consent?.startTurnedOn(actor.userId, paidChannelsTurnedOn(saved));
+        if (before) await deps.consent?.startTurnedOn(actor.userId, paidChannelsTurnedOn(saved, before));
         return ok(await preferencesPayload(deps, actor.userId, actor.scopeClientId ?? null));
       }),
     },

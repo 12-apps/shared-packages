@@ -51,12 +51,22 @@ function parseCodeBody(
   return { channel, code: record.code };
 }
 
-/** The paid channels a preferences save switched ON, in any category. */
-export function paidChannelsTurnedOn(
-  saved: Record<string, Partial<Record<NotificationChannel, boolean>>>,
-): PaidChannel[] {
+type Toggles = Record<string, Partial<Record<NotificationChannel, boolean>> | undefined>;
+
+/**
+ * The paid channels a preferences save switched ON — false → true against what
+ * the person had (`before`, their effective matrix), in any category. A
+ * payload that merely RESTATES an on switch (a client that PUTs the whole
+ * matrix on every save) asks nothing: re-asking there sent a paid prompt to an
+ * opted-out number on every unrelated save. Without `before`, every true
+ * counts (the caller has not read the stored preferences yet).
+ */
+export function paidChannelsTurnedOn(saved: Toggles, before?: Toggles): PaidChannel[] {
   return PAID_CHANNELS.filter((channel) =>
-    Object.values(saved).some((toggles) => toggles[channel] === true),
+    Object.entries(saved).some(
+      ([category, toggles]) =>
+        toggles?.[channel] === true && (before === undefined || (before[category] !== undefined && before[category]?.[channel] !== true)),
+    ),
   );
 }
 
