@@ -425,7 +425,7 @@ import { createTranscriber } from "@12-apps/llm";
 const transcriber = createTranscriber({
   provider: "elevenlabs",
   credentials: { kind: "apiKey", apiKey: () => readKeyFromYourVault() },
-  // model defaults to "scribe_v1"; retry takes the same hook as the chat client
+  // model defaults to "scribe_v2"; retry takes the same hook as the chat client
 });
 
 const result = await transcriber.transcribe({
@@ -447,7 +447,11 @@ const result = await transcriber.transcribe({
   sealed edge as chat: one allowed route, no redirects, only the call's own key,
   nothing from the platform's environment.
 - **Errors** are the table below: 401/403 `AuthError`, 429 `RateLimitError`,
-  5xx and network failures `ProviderUnavailableError`, 4xx `InvalidRequestError`.
+  5xx and network failures `ProviderUnavailableError`, any other 4xx
+  `InvalidRequestError`. A 200 that carries no transcript (a webhook-shaped
+  `{ message, request_id }` body) is an `InvalidResponseError`.
+- **Duration.** `durationSeconds` is the provider's `audio_duration_secs`, else
+  the last word's end, else the `durationSeconds` the host passed, else 0.
 - **A second provider** is one `TranscriptionAdapter` (`id`, `credentialKinds`,
   `transcribe(call)`) registered with `createTranscriptionRegistry(...)` and
   passed as `registry`.

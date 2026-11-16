@@ -84,8 +84,8 @@ describe("elevenlabs request mapping", () => {
     expect((seen[0]?.form?.get("file") as File).name).toBe("audio.mp3");
   });
 
-  it("defaults the model to scribe_v1 and lets the host change it", () => {
-    expect(elevenLabsAdapter().defaultModel).toBe("scribe_v1");
+  it("defaults the model to scribe_v2 and lets the host change it", () => {
+    expect(elevenLabsAdapter().defaultModel).toBe("scribe_v2");
     expect(elevenLabsAdapter({ defaultModel: "scribe_x" }).defaultModel).toBe("scribe_x");
   });
 });
@@ -101,6 +101,23 @@ describe("elevenlabs response mapping", () => {
       durationSeconds: 3.5,
       usage: { audioSeconds: 3.5 },
     });
+  });
+
+  it("falls back to the host's durationSeconds when the provider reports no duration", async () => {
+    const body = { text: "oi", language_code: "por", words: [], audio_duration_secs: null };
+    const adapter = elevenLabsAdapter({ fetch: recordingFetch(() => json(body)).fetch });
+    const withHint = await adapter.transcribe(call({ durationSeconds: 7 }));
+    expect(withHint.durationSeconds).toBe(7);
+    expect(withHint.usage.audioSeconds).toBe(7);
+    await expect(adapter.transcribe(call({ durationSeconds: 7, maxDurationSeconds: 5 }))).rejects.toBeInstanceOf(AudioTooLongError);
+    const neither = await adapter.transcribe(call());
+    expect(neither.durationSeconds).toBe(0);
+    expect(neither.usage.audioSeconds).toBe(0);
+  });
+
+  it("rejects a webhook-shaped 200 body as InvalidResponseError", async () => {
+    const adapter = elevenLabsAdapter({ fetch: recordingFetch(() => json({ message: "Request accepted", request_id: "r1" })).fetch });
+    await expect(adapter.transcribe(call())).rejects.toBeInstanceOf(InvalidResponseError);
   });
 
   it("falls back to the last word's end when the duration is null", async () => {
@@ -205,7 +222,7 @@ describe("the sealed edge of this adapter", () => {
 
 describe("createTranscriber", () => {
   it("is built in, with credential kinds checked", () => {
-    expect(createTranscriber({ provider: "elevenlabs", credentials: { kind: "apiKey", apiKey: "k" } }).model).toBe("scribe_v1");
+    expect(createTranscriber({ provider: "elevenlabs", credentials: { kind: "apiKey", apiKey: "k" } }).model).toBe("scribe_v2");
     expect(() =>
       createTranscriber({ provider: "elevenlabs", credentials: { kind: "oauth", token: () => ({ accessToken: "t" }), refresh: () => ({ accessToken: "t" }) } }),
     ).toThrow(/does not accept "oauth"/);
@@ -245,6 +262,12 @@ describe("createTranscriber", () => {
     const long = transcriberFor(() => json({ ...ok, audio_duration_secs: 99 }), { retry: (error) => (error.kind === "invalid_request" ? null : 0) });
     await expect(long.scribe.transcribe({ audio, mimeType: "audio/ogg", maxDurationSeconds: 10 })).rejects.toBeInstanceOf(AudioTooLongError);
     expect(long.seen).toHaveLength(1);
+  });
+
+  it("never retries AudioTooLongError, even when the hook retries everything", async () => {
+    const { scribe, seen } = transcriberFor(() => json({ ...ok, audio_duration_secs: 99 }), { retry: () => 1, sleep: async () => undefined });
+    await expect(scribe.transcribe({ audio, mimeType: "audio/ogg", maxDurationSeconds: 10 })).rejects.toBeInstanceOf(AudioTooLongError);
+    expect(seen).toHaveLength(1);
   });
 
   it("takes a second provider as one adapter", async () => {

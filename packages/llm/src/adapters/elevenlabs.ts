@@ -7,7 +7,7 @@
  * - Request: `multipart/form-data` with `model_id` (required), `file`, and
  *   `language_code` when the host passes a hint. Auth: `xi-api-key`.
  * - Response: `text`, `language_code`, `audio_duration_secs` (nullable; the
- *   last word's `end` stands in), or `{ transcripts: [...] }` for multichannel.
+ *   last word's `end` stands in, then the host's own `durationSeconds`), or `{ transcripts: [...] }` for multichannel.
  * - Only that one route is allowed, redirects are never followed, and the
  *   call's own key is set last on the request (B3).
  * - Credentials: API keys only.
@@ -18,7 +18,7 @@ import type { TranscribeCall, TranscriptionAdapter, TranscriptionResult } from "
 import { sealedFetch, type SealRoute } from "./sealed-fetch";
 
 export const ELEVENLABS_PROVIDER = "elevenlabs";
-export const ELEVENLABS_DEFAULT_MODEL = "scribe_v1";
+export const ELEVENLABS_DEFAULT_MODEL = "scribe_v2";
 
 /** Where ElevenLabs' API lives; never read from the environment. */
 export const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io";
@@ -109,7 +109,7 @@ function fromElevenLabsResponse(body: unknown, model: string, request: Transcrib
   const text = textOf(body);
   if (text === null) throw new InvalidResponseError(ELEVENLABS_PROVIDER, "The response carries no transcript text.");
   const chunk = firstChunk(body);
-  const durationSeconds = numberOf(body.audio_duration_secs) ?? numberOf(chunk.audio_duration_secs) ?? lastWordEnd(chunk.words) ?? 0;
+  const durationSeconds = numberOf(body.audio_duration_secs) ?? numberOf(chunk.audio_duration_secs) ?? lastWordEnd(chunk.words) ?? numberOf(request.durationSeconds) ?? 0;
   assertWithin(durationSeconds, request.maxDurationSeconds);
   const language = languageOf(chunk);
   return {

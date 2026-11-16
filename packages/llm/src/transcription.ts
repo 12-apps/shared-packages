@@ -178,7 +178,7 @@ export function createTranscriber(options: TranscriberOptions): Transcriber {
           const credential = await session.current();
           return await callWithAuth(adapter, { model, request }, credential, (used) => session.afterUnauthorized(used));
         } catch (error) {
-          if (!(error instanceof LlmError)) throw error;
+          if (!(error instanceof LlmError) || error instanceof AudioTooLongError) throw error;
           const delay = retry(error, attempt);
           if (delay === null || request.signal?.aborted) throw error;
           await sleep(delay);
