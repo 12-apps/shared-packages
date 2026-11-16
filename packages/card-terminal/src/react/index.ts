@@ -118,6 +118,8 @@ export {
   type TypedCaptureInbox,
   type TypedCaptureInboxConfig,
   type TypedEntry,
+  type TypedUnheld,
+  type TypedUnholdReason,
   type TypedEntryState,
   type TypedWait,
 } from './typed-captures';

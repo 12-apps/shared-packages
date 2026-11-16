@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CaptureError, type BindTarget, type TerminalCaptureRecord } from '../model';
-import { createTypedCaptureClaims, heldAnswer, typedRefusalOf, type TypedBookAnswer, type TypedCaptureInput } from '../typed-booking';
+import { createTypedCaptureClaims, heldAnswer, timeoutHold, typedRefusalOf, type TypedBookAnswer, type TypedCaptureInput } from '../typed-booking';
 import { OTHER_TENANT, TENANT, capture, wire, world, type World } from './world';
 
 /**
@@ -98,9 +98,11 @@ function host(made: World, options: HostOptions = {}) {
   const typedClaims = createTypedCaptureClaims({ ledger: made.ledger });
 
   /** One decision: the claim, then the caller's policy and session, then its sale and the bind in one transaction. */
-  async function once(input: TypedCaptureInput): Promise<TypedBookAnswer | { lost: unknown }> {
+  async function once(input: TypedCaptureInput, confirmedFlaggedAt: string | null): Promise<TypedBookAnswer | { lost: unknown }> {
     const claim = await typedClaims.claimable(input);
     if (claim.claim !== 'FREE') return heldAnswer(claim, await hostPorts.bookedFor(input.clientId, input.capture.transactionCode));
+    const flagged = timeoutHold(claim, confirmedFlaggedAt);
+    if (flagged !== null) return flagged;
     const policy = await hostPorts.mayBook();
     if (!policy.ok) return { outcome: 'NOT_ALLOWED', reason: policy.reason, ack: false };
     const session = await hostPorts.openSession();
@@ -119,10 +121,10 @@ function host(made: World, options: HostOptions = {}) {
   }
 
   const typedBooking = {
-    async book(input: TypedCaptureInput): Promise<TypedBookAnswer> {
+    async book(input: TypedCaptureInput, confirmedFlaggedAt: string | null = null): Promise<TypedBookAnswer> {
       const losses: unknown[] = [];
       for (let attempt = 0; attempt < BOOK_ATTEMPTS; attempt += 1) {
-        const answer = await once(input);
+        const answer = await once(input, confirmedFlaggedAt);
         if (!('lost' in answer)) return answer;
         losses.push(answer.lost);
       }
@@ -342,13 +344,58 @@ describe('what refuses it', () => {
     expect(sold).toHaveLength(0);
   });
 
-  it('D9-R22: a capture flagged only for the timeout is booked, and the bind clears the flag', async () => {
+  it('P-BOOK R22: a capture flagged only for the timeout is not booked unasked: FLAGGED_TIMEOUT with the flag date, nothing written', async () => {
+    const { w, deviceId, booking, sold } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+    await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString();
+
+    expect(await booking.book({ clientId: TENANT, deviceId, capture: wire() })).toEqual({ outcome: 'FLAGGED_TIMEOUT', flaggedAt, ack: false });
+    expect(await booking.book({ clientId: TENANT, deviceId, capture: wire() }, '2020-01-01T00:00:00.000Z')).toMatchObject({ outcome: 'FLAGGED_TIMEOUT' });
+    expect(sold).toHaveLength(0);
+    expect(w.row('TC-0001')).toMatchObject({ state: 'UNBOUND', refundClearedAt: null });
+  });
+
+  it('P-BOOK R22: a person confirming that very flag books it, and the bind clears the flag', async () => {
     const { w, deviceId, booking } = setUp();
     await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
     await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString() ?? null;
 
-    expect(await booking.book({ clientId: TENANT, deviceId, capture: wire() })).toMatchObject({ outcome: 'BOOKED', created: true });
+    expect(await booking.book({ clientId: TENANT, deviceId, capture: wire() }, flaggedAt)).toMatchObject({ outcome: 'BOOKED', created: true });
     expect(w.row('TC-0001').refundClearedAt).not.toBeNull();
+  });
+
+  it('P-BOOK R22: a flagged capture picked onto a sale unconfirmed is refused by pickHold, and nothing is written', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+    await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString();
+    const input = { clientId: TENANT, deviceId, capture: wire() };
+
+    expect(await claims.pickHold(input, null)).toEqual({ outcome: 'FLAGGED_TIMEOUT', flaggedAt, ack: false });
+    expect(await claims.pickHold(input, '2020-01-01T00:00:00.000Z')).toMatchObject({ outcome: 'FLAGGED_TIMEOUT' });
+    expect(w.row('TC-0001')).toMatchObject({ state: 'UNBOUND', orderId: null, refundClearedAt: null });
+  });
+
+  it('P-BOOK R22: a confirmed pick passes pickHold, and binding it to the sale clears the flag', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+    await w.ledger.flag({ clientId: TENANT, transactionCode: 'TC-0001' }, 'UNBOUND_TIMEOUT');
+    const flaggedAt = w.row('TC-0001').refundFlaggedAt?.toISOString() ?? null;
+
+    expect(await claims.pickHold({ clientId: TENANT, deviceId, capture: wire() }, flaggedAt)).toBeNull();
+    const target = w.sale();
+    await w.ledger.bind(null, TENANT, ['TC-0001'], target);
+    expect(w.row('TC-0001')).toMatchObject({ state: 'BOUND', orderId: target.orderId });
+    expect(w.row('TC-0001').refundClearedAt).not.toBeNull();
+  });
+
+  it('P-BOOK R22: pickHold lets an unflagged capture through', async () => {
+    const { w, deviceId, claims } = setUp();
+    await w.ledger.record(capture({ deviceId, source: 'DEVICE' }));
+
+    expect(await claims.pickHold({ clientId: TENANT, deviceId, capture: wire() }, null)).toBeNull();
   });
 
   it('D9-R13: a host error inside the transaction that is not a race is thrown at once, never decided again', async () => {
@@ -375,7 +422,7 @@ describe('caller-driven: the claims decide payment state only', () => {
 
     const claim = await claims.claimable({ clientId: TENANT, deviceId, capture: wire() });
 
-    expect(claim).toMatchObject({ claim: 'FREE', clientId: TENANT, deviceId, capture: expect.objectContaining({ transactionCode: 'TC-0001', state: 'UNBOUND' }) });
+    expect(claim).toMatchObject({ claim: 'FREE', clientId: TENANT, deviceId, timeoutFlaggedAt: null, capture: expect.objectContaining({ transactionCode: 'TC-0001', state: 'UNBOUND' }) });
     expect(w.row('TC-0001').state).toBe('UNBOUND');
     expect(sold).toHaveLength(0);
   });

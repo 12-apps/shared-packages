@@ -1,6 +1,6 @@
 import { owedBackForGood } from './decisions';
 import type { TerminalCaptureLedger } from './ledger';
-import { CaptureError, clampToNow, type BindTarget, type RecordCaptureInput, type TerminalCaptureRecord } from './model';
+import { CaptureError, clampToNow, refundLive, type BindTarget, type RecordCaptureInput, type TerminalCaptureRecord } from './model';
 import type { StationCaptureWire } from './readers';
 
 /**
@@ -15,7 +15,9 @@ import type { StationCaptureWire } from './readers';
  * 1. {@link TypedCaptureClaims.claimable}: records the capture and answers
  *    whether it is `FREE` (UNBOUND, not owed back), `HELD` by a sale, `FLAGGED`
  *    (owed back), or `REFUSED`.
- * 2. Only on `FREE`, and once its own policy and session allow it, the caller
+ * 2. Only on `FREE`, and once {@link timeoutHold} answers null (a capture the
+ *    refund sweep flagged `UNBOUND_TIMEOUT` is booked only on a person's
+ *    answer, D9-R22) and its own policy and session allow it, the caller
  *    opens ONE transaction and writes its sale and the sale's one payment row
  *    (the capture's kind and amount), sold by `claim.deviceId`.
  * 3. In that same transaction it calls {@link TypedCaptureClaims.bind} with the
@@ -48,12 +50,16 @@ export type TypedBookRefusal = 'CONFLICT' | 'DEVICE_MISMATCH' | 'CONTENDED';
  * The booking's answer, as the caller gives it to the station. The engine
  * answers `BOOKED`, `BOUND`, `FLAGGED` and `REFUSED`; `WAITING` (no open
  * session) and `NOT_ALLOWED` (the caller's policy, its own reason code) are the
- * caller's own. `ack`: the terminal may stop reporting the capture.
+ * caller's own. `FLAGGED_TIMEOUT` ({@link timeoutHold}): the sweep flagged it
+ * for a refund (`UNBOUND_TIMEOUT`, shown "A estornar") at `flaggedAt` (ISO),
+ * and nobody confirmed booking it anyway; it is booked only once a person
+ * confirms that very flag. `ack`: the terminal may stop reporting the capture.
  */
 export type TypedBookAnswer =
   | { outcome: 'BOOKED'; orderId: string; paymentId: string; created: boolean; ack: true }
   | { outcome: 'BOUND'; orderId: string; ack: true }
   | { outcome: 'FLAGGED'; ack: true }
+  | { outcome: 'FLAGGED_TIMEOUT'; flaggedAt: string; ack: false }
   | { outcome: 'WAITING'; ack: false }
   | { outcome: 'NOT_ALLOWED'; reason: string; ack: false }
   | { outcome: 'REFUSED'; code: TypedBookRefusal; ack: false };
@@ -68,12 +74,14 @@ export interface TypedCaptureInput {
 /**
  * What the capture is free for.
  * - `FREE`: the caller may book it; `deviceId` is the seller, `capture` the recorded row.
+ *   `timeoutFlaggedAt`: when the sweep flagged it `UNBOUND_TIMEOUT` (a bind clears that
+ *   flag), null when it is not so flagged; see {@link timeoutHold}.
  * - `HELD`: a sale holds it (`paymentId` null while only marked created).
  * - `FLAGGED`: its money is owed back for good; acknowledged, never booked.
  * - `REFUSED`: see {@link TypedBookRefusal}.
  */
 export type TypedClaim =
-  | { claim: 'FREE'; clientId: string; deviceId: string; capture: TerminalCaptureRecord }
+  | { claim: 'FREE'; clientId: string; deviceId: string; capture: TerminalCaptureRecord; timeoutFlaggedAt: Date | null }
   | { claim: 'HELD'; orderId: string; paymentId: string | null }
   | { claim: 'FLAGGED' }
   | { claim: 'REFUSED'; code: TypedBookRefusal };
@@ -97,6 +105,18 @@ export interface TypedCaptureClaims<TTx = unknown> {
    * `REFUSED` `CONTENDED` (`ack: false`) and let the terminal report it again.
    */
   bind(tx: TTx, claim: Extract<TypedClaim, { claim: 'FREE' }>, target: BindTarget): Promise<Extract<TypedBookAnswer, { outcome: 'BOOKED' }>>;
+  /**
+   * D9-R22 on the sale route: a person tapped a typed capture onto one of the
+   * caller's sales ("Is it this sale?"). Before the caller's settle binds it to
+   * that sale, ask this with the page's `confirmedFlaggedAt`. It records the
+   * capture like {@link claimable}; a `FREE` capture flagged `UNBOUND_TIMEOUT`
+   * whose flag the person has not confirmed answers `FLAGGED_TIMEOUT`, and the
+   * caller binds nothing (the general bind would clear the flag, booking money
+   * that may already be refunded) and hands the answer to the page
+   * (`inbox.pickRefused`). Null otherwise: any other claim is left to the
+   * caller's own binder, which refuses what it must.
+   */
+  pickHold(input: TypedCaptureInput, confirmedFlaggedAt: string | null): Promise<Extract<TypedBookAnswer, { outcome: 'FLAGGED_TIMEOUT' }> | null>;
 }
 
 const STOPS: ReadonlySet<string> = new Set<TypedBookRefusal>(['CONFLICT', 'DEVICE_MISMATCH', 'CONTENDED']);
@@ -128,6 +148,23 @@ export function typedRefusalOf(error: unknown): Extract<TypedClaim, { claim: 'RE
 }
 
 /**
+ * D9-R22: may this `FREE` capture be booked now? Null when it may: it is not
+ * flagged `UNBOUND_TIMEOUT`, or a person confirmed booking it anyway and
+ * `confirmedFlaggedAt` is that very flag's date (ISO, as the answer gave it).
+ * Otherwise the `FLAGGED_TIMEOUT` answer (`ack: false`), and the caller writes
+ * nothing: the money may already have been refunded on the terminal, so an
+ * arrival or a retry never books it. Pure.
+ */
+export function timeoutHold(
+  claim: Extract<TypedClaim, { claim: 'FREE' }>,
+  confirmedFlaggedAt: string | null,
+): Extract<TypedBookAnswer, { outcome: 'FLAGGED_TIMEOUT' }> | null {
+  if (claim.timeoutFlaggedAt === null) return null;
+  const flaggedAt = claim.timeoutFlaggedAt.toISOString();
+  return confirmedFlaggedAt === flaggedAt ? null : { outcome: 'FLAGGED_TIMEOUT', flaggedAt, ack: false };
+}
+
+/**
  * The answer for a claim that is not `FREE`. `bookedFor` is the caller's own
  * key: the sale it booked for this capture's code, or null. Pure.
  */
@@ -148,20 +185,27 @@ export function createTypedCaptureClaims<TTx = unknown>(config: TypedCaptureClai
     if (capture.deviceId !== null && capture.deviceId !== input.deviceId) return { claim: 'REFUSED', code: 'DEVICE_MISMATCH' };
     if (capture.orderId !== null) return { claim: 'HELD', orderId: capture.orderId, paymentId: capture.paymentId };
     if (owedBackForGood(capture)) return { claim: 'FLAGGED' };
-    return { claim: 'FREE', clientId: input.clientId, deviceId: capture.deviceId ?? input.deviceId, capture };
+    const timeoutFlaggedAt = refundLive(capture) && capture.refundReason === 'UNBOUND_TIMEOUT' ? capture.refundFlaggedAt : null;
+    return { claim: 'FREE', clientId: input.clientId, deviceId: capture.deviceId ?? input.deviceId, capture, timeoutFlaggedAt };
+  }
+
+  async function claimable(input: TypedCaptureInput): Promise<TypedClaim> {
+    // No terminal named: the tenant check would be skipped, so nothing is recorded.
+    if (input.deviceId.trim() === '') return { claim: 'REFUSED', code: 'DEVICE_MISMATCH' };
+    try {
+      return await decide(input);
+    } catch (error) {
+      const refused = typedRefusalOf(error);
+      if (refused !== null) return refused;
+      throw error;
+    }
   }
 
   return {
-    async claimable(input) {
-      // No terminal named: the tenant check would be skipped, so nothing is recorded.
-      if (input.deviceId.trim() === '') return { claim: 'REFUSED', code: 'DEVICE_MISMATCH' };
-      try {
-        return await decide(input);
-      } catch (error) {
-        const refused = typedRefusalOf(error);
-        if (refused !== null) return refused;
-        throw error;
-      }
+    claimable,
+    async pickHold(input, confirmedFlaggedAt) {
+      const claim = await claimable(input);
+      return claim.claim === 'FREE' ? timeoutHold(claim, confirmedFlaggedAt) : null;
     },
     async bind(tx, claim, target) {
       await ledger.bind(tx, claim.clientId, [claim.capture.transactionCode], target, clock());

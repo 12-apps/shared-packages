@@ -27,7 +27,7 @@ interface Setup {
 
 function inbox(setup: Setup = {}) {
   const answers = [...(setup.answers ?? [])];
-  const book = vi.fn<(deviceId: string, capture: CaptureWire) => Promise<TypedBookAnswer>>(async () => {
+  const book = vi.fn<(deviceId: string, capture: CaptureWire, confirmedFlaggedAt: string | null) => Promise<TypedBookAnswer>>(async () => {
     const next = answers.shift() ?? BOOKED;
     if (next instanceof Error) throw next;
     return next;
@@ -144,7 +144,7 @@ describe('booking on its own (State 2)', () => {
     expect(ack).not.toHaveBeenCalled();
     await settle();
 
-    expect(book).toHaveBeenCalledWith(DEVICE, expect.objectContaining({ transactionCode: 'TC-2500', amountCents: 2500 }));
+    expect(book).toHaveBeenCalledWith(DEVICE, expect.objectContaining({ transactionCode: 'TC-2500', amountCents: 2500 }), null);
     expect(ack).toHaveBeenCalledWith(DEVICE, ['TC-2500']);
     expect(onAnswer).toHaveBeenCalledWith(expect.objectContaining({ state: 'done', answer: BOOKED }));
   });
