@@ -9,6 +9,7 @@
     "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
     "./hono": "./src/hono/index.ts",
+    "./pdf": "./src/pdf/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
     "./manifest/web": "./src/manifest/web.ts",
@@ -31,6 +32,7 @@
   },
   "dependencies": {
     "@12-apps/ui": "workspace:*",
+    "pdf-lib": "1.17.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {
