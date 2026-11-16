@@ -42,6 +42,8 @@ export const PT_BR_REPORT_SCHEDULE_COPY: ReportScheduleCopy = {
   recipientsLoading: "Carregando as pessoas da loja…",
   recipientsFailed: "Não foi possível carregar as pessoas da loja.",
   recipientsEmpty: "Nenhuma pessoa da loja para escolher.",
-  zoneNote: (timeZone) =>
-    `Horário de ${timeZone} (fuso da loja). Só recebe quem tem acesso às informações deste relatório.`,
+  needsRecipient: "Escolha quem recebe o envio automático, ou desligue o envio.",
+  retry: "Tentar de novo",
+  zoneNote: (zoneName) =>
+    `Horário de ${zoneName} (fuso da loja). Só recebe quem tem acesso às informações deste relatório.`,
 };

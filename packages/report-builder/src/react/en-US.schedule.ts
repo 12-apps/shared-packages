@@ -39,6 +39,8 @@ export const EN_US_REPORT_SCHEDULE_COPY: ReportScheduleCopy = {
   recipientsLoading: "Loading the store's people…",
   recipientsFailed: "Could not load the store's people.",
   recipientsEmpty: "No one in the store to choose.",
-  zoneNote: (timeZone) =>
-    `Time in ${timeZone} (the store's zone). Only people with access to this report's data receive it.`,
+  needsRecipient: "Choose who receives the automatic delivery, or turn it off.",
+  retry: "Try again",
+  zoneNote: (zoneName) =>
+    `Time in ${zoneName} (the store's zone). Only people with access to this report's data receive it.`,
 };

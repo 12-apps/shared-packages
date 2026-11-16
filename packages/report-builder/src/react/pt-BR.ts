@@ -103,7 +103,6 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
       "As alterações que você ainda não publicou serão perdidas e o relatório volta à versão publicada. Não dá para desfazer.",
     discardConfirm: "Descartar alterações",
     needsName: "Dê um nome ao relatório antes de salvar.",
-    needsRecipient: "Escolha quem recebe o envio automático, ou desligue-o.",
     needsBlock: "Adicione ao menos um bloco ao relatório.",
     addBlock: "Adicionar bloco — gráfico, tabela ou indicador",
     addBlockLimit: (max) => `Limite de ${max} blocos por relatório.`,

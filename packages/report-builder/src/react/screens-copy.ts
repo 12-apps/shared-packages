@@ -133,8 +133,8 @@ export interface ReportEditorCopy {
   discardConfirm: string;
   /** Why a save is refused. */
   needsName: string;
-  /** The automatic delivery is on and nobody is ticked (FUT-776). */
-  needsRecipient: string;
+  /** Automatic delivery is on and nobody is ticked (FUT-776); absent: the package's own words. */
+  needsRecipient?: string;
   needsBlock: string;
   /** The canvas: adding a block, and removing one. */
   addBlock: string;
@@ -354,8 +354,14 @@ export interface ReportSettingsCopy {
   statusCards: Readonly<Record<string, ReportChoiceCardCopy>>;
   /** The audience cards, keyed by the stored visibility. */
   visibilityCards: Readonly<Record<string, ReportChoiceCardCopy>>;
-  /** The scheduled e-mail delivery section (FUT-776). */
-  schedule: ReportScheduleCopy;
+  /** The delivery section (FUT-776); absent: the package's own words for the pack's locale. */
+  schedule?: ReportScheduleCopy;
+  /** @deprecated The deferred row is gone (FUT-776); ignored. */
+  scheduleLabel?: string;
+  /** @deprecated Ignored. */
+  scheduleValue?: string;
+  /** @deprecated Ignored. */
+  scheduleReason?: string;
   /** The audience field's own label, above the cards. */
   visibilityLabel: string;
   /** The dialog's dismiss, which carries no visible label. */

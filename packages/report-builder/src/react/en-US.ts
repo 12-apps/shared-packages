@@ -114,7 +114,6 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
       "The changes you have not published will be lost and the report returns to its published version. This cannot be undone.",
     discardConfirm: "Discard changes",
     needsName: "Give the report a name before saving.",
-    needsRecipient: "Choose who receives the automatic delivery, or turn it off.",
     needsBlock: "Add at least one block to the report.",
     addBlock: "Add a block — chart, table or number",
     addBlockLimit: (max) => `Limit of ${max} blocks per report.`,

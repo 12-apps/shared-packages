@@ -4,6 +4,7 @@ import { draftFromWire, wireFromDraft, type ScheduleDraft } from '../lib/schedul
 import { editorSource } from '../report-editor-source';
 import { documentGuardError } from '../report-editor-writes';
 import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+import { PT_BR_REPORT_SCHEDULE_COPY } from '../pt-BR.schedule';
 import type { SavedReportView } from '../custom-reports-api';
 
 const DRAFT: ScheduleDraft = {
@@ -83,7 +84,8 @@ describe('documentGuardError for the schedule', () => {
       schedule,
     };
   };
-  const { editor, builder } = PT_BR_REPORT_SCREENS_COPY;
+  const { builder } = PT_BR_REPORT_SCREENS_COPY;
+  const editor = { ...PT_BR_REPORT_SCREENS_COPY.editor, needsRecipient: PT_BR_REPORT_SCHEDULE_COPY.needsRecipient };
 
   it('holds a save that would switch delivery on for nobody', () => {
     expect(documentGuardError(state({ ...DRAFT, recipients: [] }), editor, builder)).toBe(editor.needsRecipient);

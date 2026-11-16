@@ -45,7 +45,7 @@ function toSaveInput(state: PersistedEditorState): ReportWorkingCopyWire {
  */
 export function documentGuardError(
   state: PersistedEditorState,
-  copy: ReportEditorCopy,
+  copy: ReportEditorCopy & { needsRecipient: string },
   builderCopy: ReportBuilderPanelCopy,
 ): string | null {
   if (state.draft.name.trim() === "") return copy.needsName;

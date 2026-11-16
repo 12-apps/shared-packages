@@ -1,4 +1,5 @@
 import type { ScheduleCadence } from "../schedule";
+import type { ReportScreensCopy } from "./screens-copy";
 
 /** What the summary sentence under the switch is told about the choice. */
 export interface ReportScheduleSummaryInput {
@@ -35,5 +36,19 @@ export interface ReportScheduleCopy {
   recipientsFailed: string;
   recipientsEmpty: string;
   /** The footnote under the people list: whose clock, and who is left out. */
-  zoneNote(timeZone: string): string;
+  zoneNote(zoneName: string): string;
+  /** Why a save is held with the switch on and nobody ticked. */
+  needsRecipient: string;
+  /** The recipients list could not be loaded: the retry control. */
+  retry: string;
 }
+
+/**
+ * What the screens read: `ReportBuilderCopy` with the delivery words filled in,
+ * so a host whose pack predates them keeps compiling and renders the package's
+ * own words (FUT-776). `withScheduleDefaults` produces it.
+ */
+export type ResolvedScreensCopy = Omit<ReportScreensCopy, "settings" | "editor"> & {
+  settings: ReportScreensCopy["settings"] & { schedule: ReportScheduleCopy };
+  editor: ReportScreensCopy["editor"] & { needsRecipient: string };
+};
