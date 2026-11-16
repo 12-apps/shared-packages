@@ -113,6 +113,7 @@ export function useFlowPorts(runtime: FlowsRuntime): Omit<CheckoutPorts, "useAva
   const hasSave = current.saveBuyerContact !== undefined;
   const hasPaid = current.onPaid !== undefined;
   const hasApple = current.validateApplePayMerchant !== undefined;
+  const short = useShortPorts(latest, current);
   return useMemo(
     () => ({
       createPayable: (input) => latest.current.createPayable(input),
@@ -126,8 +127,34 @@ export function useFlowPorts(runtime: FlowsRuntime): Omit<CheckoutPorts, "useAva
             return validate ? validate(validationURL) : Promise.reject(new Error("no merchant validation port"));
           }
         : undefined,
+      ...short,
     }),
-    [hasSave, hasPaid, hasApple],
+    [hasSave, hasPaid, hasApple, short],
+  );
+}
+
+/** The two short-capture acts (FUT-612), wrapped like the others: stable, calling the latest. */
+function useShortPorts(
+  latest: { current: Omit<CheckoutPorts, "useAvailability"> },
+  current: Omit<CheckoutPorts, "useAvailability">,
+): Pick<CheckoutPorts, "payDifference" | "requestShortRefund"> {
+  const hasDifference = current.payDifference !== undefined;
+  const hasRefund = current.requestShortRefund !== undefined;
+  return useMemo(
+    () => ({
+      ...(hasDifference
+        ? { payDifference: (input) => (latest.current.payDifference ?? latest.current.createPayable)(input) }
+        : {}),
+      ...(hasRefund
+        ? {
+            requestShortRefund: (orderId) => {
+              const refund = latest.current.requestShortRefund;
+              return refund ? refund(orderId) : Promise.reject(new Error("no short refund port"));
+            },
+          }
+        : {}),
+    }),
+    [hasDifference, hasRefund, latest],
   );
 }
 

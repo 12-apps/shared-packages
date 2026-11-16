@@ -83,6 +83,7 @@ export type {
 } from './components/checkout/view-copy';
 export type { ShortPaymentCopy } from './components/checkout/short-copy';
 export type { CheckoutStatusDetail } from './components/checkout/status-detail';
+export type { ShortPaymentPorts } from './components/checkout/use-short-payment';
 export {
   PT_BR_CHECKOUT_COPY,
   PT_BR_CHECKOUT_VIEW_COPY,

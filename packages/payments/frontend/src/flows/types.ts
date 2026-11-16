@@ -88,6 +88,14 @@ export interface CheckoutPorts {
    * Apple Pay sheet cannot start and the card form remains the way to pay.
    */
   validateApplePayMerchant?(validationURL: string): Promise<unknown>;
+  /**
+   * A short-paid pedido's balance order (FUT-612): answered like
+   * `createPayable`, its amount the difference. Absent, "Pagar R$ X" is not
+   * offered. See `ShortPaymentPorts`.
+   */
+  payDifference?(input: CreateOrderRequest): Promise<CreateOrderResult>;
+  /** Cancel and have a short capture returned; answers `/status`'s detail after it (FUT-612). */
+  requestShortRefund?(orderId: string): Promise<Result<CheckoutStatusDetail>>;
   /** The remedy shown on the no-provider screen, AND the host's veto. */
   useAvailability?(): CheckoutAvailability;
 }

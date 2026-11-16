@@ -107,6 +107,8 @@ export const CHECKOUT_PROP_ROUTES = {
   onExitToMenu: "usePorts",
   onPaid: "usePorts",
   validateApplePayMerchant: "usePorts",
+  payDifference: "usePorts",
+  requestShortRefund: "usePorts",
   components: "mount",
   parkHostedOrders: "mount",
 } as const satisfies { readonly [K in keyof Required<CheckoutFlowProps>]: PropRoute };
@@ -149,6 +151,8 @@ export function createCheckoutPropsBinding(base: CheckoutPropsBindingBase): Chec
         exitToCatalog: p.onExitToMenu,
         onPaid: p.onPaid,
         validateApplePayMerchant: p.validateApplePayMerchant,
+        payDifference: p.payDifference,
+        requestShortRefund: p.requestShortRefund,
       };
     },
   };

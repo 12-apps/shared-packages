@@ -4,6 +4,7 @@ import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutCopy } from "./copy-context";
 import { createPollLoop, type PollLoop, type PollingOptions, type PollSink } from "./poll-loop";
 import { useLiveWait } from "./live-context";
+import { askStatus, useStatusFactsReporter } from "./status-facts-context";
 import { carriesSettlementPair } from "./transport";
 import type { OrderStatus } from "./types";
 
@@ -141,6 +142,7 @@ export function usePaymentPolling(
   // belongs in the deps below rather than being read out of a ref: a checkout
   // re-pointed at another mount must re-poll against THAT one.
   const client = useCheckoutClientApi();
+  const reportFacts = useStatusFactsReporter(); // FUT-612: the money facts ride this same answer
   // The buyer's own sentence for "we could not reach the server", reused for an
   // ask abandoned for hanging. `Result.error` is rendered verbatim by the PIX,
   // card and wallet panels, so without this a hang printed the English token
@@ -155,7 +157,7 @@ export function usePaymentPolling(
     if (!orderId || !enabled) return undefined;
 
     const running = createPollLoop(
-      () => client.getStatus(orderId),
+      () => askStatus(client, orderId, reportFacts),
       {
         intervalMs,
         maxWaitMs,
@@ -186,6 +188,7 @@ export function usePaymentPolling(
     slowIntervalMs,
     askTimeoutMs,
     client,
+    reportFacts,
     transportCopy,
     isLive, liveIntervalMs,
   ]);
