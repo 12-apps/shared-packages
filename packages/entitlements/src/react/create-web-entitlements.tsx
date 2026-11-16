@@ -25,16 +25,10 @@ import { UpsellPromptHost } from './upsell-host';
 import { UpgradeButton, type UpgradeButtonProps } from './upgrade-button';
 import { createWithEntitlement, type EntitlementGate } from './with-entitlement';
 
-/** The default link: a plain anchor. Pass the router's Link to replace it. */
-function PlainAnchor({
-  to,
-  onClick,
-  children,
-  className,
-  ...rest
-}: EntitlementsLinkProps): JSX.Element {
+/** The default link: a plain anchor that keeps every prop it is given. */
+function PlainAnchor({ to, children, ...rest }: EntitlementsLinkProps): JSX.Element {
   return (
-    <a href={to} onClick={onClick} className={className} data-testid={rest['data-testid']}>
+    <a href={to} {...rest}>
       {children}
     </a>
   );

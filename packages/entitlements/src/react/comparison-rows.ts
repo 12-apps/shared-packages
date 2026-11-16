@@ -128,7 +128,7 @@ function lineForKey(tier: ComparisonTier, key: string): ComparisonLine | undefin
  * that carries the request's key.
  *
  * The screen words its rows because what a feature means HERE is the
- * screen's to say ("Crédito na carteira de cada cliente"), not the plan
+ * screen's to say ("Export to PDF" rather than the catalogue's "Reports"), not the plan
  * page's catalogue sentence. So the same key may open several rows: one
  * entitlement can gate several things the screen lists apart, and each gets a
  * row of its own (the row's identity is its position, never its key). A key

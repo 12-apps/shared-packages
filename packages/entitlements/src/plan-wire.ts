@@ -191,6 +191,10 @@ export interface UpsellPrompt {
   compareKeys?: readonly string[];
   /** The comparison's title, in the screen's own words (`PlanCompareRequest.title`). */
   compareTitle?: string;
+  /** A sentence under the title (`PlanCompareRequest.subtitle`). */
+  compareSubtitle?: string;
+  /** A note under the table (`PlanCompareRequest.footnote`). */
+  compareFootnote?: string;
   /** The screen's own labelled rows (`PlanCompareRequest.rows`). */
   compareRows?: readonly ComparisonRowRequest[];
   /** `'each'`: one action per offered upgrade plan (`PlanCompareRequest.offer`). */

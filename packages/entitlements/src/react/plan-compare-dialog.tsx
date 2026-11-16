@@ -27,7 +27,7 @@
  * sits in the dialog's actions slot, pinned under the scrolling rows, so the
  * one action is on screen at 320 px without a scroll.
  */
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
@@ -60,31 +60,8 @@ import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
 import { raiseUpsell } from './upsell-channel';
 import type { ResolvedWebConfig } from './web-config';
 
-/** What a screen hands the comparison. */
-export interface PlanCompareRequest {
-  /**
-   * The rows to compare, by {@link ComparisonLine.key}, worded by the host's
-   * plan catalogue. Keys no line carries are ignored; when none matches, the
-   * dialog says so rather than opening blank. Ignored when `rows` is given.
-   */
-  keys?: readonly string[] | undefined;
-  /**
-   * The screen's OWN rows, worded in its own copy: each names the line that
-   * decides its marks (`key`) and the `label` it shows. A key may repeat, one
-   * entitlement gating several rows. Shown in the screen's order. Wins over
-   * `keys`.
-   */
-  rows?: readonly ComparisonRowRequest[] | undefined;
-  /** The dialog's title, in the screen's words. Default: the copy pack's. */
-  title?: string | undefined;
-  /**
-   * What the footer offers. `'cheapest'` (default): one ask, for the tier
-   * `plan` names or else the cheapest upgrade covering every row. `'each'`:
-   * one "Conhecer o <plano>" per upgrade tier on sale, each linking the
-   * plans page at that tier; `plan` is then ignored. Without a `plansPath`
-   * there is nothing to link, so `'each'` falls back to `'cheapest'`.
-   */
-  offer?: CompareOfferMode | undefined;
+/** What every request carries, whichever way it names its rows. */
+interface PlanCompareBaseRequest {
   /**
    * The tier to offer. Omitted or null: the cheapest upgrade tier that
    * includes EVERY compared row. A tier that is not an upgrade (the tenant's
@@ -93,12 +70,71 @@ export interface PlanCompareRequest {
   plan?: string | null;
   /** The feature that prompted the ask, filed beside the request. */
   feature?: string;
+  /** The dialog's title, in the screen's words. Default: the copy pack's. */
+  title?: string | undefined;
+  /** A sentence under the title, above the table, in the screen's words. */
+  subtitle?: string | undefined;
+  /** A note under the table, in the screen's words. */
+  footnote?: string | undefined;
+  /**
+   * A picture beside the subtitle, above the table. The screen draws it (the
+   * package names no brand artwork); it is decoration unless the node says
+   * otherwise, so give it its own accessible name if it carries meaning.
+   */
+  illustration?: ReactNode;
+  /**
+   * What the footer offers. `'cheapest'` (default): one ask, for the tier
+   * `plan` names or else the cheapest upgrade covering every row. `'each'`:
+   * one "Conhecer o <plano>" per upgrade tier on sale, each linking the
+   * plans page at that tier; `plan` is then ignored. Without a `plansPath`
+   * there is nothing to link, so `'each'` falls back to `'cheapest'`.
+   */
+  offer?: CompareOfferMode | undefined;
 }
 
-export interface PlanCompareProps extends PlanCompareRequest {
+/**
+ * What a screen hands the comparison: the rows by `keys`, worded by the
+ * host's plan catalogue, OR its own `rows`, worded in its own copy. One of
+ * the two is required.
+ */
+export type PlanCompareRequest = PlanCompareBaseRequest &
+  (
+    | {
+        /**
+         * The rows to compare, by {@link ComparisonLine.key}. Keys no line
+         * carries are ignored; when none matches, the dialog says so rather
+         * than opening blank.
+         */
+        keys: readonly string[];
+        rows?: undefined;
+      }
+    | {
+        /**
+         * The screen's OWN rows: each names the line that decides its marks
+         * (`key`) and the `label` it shows. A key may repeat, one entitlement
+         * gating several rows. Shown in the screen's order.
+         */
+        rows: readonly ComparisonRowRequest[];
+        keys?: undefined;
+      }
+  );
+
+/**
+ * The controlled component's props. Looser than {@link PlanCompareRequest} on
+ * purpose: a component is rendered from state, with props merged from several
+ * places, and a union does not survive a spread. `keys` or `rows` is still what
+ * it reads (rows win; neither shows the empty sentence); `openPlanCompare`,
+ * the call a screen writes by hand, is the strict one.
+ */
+export interface PlanCompareProps extends PlanCompareBaseRequest {
   open: boolean;
   onClose: () => void;
+  keys?: readonly string[] | undefined;
+  rows?: readonly ComparisonRowRequest[] | undefined;
 }
+
+/** What the dialog reads: either way of naming rows, neither required here. */
+type PlanCompareRead = Omit<PlanCompareProps, 'open' | 'onClose'>;
 
 /** The all-plans link, with a 40 px hit area (a 16 px line of text is not a target). */
 function AllPlansLink({
@@ -179,10 +215,42 @@ function CompareFooter({
   return <SingleAskFooter offer={offer} feature={feature} config={config} onClose={onClose} />;
 }
 
+/** The picture and the sentence above the table, when the screen gave either. */
+function CompareIntro({
+  subtitle,
+  illustration,
+  gap,
+}: {
+  subtitle: string | undefined;
+  illustration: ReactNode;
+  gap: number;
+}): JSX.Element | null {
+  const hasText = subtitle !== undefined && subtitle !== '';
+  const hasPicture = illustration !== undefined && illustration !== null && illustration !== false;
+  if (!hasText && !hasPicture) return null;
+  return (
+    <Box
+      sx={{ display: 'flex', alignItems: 'center', columnGap: 2, mb: gap }}
+      data-testid="plan-compare-intro"
+    >
+      {hasPicture ? (
+        <Box sx={{ flexShrink: 0 }} data-testid="plan-compare-illustration">
+          {illustration}
+        </Box>
+      ) : null}
+      {hasText ? (
+        <Text as="div" color="secondary" data-testid="plan-compare-subtitle">
+          {subtitle}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
 /** The matrix rows: the screen's own, or the payload's lines it named by key. */
 function matrixFor(
   tiers: ComparisonTier[],
-  request: PlanCompareRequest,
+  request: PlanCompareRead,
 ): { selected: ComparisonTier[]; sections: MatrixSection[] } {
   if (request.rows !== undefined) {
     const selected = selectComparisonRows(tiers, keysOfRows(request.rows));
@@ -204,7 +272,7 @@ function PlanCompareBody({
   onClose,
 }: {
   tiers: ComparisonTier[];
-  request: PlanCompareRequest;
+  request: PlanCompareRead;
   config: ResolvedWebConfig;
   dense: boolean;
   onClose: () => void;
@@ -229,6 +297,11 @@ function PlanCompareBody({
   return (
     <>
       <DialogContent dense={dense}>
+        <CompareIntro
+          subtitle={request.subtitle}
+          illustration={request.illustration}
+          gap={dense ? 1 : 2}
+        />
         <Box ref={measureRef} data-testid="plan-compare">
           {rowCount === 0 ? (
             <Text as="div" color="secondary" data-testid="plan-compare-empty">
@@ -244,6 +317,13 @@ function PlanCompareBody({
             />
           )}
         </Box>
+        {request.footnote === undefined || request.footnote === '' ? null : (
+          <Box sx={{ mt: 1.5 }}>
+            <Text as="div" size="sm" color="secondary" data-testid="plan-compare-footnote">
+              {request.footnote}
+            </Text>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions alignment="left">
         <CompareFooter
@@ -264,7 +344,7 @@ function PlanCompareLoader({
   dense,
   onClose,
 }: {
-  request: PlanCompareRequest;
+  request: PlanCompareRead;
   config: ResolvedWebConfig;
   dense: boolean;
   onClose: () => void;
@@ -304,11 +384,13 @@ function PlanCompareLoader({
 }
 
 /** One identity per request: a new request is a new dialog, not a reused "sent" state. */
-function requestKey(request: PlanCompareRequest): string {
+function requestKey(request: PlanCompareRead): string {
   return JSON.stringify([
     request.keys ?? null,
     request.rows ?? null,
     request.title ?? null,
+    request.subtitle ?? null,
+    request.footnote ?? null,
     request.offer ?? null,
     request.plan ?? null,
     request.feature ?? null,
@@ -368,5 +450,8 @@ export function openPlanCompare(request: PlanCompareRequest & { feature: string 
     ...(request.title === undefined ? {} : { compareTitle: request.title }),
     ...(request.rows === undefined ? {} : { compareRows: request.rows }),
     ...(request.offer === undefined ? {} : { compareOffer: request.offer }),
+    ...(request.subtitle === undefined ? {} : { compareSubtitle: request.subtitle }),
+    ...(request.footnote === undefined ? {} : { compareFootnote: request.footnote }),
+    ...(request.illustration === undefined ? {} : { compareIllustration: request.illustration }),
   });
 }

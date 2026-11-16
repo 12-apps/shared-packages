@@ -217,6 +217,4 @@ export interface EntitlementsWebCopy {
 }
 
 /** The copy as the screens read it: every optional block resolved. */
-export type ResolvedEntitlementsWebCopy = EntitlementsWebCopy & {
-  planCompare: PlanCompareCopy & Required<Pick<PlanCompareCopy, 'learnPlan'>>;
-};
+export type ResolvedEntitlementsWebCopy = EntitlementsWebCopy & { planCompare: PlanCompareCopy };

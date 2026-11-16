@@ -24,11 +24,11 @@ import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { UpsellPrompt, UpsellReason } from '../plan-wire';
+import type { UpsellReason } from '../plan-wire';
 import { PlanCompareDialog } from './plan-compare-dialog';
 import { createPlanApi, useRead } from './plan-api';
 import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
-import { subscribeToUpsell } from './upsell-channel';
+import { subscribeToUpsell, type UpsellPrompt } from './upsell-channel';
 import type { ResolvedWebConfig } from './web-config';
 
 /** The two reasons an upgrade honestly fixes. */
@@ -152,18 +152,27 @@ export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX
   // switched-off feature keeps the plain prompt, whose copy says why no plan
   // fixes it.
   if (isComparison(prompt) && isUpgradeable(prompt.reason)) {
+    const decor = {
+      title: prompt.compareTitle,
+      subtitle: prompt.compareSubtitle,
+      footnote: prompt.compareFootnote,
+      illustration: prompt.compareIllustration,
+      offer: prompt.compareOffer,
+    };
+    const rows =
+      prompt.compareRows === undefined
+        ? { keys: prompt.compareKeys ?? [] }
+        : { rows: prompt.compareRows };
     return (
       <PlanCompareDialog
         key={id}
         open
         onClose={close}
-        keys={prompt.compareKeys}
-        rows={prompt.compareRows}
-        title={prompt.compareTitle}
-        offer={prompt.compareOffer}
         feature={prompt.feature}
         plan={prompt.requiredPlan}
         config={config}
+        {...decor}
+        {...rows}
       />
     );
   }

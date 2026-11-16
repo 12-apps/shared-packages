@@ -2,7 +2,7 @@
  * The config `createWebEntitlements` closes over — everything the host knows
  * and the surface does not.
  */
-import type { ComponentType, ReactNode } from 'react';
+import type { AnchorHTMLAttributes, ComponentType, ReactNode, Ref } from 'react';
 
 import type { EntitlementsWebCopy, ResolvedEntitlementsWebCopy } from './copy';
 
@@ -14,18 +14,24 @@ export interface TenantSwitchLocation {
   label: string;
 }
 
-/** The link primitive — the host's router owns navigation, not this package. */
-export interface EntitlementsLinkProps {
+/**
+ * The link primitive — the host's router owns navigation, not this package.
+ *
+ * It takes every prop an anchor takes, plus `to` for `href` and a forwarded
+ * `ref`, and an adapter MUST pass ALL of them to the element it renders
+ * (`<RouterLink {...props} />`, never a hand-picked few). Some surfaces paint
+ * the link as a button (the plan comparison's "Conhecer o <plano>"): the
+ * button's look comes in as `className` and its keyboard focus ring as the
+ * `onFocus`/`onBlur` handlers and the `ref` it owns, so an adapter that
+ * forwards only `to` and `onClick` still navigates but draws a bare link with
+ * no visible focus.
+ */
+export interface EntitlementsLinkProps
+  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
   to: string;
-  onClick?: () => void;
   children: ReactNode;
   'data-testid'?: string;
-  /**
-   * Set when the surface paints the link as a button (the comparison's
-   * "Conhecer o <plano>"). A router's `Link` forwards it with the rest of
-   * its props; a custom adapter that drops it still navigates, unstyled.
-   */
-  className?: string;
+  ref?: Ref<HTMLAnchorElement>;
 }
 
 export interface WebEntitlementsConfig {

@@ -98,9 +98,9 @@ function labels(): string[] {
 
 describe('title', () => {
   it("shows the screen's own title", async () => {
-    mount([FREE, MAX], { title: 'Clientes sumidos' });
+    mount([FREE, MAX], { title: 'Reports' });
     const modal = await screen.findByTestId('plan-compare-modal');
-    expect(within(modal).getByText('Clientes sumidos')).toBeDefined();
+    expect(within(modal).getByText('Reports')).toBeDefined();
     expect(within(modal).queryAllByText(PT_BR_ENTITLEMENTS_WEB_COPY.planCompare.title)).toHaveLength(0);
   });
 
@@ -247,13 +247,13 @@ describe('opening it from anywhere', () => {
     act(() => {
       openPlanCompare({
         feature: 'win.email',
-        title: 'Clientes sumidos',
+        title: 'Reports',
         rows: rowsOf(),
         offer: 'each',
       });
     });
     const modal = await screen.findByTestId('plan-compare-modal');
-    expect(within(modal).getByText('Clientes sumidos')).toBeDefined();
+    expect(within(modal).getByText('Reports')).toBeDefined();
     await screen.findByTestId('plan-compare-learn-max');
     expect(labels()).toEqual(rowsOf().map((row) => row.label));
   });

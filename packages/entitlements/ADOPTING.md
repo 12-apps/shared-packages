@@ -407,12 +407,15 @@ can word its rows itself and ask for every plan on sale, not one.
 
 ```ts
 openPlanCompare({
-  feature: 'customers.winback_email',
-  title: 'Clientes sumidos',
+  feature: 'reports.email',
+  title: 'Reports',
+  subtitle: 'What each plan does on this screen.',   // optional, under the title
+  footnote: 'Only plans on sale today are listed.',   // optional, under the table
+  illustration: <Mascot />,                           // optional, beside the subtitle
   rows: [
-    { key: 'customers.winback_list', label: 'Lista com WhatsApp' },
-    { key: 'customers.winback_email', label: 'E-mail de volta' },
-    { key: 'customers.winback_email', label: 'Crédito na carteira' }, // a key may repeat
+    { key: 'reports.list', label: 'Exported list' },
+    { key: 'reports.email', label: 'E-mail summary' },
+    { key: 'reports.email', label: 'PDF attached' },  // a key may repeat
   ],
   offer: 'each',
 });
@@ -420,16 +423,42 @@ openPlanCompare({
 
 | prop | |
 |---|---|
+| `keys` or `rows` | one is required at `openPlanCompare`. `rows` is `{ key, label }[]` in the screen's order, labels in the screen's own copy; the key picks the tier line that decides the marks and may repeat; a key no tier carries drops its row. (The `PlanCompare` component's props are looser, since props are merged from several places; `rows` wins when both are given) |
 | `title` | the dialog's title; default `copy.planCompare.title` |
-| `rows` | `{ key, label }[]`, in the screen's order, the labels the screen's own copy. The key picks the tier line that decides the marks and may repeat; a key no tier carries drops its row. Wins over `keys` |
-| `offer` | `'cheapest'` (default: the one ask above) or `'each'`: one `copy.planCompare.learnPlan` action per upgrade tier in the payload, a link to `plansPath?plan=<tier key>`, solid for the tier flagged `recommended` (else the last), outlined for the rest, all on ONE line at every width. `plan` is ignored; with no `plansPath` there is nothing to link and it falls back to `'cheapest'` |
+| `subtitle`, `footnote`, `illustration` | optional; nothing is drawn for one that is omitted. The package words and draws none of them: the subtitle (and picture) sit under the title above the table, the footnote under the table |
+| `offer` | `'cheapest'` (default: the one ask above) or `'each'`: one `copy.planCompare.learnPlan` action per upgrade tier in the payload, a link to `plansPath?plan=<tier key>`, solid for the tier flagged `recommended` (else the last), outlined for the rest. `plan` is ignored; with no `plansPath` there is nothing to link and it falls back to `'cheapest'`; with no row compared it offers no plan, only the all-plans link |
+
+The actions sit side by side in equal columns only while the longest label fits
+on ONE line in a column; otherwise each takes the whole row, centred. A label
+never wraps inside its button.
+
+`?plan=<tier key>` is a hint to the host: this package's own plans page does
+not read it, so today the action lands on the plans page. A host that routes
+the plans screen may read it (to scroll to or highlight the tier).
 
 "Your plan" is the payload's `current` tier, shown even when it is no longer on
 sale; the columns are the tiers the host's `comparison` builder keeps, so a
 plan off sale appears only as the tenant's own. A host `copy.planCompare`
-written before `learnPlan` existed gets the en-US wording for it. A host
-`LinkComponent` should forward `className` (a router `Link` does) so the
-action is painted as a button.
+written before `learnPlan` existed gets the en-US wording for it.
+
+**The link adapter must forward every prop and the ref.** The "Conhecer"
+action is a `Button` rendered through `LinkComponent`, and the button's look
+(`className`) and its keyboard focus ring (`onFocus`, `onBlur`, `ref`, `tabIndex`
+and `aria-*`) arrive as props of that link. `EntitlementsLinkProps` is the
+anchor's props plus `to` and `ref`; an adapter that forwards only `to` and
+`onClick` still navigates, but draws a bare link with no visible focus:
+
+```tsx
+// WRONG: drops className, the handlers and the ref
+const RouterLink = ({ to, onClick, children }: EntitlementsLinkProps) => (
+  <Link to={to} onClick={onClick}>{children}</Link>
+);
+
+// RIGHT: everything the surface passed reaches the router's link
+const RouterLink = ({ to, children, ...rest }: EntitlementsLinkProps) => (
+  <Link to={to} {...rest}>{children}</Link>
+);
+```
 
 The ask is the upsell prompt's own: without `canRequestPlanChange` the dialog
 names the plan and says who can ask, with no button. With no `plan`, a tenant

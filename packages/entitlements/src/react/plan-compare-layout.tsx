@@ -105,7 +105,10 @@ export function compareOffers(
 ): CompareOffers {
   const current = tiers.find((tier) => tier.current);
   const covered = rowCount > 0 && current !== undefined && coversEveryRow(current, sections);
-  return { tiers: covered ? [] : tiers.filter((tier) => tier.upgrade), covered };
+  // No rows: nothing was compared, so there is nothing to look at a plan FOR.
+  // Said by the empty sentence and the all-plans link, as `'cheapest'` does.
+  const offered = covered || rowCount === 0 ? [] : tiers.filter((tier) => tier.upgrade);
+  return { tiers: offered, covered };
 }
 
 type CompareLayout = 'table' | 'stacked';

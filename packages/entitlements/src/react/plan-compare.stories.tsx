@@ -132,16 +132,16 @@ function Demo({
  * from three entitlements (a key repeats), and asks for one "Conhecer o
  * <plano>" per plan on sale. The tiers carry no copy of the screen's.
  */
-const WIN_ROWS = [
-  { key: 'win.list', label: 'Lista com WhatsApp (envio manual)' },
-  { key: 'win.email', label: 'E-mail “Sentimos sua falta”' },
-  { key: 'win.email', label: 'Crédito na carteira de cada cliente' },
-  { key: 'win.email', label: 'Enviar para todos com um toque' },
-  { key: 'win.auto', label: 'Envio automático todo dia' },
-  { key: 'win.auto', label: 'Teto de crédito por mês' },
+const OWN_ROWS = [
+  { key: 'reports.list', label: 'Lista exportada (envio manual)' },
+  { key: 'reports.email', label: 'Resumo por e-mail' },
+  { key: 'reports.email', label: 'Anexo em PDF no e-mail' },
+  { key: 'reports.email', label: 'Enviar para todos com um toque' },
+  { key: 'reports.auto', label: 'Envio automático todo dia' },
+  { key: 'reports.auto', label: 'Teto de envios por mês' },
 ];
 
-function winTier(
+function ownTier(
   key: string,
   name: string,
   included: [boolean, boolean, boolean],
@@ -152,22 +152,30 @@ function winTier(
     ...tier(key, name, [false, false, false], over),
     sections: [
       {
-        title: 'Clientes',
+        title: 'Relatórios',
         lines: [
-          { key: 'win.list', label: 'Lista de clientes', included: list, detail: null },
-          { key: 'win.email', label: 'E-mail de volta', included: email, detail: null },
-          { key: 'win.auto', label: 'Envio automático', included: auto, detail: null },
+          { key: 'reports.list', label: 'Lista exportada', included: list, detail: null },
+          { key: 'reports.email', label: 'Resumo por e-mail', included: email, detail: null },
+          { key: 'reports.auto', label: 'Envio automático', included: auto, detail: null },
         ],
       },
     ],
   };
 }
 
-const WIN_FREE = winTier('free', 'Grátis', [true, false, false], { current: true, upgrade: false });
-const WIN_PRO = winTier('pro', 'Pro', [true, true, false]);
-const WIN_MAX = winTier('max', 'Max', [true, true, true], { recommended: true });
+const OWN_FREE = ownTier('free', 'Grátis', [true, false, false], { current: true, upgrade: false });
+const OWN_PRO = ownTier('pro', 'Pro', [true, true, false]);
+const OWN_MAX = ownTier('max', 'Max', [true, true, true], { recommended: true });
 
-function OwnRowsDemo({ tiers }: { tiers: ComparisonTier[] }): JSX.Element {
+function OwnRowsDemo({
+  tiers,
+  subtitle,
+  footnote,
+}: {
+  tiers: ComparisonTier[];
+  subtitle?: string;
+  footnote?: string;
+}): JSX.Element {
   const [{ PlanCompare }] = useState(() =>
     createWebEntitlements({
       apiBase: '/api/demo',
@@ -184,10 +192,12 @@ function OwnRowsDemo({ tiers }: { tiers: ComparisonTier[] }): JSX.Element {
       <PlanCompare
         open={open}
         onClose={() => setOpen(false)}
-        title="Clientes sumidos"
-        rows={WIN_ROWS}
+        title="Relatórios"
+        rows={OWN_ROWS}
         offer="each"
-        feature="win.email"
+        subtitle={subtitle}
+        footnote={footnote}
+        feature="reports.email"
       />
     </>
   );
@@ -218,10 +228,21 @@ export const EnglishCopy: StoryObj = { render: () => <Demo copy={EN_US_ENTITLEME
 
 /** The screen's title and rows, the only plan on sale (Max) offered alone. */
 export const OwnRowsOnePlanOnSale: StoryObj = {
-  render: () => <OwnRowsDemo tiers={[WIN_FREE, WIN_MAX]} />,
+  render: () => <OwnRowsDemo tiers={[OWN_FREE, OWN_MAX]} />,
 };
 
 /** Two plans on sale: two actions on ONE line at every width, Max solid. */
 export const OwnRowsEachPlan: StoryObj = {
-  render: () => <OwnRowsDemo tiers={[WIN_FREE, WIN_PRO, WIN_MAX]} />,
+  render: () => <OwnRowsDemo tiers={[OWN_FREE, OWN_PRO, OWN_MAX]} />,
+};
+
+/** The optional sentence under the title and the note under the table. */
+export const OwnRowsWithSubtitleAndFootnote: StoryObj = {
+  render: () => (
+    <OwnRowsDemo
+      tiers={[OWN_FREE, OWN_MAX]}
+      subtitle="Veja o que cada plano faz nesta tela."
+      footnote="Só aparecem os planos à venda hoje."
+    />
+  ),
 };
