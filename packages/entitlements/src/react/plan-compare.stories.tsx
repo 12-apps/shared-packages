@@ -127,6 +127,72 @@ function Demo({
   );
 }
 
+/**
+ * A screen's OWN title and rows (FUT-3921): the first caller words six rows
+ * from three entitlements (a key repeats), and asks for one "Conhecer o
+ * <plano>" per plan on sale. The tiers carry no copy of the screen's.
+ */
+const WIN_ROWS = [
+  { key: 'win.list', label: 'Lista com WhatsApp (envio manual)' },
+  { key: 'win.email', label: 'E-mail “Sentimos sua falta”' },
+  { key: 'win.email', label: 'Crédito na carteira de cada cliente' },
+  { key: 'win.email', label: 'Enviar para todos com um toque' },
+  { key: 'win.auto', label: 'Envio automático todo dia' },
+  { key: 'win.auto', label: 'Teto de crédito por mês' },
+];
+
+function winTier(
+  key: string,
+  name: string,
+  included: [boolean, boolean, boolean],
+  over: Partial<ComparisonTier> = {},
+): ComparisonTier {
+  const [list, email, auto] = included;
+  return {
+    ...tier(key, name, [false, false, false], over),
+    sections: [
+      {
+        title: 'Clientes',
+        lines: [
+          { key: 'win.list', label: 'Lista de clientes', included: list, detail: null },
+          { key: 'win.email', label: 'E-mail de volta', included: email, detail: null },
+          { key: 'win.auto', label: 'Envio automático', included: auto, detail: null },
+        ],
+      },
+    ],
+  };
+}
+
+const WIN_FREE = winTier('free', 'Grátis', [true, false, false], { current: true, upgrade: false });
+const WIN_PRO = winTier('pro', 'Pro', [true, true, false]);
+const WIN_MAX = winTier('max', 'Max', [true, true, true], { recommended: true });
+
+function OwnRowsDemo({ tiers }: { tiers: ComparisonTier[] }): JSX.Element {
+  const [{ PlanCompare }] = useState(() =>
+    createWebEntitlements({
+      apiBase: '/api/demo',
+      fetchImpl: fakeFetch(tiers),
+      canRequestPlanChange: true,
+      copy: PT_BR_ENTITLEMENTS_WEB_COPY,
+      plansPath: '#plans',
+    }),
+  );
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Open</Button>
+      <PlanCompare
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Clientes sumidos"
+        rows={WIN_ROWS}
+        offer="each"
+        feature="win.email"
+      />
+    </>
+  );
+}
+
 const meta: Meta = { title: 'Entitlements/PlanCompareDialog' };
 export default meta;
 
@@ -149,3 +215,13 @@ export const NoMatchingRows: StoryObj = { render: () => <Demo keys={['unknown.ke
 
 /** The English pack. */
 export const EnglishCopy: StoryObj = { render: () => <Demo copy={EN_US_ENTITLEMENTS_WEB_COPY} /> };
+
+/** The screen's title and rows, the only plan on sale (Max) offered alone. */
+export const OwnRowsOnePlanOnSale: StoryObj = {
+  render: () => <OwnRowsDemo tiers={[WIN_FREE, WIN_MAX]} />,
+};
+
+/** Two plans on sale: two actions on ONE line at every width, Max solid. */
+export const OwnRowsEachPlan: StoryObj = {
+  render: () => <OwnRowsDemo tiers={[WIN_FREE, WIN_PRO, WIN_MAX]} />,
+};

@@ -402,6 +402,35 @@ openPlanCompare({ feature: 'chat.assistant', keys: CHAT_KEYS, plan: 'max' });
 | `plan` | the tier to offer; a tier that is not an upgrade offers nothing |
 | `feature` | the feature that prompted the ask, sent with `POST /plan/request` |
 
+**A screen's own title and words (FUT-3921).** The popup is reusable: a screen
+can word its rows itself and ask for every plan on sale, not one.
+
+```ts
+openPlanCompare({
+  feature: 'customers.winback_email',
+  title: 'Clientes sumidos',
+  rows: [
+    { key: 'customers.winback_list', label: 'Lista com WhatsApp' },
+    { key: 'customers.winback_email', label: 'E-mail de volta' },
+    { key: 'customers.winback_email', label: 'Crédito na carteira' }, // a key may repeat
+  ],
+  offer: 'each',
+});
+```
+
+| prop | |
+|---|---|
+| `title` | the dialog's title; default `copy.planCompare.title` |
+| `rows` | `{ key, label }[]`, in the screen's order, the labels the screen's own copy. The key picks the tier line that decides the marks and may repeat; a key no tier carries drops its row. Wins over `keys` |
+| `offer` | `'cheapest'` (default: the one ask above) or `'each'`: one `copy.planCompare.learnPlan` action per upgrade tier in the payload, a link to `plansPath?plan=<tier key>`, solid for the tier flagged `recommended` (else the last), outlined for the rest, all on ONE line at every width. `plan` is ignored; with no `plansPath` there is nothing to link and it falls back to `'cheapest'` |
+
+"Your plan" is the payload's `current` tier, shown even when it is no longer on
+sale; the columns are the tiers the host's `comparison` builder keeps, so a
+plan off sale appears only as the tenant's own. A host `copy.planCompare`
+written before `learnPlan` existed gets the en-US wording for it. A host
+`LinkComponent` should forward `className` (a router `Link` does) so the
+action is painted as a button.
+
 The ask is the upsell prompt's own: without `canRequestPlanChange` the dialog
 names the plan and says who can ask, with no button. With no `plan`, a tenant
 whose own tier already includes every compared row is told so and offered
