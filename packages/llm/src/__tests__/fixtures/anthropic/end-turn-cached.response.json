@@ -1,0 +1,27 @@
+{
+  "id": "msg_01FixtureEnd",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    { "type": "text", "text": "We have two pizzas" },
+    { "type": "text", "text": " on the menu today." }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "container": null,
+  "diagnostics": null,
+  "usage": {
+    "input_tokens": 17,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 2048,
+    "output_tokens": 12,
+    "cache_creation": null,
+    "inference_geo": null,
+    "output_tokens_details": null,
+    "server_tool_use": null,
+    "service_tier": "standard",
+    "speed": null
+  }
+}
