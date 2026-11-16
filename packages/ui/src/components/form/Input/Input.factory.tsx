@@ -134,6 +134,16 @@ function keyboardOf(inputMode: InputProps['inputMode']): Pick<InputProps, 'input
   return inputMode === undefined ? {} : { inputMode };
 }
 
+/**
+ * A top-level `readOnly`, for the `<input>`. Left with the rest it reached the
+ * text field's root `<div>` (the slim field sends it there, as MUI's
+ * `TextField` does), so the documented prop rendered an input anyone could type
+ * into. A caller's `inputProps.readOnly` still wins.
+ */
+function readOnlyOf(readOnly: InputProps['readOnly']): Pick<InputProps, 'readOnly'> {
+  return readOnly === undefined ? {} : { readOnly };
+}
+
 /** The render function `createInput` hands `forwardRef`, over a given styled field. */
 function inputRenderer(
   StyledTextField: ReturnType<typeof styledField>,
@@ -164,7 +174,7 @@ function inputRenderer(
     },
     ref,
   ) => {
-    const { testId: dataTestId, rest: props } = splitTestId(rest);
+    const { testId: dataTestId, rest: { readOnly, ...props } } = splitTestId(rest);
     const generatedId = React.useId();
     const id = props.id ?? generatedId;
     return (
@@ -193,11 +203,12 @@ function inputRenderer(
          * inputs were both named in source and anonymous to a screen reader.
          * `aria-describedby` and `aria-busy` are the same case: `inputAriaOf`.
          * So is a top-level `inputMode` (FUT-1440, `keyboardOf`); a caller's
-         * `inputProps.inputMode` still wins.
+         * `inputProps.inputMode` still wins. So is `readOnly` (`readOnlyOf`).
          */
         inputProps={{
           'data-testid': dataTestId,
           ...keyboardOf(inputMode),
+          ...readOnlyOf(readOnly),
           ...inputProps,
           ...inputAriaOf({ id, helperText, label: ariaLabel, describedBy: ariaDescribedBy, busy: ariaBusy }),
         }}
