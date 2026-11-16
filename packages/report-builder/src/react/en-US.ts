@@ -9,6 +9,7 @@
  * and `heights` are the package's own ids — the surface matches on them — so
  * they stay exactly as they are. Only the labels beside them are words.
  */
+import { EN_US_REPORT_SCHEDULE_COPY } from "./en-US.schedule";
 import { EN_US_REPORT_TRANSPORT_ERROR_COPY } from "./en-US.transport";
 import type { ReportScreensCopy } from "./screens-copy";
 import { EN_US_BREADCRUMB_COPY } from "@12-apps/ui/en-US";
@@ -340,9 +341,7 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
           "Cost fields stay hidden from anyone without the permission, whatever role they hold.",
       },
     },
-    scheduleLabel: "Automatic delivery",
-    scheduleValue: "E-mail it every Monday at 8am",
-    scheduleReason: "Coming soon (FUT-776) — delivery cannot be scheduled yet.",
+    schedule: EN_US_REPORT_SCHEDULE_COPY,
     visibilityLabel: "Who can see it",
     close: "Close",
   },

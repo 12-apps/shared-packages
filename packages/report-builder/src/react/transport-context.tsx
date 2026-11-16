@@ -3,6 +3,7 @@ import { createContext, useContext, useMemo, type JSX, type ReactNode } from "re
 import type { ReportEngineCopy } from "../copy";
 
 import type { ReportBuilderCopy } from "./copy";
+import { withScheduleDefaults, type ResolvedReportBuilderCopy } from "./schedule-defaults";
 import type {
   SystemDashboardDef,
   SystemReportNavEntry,
@@ -10,6 +11,7 @@ import type {
 } from "../server/system-reports";
 
 import type { BlockTemplateGroup } from "../server/block-templates";
+import type { ReportScheduleSurface } from "./schedule-surface";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
 import type { BucketFormatter } from "./lib/column-value";
 import type { ReportRange } from "./reports-api";
@@ -67,6 +69,11 @@ export interface ReportBuilderSurface {
    * the server sent it.
    */
   formatBucket?: BucketFormatter;
+  /**
+   * Scheduled e-mail delivery of a saved report (FUT-776). Absent: the
+   * "Envio automático" control is not shown at all, rather than shown dead.
+   */
+  schedule?: ReportScheduleSurface;
 }
 
 /**
@@ -90,7 +97,7 @@ interface ReportBuilderContextValue {
   transport: ReportBuilderTransport;
   tenantSlug: string;
   surface: ReportBuilderSurface;
-  copy: ReportBuilderCopy;
+  copy: ResolvedReportBuilderCopy;
 }
 
 const ReportBuilderContext = createContext<ReportBuilderContextValue | null>(null);
@@ -109,7 +116,7 @@ export function ReportBuilderProvider({
   children: ReactNode;
 }): JSX.Element {
   const value = useMemo(
-    () => ({ transport, tenantSlug, surface, copy }),
+    () => ({ transport, tenantSlug, surface, copy: withScheduleDefaults(copy) }),
     [transport, tenantSlug, surface, copy],
   );
   return <ReportBuilderContext.Provider value={value}>{children}</ReportBuilderContext.Provider>;
@@ -146,7 +153,7 @@ export function useReportSurface(): ReportBuilderSurface {
  * silent. Failing at the first render names the wiring mistake; blank labels
  * would hide it.
  */
-export function useReportCopy(): ReportBuilderCopy {
+export function useReportCopy(): ResolvedReportBuilderCopy {
   const value = useContext(ReportBuilderContext);
   if (!value) {
     throw new Error(

@@ -33,6 +33,14 @@ export {
   type ReportRangeView,
   type ResolvedReportRange,
 } from './range';
+/** Scheduled e-mail delivery of a saved report (FUT-776): wire shapes and the stored-JSON reader. */
+export {
+  readSchedule,
+  reportScheduleDraftInput,
+  reportScheduleInput,
+  resolveSchedule,
+  type ReportScheduleInput,
+} from './schedule';
 /** Compile-only validation of a document, the way the save routes do it. */
 export { compileDocument } from './compile-document';
 export { toSummary, type SavedReportSummary } from './summary';

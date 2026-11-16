@@ -159,7 +159,7 @@ function renderDialog(changes: unknown[] = [], publish: PublishDraft = PUBLISH):
     <ReportSettingsDialog
       open
       tenantSlug="acme"
-      value={{ name: 'Painel', description: '', publish, defaultRange: '30d' }}
+      value={{ name: 'Painel', description: '', publish, defaultRange: '30d', schedule: null }}
       onChange={(next) => changes.push(next)}
       onClose={() => undefined}
     />,
@@ -212,19 +212,14 @@ describe('the Ajustes dialog', () => {
     expect((changes.at(-1) as { defaultRange: string }).defaultRange).toBe('today');
   });
 
-  it('refuses the scheduled e-mail out loud, and reachably', () => {
+  // REPLACED (FUT-776). This pinned the deferred "Em breve (FUT-776)" row, the
+  // placeholder the ticket exists to remove. The control now renders from a
+  // host-provided surface (`schedule-section.test.tsx` covers it, including the
+  // locked state's reachable reason); what stays true here is that a host that
+  // offers nothing gets no dead control.
+  it('shows no delivery control when the host offers none', () => {
     renderDialog();
-    const row = screen.getByTestId('report-settings-schedule');
-    // aria-disabled, not `disabled`: a disabled control is unfocusable and has
-    // no hover, so the sentence explaining it would be the one thing a
-    // keyboard user could never reach.
-    expect(row.getAttribute('aria-disabled')).toBe('true');
-    // Still in the tab order, which is the whole point of refusing it with
-    // `aria-disabled` rather than with `disabled`. Asserted as a SELECTOR
-    // match: reading the property back reads to the flakiness gate as a focus
-    // check, and this is a static attribute, not a focus state.
-    expect(row.matches('[tabindex="0"]')).toBe(true);
-    const reason = document.getElementById(row.getAttribute('aria-describedby') ?? '');
-    expect(reason?.textContent).toContain('FUT-776');
+    expect(screen.getByTestId('report-settings-done')).toBeTruthy();
+    expect(screen.queryAllByTestId('report-settings-schedule')).toEqual([]);
   });
 });

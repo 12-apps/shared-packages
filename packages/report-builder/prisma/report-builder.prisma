@@ -42,6 +42,16 @@ model SavedReport {
   // that predates this column keeps behaving exactly as it did. String + DB
   // CHECK, house style.
   defaultRange String? @map("default_range")
+  // E-mail delivery of the report on a schedule (FUT-776): the package's
+  // `ReportSchedule` as JSON — enabled, cadence (daily | weekly | biweekly |
+  // monthly), weekday or day of month, time of day, the store's IANA zone, the
+  // recipients' opaque host user ids and the date fortnights count from. NULL =
+  // never scheduled, which is every row that predates this column. Untrusted
+  // JSON like `spec`: validated on write, and re-read through `readSchedule`,
+  // which answers null for anything it cannot fully understand, so a delivery
+  // job never fires from a half-read value. The host's job decides who may be
+  // listed; this column only keeps what the author chose.
+  schedule    Json?
   // Unpublished changes to a PUBLISHED report (FUT-755): the author's
   // in-progress edit, stored BESIDE the live document rather than over it.
   //

@@ -7,11 +7,9 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { useTransport } from "./transport-context";
-
 import { isRunnableRange, rangeQuery, rangeQueryKey, rangeSelection } from "./reports-api";
-
 import type { ReportWorkingCopyWire } from "./custom-reports-write";
-
+import type { ReportScheduleViewField } from "./lib/schedule-draft";
 import type { Result } from "./lib/rest-result";
 import type { ReportBuilderTransport } from "./transport";
 import type {
@@ -177,7 +175,7 @@ export interface SavedReportSummary {
 }
 
 
-interface SavedReportViewBase {
+interface SavedReportViewBase extends ReportScheduleViewField {
   id: string;
   name: string;
   description: string | null;

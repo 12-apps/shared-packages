@@ -92,16 +92,20 @@ function EditorSettings({
   open: boolean;
   onClose: () => void;
 }): JSX.Element {
-  const { draft, setDraft, publish, setPublish, defaultRange, setDefaultRange } = editor;
+  const { draft, setDraft, publish, setPublish, defaultRange, setDefaultRange, schedule, setSchedule } =
+    editor;
+  const entities = [...new Set(draft.blocks.map((block) => block.spec.entity))];
   return (
     <ReportSettingsDialog
       open={open}
       tenantSlug={tenantSlug}
-      value={{ name: draft.name, description: draft.description, publish, defaultRange }}
+      entities={entities}
+      value={{ name: draft.name, description: draft.description, publish, defaultRange, schedule }}
       onChange={(next) => {
         setDraft((prev) => ({ ...prev, name: next.name, description: next.description }));
         setPublish(next.publish);
         setDefaultRange(next.defaultRange);
+        setSchedule(next.schedule);
       }}
       onClose={onClose}
     />

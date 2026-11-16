@@ -1,3 +1,5 @@
+import type { ReportSchedule } from '../schedule';
+
 /**
  * SavedReport store (FUT-138), owned by the package over the model it owns
  * (`prisma/report-builder.prisma`) — duck-typed over the host's client like
@@ -22,6 +24,13 @@ export interface SavedReportRecord {
    * behaviour every row that predates the column already had.
    */
   defaultRange: string | null;
+  /**
+   * The e-mail delivery schedule (FUT-776), untrusted JSON — read it through
+   * `readSchedule`. Optional for the same reason `workingCopy` is: only this
+   * store's own select produces it, and an in-memory double written before the
+   * field existed has no opinion about it. Absent reads as "no schedule".
+   */
+  schedule?: unknown;
   /**
    * Unpublished changes parked beside the published document (FUT-755), or
    * NULL when there are none. Untrusted JSON exactly like `spec` — read
@@ -49,6 +58,8 @@ export interface SavedReportInput {
   visibilityRoles: string[];
   /** Omitted or null clears the preference back to the reader's default. */
   defaultRange?: string | null;
+  /** The resolved schedule (zone and anchor stamped); null removes it; undefined leaves the column alone. */
+  schedule?: ReportSchedule | null;
 }
 
 const summarySelect = {
@@ -60,6 +71,7 @@ const summarySelect = {
   visibility: true,
   visibilityRoles: true,
   defaultRange: true,
+  schedule: true,
   workingCopy: true,
   createdBy: true,
   createdAt: true,
@@ -79,6 +91,7 @@ function documentData(input: SavedReportInput): {
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string | null;
+  schedule?: ReportSchedule | null;
 } {
   return {
     name: input.name,
@@ -88,6 +101,8 @@ function documentData(input: SavedReportInput): {
     visibility: input.visibility,
     visibilityRoles: input.visibilityRoles,
     defaultRange: input.defaultRange ?? null,
+    // Absent from the data when the body never mentioned it (never erase).
+    ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
   };
 }
 
@@ -118,6 +133,7 @@ export interface SavedReportDb {
         visibility: string;
         visibilityRoles: string[];
         defaultRange: string | null;
+        schedule: ReportSchedule | null;
         createdBy: string | null;
       };
       select: typeof summarySelect;
@@ -132,6 +148,7 @@ export interface SavedReportDb {
         visibility?: string;
         visibilityRoles?: string[];
         defaultRange?: string | null;
+        schedule?: ReportSchedule | null;
         /**
          * `null` DROPS the parked edit. Optional so an ordinary update leaves
          * it alone: archiving a report re-sends the document with only
@@ -220,6 +237,7 @@ export function createSavedReportStore(getDb: SavedReportDbProvider): SavedRepor
           visibility: input.visibility,
           visibilityRoles: input.visibilityRoles,
           defaultRange: input.defaultRange ?? null,
+          schedule: input.schedule ?? null,
           createdBy,
         },
         select: summarySelect,

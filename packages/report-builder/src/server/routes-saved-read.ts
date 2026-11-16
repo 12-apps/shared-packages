@@ -21,6 +21,8 @@ import { windowOfQuery } from './range-query';
 import type { SavedReportRecord, SavedReportStore } from './saved';
 import { documentShape, toSummary } from './summary';
 import { resolveDefaultRange } from './range';
+import { readSchedule } from './schedule';
+import type { ReportSchedule } from '../schedule';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { readWorkingCopy, type ReportWorkingCopy } from './working-copy';
 
@@ -52,6 +54,7 @@ function lifecycleOf(
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string;
+  schedule: ReportSchedule | null;
   workingCopy: ReportWorkingCopy | null;
 } {
   return {
@@ -59,6 +62,8 @@ function lifecycleOf(
     visibility: record.visibility,
     visibilityRoles: visibilityRoleIds(record.visibilityRoles),
     workingCopy: mayAuthor(config, actor) ? readWorkingCopy(record.workingCopy) : null,
+    // Names the people the report goes to, so it is an author's to see (FUT-776).
+    schedule: mayAuthor(config, actor) ? readSchedule(record.schedule) : null,
     // Resolved rather than echoed: a row written before the column existed
     // carries NULL, and the client should be told the period it will actually
     // open on rather than left to re-derive the fallback (FUT-755).

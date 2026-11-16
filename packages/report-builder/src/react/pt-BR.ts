@@ -7,6 +7,7 @@
  * the components used to render, so a host adopting it sees no change on
  * screen — what changes is that the words are chosen in a diff.
  */
+import { PT_BR_REPORT_SCHEDULE_COPY } from "./pt-BR.schedule";
 import { PT_BR_REPORT_TRANSPORT_ERROR_COPY } from "./pt-BR.transport";
 import type { ReportScreensCopy } from "./screens-copy";
 import { PT_BR_BREADCRUMB_COPY } from "@12-apps/ui/pt-BR";
@@ -322,9 +323,7 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
           "Campos de custo continuam ocultos para quem não tem permissão, qualquer que seja o cargo.",
       },
     },
-    scheduleLabel: "Envio automático",
-    scheduleValue: "Enviar por e-mail toda segunda, 8h",
-    scheduleReason: "Em breve (FUT-776) — ainda não é possível agendar o envio.",
+    schedule: PT_BR_REPORT_SCHEDULE_COPY,
     visibilityLabel: "Quem pode ver",
     close: "Fechar",
   },
