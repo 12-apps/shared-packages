@@ -1,6 +1,6 @@
 /**
  * The database seam (12-15) — the exact, narrow slice of a Prisma-shaped
- * client this surface reads and writes on the four models the package owns
+ * client this surface reads and writes on the six models the package owns
  * (`prisma/notifications.prisma`). Structural on purpose, never generated: a
  * real host passes its Prisma client; the harness passes hand-written SQL, and
  * the stores cannot tell.
@@ -19,6 +19,8 @@
 
 import type { DeliveryStatus, NotificationChannel } from '../types';
 import type { NotificationRow } from '../wire';
+
+import type { ChannelConsentDelegate, SendCounterDelegate } from './consent-db';
 
 // ---------------------------------------------------------------------------
 // notifications
@@ -122,6 +124,14 @@ export interface NotificationDeliveryRow {
   sentAt: Date | null;
   /** How many times a dispatcher has CLAIMED this row (the retry ceiling). */
   attempts: number;
+  /**
+   * The provider's id for the sent message (Twilio's `sid`, Meta's `wamid`),
+   * written with SENT — what a delivery receipt finds the row by. Optional so
+   * an adapter written before the column still type-checks.
+   */
+  providerMessageId?: string | null;
+  /** When the provider said the message reached the handset. */
+  deliveredAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -142,6 +152,9 @@ export interface NotificationDeliveryWhere {
   notificationId?: string;
   status?: DeliveryStatus | { in: DeliveryStatus[] };
   updatedAt?: { lt: Date };
+  /** A receipt's lookup, always with `providerMessageId` (the partial unique key). */
+  channel?: NotificationChannel;
+  providerMessageId?: string;
 }
 
 export interface NotificationDeliveryDelegate {
@@ -161,6 +174,8 @@ export interface NotificationDeliveryDelegate {
       status: DeliveryStatus;
       sentAt?: Date | null;
       error?: string | null;
+      /** Present only when the transport answered an id. */
+      providerMessageId?: string;
     };
   }): Promise<NotificationDeliveryRow>;
   /**
@@ -171,7 +186,14 @@ export interface NotificationDeliveryDelegate {
    */
   updateMany(args: {
     where: NotificationDeliveryWhere;
-    data: { status: DeliveryStatus; attempts?: { increment: number } };
+    data: {
+      status: DeliveryStatus;
+      attempts?: { increment: number };
+      /** A receipt's answer, or why a gated row was abandoned. */
+      error?: string | null;
+      /** A DELIVERED receipt's time. */
+      deliveredAt?: Date;
+    };
   }): Promise<{ count: number }>;
 }
 
@@ -291,6 +313,13 @@ export interface NotificationsDbClient {
   notificationDelivery: NotificationDeliveryDelegate;
   notificationPreference: NotificationPreferenceDelegate;
   pushSubscription: PushSubscriptionDelegate;
+  /**
+   * Paid-channel consent. Optional: only a mount that configures
+   * `consent` reads it, and an adapter written before it still type-checks.
+   */
+  notificationChannelConsent?: ChannelConsentDelegate;
+  /** Paid-message caps. Optional: only a mount with `caps` reads it. */
+  notificationSendCounter?: SendCounterDelegate;
 }
 
 /**
@@ -325,5 +354,7 @@ export interface NotificationContactDirectory {
     email: string | null;
     phone: string | null;
     locale?: string | null;
+    /** For a confirmation's greeting; absent = the host's copy greets nobody. */
+    firstName?: string | null;
   } | null>;
 }

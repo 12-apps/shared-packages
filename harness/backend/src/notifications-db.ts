@@ -32,6 +32,7 @@ import type {
 import type { NotificationRow } from '@12-apps/notifications';
 
 import { preferenceDelegate, subscriptionDelegate } from './notifications-db-account';
+import { consentDelegate, counterDelegate } from './notifications-db-consent';
 import { Params, type SqlRunner } from './rbac-db-shared';
 
 const MIGRATIONS_DIR = fileURLToPath(
@@ -231,6 +232,8 @@ interface DeliverySqlRow {
   error: string | null;
   attempts: number;
   sent_at: Date | null;
+  provider_message_id: string | null;
+  delivered_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -243,6 +246,8 @@ const deliveryRow = (row: DeliverySqlRow): NotificationDeliveryRow => ({
   error: row.error,
   attempts: Number(row.attempts),
   sentAt: row.sent_at,
+  providerMessageId: row.provider_message_id,
+  deliveredAt: row.delivered_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -263,6 +268,10 @@ function deliveryWhere(where: NotificationDeliveryWhere, params: Params): string
   }
   if (where.updatedAt !== undefined) {
     conditions.push(`updated_at < ${params.add(where.updatedAt.lt)}`);
+  }
+  if (where.channel !== undefined) conditions.push(`channel = ${params.add(where.channel)}`);
+  if (where.providerMessageId !== undefined) {
+    conditions.push(`provider_message_id = ${params.add(where.providerMessageId)}`);
   }
   return conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
 }
@@ -305,6 +314,9 @@ function deliveryDelegate(sql: SqlRunner): NotificationDeliveryDelegate {
       const assignments = [`status = ${params.add(data.status)}`];
       if ('sentAt' in data) assignments.push(`sent_at = ${params.add(data.sentAt ?? null)}`);
       if ('error' in data) assignments.push(`error = ${params.add(data.error ?? null)}`);
+      if (data.providerMessageId !== undefined) {
+        assignments.push(`provider_message_id = ${params.add(data.providerMessageId)}`);
+      }
       const { rows } = await sql.query<DeliverySqlRow>(
         `UPDATE notification_deliveries SET ${assignments.join(', ')}, updated_at = NOW()
          WHERE id = ${params.add(where.id)} RETURNING *`,
@@ -324,6 +336,8 @@ function deliveryDelegate(sql: SqlRunner): NotificationDeliveryDelegate {
       if (data.attempts) {
         assignments.push(`attempts = attempts + ${params.add(data.attempts.increment)}`);
       }
+      if ('error' in data) assignments.push(`error = ${params.add(data.error ?? null)}`);
+      if (data.deliveredAt) assignments.push(`delivered_at = ${params.add(data.deliveredAt)}`);
       const clause = deliveryWhere(where, params);
       const { affectedRows } = await sql.query(
         `UPDATE notification_deliveries SET ${assignments.join(', ')}, updated_at = NOW()
@@ -341,6 +355,8 @@ function clientOver(sql: SqlRunner): NotificationsDbClient {
     notificationDelivery: deliveryDelegate(sql),
     notificationPreference: preferenceDelegate(sql),
     pushSubscription: subscriptionDelegate(sql),
+    notificationChannelConsent: consentDelegate(sql),
+    notificationSendCounter: counterDelegate(sql),
   };
 }
 

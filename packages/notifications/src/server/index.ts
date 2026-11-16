@@ -43,6 +43,52 @@ export type {
   PushSubscriptionWhere,
 } from './db';
 
+export type {
+  ChannelConsentCreateData,
+  ChannelConsentDelegate,
+  ChannelConsentMethod,
+  ChannelConsentRow,
+  ChannelConsentStatus,
+  ChannelConsentUpdateData,
+  ChannelConsentWhere,
+  SendCounterDelegate,
+  SendCounterKey,
+  SendCounterScope,
+} from './consent-db';
+
+/**
+ * Paid-channel policy: the confirmed-destination engine, the
+ * per-person and per-tenant caps, delivery receipts, and Twilio's webhook
+ * helpers — every one opt-in on the mount.
+ */
+export type { NotificationConsentApi } from './consent';
+export { PAID_CHANNELS, foldReply, type PaidChannel } from './consent-text';
+export type {
+  CodeResult,
+  ConfirmMethod,
+  ConfirmationMessageInput,
+  ConfirmationResult,
+  ConsentStatus,
+  ConsentView,
+  InboundConsentInput,
+  InboundConsentResult,
+  NotificationConsentConfig,
+} from './consent-types';
+export {
+  DEFAULT_PER_RECIPIENT_DAILY_CAP,
+  DEFAULT_PER_TENANT_MONTHLY_CAP,
+  type NotificationCapsConfig,
+} from './caps';
+export {
+  WHATSAPP_CONFIRMATION_CALLBACK_PREFIX,
+  confirmationOfWhatsAppStatus,
+  type AppliedDeliveryReceipt,
+  type DeliveryReceiptInput,
+  type DeliveryReceiptOutcome,
+  type DeliveryReceiptStatus,
+} from './receipts';
+export { parseTwilioCallback, verifyTwilioSignature, type TwilioCallback } from './twilio';
+
 export type { ListNotificationsInput, NotificationInboxStore } from './inbox';
 export type { NotificationPreferenceStore } from './preferences';
 export type { PushSubscriptionInput, PushSubscriptionStore } from './push-subscriptions';
@@ -105,6 +151,7 @@ export {
   type WhatsAppDriver,
   type WhatsAppDriverDeclaration,
   type WhatsAppMessage,
+  type WhatsAppTemplateRef,
 } from './transports/whatsapp';
 
 export {

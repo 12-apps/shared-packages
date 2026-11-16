@@ -16,6 +16,7 @@ import {
   DEFAULT_SWEEP_TAKE,
   type NotificationDispatchDeps,
 } from './dispatch';
+import type { CapsGate } from './caps';
 import { applyEmitFilter, type NotificationEmitChannelFilter } from './emit-filter';
 
 export type { NotificationEmitChannelFilter } from './emit-filter';
@@ -125,6 +126,8 @@ export interface NotifyResult {
 }
 
 interface NotificationRouterDeps extends NotificationDispatchDeps {
+  /** Paid-message caps, counted when the delivery rows are created. */
+  caps?: CapsGate;
   generators: NotificationGeneratorRegistry;
   preferences: NotificationPreferenceStore;
   channelPolicy?: NotificationChannelPolicy;
@@ -255,7 +258,17 @@ async function resolveChannels(
   // The host's per-emit hook: what THIS event may use, beyond its tenant and
   // its type (an order already told on another path skips a channel).
   const kept = await applyEmitFilter(deps.emitChannelFilter, deps.logger, event, permitted, policyFallback);
-  return capToAvailable(kept, generator.channels);
+  const available = capToAvailable(kept, generator.channels);
+  // LAST, and in this order, so each costs nothing once the paid channels are
+  // gone: consent drops a paid channel the number has not agreed to, and only
+  // what survives it is counted against the caps (a dropped channel is never
+  // a counted message).
+  const consented = deps.consentGate
+    ? await deps.consentGate(recipient.userId, recipient.phone, available)
+    : available;
+  return deps.caps
+    ? deps.caps.apply(recipient.userId, event.recipient.clientId ?? null, consented)
+    : consented;
 }
 
 /** Commit the inbox record and its delivery rows together, in one transaction. */

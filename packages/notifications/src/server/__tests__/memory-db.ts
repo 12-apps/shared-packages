@@ -5,6 +5,7 @@
    reads a wall-clock value. */
 import type { DeliveryStatus } from '../../types';
 import type { NotificationRow } from '../../wire';
+import type { ChannelConsentRow } from '../consent-db';
 import type {
   NotificationDeliveryRow,
   NotificationDeliveryWhere,
@@ -16,6 +17,8 @@ import type {
   PushSubscriptionRow,
   PushSubscriptionWhere,
 } from '../db';
+
+import { memoryConsentDelegate, memoryCounterDelegate, type SendCounterRow } from './memory-db-consent';
 
 /**
  * An in-memory {@link NotificationsDb} for the unit suites.
@@ -35,6 +38,8 @@ export interface MemoryDb extends NotificationsDb {
     deliveries: NotificationDeliveryRow[];
     preferences: NotificationPreferenceRow[];
     subscriptions: PushSubscriptionRow[];
+    consents: ChannelConsentRow[];
+    counters: SendCounterRow[];
   };
 }
 
@@ -131,6 +136,10 @@ function matchesDelivery(row: NotificationDeliveryRow, where: NotificationDelive
   if (where.updatedAt !== undefined && row.updatedAt.getTime() >= where.updatedAt.lt.getTime()) {
     return false;
   }
+  if (where.channel !== undefined && row.channel !== where.channel) return false;
+  if (where.providerMessageId !== undefined && row.providerMessageId !== where.providerMessageId) {
+    return false;
+  }
   return true;
 }
 
@@ -139,6 +148,8 @@ export function createMemoryDb(): MemoryDb {
   const deliveries: NotificationDeliveryRow[] = [];
   const preferences: NotificationPreferenceRow[] = [];
   const subscriptions: PushSubscriptionRow[] = [];
+  const consents: ChannelConsentRow[] = [];
+  const counters: SendCounterRow[] = [];
 
   const client: NotificationsDbClient = {
     notification: {
@@ -196,6 +207,8 @@ export function createMemoryDb(): MemoryDb {
             error: null,
             attempts: 0,
             sentAt: null,
+            providerMessageId: null,
+            deliveredAt: null,
             createdAt: now,
             updatedAt: now,
           });
@@ -212,6 +225,16 @@ export function createMemoryDb(): MemoryDb {
       update({ where, data }) {
         const row = deliveries.find((entry) => entry.id === where.id);
         if (!row) throw new Error(`no delivery ${where.id}`);
+        // The partial unique (channel, provider_message_id), as Postgres has it.
+        const clash =
+          data.providerMessageId !== undefined &&
+          deliveries.some(
+            (other) =>
+              other.id !== row.id &&
+              other.channel === row.channel &&
+              other.providerMessageId === data.providerMessageId,
+          );
+        if (clash) throw new Error(`duplicate provider id ${data.providerMessageId ?? ''}`);
         Object.assign(row, data, { updatedAt: new Date() });
         return Promise.resolve(snapshot(row));
       },
@@ -291,6 +314,9 @@ export function createMemoryDb(): MemoryDb {
         return Promise.resolve({ count });
       },
     },
+
+    notificationChannelConsent: memoryConsentDelegate(consents, nextId),
+    notificationSendCounter: memoryCounterDelegate(counters),
   };
 
   return {
@@ -298,7 +324,7 @@ export function createMemoryDb(): MemoryDb {
     // No isolation to model: the suites assert committed state, and a rollback
     // path a fake invents would be a rollback nothing tests.
     $transaction: (fn) => fn(client),
-    rows: { notifications, deliveries, preferences, subscriptions },
+    rows: { notifications, deliveries, preferences, subscriptions, consents, counters },
   };
 }
 

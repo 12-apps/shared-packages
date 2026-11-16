@@ -18,6 +18,10 @@ import {
   type NotificationsActor,
   type NotificationsRoute,
 } from './context';
+import type { ConsentEngine } from './consent';
+import { consentRoutes, paidChannelsTurnedOn } from './consent-routes';
+import type { PaidChannel } from './consent-text';
+import type { ConsentView } from './consent-types';
 import type { NotificationContactDirectory } from './db';
 import type { NotificationInboxStore } from './inbox';
 import type { NotificationPreferenceStore } from './preferences';
@@ -27,7 +31,8 @@ import type { TransportRegistry } from './transports/registry';
 /**
  * The endpoints, as framework-neutral descriptors (12-15).
  *
- * Nine routes, and the paths are the PACKAGE's: the shipped react client
+ * Nine routes (eleven with `consent`: the two phone-confirmation routes of
+ * `./consent-routes`), and the paths are the PACKAGE's: the shipped react client
  * builds these URLs, so a host that renamed one would be a host whose own bell
  * stopped working. The host names only where the whole block is mounted
  * (the origin mounts it at `/api/account`).
@@ -52,6 +57,12 @@ interface NotificationRoutesDeps {
   messages: NotificationsCopySource<NotificationWireMessages>;
   /** Told when a write actually changed something (for a realtime hint). */
   onInboxChanged?: (userId: string) => void;
+  /**
+   * The consent engine, when the host configured `consent`: the
+   * preferences answer `consent` too, a save that turns a paid channel on asks
+   * the number, and the two phone-confirmation routes are mounted.
+   */
+  consent?: ConsentEngine;
 }
 
 /**
@@ -97,15 +108,23 @@ async function preferencesPayload(
   preferences: Record<string, Record<string, boolean>>;
   availability: Record<NotificationChannel, boolean>;
   categories: string[];
+  consent?: Record<PaidChannel, ConsentView>;
 }> {
-  const [preferences, availability] = await Promise.all([
+  const [preferences, availability, consent] = await Promise.all([
     deps.preferences.get(userId),
     channelAvailability(deps, userId, scopeClientId),
+    deps.consent?.get(userId),
   ]);
   // `categories` travels with the matrix so the settings screen renders the
   // HOST's taxonomy without being told it twice (once in the api config, once
-  // in the web config) — the two could then disagree.
-  return { preferences, availability, categories: [...deps.categories] };
+  // in the web config) — the two could then disagree. `consent` only exists
+  // where the host configured it, so an adopter without it sees today's shape.
+  return {
+    preferences,
+    availability,
+    categories: [...deps.categories],
+    ...(consent ? { consent } : {}),
+  };
 }
 
 /**
@@ -193,10 +212,18 @@ function preferenceRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
       handle: guarded(async ({ actor, body, locale }) => {
         // The dispatch pipeline reads these on every emit, so a save takes
         // effect immediately — no cache to invalidate.
-        await deps.preferences.save(
-          actor.userId,
-          parsePreferencesBody(body, messagesOf(deps, locale)),
-        );
+        const saved = parsePreferencesBody(body, messagesOf(deps, locale));
+        // What the person had, read only when a paid switch is ON in the
+        // payload: the confirmation is asked on a false → true change only.
+        const before =
+          deps.consent && paidChannelsTurnedOn(saved).length > 0
+            ? await deps.preferences.get(actor.userId)
+            : null;
+        await deps.preferences.save(actor.userId, saved);
+        // A paid channel switched on starts its confirmation — the same flow
+        // for a person's switch and an agent's, one ask per number and channel
+        // however many categories turned it on.
+        if (before) await deps.consent?.startTurnedOn(actor.userId, paidChannelsTurnedOn(saved, before));
         return ok(await preferencesPayload(deps, actor.userId, actor.scopeClientId ?? null));
       }),
     },
@@ -256,5 +283,10 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
 }
 
 export function notificationRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
-  return [...inboxRoutes(deps), ...preferenceRoutes(deps), ...pushRoutes(deps)];
+  return [
+    ...inboxRoutes(deps),
+    ...preferenceRoutes(deps),
+    ...pushRoutes(deps),
+    ...(deps.consent ? consentRoutes({ consent: deps.consent, messages: deps.messages }) : []),
+  ];
 }

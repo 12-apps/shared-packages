@@ -341,6 +341,68 @@ sweep — endpoints and screens included.
     `WebPushSubscriptionSource.list` that drops the field makes every device
     read as "all".
 
+16. **Paid channels: consent, opt-out, caps and receipts are opt-in, and the
+    words are yours.** None of the four changes anything until configured.
+
+    - **The schema first.** `20261116190000_paid_channel_consent` is additive
+      (two nullable columns, two tables, a widened status CHECK): sync,
+      regenerate and migrate BEFORE the bumped package serves a request. A
+      HAND-WRITTEN adapter (rule 4) fills `notificationChannelConsent` and
+      `notificationSendCounter` — and every conditional write there must be ONE
+      statement whose WHERE is the precondition (`count < cap`, `askedAt IS
+      NULL`, `code_attempts < max`, the resend slot): a read-then-write passes
+      the cap under concurrency. Add the FK `user_id → users(id) ON DELETE
+      CASCADE` in your own migration, as for the other tables.
+    - **`requireConsent` + `consent`.** `methods` (per channel: `REPLY` where
+      the channel carries replies, `CODE` where it cannot), `confirmKeywords`
+      and `optOutKeywords` (whole-reply words, folded; the mount refuses empty
+      lists — the package ships no language), `defaultCountryCode`, and
+      `message(input)`: the confirmation's words, with `input.code` for a code
+      and `input.firstName` when your `contacts.getContact` answers one.
+      `requireConsent` decides where a confirmation is NEEDED; an opt-out is
+      honoured on every paid channel as soon as `consent` is configured, in
+      `requireConsent` or not (a number that said stop gets nothing more there).
+    - **The WhatsApp confirmation is a TEMPLATE.** Outside the 24 h window Meta
+      accepts only approved templates, and the confirmation (a question with a
+      reply button) is not your generic alert template. Register it with Meta
+      and answer it from `consent.whatsAppTemplate(input)` as `{ name,
+      language?, bodyParameters, quickReplyPayloads? }`; the reply button's
+      TITLE (fixed in the template) arrives as the reply's text, so make it one
+      of your `confirmKeywords`. Only the confirmations the engine builds carry
+      their own template; a notification's `data` cannot name one. Body
+      parameters are sent without newlines or tabs (Meta rejects them).
+    - **The inbound route is yours.** Verify and parse (Meta: `@12-apps/messaging`,
+      whose `hooks.onUnclaimedEvents` hands you the events of EVERY account no
+      connection names on a shared app — keep only those whose `accountId` is
+      YOUR number's; Twilio: `verifyTwilioSignature` + `parseTwilioCallback`).
+      Normalise Meta's `wa_id` before passing it as `from`: for many Brazilian
+      mobiles it lacks the 9th digit, and an exact match against the stored
+      `+55…9…` number would miss the SIM or SAIR. Then
+      call `api.consent.applyInbound({ channel, from, text | optOut, at,
+      externalId })` for a reply and `api.applyDeliveryReceipt(...)` for a
+      status. Retry a receipt that answered `applied: false` later: it may have
+      raced its own SENT write — but never one that answered `reason:
+      'not-tracked'`: that is a confirmation message's receipt, final. Pass
+      Twilio's callback URL to `parseTwilioCallback(params, { url })` and Meta's
+      `biz_opaque_callback_data` through `confirmationOfWhatsAppStatus`, and hand
+      the result on as the receipt's `confirmation`.
+    - **A phone change** calls `api.consent.forgetDestination(userId)`. Even
+      without it a changed number is unconfirmed (every check compares the
+      stored number with the current one), but the call clears the stale rows.
+    - **Numbers already receiving** before you turned consent on:
+      `api.consent.grandfather([{ userId, channel }])` keeps them receiving, and
+      `api.consent.askGrandfathered({ take })`, from a job, asks each one once.
+      A permanent delivery failure on a grandfathered number drops it.
+    - **`caps`** takes RESOLVERS (`perRecipientDaily()`,
+      `perTenantMonthly(tenantId)`, `timeZoneOf(tenantId)`), read per emit, a
+      required `timeZone`, and `onTenantCapReached(tenantId, period)`. A
+      resolver that throws, or a counter statement that fails, drops the paid
+      channels of that emit; the inbox row and the free channels are still
+      written. A seam without `notificationSendCounter` is reported at mount.
+    - **Two more routes** (`/phone-confirmation/resend`, `/phone-confirmation/code`)
+      are mounted when `consent` is configured; they are cookie-authenticated
+      writes like the rest (rule 13).
+
 ## The minimum host
 
 ```ts

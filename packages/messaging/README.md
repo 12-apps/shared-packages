@@ -38,6 +38,7 @@ messaging.process-delivery (a job)
   ├─ parse the stored bytes through the channel's adapter
   ├─ per event, resolve the tenant: the event's account against the connections
   │    unknown, revoked or in error ............. dropped (the edge already said 200)
+  │    unknown only, with hooks.onUnclaimedEvents  handed to the host (see below)
   ├─ message  → create or re-open the conversation, update lastInboundAt,
   │             store the message (a known channel id is a no-op),
   │             then the host's onInboundMessage({ conversation, message })
@@ -49,6 +50,29 @@ messaging.process-delivery (a job)
 
 The tenant is never taken from the URL: a channel like WhatsApp posts every
 connected account's events to the one callback configured on the app.
+
+**A number nobody connected.** A host whose OWN number lives on the same app
+(a platform notification number: its confirmation replies, its opt-outs, its
+delivery receipts) passes `hooks.onUnclaimedEvents(channel, events)`. It is
+handed, once per processed delivery, the parsed events of every account no
+connection row names: already signature-checked and persisted, and stored
+nowhere here. A revoked or errored account is a tenant's and is never handed
+over. A throw settles the delivery `FAILED` and the reconciliation sweep runs
+it again, so the handler is idempotent on the provider's message id. Without
+the hook those events are dropped, as before.
+
+**Filter on your OWN account id.** The hook is handed every account the app
+posts for that no connection names — not only the platform's number. A host
+that wants its own number's events keeps `event.accountId === <its phone
+number id>` and drops the rest; anything else would act on a stranger's
+messages.
+
+**Meta's `wa_id` is not always the stored number.** For many Brazilian mobiles
+Meta reports the sender WITHOUT the 9th digit (`55 11 8765-4321` for
+`+55 11 98765-4321`). A host matching a reply to a stored number (a consent
+reply, `@12-apps/notifications`' `applyInbound`) normalises `from` first: for a
+`55` number with a 2-digit area code and an 8-digit subscriber starting 6–9,
+insert the `9` — or the reply misses the account that sent it.
 
 **Opt-out.** On WhatsApp, a message that is exactly `PARAR`, `SAIR`, `STOP` or
 `CANCELAR` — case- and accent-insensitive, ignoring punctuation and emoji

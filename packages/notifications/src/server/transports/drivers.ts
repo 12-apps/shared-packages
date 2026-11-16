@@ -20,11 +20,14 @@
  * own), and the router, the registry and the other transports are untouched.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { normalizePhoneE164 } from '../../phone';
 import type {
   NotificationContent,
   NotificationTransport,
   TransportRecipient,
+  TransportSendResult,
 } from '../../types';
 
 /** Every HTTP call a built-in driver makes goes through this, so a test can. */
@@ -48,29 +51,60 @@ export interface DriverDeclarationBase {
   fetchImpl?: FetchImpl;
 }
 
-/** A vendor rejection, carrying what the provider actually said. */
+/**
+ * A vendor rejection, carrying what the provider actually said: `detail` is the
+ * response body as received, which is where a vendor puts its own error code
+ * (`./../twilio.ts` reads Twilio's to tell a bad number from a bad moment).
+ */
 export class NotificationProviderError extends Error {
+  readonly vendor: string;
   readonly status: number;
+  readonly detail: string;
   constructor(vendor: string, status: number, detail: string) {
     super(`${vendor} rejected the message (${status} ${detail}).`);
     this.name = 'NotificationProviderError';
+    this.vendor = vendor;
     this.status = status;
+    this.detail = detail;
     Object.setPrototypeOf(this, NotificationProviderError.prototype);
   }
 }
 
-/** `fetch` and throw {@link NotificationProviderError} on a non-2xx. */
+/**
+ * `fetch` and throw {@link NotificationProviderError} on a non-2xx; resolve the
+ * parsed JSON body otherwise (`null` when there is none or it is not JSON).
+ *
+ * The body is read on SUCCESS too because it carries the provider's id for the
+ * message, which is the only thing a later delivery receipt can be matched on.
+ * An unreadable success body is still a success — the message went — so it
+ * answers `null` rather than throwing a sent message into a retry.
+ */
 export async function postOrThrow(
   vendor: string,
   fetchImpl: FetchImpl | undefined,
   url: string,
   init: { headers: Record<string, string>; body: string },
-): Promise<void> {
+): Promise<unknown> {
   const call = fetchImpl ?? (globalThis.fetch as unknown as FetchImpl);
   const response = await call(url, { method: 'POST', ...init });
   if (!response.ok) {
     throw new NotificationProviderError(vendor, response.status, await response.text());
   }
+  try {
+    return JSON.parse(await response.text()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** `{ providerMessageId }` when `id` is a non-empty string, else nothing. */
+export function sentAs(id: unknown): TransportSendResult | undefined {
+  return typeof id === 'string' && id.length > 0 ? { providerMessageId: id } : undefined;
+}
+
+/** A log driver's stand-in id: unique per send, so dev and e2e exercise receipts. */
+export function fakeProviderId(vendor: string): TransportSendResult {
+  return { providerMessageId: `${vendor}-log-${randomUUID()}` };
 }
 
 /**
@@ -128,7 +162,7 @@ export function phoneChannel<TMessage>(
     /** Country calling code for a bare local number. Required — see `phone.ts`. */
     defaultCountryCode: string;
     format: (content: NotificationContent) => TMessage;
-    send: (toE164: string, message: TMessage) => Promise<void>;
+    send: (toE164: string, message: TMessage) => Promise<TransportSendResult | void>;
   },
 ): NotificationTransport<TMessage> {
   const toE164 = (recipient: TransportRecipient): string | null =>
@@ -142,7 +176,7 @@ export function phoneChannel<TMessage>(
     async send(message, recipient) {
       const to = toE164(recipient);
       if (!to) throw new Error('Recipient has no usable phone number.');
-      await options.send(to, message);
+      return options.send(to, message);
     },
   };
 }
