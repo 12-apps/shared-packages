@@ -162,6 +162,21 @@ export type {
   PullCatalogue,
   PushCatalogue,
 } from "./core/catalogue-port";
+export { centsFromMajor } from "./core/catalogue-read-port";
+export type {
+  CatalogueReadContext,
+  CatalogueReader,
+  CatalogueReadNotice,
+  CatalogueReadRefusalCode,
+  CatalogueReadResult,
+  CatalogueReadWarning,
+  CatalogueReadWarningCode,
+  CatalogueSnapshot,
+  CatalogueSnapshotCategory,
+  CatalogueSnapshotItem,
+  CatalogueSnapshotOption,
+  CatalogueSnapshotOptionGroup,
+} from "./core/catalogue-read-port";
 export type {
   CatalogueFailedAction,
   CatalogueFailureCode,
