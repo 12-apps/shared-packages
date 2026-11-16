@@ -57,3 +57,25 @@ export async function askStatus(
   if (answered.data.status !== "AWAITING_PAYMENT") report(orderId, answered.data);
   return ok(answered.data.status);
 }
+
+/**
+ * A card the server answered FAILED (FUT-612, contract C2 and C7 by card): a
+ * capture can come back short, and a refusal beside the card form would then
+ * tell somebody whose money arrived that nothing was charged. So inside a flow
+ * the card path asks `/status` ONCE — only on FAILED — and answers whether the
+ * server stated a money fact. When it did, the fact is reported to the flow and
+ * the caller resolves to the confirmation step; when it did not (a real
+ * decline), or nothing listens, or the read fails, the caller refuses exactly
+ * as before.
+ */
+export async function moneyFactOnFailure(
+  client: Pick<CheckoutClient, "getStatusDetail">,
+  orderId: string,
+  report: StatusFactsReporter | null,
+): Promise<boolean> {
+  if (!report || !client.getStatusDetail) return false;
+  const answered = await client.getStatusDetail(orderId);
+  if (!answered.ok || (!answered.data.shortfall && !answered.data.stockGone)) return false;
+  report(orderId, answered.data);
+  return true;
+}

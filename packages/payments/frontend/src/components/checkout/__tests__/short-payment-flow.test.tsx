@@ -16,7 +16,7 @@ import type { PaymentShortfall } from "@12-apps/payments-backend";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CheckoutStatusDetail } from "../status-detail";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
-import { onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
 const SHORT: PaymentShortfall = { totalCents: 2070, paidCents: 690, dueCents: 1380, paidMethod: "PIX", resolution: null };
 
@@ -138,5 +138,57 @@ describe("option C in <CheckoutFlow> (FUT-612)", () => {
 
     const open = await screen.findByTestId("payment-short-open");
     expect(open.querySelectorAll("button")).toHaveLength(0);
+  });
+});
+
+/** A returning buyer pays the saved Visa; the charge answers `status`, `/status` answers `detail`. */
+async function payBySavedCard(status: "FAILED" | "PAID", detail: CheckoutStatusDetail | null) {
+  const base = stubClient([SAVED_VISA]);
+  base.charge.mockResolvedValue({ ok: true, data: { status } } as never);
+  const getStatusDetail = vi.fn(async () => ({ ok: true as const, data: detail ?? { status } }));
+  const client = detail === null ? base : { ...base, getStatusDetail };
+  renderList({ config: onPageStore(), client: client as never, flow: { payDifference: vi.fn(), requestShortRefund: vi.fn() } });
+  await waitFor(() => expect((screen.getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
+  await pressBar();
+  return { getStatusDetail, charge: base.charge };
+}
+
+describe("a card answered FAILED inside the flow (FUT-612, C2 and C7 by card)", () => {
+  it("shows option C when /status states a shortfall", async () => {
+    const { getStatusDetail } = await payBySavedCard("FAILED", { status: "FAILED", shortfall: { ...SHORT, paidMethod: "CARD" } });
+
+    const open = await screen.findByTestId("payment-short-open");
+    expect(normalized(open)).toContain("Já pago (Cartão)");
+    expect(normalized(open)).not.toContain("Nenhum valor foi cobrado");
+    expect(getStatusDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the stock-gone notice when /status states one", async () => {
+    await payBySavedCard("FAILED", { status: "FAILED", stockGone: { receivedCents: 2700, missing: ["Café"] } });
+
+    const notice = await screen.findByTestId("payment-stock-gone");
+    expect(normalized(notice)).toContain("Recebemos R$ 27,00, mas acabou Café");
+  });
+
+  it("keeps today's refusal beside the card, word for word, when /status states no fact", async () => {
+    await payBySavedCard("FAILED", null);
+    const today = (await screen.findByTestId("card-error")).textContent;
+    cleanup();
+
+    const { getStatusDetail } = await payBySavedCard("FAILED", { status: "FAILED" });
+    const now = (await screen.findByTestId("card-error")).textContent;
+
+    expect(today).toContain("nada foi cobrado");
+    expect(now).toBe(today);
+    expect(getStatusDetail).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("card-error")).toBeTruthy();
+  });
+
+  it("asks /status nothing for a card answer that is not FAILED", async () => {
+    const { getStatusDetail, charge } = await payBySavedCard("PAID", { status: "PAID" });
+
+    await screen.findByTestId("payment-receipt");
+    expect(charge).toHaveBeenCalledTimes(1);
+    expect(getStatusDetail).not.toHaveBeenCalled();
   });
 });
