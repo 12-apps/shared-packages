@@ -30,7 +30,7 @@ const REGISTRY = "https://registry.npmjs.org";
 
 /** True only when the registry answers 200 for the name; anything else (404, offline, timeout) is "not known". */
 export async function onRegistry(name, fetchImpl = fetch) {
-  const response = await fetchImpl(`${REGISTRY}/${name.replace("/", "%2F")}`, {
+  const response = await fetchImpl(`${REGISTRY}/${name.replaceAll("/", "%2F")}`, {
     method: "HEAD",
     signal: AbortSignal.timeout(5000),
   });
