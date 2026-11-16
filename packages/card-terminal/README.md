@@ -31,6 +31,34 @@ The ledger's ports are the capture table (`TerminalCaptureStore`) and two
 read-only directories that say whether a terminal, a sale or a payment row is
 the tenant's.
 
+### The refund sweep
+
+`flag-unbound-captures` flags, every ten minutes, the captures whose money
+nothing will claim once the ledger's `unboundRefundAfterMs` has passed:
+
+- `UNBOUND_TIMEOUT`: no sale took the capture. A late bind clears it.
+- `SALE_NOT_PAID`: a sale took it (ORDER_CREATED, so the terminal was
+  acknowledged and never reports it again) and then was abandoned, neither
+  paid nor cancelled. Implement `SaleDirectory.staleUnpaidSales(sales, cutoff)`
+  to answer, of the sales asked, those written at or before `cutoff` and not
+  paid. Name only what you know is unpaid: every sale you answer has its held
+  captures flagged, and a bind does not clear that flag. Without the method
+  the sweep leaves held captures alone and the job warns once a tick
+  (`HELD_SWEEP_OFF_WARNING`). Your table needs a `created_at` beside
+  `captured_at`; a partial index on the ORDER_CREATED rows by
+  `(captured_at, id)` keeps the read cheap.
+
+The held read pages on, by `(captured_at, id)`, past the rows you do not name
+(a paid sale's leftover capture, a sale still inside the window), a few pages a
+tick, and keeps its place between ticks, so such rows never hide a newer
+abandoned capture. Its place lives in memory, on the ledger you create: create
+the ledger once per process and run the job in a long-lived worker. A process
+started fresh for every tick starts from the oldest rows every time and never
+reaches past the first pages. Two things it does not judge: a sale paid by another tender
+between your answer and the flag is still flagged, and a sale you leave open
+(to be received later) past the window is flagged for good, so a receive after
+it charges again.
+
 ### Refund a capture (`createCaptureActs(...).refund`)
 
 1. Open a transaction.

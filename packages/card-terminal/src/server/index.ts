@@ -56,6 +56,8 @@ export {
   type RawSqlHandle,
   type RefundFlag,
   type SaleDirectory,
+  type SaleRef,
+  type StaleHeldCursor,
   type Savepoint,
   type TerminalCaptureStore,
   type TerminalCaptureStoreFor,
@@ -97,6 +99,7 @@ export {
 } from './prisma-store';
 export { createMemoryTerminalCaptureStore, type MemoryTerminalCaptures } from './memory-store';
 export {
+  HELD_SWEEP_OFF_WARNING,
   UNBOUND_CAPTURE_SWEEP_BATCH,
   UNBOUND_CAPTURE_SWEEP_CRON,
   terminalCaptureJobBlueprints,

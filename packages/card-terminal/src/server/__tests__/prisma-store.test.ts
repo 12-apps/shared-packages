@@ -124,6 +124,27 @@ describe('the Prisma capture store', () => {
     ]);
   });
 
+  it('reads the stale held captures on both clocks, not live, oldest first, at most `limit`, past a cursor (FUT-5095)', async () => {
+    const { client, delegate } = fake();
+    const cutoff = new Date(1);
+
+    const after = { capturedAt: new Date(0), id: 'c0' };
+
+    await createPrismaTerminalCaptureStore(client).findStaleHeld?.(cutoff, 200);
+    await createPrismaTerminalCaptureStore(client).findStaleHeld?.(cutoff, 200, after);
+
+    const read = (past: unknown[]) => ({
+      where: { state: 'ORDER_CREATED', capturedAt: { lte: cutoff }, createdAt: { lte: cutoff }, AND: [{ OR: NOT_LIVE }, ...past] },
+      orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
+      take: 200,
+      select: CAPTURE_SELECT,
+    });
+    expect(delegate.findMany.mock.calls.map(([args]) => args)).toEqual([
+      read([]),
+      read([{ OR: [{ capturedAt: { gt: after.capturedAt } }, { capturedAt: after.capturedAt, id: { gt: after.id } }] }]),
+    ]);
+  });
+
   it("runs on the host's transaction when one is passed, on the lazily resolved root otherwise", async () => {
     const root = fake();
     const tx = fake();

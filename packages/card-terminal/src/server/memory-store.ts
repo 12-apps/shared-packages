@@ -5,6 +5,7 @@ import type {
   NewTerminalCapture,
   RefundFlag,
   Savepoint,
+  StaleHeldCursor,
   TerminalCaptureStore,
   TerminalCaptureStoreFor,
 } from './ports';
@@ -90,6 +91,25 @@ function staleRows(table: Table, cutoff: Date, limit: number): Row[] {
     .slice(0, limit);
 }
 
+const pastCursor = (row: Row, after: StaleHeldCursor | undefined): boolean =>
+  !after ||
+  row.capturedAt.getTime() > after.capturedAt.getTime() ||
+  (row.capturedAt.getTime() === after.capturedAt.getTime() && row.id > after.id);
+
+function staleHeldRows(table: Table, cutoff: Date, limit: number, after?: StaleHeldCursor): Row[] {
+  return [...table.rows.values()]
+    .filter(
+      (row) =>
+        row.state === 'ORDER_CREATED' &&
+        !refundLive(row) &&
+        row.capturedAt.getTime() <= cutoff.getTime() &&
+        row.recordedAt.getTime() <= cutoff.getTime() &&
+        pastCursor(row, after),
+    )
+    .sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, limit);
+}
+
 function insertInto(table: Table, row: NewTerminalCapture): boolean {
   const key = keyOf(row.clientId, row.transactionCode);
   if (table.rows.has(key)) return false;
@@ -142,6 +162,7 @@ function memoryStore(table: Table): TerminalCaptureStore {
       for (const row of stale) Object.assign(row, { refundFlaggedAt: now, refundReason: 'UNBOUND_TIMEOUT' });
       return stale.length;
     },
+    findStaleHeld: async (cutoff, limit, after) => staleHeldRows(table, cutoff, limit, after).map(answer),
     async findUnclaimed(clientId, deviceIds) {
       const devices = new Set(deviceIds);
       return rows()

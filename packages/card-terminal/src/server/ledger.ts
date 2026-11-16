@@ -19,6 +19,7 @@ import {
 } from './model';
 import type { CapturePatch, SaleDirectory, TerminalCaptureStore, TerminalCaptureStoreFor, TerminalDirectory } from './ports';
 import type { DeviceCaptureReport } from './readers';
+import { flagStaleHeld, heldSweepReady, type HeldSweepState } from './held-sweep';
 import { awaitsItsReport, fillLegacyTrace } from './legacy-journal';
 
 /**
@@ -165,6 +166,20 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * each. How many this call flagged.
    */
   flagStaleUnbound(now: Date, limit: number): Promise<number>;
+  /**
+   * Flag `SALE_NOT_PAID` up to `limit` captures still ORDER_CREATED
+   * {@link unboundRefundAfterMs} after they were taken AND recorded, whose sale
+   * the host names that old and still unpaid (`SaleDirectory.staleUnpaidSales`),
+   * oldest first, once each: the terminal was told the sale holds the money,
+   * so nothing else owes it back (`./held-sweep`). How many this call flagged.
+   */
+  flagStaleHeld(now: Date, limit: number): Promise<number>;
+  /**
+   * The store and the host both answer the held read (`findStaleHeld`,
+   * `SaleDirectory.staleUnpaidSales`). False: {@link flagStaleHeld} flags
+   * nothing, and the sweep job warns once a tick.
+   */
+  readonly heldSweepReady: boolean;
 }
 
 function positive(name: string, value: number): number {
@@ -333,6 +348,7 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
     unboundOnly: new Set([...UNBOUND_ONLY_REASONS, ...(config.unboundOnlyReasons ?? [])]),
   };
   const { storeFor, clock } = engine;
+  const heldSweep: HeldSweepState = {};
 
   return {
     maxAmountCents,
@@ -370,6 +386,11 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
     },
     async flagStaleUnbound(now, limit) {
       return storeFor().flagStaleUnbound(now, new Date(now.getTime() - unboundRefundAfterMs), limit);
+    },
+    flagStaleHeld: (now, limit) =>
+      flagStaleHeld(storeFor(), engine.sales, { now, cutoff: new Date(now.getTime() - unboundRefundAfterMs), limit }, heldSweep),
+    get heldSweepReady() {
+      return heldSweepReady(storeFor(), engine.sales);
     },
   };
 }

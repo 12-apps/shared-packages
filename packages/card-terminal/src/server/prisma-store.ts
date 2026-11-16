@@ -1,5 +1,5 @@
 import type { CaptureKind, CaptureState, StoredCaptureSource, TerminalCaptureRecord } from './model';
-import type { CapturePatch, CaptureVersion, NewTerminalCapture, TerminalCaptureStore, TerminalCaptureStoreFor } from './ports';
+import type { CapturePatch, CaptureVersion, NewTerminalCapture, StaleHeldCursor, TerminalCaptureStore, TerminalCaptureStoreFor } from './ports';
 
 /**
  * The capture table over a host's Prisma `terminalCapture` model. Duck-typed
@@ -13,8 +13,9 @@ import type { CapturePatch, CaptureVersion, NewTerminalCapture, TerminalCaptureS
  * which of two writers wins, and the loser writes nothing.
  *
  * The table it expects is `terminal_captures`, keyed unique on
- * `(client_id, transaction_code)`, with a partial index on the UNBOUND rows by
- * `captured_at` for the sweep; the column names are the ones below.
+ * `(client_id, transaction_code)`, with partial indexes on the UNBOUND and the
+ * ORDER_CREATED rows by `captured_at` for the sweep, and a `created_at` the
+ * database writes; the column names are the ones below.
  */
 
 export const CAPTURE_SELECT = {
@@ -59,7 +60,16 @@ const NOT_OWED_BACK = [...NOT_LIVE, { refundReason: 'UNBOUND_TIMEOUT' }] as cons
 type CaptureFindManyWhere =
   | { clientId: string; transactionCode: { in: string[] } }
   | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' }
-  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK };
+  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK }
+  | {
+      state: 'ORDER_CREATED';
+      capturedAt: { lte: Date };
+      createdAt: { lte: Date };
+      AND: readonly [{ OR: typeof NOT_LIVE }, ...{ OR: readonly StaleHeldAfter[] }[]];
+    };
+
+/** Strictly after a (`captured_at`, `id`) cursor. */
+type StaleHeldAfter = { capturedAt: { gt: StaleHeldCursor['capturedAt'] } } | { capturedAt: Date; id: { gt: string } };
 
 type CaptureUpdateWhere =
   | CaptureVersion
@@ -75,6 +85,7 @@ export interface TerminalCaptureDelegate {
   findMany(args: {
     where: CaptureFindManyWhere;
     orderBy?: { capturedAt: 'asc' } | readonly [{ capturedAt: 'asc' }, { id: 'asc' }];
+    take?: number;
     select: typeof CAPTURE_SELECT;
   }): PromiseLike<CaptureRow[]>;
   updateMany(args: { where: CaptureUpdateWhere; data: CapturePatch }): PromiseLike<{ count: number }>;
@@ -162,6 +173,17 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
       return flagged.count;
     },
     flagStaleUnbound: async (now, cutoff, limit) => flagStaleUnbound(await client(), now, cutoff, limit),
+    async findStaleHeld(cutoff, limit, after) {
+      // Both clocks, as the unbound sweep: the terminal's `captured_at` and the database's `created_at`.
+      const past = after ? [{ OR: [{ capturedAt: { gt: after.capturedAt } }, { capturedAt: after.capturedAt, id: { gt: after.id } }] }] : [];
+      const rows = await (await client()).terminalCapture.findMany({
+        where: { state: 'ORDER_CREATED', capturedAt: { lte: cutoff }, createdAt: { lte: cutoff }, AND: [{ OR: NOT_LIVE }, ...past] },
+        orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: CAPTURE_SELECT,
+      });
+      return rows.map(toRecord);
+    },
     async findUnclaimed(clientId, deviceIds) {
       const rows = await (await client()).terminalCapture.findMany({
         where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', OR: NOT_OWED_BACK },
