@@ -50,6 +50,7 @@ export {
   type PlanCompareRequest,
 } from './plan-compare-dialog';
 export { selectComparisonRows } from './comparison-rows';
+export type { CompareOfferMode, ComparisonRowRequest } from '../plan-wire';
 export type {
   ComparisonTableCopy,
   EntitlementsWebCopy,

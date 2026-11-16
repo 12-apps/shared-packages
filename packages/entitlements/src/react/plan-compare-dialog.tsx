@@ -14,7 +14,7 @@
  *
  * - `entitlements.PlanCompare` — a controlled component the host renders
  *   (`open`, `onClose`, `keys`).
- * - `openPlanCompare({ feature, keys, plan })` — from anywhere, through the
+ * - `openPlanCompare({ feature, keys | rows, plan, title, offer })` — from anywhere, through the
  *   upsell channel: the prompt host already mounted in the layout opens this
  *   dialog for a plan-gap prompt that carries `compareKeys`.
  *
@@ -38,14 +38,23 @@ import { useTheme } from '@12-apps/ui/mui/styles';
 import { useMediaQuery } from '@12-apps/ui/mui/useMediaQuery';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { ComparisonTier } from '../plan-wire';
-import { buildMatrix, selectComparisonRows } from './comparison-rows';
+import type { CompareOfferMode, ComparisonRowRequest, ComparisonTier } from '../plan-wire';
+import {
+  buildMatrix,
+  buildRowsMatrix,
+  keysOfRows,
+  selectComparisonRows,
+  type MatrixSection,
+} from './comparison-rows';
 import { createPlanApi, useRead } from './plan-api';
+import { EachPlanActions } from './plan-compare-each';
 import {
   compareOffer,
+  compareOffers,
   CompareMatrixView,
   useMeasuredWidth,
   type CompareOffer,
+  type CompareOffers,
 } from './plan-compare-layout';
 import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
 import { raiseUpsell } from './upsell-channel';
@@ -54,11 +63,28 @@ import type { ResolvedWebConfig } from './web-config';
 /** What a screen hands the comparison. */
 export interface PlanCompareRequest {
   /**
-   * The rows to compare, by {@link ComparisonLine.key}. Keys no line carries
-   * are ignored; when none matches, the dialog says so rather than opening
-   * blank.
+   * The rows to compare, by {@link ComparisonLine.key}, worded by the host's
+   * plan catalogue. Keys no line carries are ignored; when none matches, the
+   * dialog says so rather than opening blank. Ignored when `rows` is given.
    */
-  keys: readonly string[];
+  keys?: readonly string[] | undefined;
+  /**
+   * The screen's OWN rows, worded in its own copy: each names the line that
+   * decides its marks (`key`) and the `label` it shows. A key may repeat, one
+   * entitlement gating several rows. Shown in the screen's order. Wins over
+   * `keys`.
+   */
+  rows?: readonly ComparisonRowRequest[] | undefined;
+  /** The dialog's title, in the screen's words. Default: the copy pack's. */
+  title?: string | undefined;
+  /**
+   * What the footer offers. `'cheapest'` (default): one ask, for the tier
+   * `plan` names or else the cheapest upgrade covering every row. `'each'`:
+   * one "Conhecer o <plano>" per upgrade tier on sale, each linking the
+   * plans page at that tier; `plan` is then ignored. Without a `plansPath`
+   * there is nothing to link, so `'each'` falls back to `'cheapest'`.
+   */
+  offer?: CompareOfferMode | undefined;
   /**
    * The tier to offer. Omitted or null: the cheapest upgrade tier that
    * includes EVERY compared row. A tier that is not an upgrade (the tenant's
@@ -100,15 +126,27 @@ function AllPlansLink({
 
 function CompareFooter({
   offer,
+  each,
   feature,
   config,
   onClose,
 }: {
   offer: CompareOffer;
+  each: CompareOffers | null;
   feature: string | undefined;
   config: ResolvedWebConfig;
   onClose: () => void;
 }): JSX.Element {
+  if (each !== null && config.plansPath !== null && each.tiers.length > 0) {
+    return (
+      <EachPlanActions
+        offers={each}
+        plansPath={config.plansPath}
+        config={config}
+        onClose={onClose}
+      />
+    );
+  }
   const offered = offer.tier;
   const requiredPlan = offered?.key ?? null;
   const target = feature === undefined ? { requiredPlan } : { requiredPlan, feature };
@@ -124,6 +162,19 @@ function CompareFooter({
       <AllPlansLink config={config} onClose={onClose} />
     </Stack>
   );
+}
+
+/** The matrix rows: the screen's own, or the payload's lines it named by key. */
+function matrixFor(
+  tiers: ComparisonTier[],
+  request: PlanCompareRequest,
+): { selected: ComparisonTier[]; sections: MatrixSection[] } {
+  if (request.rows !== undefined) {
+    const selected = selectComparisonRows(tiers, keysOfRows(request.rows));
+    return { selected, sections: buildRowsMatrix(selected, request.rows) };
+  }
+  const selected = selectComparisonRows(tiers, request.keys ?? []);
+  return { selected, sections: buildMatrix(selected) };
 }
 
 /**
@@ -144,14 +195,20 @@ function PlanCompareBody({
   onClose: () => void;
 }): JSX.Element {
   const [measureRef, width] = useMeasuredWidth();
-  const selected = selectComparisonRows(tiers, request.keys);
-  const sections = buildMatrix(selected);
+  const { selected, sections } = matrixFor(tiers, request);
   const rowCount = sections.reduce((sum, section) => sum + section.rows.length, 0);
-  const offer = compareOffer(selected, rowCount, request.plan);
+  const offer = compareOffer(
+    selected,
+    rowCount,
+    request.plan,
+    request.rows === undefined ? undefined : sections,
+  );
+  const each = request.offer === 'each' ? compareOffers(selected, rowCount, sections) : null;
   const copy = config.copy;
+  // Under `each` no tier is THE recommendation: the actions below name them all.
   const badges = {
     currentLabel: copy.planCompare.currentBadge,
-    offeredKey: offer.tier?.key ?? null,
+    offeredKey: each !== null && config.plansPath !== null ? null : offer.tier?.key ?? null,
     offeredLabel: copy.planCompare.offeredBadge,
   };
   return (
@@ -174,7 +231,13 @@ function PlanCompareBody({
         </Box>
       </DialogContent>
       <DialogActions alignment="left">
-        <CompareFooter offer={offer} feature={request.feature} config={config} onClose={onClose} />
+        <CompareFooter
+          offer={offer}
+          each={each}
+          feature={request.feature}
+          config={config}
+          onClose={onClose}
+        />
       </DialogActions>
     </>
   );
@@ -227,7 +290,19 @@ function PlanCompareLoader({
 
 /** One identity per request: a new request is a new dialog, not a reused "sent" state. */
 function requestKey(request: PlanCompareRequest): string {
-  return JSON.stringify([request.keys, request.plan ?? null, request.feature ?? null]);
+  return JSON.stringify([
+    request.keys ?? null,
+    request.rows ?? null,
+    request.title ?? null,
+    request.offer ?? null,
+    request.plan ?? null,
+    request.feature ?? null,
+  ]);
+}
+
+/** The screen's title, or the pack's when none (or only blanks) was given. */
+function titleOf(requested: string | undefined, fallback: string): string {
+  return requested !== undefined && requested.trim() !== '' ? requested : fallback;
 }
 
 /**
@@ -248,7 +323,7 @@ export function PlanCompareDialog({
       open
       size="sm"
       variant={phone ? 'bottom-sheet' : 'default'}
-      title={config.copy.planCompare.title}
+      title={titleOf(request.title, config.copy.planCompare.title)}
       closeLabel={config.copy.planCompare.closeLabel}
       onClose={onClose}
       dataTestId="plan-compare-modal"
@@ -274,6 +349,9 @@ export function openPlanCompare(request: PlanCompareRequest & { feature: string 
     feature: request.feature,
     requiredPlan: request.plan ?? null,
     reason: 'not-entitled',
-    compareKeys: request.keys,
+    compareKeys: request.rows === undefined ? (request.keys ?? []) : keysOfRows(request.rows),
+    ...(request.title === undefined ? {} : { compareTitle: request.title }),
+    ...(request.rows === undefined ? {} : { compareRows: request.rows }),
+    ...(request.offer === undefined ? {} : { compareOffer: request.offer }),
   });
 }

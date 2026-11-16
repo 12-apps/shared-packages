@@ -63,6 +63,7 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
     alreadyIncluded: 'Your plan already includes all of these features.',
     retry: 'Try again',
     closeLabel: 'Close',
+    learnPlan: ({ planName }) => `Explore ${planName}`,
   },
   upsell: {
     reasons: {

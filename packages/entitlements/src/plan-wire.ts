@@ -73,6 +73,21 @@ export interface ComparisonLine {
   detail: string | null;
 }
 
+/**
+ * One row a SCREEN asks the plan comparison to draw: a stable
+ * {@link ComparisonLine.key} naming which tier line decides the marks, and the
+ * label the screen words itself, in its own copy. The same key may appear on
+ * several rows: a single entitlement can gate several things the screen says
+ * separately ("e-mail", "credit", "one tap").
+ */
+export interface ComparisonRowRequest {
+  key: string;
+  label: string;
+}
+
+/** What the comparison's footer asks for: one plan, or every plan on sale. */
+export type CompareOfferMode = 'cheapest' | 'each';
+
 /** A titled block within a card. */
 export interface ComparisonSection {
   title: string;
@@ -174,6 +189,12 @@ export interface UpsellPrompt {
    * set from a 402 body — a screen raises it (`openPlanCompare`).
    */
   compareKeys?: readonly string[];
+  /** The comparison's title, in the screen's own words (`PlanCompareRequest.title`). */
+  compareTitle?: string;
+  /** The screen's own labelled rows (`PlanCompareRequest.rows`). */
+  compareRows?: readonly ComparisonRowRequest[];
+  /** `'each'`: one action per offered upgrade plan (`PlanCompareRequest.offer`). */
+  compareOffer?: CompareOfferMode;
 }
 
 /** The machine half of the 402 body (see `server/wire.ts`, the producer). */

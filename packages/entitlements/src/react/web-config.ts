@@ -20,6 +20,12 @@ export interface EntitlementsLinkProps {
   onClick?: () => void;
   children: ReactNode;
   'data-testid'?: string;
+  /**
+   * Set when the surface paints the link as a button (the comparison's
+   * "Conhecer o <plano>"). A router's `Link` forwards it with the rest of
+   * its props; a custom adapter that drops it still navigates, unstyled.
+   */
+  className?: string;
 }
 
 export interface WebEntitlementsConfig {
