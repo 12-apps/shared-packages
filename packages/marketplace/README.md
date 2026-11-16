@@ -48,7 +48,7 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | **Order fetch** | For a marketplace whose events name an order without carrying it (Open Delivery's `CREATED`), the adapter marks the event `orderToFetch`: the webhook records it PENDING and queues `marketplace.fetch-order`, which calls the adapter's `fetchOrder` and ingests through the same ingest path. No request calls out; the reconciliation sweep re-queues a row still owed, and a host that holds the job holds every fetch. |
 | **Inbound outcomes** | A marketplace CANCELLED confirms a pending request; CANCELLATION_REQUEST_FAILED marks it FAILED; CONFIRMED is terminal. |
 | **Catalogue publishing** | A store turns a product ON or OFF per connected marketplace, with an optional price for that marketplace. One row per (store, marketplace, product): PUBLISHING → PUBLISHED, WITHDRAWING → WITHDRAWN, FAILED with a failure code (and the marketplace's own words for a refusal). The `marketplace.catalogue` job makes the call; the sweep re-queues what is owed. Push or pull is the adapter's. See [Catalogue publishing](#catalogue-publishing). |
-| **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, `capabilities`, and the optional `fetchOrder` and `catalogue`. |
+| **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, `capabilities`, and the optional `fetchOrder`, `catalogue` and `catalogueReader`. |
 
 ## Subpaths
 
@@ -152,6 +152,56 @@ catalogue". The capability is absent, `engine.catalogueMode("RAPPI")` is null,
 and the host shows Rappi as not publishable. Supporting it later is a pull-like
 whole-menu mode over the same rows, once a store accepts that its Rappi menu
 is exactly what it switches on here.
+
+## Catalogue reading
+
+FUT-951: during onboarding a store imports the menu it already keeps on a
+marketplace. The engine reads it through the store's OWN connection (its
+merchant id and sealed credentials, the same client-credentials grant the
+orders use): no platform app, no homologation credentials. Nothing is stamped
+or queued; the host asks while the store waits.
+
+```ts
+const result = await engine.readCatalogue({ clientId, provider: "IFOOD" });
+// { kind: "snapshot", snapshot: { categories, notices } }
+// { kind: "refused", code: "UNSUPPORTED" | "NOT_CONNECTED" | "CREDENTIALS" | "NOT_AUTHORIZED" | "REFUSED", status, message }
+// { kind: "retry", reason }   // 429, 5xx, a timeout: ask again later
+```
+
+| part | what it is |
+|---|---|
+| **The port** | `adapter.catalogueReader.read(ctx)` (`CatalogueReader`), optional and independent of `catalogue`: a marketplace may be read without being published to. `ctx` is the outbound context plus `externalMerchantId`. |
+| **The snapshot** | `categories[]` → `items[]`, each with `externalId`, `externalCode`, `name`, `description`, `priceCents` (null when none), `photoUrl` (absolute, or null), `available`, `optionGroups[]` (`name`, `min`, `max`, `options[]` with `name`, `priceDeltaCents`, `photoUrl`, `available`) and `warnings[]`. Sizes, flavours and add-ons are all option groups. |
+| **Money** | Integer cents of the menu's currency, `centsFromMajor(value)`: cut to 12 significant digits (no float error), then rounded half up to the cent (`1.005` → 101). A negative or non-numeric price is no price. |
+| **Nothing dropped silently** | A field that cannot be mapped is a warning on its item (`PRICE_MISSING`, `OPTION_PRICE_MISSING`, `OPTION_GROUP_UNREADABLE`, `OPTION_UNREADABLE`, `PHOTO_UNREADABLE`, `ITEM_TYPE_UNSUPPORTED`), naming the group or option; an item or category that cannot be read at all is a notice on the snapshot (`ITEM_UNREADABLE`, `CATEGORY_UNREADABLE`). Codes are vocabulary: the host words them. |
+| **Failures** | Before any call the engine refuses `UNSUPPORTED` (no reader), `NOT_CONNECTED` (no live connection with a merchant id), `CREDENTIALS` (none on file, or they do not open), with `status`/`message` null. From the marketplace: `CREDENTIALS` (the token grant refused), `NOT_AUTHORIZED` (this app may not read this merchant), `REFUSED` (another final 4xx, or a category list that is not a list), or `retry`. One category answered in an unexpected shape is a `CATEGORY_UNREADABLE` notice, and the rest of the menu is still read. |
+
+**iFood** (`src/ifood/catalogue-read.ts`, `src/ifood/catalogue-snapshot.ts`).
+Read 2026-11-16: the Catalog module's Introduction was read whole; its
+Endpoints, Fundamentals, How it works and Errors pages answered 403 to our
+reader that day, so what they would settle is ESTIMATED below (the push's
+2026-11-13 reading of them is cited where it applies).
+
+| fact | status |
+|---|---|
+| Same base and bearer token as the push: `https://merchant-api.ifood.com.br/catalog/v2.0/merchants/{merchantId}/…`, client-credentials grant of the store's own app | CONFIRMED — [Introduction](https://developer.ifood.com.br/en-US/docs/food/guides/modules/catalog/introduction) |
+| `GET /categories` lists the merchant's categories | CONFIRMED — [Endpoints](https://developer.ifood.com.br/en-US/docs/food/guides/modules/catalog/endpoints), as read 2026-11-13 for the push |
+| `GET /categories/{categoryId}/items` lists a category's items "with their associated complements" | CONFIRMED — Introduction, step 5 |
+| An item is `item` (id, type, categoryId, status, `price { value }` in the major unit, externalCode), `products` (id, name, description, externalCode, and `optionGroups: [{ id, min, max }]` linking a product to its groups), `optionGroups` (id, name, status, `optionIds`), `options` (id, `productId` naming the product with its name, status, `price { value }`) | CONFIRMED as the `PUT /items` payload — Introduction, steps 3 and 4 |
+| The category list answers an array of `{ id, name, status, externalCode }` | ESTIMATED (the push makes the same estimate) |
+| `GET /categories/{categoryId}/items` answers the PUT's four lists as `{ items, products, optionGroups, options }` | ESTIMATED |
+| `item.productId` names the item's product (its name, description, photo); without it the item's own `name` is used | ESTIMATED (the push sends the same field) |
+| `products[].imagePath` is the photo, served under `https://static-images.ifood.com.br/image/upload/t_high/pratos/` (`IFOOD_IMAGE_BASE_URL`); an absolute https path is used as it is | ESTIMATED (the pages read name `imagePath` but not its host; the host is the one iFood's own app loads dish photos from) |
+| No pagination: neither call shows a page, size or cursor parameter, so the menu is read one category per call | ESTIMATED |
+| 401: the token is dropped and the call asked once more with a fresh one; a second 401 is a `retry` | choice (as the push's `call`) |
+| The token grant refused (400/401/403) is `CREDENTIALS`; 403 on a catalogue call (the Errors page: the module is not enabled for the app) is `NOT_AUTHORIZED`; 429, 408, 425 and 5xx are a `retry`; another 4xx is `REFUSED` | CONFIRMED for the statuses — [Errors](https://developer.ifood.com.br/en-US/docs/food/guides/modules/catalog/errors-and-troubleshooting), as read 2026-11-13; the mapping is a choice |
+| A 404 on the category list means this app has no such merchant: `NOT_AUTHORIZED`; a 404 on one category's items (deleted between the calls) leaves that category out with a `CATEGORY_UNREADABLE` notice | ESTIMATED |
+| A photo path is used as a URL path as it is (an encoded `%20` stays); only characters a URL may not carry are encoded | choice |
+| An item `type` other than `DEFAULT` (a pizza, a combo) is read as a plain item with `ITEM_TYPE_UNSUPPORTED` | choice |
+| The read covers the merchant-level categories (the DEFAULT, delivery, context); other catalogs and `contextModifiers` prices are not read | ESTIMATED |
+
+99Food and Rappi state no `catalogueReader`: `engine.readCatalogue` answers
+`UNSUPPORTED` for them.
 
 ## iFood is unverified
 
