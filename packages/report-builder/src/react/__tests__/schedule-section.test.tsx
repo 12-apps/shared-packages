@@ -124,6 +124,13 @@ describe('the delivery section', () => {
     expect(screen.queryAllByTestId('report-settings-frequency')).toEqual([]);
   });
 
+  it('the whole title block is the switch label, so the line under the title toggles too', () => {
+    renderSection(on());
+    const label = screen.getByText('Enviar por e-mail toda segunda, 8h').closest('label');
+    expect(label?.getAttribute('for')).toBe(screen.getByTestId('report-settings-schedule-switch').id);
+    expect(label?.textContent).toContain('Envio automático');
+  });
+
   it('says what is chosen only while it is on, and the title is a label for the switch', () => {
     renderSection(on());
     expect(screen.getByText('Enviar por e-mail toda segunda, 8h')).toBeTruthy();

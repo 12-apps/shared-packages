@@ -39,7 +39,7 @@ function RecipientRow({
     <Box sx={{ borderBottom: "1px solid", borderColor: "divider", "&:last-of-type": { borderBottom: 0 } }}>
       <FormControlLabel
         disabled={!person.canReceive}
-        sx={{ m: 0, py: 0.25, width: "100%", alignItems: "center", gap: 0.5 }}
+        sx={{ m: 0, py: 0.875, width: "100%", alignItems: "center", gap: 0.5 }}
         control={
           <Checkbox
             checked={checked}

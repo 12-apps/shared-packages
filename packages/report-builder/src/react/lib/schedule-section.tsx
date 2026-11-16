@@ -10,7 +10,7 @@
  * answer — a person who cannot is shown disabled with the reason beside them,
  * never hidden, so the author sees why somebody they expected is missing.
  */
-import { useRef, type JSX } from "react";
+import { useLayoutEffect, useRef, useState, type JSX, type RefObject } from "react";
 
 import { Select } from "@12-apps/ui/form/Select";
 import { Switch } from "@12-apps/ui/form/Switch";
@@ -101,7 +101,49 @@ const FREQUENCY_SX = {
   },
 } as const;
 
-/** The frequency: four equal parts on ONE line at every width (ADR 0190). */
+/** The least a label keeps clear of its part's edge, at every width. */
+const MIN_LABEL_INSET_PX = 4;
+/** The frame's own border and padding, both sides. */
+const FRAME_EXTRA_PX = 6;
+
+function labelWidth(button: HTMLElement): number {
+  const range = document.createRange();
+  range.selectNodeContents(button);
+  // A DOM with no layout (a test) has no Range rects: no measure, so the toggle stays.
+  return typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect().width : 0;
+}
+
+/**
+ * Whether the four parts fit with every label keeping its inset (ADR 0190:
+ * one line, so when they would not, a select takes their place). The width the
+ * parts need is remembered while the select is showing, so the toggle returns
+ * once the row is that wide again. With no layout (a test DOM) the toggle stays.
+ */
+function useFrequencyFits(): { wrapperRef: RefObject<HTMLDivElement | null>; fits: boolean } {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const needed = useRef(0);
+  const [fits, setFits] = useState(true);
+  useLayoutEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+    const measure = (): void => {
+      const buttons = [...wrapper.querySelectorAll<HTMLElement>("button")];
+      if (buttons.length > 0) {
+        const widest = Math.max(...buttons.map(labelWidth));
+        needed.current = (widest + 2 * MIN_LABEL_INSET_PX) * buttons.length + FRAME_EXTRA_PX;
+      }
+      setFits(needed.current <= 0 || wrapper.clientWidth <= 0 || needed.current <= wrapper.clientWidth);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [fits]);
+  return { wrapperRef, fits };
+}
+
+/** The frequency: four equal parts on ONE line, or a select where they cannot fit (ADR 0190). */
 function Frequency({
   value,
   onChange,
@@ -112,22 +154,37 @@ function Frequency({
   testId: string;
 }): JSX.Element {
   const copy = useReportCopy().screens.settings.schedule;
+  const { wrapperRef, fits } = useFrequencyFits();
+  const options = SCHEDULE_CADENCES.map((cadence) => ({ value: cadence, label: copy.cadences[cadence] }));
   return (
     <Field label={copy.frequencyLabel}>
-      <ToggleGroup
-        variant="exclusive"
-        selection="quiet"
-        size="sm"
-        options={SCHEDULE_CADENCES.map((cadence) => ({ value: cadence, label: copy.cadences[cadence] }))}
-        value={value}
-        onChange={(_event, next) => {
-          // An exclusive group reports null when the chosen part is pressed again.
-          if (typeof next === "string") onChange(next as ScheduleCadence);
-        }}
-        aria-label={copy.frequencyLabel}
-        dataTestId={`${testId}-frequency`}
-        sx={FREQUENCY_SX}
-      />
+      <Box ref={wrapperRef} sx={{ minWidth: 0 }}>
+        {fits ? (
+          <ToggleGroup
+            variant="exclusive"
+            selection="quiet"
+            size="sm"
+            options={options}
+            value={value}
+            onChange={(_event, next) => {
+              // An exclusive group reports null when the chosen part is pressed again.
+              if (typeof next === "string") onChange(next as ScheduleCadence);
+            }}
+            aria-label={copy.frequencyLabel}
+            dataTestId={`${testId}-frequency`}
+            sx={FREQUENCY_SX}
+          />
+        ) : (
+          <Select
+            size="sm"
+            aria-label={copy.frequencyLabel}
+            options={options}
+            value={value}
+            onChange={(event) => onChange(event.target.value as ScheduleCadence)}
+            data-testid={`${testId}-frequency`}
+          />
+        )}
+      </Box>
     </Field>
   );
 }
@@ -203,19 +260,22 @@ function SwitchRow({
   const copy = useReportCopy().screens.settings.schedule;
   const inputId = `${testId}-schedule-switch-input`;
   return (
-    <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
-      <Stack sx={{ flex: 1, minWidth: 0 }}>
-        <Box component="label" htmlFor={inputId} sx={{ cursor: "pointer" }}>
-          <Text variant="body" size="md" weight="semibold" as="span">
-            {copy.label}
-          </Text>
-        </Box>
+    <Stack direction="row" sx={{ alignItems: "center", gap: 2, minHeight: 44 }}>
+      {/* The whole text block is the label, so tapping the line under the title toggles too. */}
+      <Box
+        component="label"
+        htmlFor={inputId}
+        sx={{ flex: 1, minWidth: 0, minHeight: 44, display: "flex", flexDirection: "column", justifyContent: "center", cursor: "pointer" }}
+      >
+        <Text variant="body" size="md" weight="semibold" as="span">
+          {copy.label}
+        </Text>
         {draft.enabled ? (
-          <Text variant="body" size="xs" color="secondary" id={`${testId}-schedule-summary`}>
+          <Text variant="body" size="xs" color="secondary" as="span" id={`${testId}-schedule-summary`}>
             {copy.summary({ ...draft })}
           </Text>
         ) : null}
-      </Stack>
+      </Box>
       <Switch
         id={inputId}
         checked={draft.enabled}
