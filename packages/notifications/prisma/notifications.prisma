@@ -94,9 +94,9 @@ model NotificationDelivery {
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, channel])
-  // A receipt's lookup. NULLs are distinct in Postgres, so every row without
-  // an id (sent before the column, or on a channel that answers none) is free.
-  @@unique([channel, providerMessageId])
+  // A receipt's lookup, (channel, provider_message_id), is a PARTIAL unique
+  // index (WHERE provider_message_id IS NOT NULL) in the migration: Prisma
+  // cannot express a partial index, so none is declared here.
   // Serves the retry sweep: `status IN (…) AND updated_at < cutoff`. On
   // `updatedAt`, because "stale" is a question about the last write and
   // `createdAt` cannot answer it — a row re-queued a second ago has an ancient

@@ -18,15 +18,25 @@ ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "provider_message
 ALTER TABLE "notification_deliveries" ADD COLUMN IF NOT EXISTS "delivered_at" TIMESTAMP(3);
 
 -- A receipt finds its row by (channel, provider id). UNIQUE, so one provider id
--- can never be two rows' receipt; Postgres treats NULLs as distinct, so every
--- row sent before this column (and every channel that answers no id) is free.
+-- can never be two rows' receipt, and PARTIAL: only the rows that hold an id
+-- are indexed, so the delivery history sent before this column (and every
+-- channel that answers no id) costs the index nothing. Prisma cannot express a
+-- partial index, so the partial declares none (as `@12-apps/fiscal` does).
 CREATE UNIQUE INDEX IF NOT EXISTS "notification_deliveries_channel_provider_message_id_key"
-    ON "notification_deliveries"("channel", "provider_message_id");
+    ON "notification_deliveries"("channel", "provider_message_id")
+    WHERE "provider_message_id" IS NOT NULL;
 
 -- The status set gains the receipt's two terminal answers. DROP + ADD as the
--- first migration does (the definition changed under existing adopters), but
--- added NOT VALID and validated separately: the ADD then takes no long lock,
--- and the VALIDATE scans the table under a lock that lets writes through.
+-- first migration does (the definition changed under existing adopters).
+--
+-- LOCKING, as it really is: Prisma sends this whole file as one script, which
+-- Postgres runs as ONE implicit transaction, so every lock is held to the end
+-- of the file: the index build's SHARE lock above, and the ACCESS EXCLUSIVE
+-- lock the DROP takes, through the VALIDATE's scan of the whole table. The
+-- NOT VALID / VALIDATE split therefore shortens nothing here. It is kept only because it is harmless and correct for
+-- a host that applies the file statement by statement. Accepted: the change is
+-- additive and `notification_deliveries` is a moderate table, so the scan is
+-- short; a host with a very large one runs the VALIDATE apart, off-peak.
 ALTER TABLE "notification_deliveries"
     DROP CONSTRAINT IF EXISTS "notification_deliveries_status_check";
 ALTER TABLE "notification_deliveries"

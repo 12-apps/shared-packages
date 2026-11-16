@@ -219,6 +219,24 @@ describe('@12-apps/notifications — the prisma assets survive publication', () 
     }
   });
 
+  it('indexes the provider id PARTIALLY: only rows that hold one (FUT-285)', async () => {
+    // A receipt's lookup. The delivery history (and every channel that answers
+    // no id) holds NULL there for ever, and must cost the index nothing.
+    const pg = new PGlite();
+    try {
+      await applyAll(pg);
+      const { rows } = await pg.query<{ indexdef: string }>(
+        `SELECT indexdef FROM pg_indexes
+         WHERE indexname = 'notification_deliveries_channel_provider_message_id_key'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.indexdef).toMatch(/^CREATE UNIQUE INDEX/);
+      expect(rows[0]?.indexdef).toMatch(/WHERE \(provider_message_id IS NOT NULL\)/);
+    } finally {
+      await pg.close();
+    }
+  });
+
   it('leaves `category` OPEN, because the taxonomy is host vocabulary', async () => {
     // The rbac precedent for `role`: a closed set here would be wrong for every
     // host but the first, and the package takes `categories` as config.
