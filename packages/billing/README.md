@@ -13,7 +13,7 @@ config**. The package owns the mechanism and none of the policy — see
 
 | entry | contains | dependencies |
 |---|---|---|
-| `@12-apps/billing` | periods, the lifecycle vocabulary and its ageing, the entitlement seam | **none** |
+| `@12-apps/billing` | periods, the lifecycle vocabulary and its ageing, the entitlement seam, usage pricing and its breakdown check | **none** |
 | `@12-apps/billing/server` | the retry policy, the cycle collection binding, the subscription refund, the card vault, the HTTP surface | `@12-apps/payments-backend` (peer) |
 
 A browser that needs to say "this account is past due" imports the root entry
@@ -44,6 +44,84 @@ have concluded — it is a materialization, not the source of truth.
 **`createBillingLayer` is the whole translation into a gate.** It turns one
 subscription row into `{ planKey, plan, status }`, or `null` when billing has
 no opinion at all. Both mapping tables are yours; see below.
+
+## Usage past an allowance
+
+`createUsagePricing` composes a cycle's charge from its base price and the
+usage the period that just ended went past an allowance — one charge whose
+**breakdown sums to its amount**, to the centavo. The package never counts:
+the host reads its own count and hands it in as a reading per meter. The
+meter key is the host's opaque name; the allowance and the price per unit are
+config, checked at construction (`BillingConfigError`).
+
+```ts
+import { checkBreakdown, createUsagePricing } from "@12-apps/billing";
+
+const pricing = createUsagePricing({
+  currency: "BRL",
+  meters: [{ meter: "units", allowance: 1000, unitPriceCents: 50 }],
+});
+
+const result = pricing.compose({
+  base: { amountCents: 29_900, currency: "BRL", period: nextCycle }, // null: final settlement
+  usagePeriod: endedPeriod,                                          // ends where nextCycle starts
+  readings: [{ meter: "units", period: endedPeriod, used: 1237, final: true, overage: "BILLED" }],
+  alreadyBilled: [],                                                 // overage on live/refunded cycles
+});
+// { ready: true, charge: { amountCents: 41_750, currency: "BRL", lines: [BASE 29_900, OVERAGE 237 × 50] } }
+// { ready: false, waitingFor: ["units"] } while a billed count is not final
+// { ready: true, charge: null } when there is nothing to bill — never a zero charge
+
+checkBreakdown(charge); // before persisting, and on every read back
+```
+
+The rules it holds:
+
+- **A period's overage lands on the cycle that starts at its end.** A base
+  whose period starts anywhere else is refused (`BillingUsageError`), and
+  `base: null` is the only other place it can land.
+- **A reading the package cannot trust bills nothing, it throws.** A missing,
+  unknown, repeated or mis-dated reading, a count that is not a whole number,
+  a base in another currency, an amount past safe integers:
+  `BillingUsageError`. A missing count is never zero.
+- **At most once.** One overage line per (meter, period), never one listed in
+  `alreadyBilled`, and the same input always composes the same charge.
+- **`checkBreakdown`** refuses (`BillingBreakdownError`) a charge whose
+  lines are not whole and non-negative, do not sum exactly, repeat a period's
+  overage or the base, carry an overage line whose own arithmetic is wrong,
+  or add up to zero.
+
+### The commercial rules, and where each one lives
+
+| case | rule (owner, 2026-11-16) | what the host passes |
+|---|---|---|
+| when a count is final | units are dated by the moment they COMMIT; what committed by the boundary is billed, a late commit counts in the period it commits in | `final: true` at the boundary; no grace window |
+| cancellation with overage pending | one final overage-only charge | `base: null`; the result is that charge, or `null` |
+| downgrade mid-period | the overage counted so far, against the FULL allowance | the count so far, and no `allowance` on the reading (a stated `allowance` replaces the meter's for that period) |
+| a refunded charge that carried overage | the overage goes back with the refund and is waived | the refunded cycle's overage stays in `alreadyBilled`; only a FAILED cycle's is left out, so its retry carries the same overage |
+| a failed charge, retried | the retry carries the same overage | a FAILED cycle is not in `alreadyBilled` |
+
+### Switching overage off
+
+`overage: "OFF"` on a reading bills nothing past the allowance, whatever the
+count, and never waits on a count that is not final; `"EXEMPT"` does the same
+for a customer out of scope. **That is the whole switch** — per customer or
+platform-wide, the host decides which readings say `OFF`, and the package
+needs nothing else: no flag, no other config, no redeploy of this package.
+A host that stops billing usage altogether (pricing by something else
+instead) keeps composing with every reading `OFF`, or drops the meter from
+its policy and passes no reading for it.
+
+### The guard at the money boundary
+
+`createSubscriptionCollection` takes an optional `breakdowns(cycleId)` lookup
+— the breakdown the host persisted for a cycle, or `null` for a cycle that
+has none (every cycle before usage pricing, charged exactly as before). With
+it, a cycle is charged only when its breakdown passes `checkBreakdown` and
+states the very amount and currency the cycle row will charge; otherwise
+`BillingBreakdownError` is thrown and nothing reaches the provider. The amount
+charged is always the row's, unchanged. `./server` re-exports
+`BillingBreakdownError` for the host's catch.
 
 ## The server half
 
@@ -192,6 +270,9 @@ silently:
   behind its own resolution and hands the resolved owner in as the actor.
 - **the database**, through the ports in `./server` — the cycle rows, the
   instrument rows and the subscription lookup.
+- **the usage count and the overage switch** — what a meter counts, when a
+  count is final, who is `EXEMPT`, whether overage is `OFF`, and where a
+  cycle's breakdown is persisted.
 
 Each one is checked at construction, not at the renewal that needed it: a
 mis-stated policy throws `BillingConfigError` at boot, where an operator is.

@@ -19,10 +19,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { CycleStore } from "@12-apps/payments-backend";
 
-import { createSubscriptionCollection, type SubscriptionCollectionDeps } from "../server/collect";
+import type { CycleCharge } from "../index";
+import {
+  BillingBreakdownError,
+  createSubscriptionCollection,
+  type CycleBreakdownLookup,
+  type SubscriptionCollectionDeps,
+} from "../server/index";
 
 import { MERCHANT, fakeGateway, fakePayments } from "./fixtures";
-import { collectionGuard, type CycleBreakdownLookup, type CycleCharge } from "./usage-pricing.contract";
 
 const PERIOD = { start: new Date("2026-11-10T00:00:00.000Z"), end: new Date("2026-12-10T00:00:00.000Z") };
 const ENDED = { start: new Date("2026-10-10T00:00:00.000Z"), end: PERIOD.start };
@@ -76,7 +81,7 @@ function collection(breakdown: CycleCharge | null) {
       hasAny: true,
     }),
     breakdowns,
-  } as SubscriptionCollectionDeps & { breakdowns: CycleBreakdownLookup };
+  } as SubscriptionCollectionDeps;
   return { gateway, breakdowns, collect: createSubscriptionCollection(deps) };
 }
 
@@ -92,14 +97,14 @@ async function rejectedName(run: () => Promise<unknown>): Promise<string | null>
 
 describe("a cycle whose breakdown disagrees with its amount", () => {
   it("is never charged by card", async () => {
-    collectionGuard();
+    expect(BillingBreakdownError).toBeTypeOf("function");
     const { collect, gateway } = collection({ ...SUMS, amountCents: 29_900 });
     expect(await rejectedName(() => collect.collectByCard("cycle-1"))).toBe("BillingBreakdownError");
     expect(gateway.charge).not.toHaveBeenCalled();
   });
 
   it("is never charged by push", async () => {
-    collectionGuard();
+    expect(BillingBreakdownError).toBeTypeOf("function");
     const lines = SUMS.lines.slice(0, 1);
     const { collect, gateway } = collection({ ...SUMS, lines });
     expect(await rejectedName(() => collect.collectByPush("cycle-1"))).toBe("BillingBreakdownError");
@@ -107,7 +112,7 @@ describe("a cycle whose breakdown disagrees with its amount", () => {
   });
 
   it("is never charged in another currency than its lines", async () => {
-    collectionGuard();
+    expect(BillingBreakdownError).toBeTypeOf("function");
     const { collect, gateway } = collection({ ...SUMS, currency: "USD" });
     expect(await rejectedName(() => collect.collectByCard("cycle-1"))).toBe("BillingBreakdownError");
     expect(gateway.charge).not.toHaveBeenCalled();

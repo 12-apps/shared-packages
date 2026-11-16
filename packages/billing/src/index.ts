@@ -3,8 +3,10 @@
  *
  * This entry is the ISOMORPHIC half: period arithmetic, the lifecycle
  * vocabulary and its ageing, and the seam that turns a subscription row into
- * an entitlement layer. Zero runtime dependencies, so a browser bundle that
- * needs to say "this account is past due" pays nothing for the money path.
+ * an entitlement layer, and usage past an allowance composed into a cycle's
+ * charge with a breakdown that sums (FUT-5094). Zero runtime dependencies,
+ * so a browser bundle that needs to say "this account is past due" pays
+ * nothing for the money path.
  *
  * Everything that touches a payment provider — the retry policy, the cycle
  * collector, the card-on-file surface — lives behind `./server`, because
@@ -14,7 +16,24 @@
  *
  * The wiring manifests live behind `./manifest` and `./manifest/server`.
  */
-export { BillingConfigError } from "./errors";
+export { BillingBreakdownError, BillingConfigError, BillingUsageError } from "./errors";
+export { checkBreakdown } from "./breakdown";
+export { createUsagePricing } from "./usage";
+export type {
+  BaseLine,
+  BilledOverage,
+  ComposeBase,
+  ComposeInput,
+  CycleCharge,
+  CycleChargeLine,
+  CycleChargeResult,
+  MeteredAllowance,
+  OverageLine,
+  UsagePeriod,
+  UsagePricing,
+  UsagePricingPolicy,
+  UsageReading,
+} from "./usage-types";
 export {
   anchorDayOf,
   isBillingInterval,
