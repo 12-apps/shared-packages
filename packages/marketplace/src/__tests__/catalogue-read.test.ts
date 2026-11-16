@@ -53,14 +53,14 @@ const SNAPSHOT = { kind: "snapshot" as const, snapshot: { categories: [], notice
 
 describe("reading a marketplace's catalogue", () => {
   it("hands the adapter the store's own connection: merchant id, opened credentials, environment, the host's HTTP client", async () => {
-    const { h, seen } = mount(async () => SNAPSHOT);
-    await h.connect(READY);
+    const mounted = mount(async () => SNAPSHOT);
+    await mounted.h.connect(READY);
 
-    const result = await h.engine.readCatalogue({ clientId: TENANT, provider: READY });
+    const result = await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY });
 
     expect(result).toEqual(SNAPSHOT);
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({
+    expect(mounted.seen).toHaveLength(1);
+    expect(mounted.seen[0]).toMatchObject({
       externalMerchantId: "merchant-READY",
       credentials: { clientId: "app-id", clientSecret: "app-secret" },
       environment: "SANDBOX",
@@ -79,33 +79,33 @@ describe("reading a marketplace's catalogue", () => {
   });
 
   it("an adapter that throws is a retry, not a crash", async () => {
-    const { h } = mount(async () => {
+    const mounted = mount(async () => {
       throw new Error("boom");
     });
-    await h.connect(READY);
+    await mounted.h.connect(READY);
 
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual({ kind: "retry", reason: "boom" });
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual({ kind: "retry", reason: "boom" });
   });
 
   it("refuses before any call: no reader, no connection, an archived one, credentials that do not open", async () => {
     const engineRefusal = (code: string) => ({ kind: "refused", code, status: null, message: null });
-    const { h, seen } = mount(async () => SNAPSHOT);
-    await h.connect(BARE);
+    const mounted = mount(async () => SNAPSHOT);
+    await mounted.h.connect(BARE);
 
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: BARE })).toEqual(engineRefusal("UNSUPPORTED"));
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: "NOBODY" })).toEqual(engineRefusal("UNSUPPORTED"));
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("NOT_CONNECTED"));
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: BARE })).toEqual(engineRefusal("UNSUPPORTED"));
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: "NOBODY" })).toEqual(engineRefusal("UNSUPPORTED"));
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("NOT_CONNECTED"));
 
-    await h.connect(READY);
-    h.patchIntegration({ credentials: "garbage" });
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("CREDENTIALS"));
-    h.patchIntegration({ credentials: "" });
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("CREDENTIALS"));
-    h.patchIntegration({ archivedAt: new Date("2026-11-10T00:00:00.000Z") });
-    expect(await h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("NOT_CONNECTED"));
+    await mounted.h.connect(READY);
+    mounted.h.patchIntegration({ credentials: "garbage" });
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("CREDENTIALS"));
+    mounted.h.patchIntegration({ credentials: "" });
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("CREDENTIALS"));
+    mounted.h.patchIntegration({ archivedAt: new Date("2026-11-10T00:00:00.000Z") });
+    expect(await mounted.h.engine.readCatalogue({ clientId: TENANT, provider: READY })).toEqual(engineRefusal("NOT_CONNECTED"));
 
-    expect(seen).toEqual([]);
-    expect(h.http.requests).toEqual([]);
+    expect(mounted.seen).toEqual([]);
+    expect(mounted.h.http.requests).toEqual([]);
   });
 });
 
