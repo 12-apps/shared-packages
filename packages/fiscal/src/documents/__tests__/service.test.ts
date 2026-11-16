@@ -5,7 +5,7 @@ import type { SaleDraft } from "../ports";
 import type { EmitterProfileInput } from "../profile-input";
 import { draftOf } from "../context";
 import { createMemoryFiscalStore } from "../memory";
-import { createFiscalDocuments } from "../service";
+import { LATE_CANCEL_CODES, createFiscalDocuments } from "../service";
 import { createSigningIdentities } from "../signing";
 import { RECORDED_ANSWERS } from "../../issuer/__tests__/fixtures/recorded";
 import { SALE } from "./fixtures";
@@ -79,6 +79,8 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
   const scripted = scriptedIssuer(script);
   const objects = new Map<string, string>();
   const emitted: unknown[] = [];
+  /** What the sale source answers for a return (model NFE), once a case sets it. */
+  const sources: { returnDraft: SaleDraft | null } = { returnDraft: null };
   /** The service's clock, moved forward by `later`. */
   const clock = { at: Date.parse("2026-11-20T15:30:00.000Z") };
   const ids = (function* () {
@@ -97,7 +99,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
       put: async (key, body) => void objects.set(key, body),
       get: async (key) => objects.get(key) ?? null,
     },
-    sales: { saleFor: async (): Promise<SaleDraft> => draft },
+    sales: { saleFor: async ({ model }): Promise<SaleDraft> => (model === "NFE" && sources.returnDraft ? sources.returnDraft : draft) },
     notify: { emit: async (event) => void emitted.push(event) },
     now: () => new Date(clock.at),
     utcOffset: () => "-03:00",
@@ -121,7 +123,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     firstContingencyNumber: 1,
   });
   const later = (ms: number) => void (clock.at += ms);
-  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later };
+  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later, sources };
 }
 
 const ISSUE = { ownerId: "owner-1", subjectId: "order-77", issuingPointId: "register-1", model: "NFCE" } as const;
@@ -236,6 +238,59 @@ describe("the document service", () => {
     const other = await service.issue({ ...ISSUE, subjectId: "order-78" });
     const late = await service.cancel({ ownerId: "owner-1", documentId: other.id, reason: "Pedido cancelado pelo cliente" });
     expect(late).toMatchObject({ failure: { class: "REJECTED", code: "501" }, document: { status: "AUTHORIZED" } });
+  });
+
+  describe("cancelOrReturn", () => {
+    const REASON = "Cliente devolveu o pedido inteiro";
+
+    async function authorised(script: Partial<Record<Method, string[]>>) {
+      const env = await setup({ issue: ["nfce-issue-authorized", ...(script.issue ?? [])], cancel: script.cancel ?? [] });
+      await env.service.createIssuingPoint("owner-1", RETURNS_POINT);
+      const document = await env.service.issue(ISSUE);
+      env.sources.returnDraft = { ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [{ accessKey: document.accessKey! }] };
+      return { ...env, document };
+    }
+
+    it("cancels inside the window, and a second call asks the issuer nothing", async () => {
+      const { service, document, calls } = await authorised({ cancel: ["nfce-cancel"] });
+      const input = { ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" };
+      expect(await service.cancelOrReturn(input)).toMatchObject({ outcome: "CANCELLED", document: { status: "CANCELLED" }, returnDocument: null });
+      const before = calls.length;
+      expect(await service.cancelOrReturn(input)).toMatchObject({ outcome: "CANCELLED", document: { status: "CANCELLED" } });
+      expect(calls).toHaveLength(before);
+    });
+
+    it("past the window (501) issues the return NF-e of entry quoting the document, which stays AUTHORIZED", async () => {
+      const { service, document, calls, store } = await authorised({ issue: ["nfce-issue-authorized"], cancel: ["nfce-cancel-late"] });
+      const input = { ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" };
+      const answer = await service.cancelOrReturn(input);
+      expect(answer).toMatchObject({ outcome: "RETURNED", document: { id: document.id, status: "AUTHORIZED" }, failure: { code: "501" } });
+      expect(answer.returnDocument).toMatchObject({ model: "NFE", issuingPointId: "returns", subjectId: document.subjectId });
+      expect(calls.at(-1)?.call).toMatchObject({ model: "NFE", document: { purpose: "RETURN", operation: "IN", referencedDocuments: [{ accessKey: document.accessKey }] } });
+      expect((await store.getDocument("owner-1", document.id))?.status).toBe("AUTHORIZED");
+
+      const before = calls.length;
+      expect(await service.cancelOrReturn(input)).toMatchObject({ outcome: "RETURNED", returnDocument: { id: answer.returnDocument?.id } });
+      expect(calls).toHaveLength(before);
+    });
+
+    it("refuses, before drawing a number, a return the sale source does not quote", async () => {
+      const { service, document, store, sources } = await authorised({ cancel: ["nfce-cancel-late"] });
+      sources.returnDraft = { ...DRAFT, purpose: "RETURN", operation: "IN", referencedDocuments: [] };
+      await expect(
+        service.cancelOrReturn({ ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" }),
+      ).rejects.toThrow(expect.objectContaining({ code: "INVALID_INPUT" }));
+      expect(store.counters.get("11222333000181|homologacao|NFE|5")).toBe(1);
+    });
+
+    it("past the window with no return point: refused by name, and the document stays AUTHORIZED", async () => {
+      expect(LATE_CANCEL_CODES).toEqual(["501"]);
+      const { service, document, store } = await authorised({ cancel: ["nfce-cancel-late"] });
+      await expect(
+        service.cancelOrReturn({ ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "nowhere" }),
+      ).rejects.toThrow(expect.objectContaining({ code: "NOT_FOUND" }));
+      expect((await store.getDocument("owner-1", document.id))?.status).toBe("AUTHORIZED");
+    });
   });
 
   it("refuses to issue where the package does not issue, and PLATFORM signing is NOT_SUPPORTED", async () => {

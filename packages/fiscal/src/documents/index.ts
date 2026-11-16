@@ -29,8 +29,8 @@ export {
   xmlKeys,
 } from "./context";
 export type { FiscalDocumentsConfig, FiscalNotifyPort, FiscalReasons } from "./context";
-export { CONTINGENCY_WARNING_AFTER_MS, createFiscalDocuments } from "./service";
-export type { CertificateFacts, FiscalDocuments, FiscalDocumentsServiceConfig, IssueInput, SweepReport } from "./service";
+export { CONTINGENCY_WARNING_AFTER_MS, LATE_CANCEL_CODES, createFiscalDocuments } from "./service";
+export type { CancelOrReturnInput, CancelOrReturnResult, CertificateFacts, FiscalDocuments, FiscalDocumentsServiceConfig, IssueInput, SweepReport } from "./service";
 export { createMemoryFiscalStore } from "./memory";
 export type { MemoryFiscalStore } from "./memory";
 export { FISCAL_NEXT_NUMBER_SQL } from "./sql";
