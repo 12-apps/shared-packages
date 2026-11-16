@@ -54,45 +54,65 @@ What the package does **not** do, and the host must:
 `timeZone` stays required and stays the answer. A host that wants each tenant's schedule stamped on that tenant's
 clock adds `resolveTimeZone: (actor) => string | Promise<string>` to the server config (it receives the saving
 `ReportActor`, whose `clientId` is the tenant). It is asked only when a save, or a publish, actually writes a
-schedule, and its answer becomes `schedule.timeZone` and the clock `startsOn` is read on. An answer that is not an IANA
-zone this runtime knows falls back to `timeZone`. It does not move the report window or the date buckets, which have
-no actor to ask: those still read `timeZone`.
+schedule, and its answer becomes `schedule.timeZone` and the clock `startsOn` is read on. It never blocks a save: an
+answer that is not an IANA zone this runtime knows, or a hook that throws or rejects, falls back to `timeZone`
+(`onTimeZoneError(error, actor)` hears the failure). It does not move the report window or the date buckets, which
+have no actor to ask: those still read `timeZone`. The editor re-sends the schedule on every save, so keep the hook
+cheap or cached.
 
 ### `@12-apps/report-builder/pdf`: the report as an attachment (minor)
 
 A server renderer for the e-mail: pdf-lib, vector shapes, no browser and no network. It draws the same render model the
-screen uses (KPI tiles, tables, bar, line, area, pie and donut charts, heat maps as grids), so it is close to
-"Exportar PDF" and not pixel-identical. Node only: it is its own entry so a browser bundle never pulls pdf-lib in.
+screen uses (KPI tiles, tables, bar, line, area, pie and donut charts, heat maps), so it is close to "Exportar PDF" and
+not pixel-identical. Node only: it is its own entry so a browser bundle never pulls pdf-lib in. The host must render only
+what the recipient may see: the renderer draws whatever model it is given.
 
 ```ts
-import { renderReportPdf, ReportPdfError } from '@12-apps/report-builder/pdf';
+import { renderReportPdf, ReportPdfError, REPORT_PDF_COPY } from '@12-apps/report-builder/pdf';
 
 try {
   const { bytes, pageCount, sizeBytes } = await renderReportPdf(
     { blocks: run.blocks },            // a dashboard run; or { render } for one report
-    { title, periodLabel, storeName, locale, timeZone, generatedAt, appName: 'My App' },
+    { title, periodLabel, storeName, locale, timeZone, generatedAt, appName: 'My App', brand: { primary: store.brandColor } },
   );
+  line = REPORT_PDF_COPY[tag].attachedLine;
 } catch (error) {
-  if (error instanceof ReportPdfError) error.code; // 'timeout' | 'too_large' | 'unsupported_block' | 'render_failed'
+  if (error instanceof ReportPdfError) line = REPORT_PDF_COPY[tag].missingLine; // error.code says why
 }
 ```
 
-- **Typed, fast failure.** `timeout` (budget 60 s, checked between blocks and every 25 table rows), `too_large` (more than
-  `maxPages` = 40, or a file over `maxBytes` = 7 000 000; `error.sizeBytes` / `error.pageCount` say how far), `unsupported_block`
-  (a render kind or chart type it cannot draw; `error.blockId`), `render_failed` (anything else, with the cause). A job that
-  sends the mail without the attachment on any of them needs nothing else. Every limit is under `options.limits`.
+- **Typed, fast failure.** `timeout` (budget 60 s, read per table row and per block), `too_large` (more than `maxPages` = 40,
+  or a file over `maxBytes` = 7 000 000; `error.sizeBytes` / `error.pageCount` say how far), `unsupported_block` (a render kind
+  or chart type it cannot draw; `error.blockId`), `render_failed` (anything else, with the cause). Every limit is under
+  `options.limits`; one left `undefined` keeps its default. Text is bounded before it is measured, so a 50,000-character
+  cell costs what a short one does.
+- **Never say "attached" about a file that is not there.** The mail body is the host's, but the two sentences are here:
+  `copy.attachedLine` when the PDF is attached, `copy.missingLine` ("Não foi possível gerar o PDF desta vez.") in its place
+  when `ReportPdfError` was thrown, next to the link to open the report in the app.
 - **Deterministic.** The same input gives the same bytes; the only dates in the file are `generatedAt`. The only clock it
   reads is for the time budget, and nothing from it reaches the file (a test can pass `clock`).
-- **Words.** The page furniture and the cut-table note come from `REPORT_PDF_COPY['pt-BR' | 'en-US']`, chosen by
-  `locale` (`en*` is English, everything else Portuguese); override any member with `options.copy`. `appName` fills the
-  note "e mais N linhas — veja no <appName>". Labels, headings and figures are the render model's own (the engine copy).
+- **Words.** The page furniture and the cut-table note come from `REPORT_PDF_COPY['pt-BR' | 'en-US']`, chosen by `locale`
+  (`en*` is English, everything else Portuguese); override any member with `options.copy`. `appName` fills the note "e mais N
+  linhas — veja no <appName>". Labels, headings and figures are the render model's own (the engine copy). **Numbers keep
+  the screen's pt-BR format in every locale** ("R$ 1.234" under an English heading), because the engine formats them once
+  for the screen and the file alike. Money is in whole reais ("R$ 9.680") unless the measure declares its decimals.
   A bucketed date reads through `options.formatBucket`, the same hook the screen takes.
+- **Type.** One typeface, Noto Sans regular and bold (SIL OFL, `src/pdf/fonts/OFL.txt`), embedded as a subset per file:
+  nothing is fetched and a file carries only the glyphs it uses. Text is composed to NFC first. A character the face has
+  no glyph for is dropped, never printed as "?"; arrows and comparisons (`->`, `>=`, `<=`, `~`) are written as the ASCII
+  that says the same. Emoji, ticks and CJK are dropped (Noto Sans has none of them).
+- **Colour.** Read from `@12-apps/ui`'s light theme (no hex lives in this package). Pass `brand: { primary, secondary }`
+  for the store's brand, or `theme: createUiTheme(...)` for a whole theme. Two series never differ by hue alone: every second
+  one is hatched (bars) or dashed (lines).
+- **Signals survive a black-and-white print.** A table row the presentation flags says why in the judged cell ("R$ 1.500
+  · Acima da meta", bold), with no tint. A heat map outlines each cell above the target (twice as heavy and hatched when
+  strongly above), shows an hour with no sale as "—" and one that sold with no cost priced as "(—)", and ends with a legend
+  in the presentation's own words (`labels.above`, `below`, `empty`, `unmeasured`). A grid with more than 8 columns and
+  more columns than rows is turned so the long axis runs down the page.
 - **Ceilings.** A table draws at most `maxTableRows` (300) rows, and is cut early if the page ceiling is reached, each time
   with that note. A chart draws at most `maxChartPoints` (120).
-- **Fonts.** The standard Helvetica faces, which every reader carries: nothing is fetched or embedded. A character outside
-  Latin-1 (an emoji in a store name) is written as `?` rather than failing the render.
-- **Layout.** Tiles and charts share a 12-column row by `span`; tables and heat maps take the width. A heat map is its grid
-  as a table (no colour ramp). Colours are the light values of the theme tokens.
+- **Layout.** Tiles and charts share a 12-column row by `span`; tables and heat maps ignore `span` and take the full width,
+  which is right on A4. Package size: the two fonts add about 1.2 MB to the tarball.
 
 ## Next minor — neutral choices, a period label per surface, null ratios (FUT-4063)
 
