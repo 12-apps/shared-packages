@@ -139,7 +139,7 @@ describe('renderReportPdf: the labels follow the locale', () => {
     const { drawn } = await draw({ blocks: SALES_BLOCKS });
     const words = said(drawn);
     expect(words).toContain('Página 1 de 1');
-    expect(words.join(' ')).toContain('Loja: Padaria Aliment Sabor');
+    expect(words.join(' ')).toContain('Loja: Loja Modelo');
     expect(words.join(' ')).toContain('Gerado em: 16/11/2026 08:00');
   });
 
@@ -147,7 +147,7 @@ describe('renderReportPdf: the labels follow the locale', () => {
     const { drawn } = await draw({ blocks: SALES_BLOCKS }, { locale: 'en-US' });
     const words = said(drawn);
     expect(words).toContain('Page 1 of 1');
-    expect(words.join(' ')).toContain('Store: Padaria Aliment Sabor');
+    expect(words.join(' ')).toContain('Store: Loja Modelo');
     expect(words.join(' ')).toContain('Generated: 11/16/2026 08:00');
   });
 
@@ -163,7 +163,7 @@ describe('renderReportPdf: the labels follow the locale', () => {
 describe('renderReportPdf: the ceilings', () => {
   it('cuts a long table with "e mais N linhas — veja no <app>"', async () => {
     const { drawn, result } = await draw({ blocks: [tableBlock('t', 1000)] }, { limits: { maxTableRows: 120 } });
-    expect(said(drawn)).toContain('e mais 880 linhas — veja no Future Pay');
+    expect(said(drawn)).toContain('e mais 880 linhas — veja no Acme');
     expect(said(drawn)).not.toContain('Colaborador 121');
     expect(result.pageCount).toBeGreaterThan(1);
   });
@@ -180,7 +180,7 @@ describe('renderReportPdf: the ceilings', () => {
     );
     expect(result.pageCount).toBe(2);
     const note = said(drawn).find((word) => word.startsWith('e mais '));
-    expect(note).toMatch(/^e mais \d+ linhas — veja no Future Pay$/);
+    expect(note).toMatch(/^e mais \d+ linhas — veja no Acme$/);
   });
 
   it('refuses a document that needs more pages than the ceiling, as too_large', async () => {
@@ -250,7 +250,7 @@ describe('renderReportPdf: determinism and metadata', () => {
     expect(reopened.getCreationDate()?.toISOString()).toBe('2026-11-16T11:00:00.000Z');
     expect(reopened.getModificationDate()?.toISOString()).toBe('2026-11-16T11:00:00.000Z');
     expect(reopened.getTitle()).toBe('Custo de mão de obra');
-    expect(reopened.getAuthor()).toBe('Padaria Aliment Sabor');
+    expect(reopened.getAuthor()).toBe('Loja Modelo');
   });
 
   it('changes only because the input changed', async () => {

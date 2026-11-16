@@ -5,11 +5,11 @@ import type { ReportRenderModel, ReportTableColumn } from '../../render';
 export const BASE_OPTIONS: ReportPdfOptions = {
   title: 'Custo de mão de obra',
   periodLabel: '9 a 15/11/2026',
-  storeName: 'Padaria Aliment Sabor',
+  storeName: 'Loja Modelo',
   locale: 'pt-BR',
   timeZone: 'America/Sao_Paulo',
   generatedAt: new Date('2026-11-16T11:00:00Z'),
-  appName: 'Future Pay',
+  appName: 'Acme',
 };
 
 export function kpiBlock(id: string, span: number, label: string, value: number | null, format: 'brl' | 'percent' | 'integer' = 'brl'): ReportPdfBlock {
