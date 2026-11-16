@@ -38,10 +38,11 @@ export type {
 } from './core/refund-series-store';
 export { createMemoryRefundRetryStore, type MemoryRefundRetryStore } from './memory';
 export { createPrismaRefundRetryStore, type RefundRetryDelegate } from './prisma/refund-retry-store';
-/** A buyer asking for their capture back, through the same retrier (FUT-612). */
+/** A short capture going back — the buyer, the 24 h sweep or the store — through the same retrier (FUT-612). */
 export {
-  BUYER_REFUND_SUBJECT,
+  SHORT_CAPTURE_REFUND_SUBJECT,
   refundCaptureOnRequest,
+  type CaptureRefundClaim,
   type CaptureRefundOutcome,
   type CaptureRefundRequest,
 } from './core/refund-on-request';

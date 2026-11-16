@@ -7,7 +7,7 @@ import type { ChargeQueryStore } from '../core/ports';
 import { attemptIdempotencyKey, attemptReference } from '../core/reference';
 import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
 
-import { voidOtherLiveCharges } from '../core/balance-supersede';
+import { balanceMovedPast } from '../core/balance-supersede';
 
 import { parkedHostedCharges, reusablePixCharge, type CheckoutCard } from './reuse';
 import { voidSupersededPixCharges } from './supersede';
@@ -150,12 +150,11 @@ export async function raiseCharge(
 ): Promise<HeldAnswer> {
   const { live, movedPast } = await liveChargeFor(deps, payable, request);
   const answer = async (held: ChargeSnapshot) => {
-    // A balance retires every other live charge, on a reuse too (FUT-612).
-    if (payable.balance) {
-      const keep = new Set([held.providerChargeId, ...movedPast.map((link) => link.providerChargeId)]);
-      await voidOtherLiveCharges(deps, { merchant: payable.merchant, reference: payable.ref, keep });
-    }
-    return answerHeld(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, held });
+    const scope = { merchant: payable.merchant, reference: payable.ref };
+    // A balance retires every other live charge with the moved-past links, on a
+    // reuse too, and only while `held` is live (FUT-612, `balance-supersede.ts`).
+    const retire = await balanceMovedPast(deps, { ...scope, held, movedPast, balance: payable.balance === true });
+    return answerHeld(deps, { ...scope, movedPast: retire, held });
   };
   if (live) return answer(live);
 

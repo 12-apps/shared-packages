@@ -108,31 +108,11 @@ describe('checkoutStatusBody', () => {
 });
 
 describe('a BALANCE payable', () => {
-  it('reports its settlement with settlesBalance, and only what this charge captured', async () => {
-    const settlements: unknown[] = [];
+  it('settles with only what this charge captured, and the same input an ordinary payable gets', async () => {
+    const seen: Record<string, unknown>[] = [];
     const balanceWorld = setupCheckoutWorld({
       chain: [{ name: 'alpha', adapter: testAdapter('alpha', { settledAmount: BRL(1380) }) }],
       payable: { amount: BRL(1380), balance: true },
-      config: {
-        correlation: {
-          attachPending: async () => undefined,
-          recordCardOutcome: async () => 'SETTLED',
-          settle: async (input) => {
-            settlements.push({ capturedAmount: input.capturedAmount, settlesBalance: input.settlesBalance });
-            return 'SETTLED';
-          },
-        },
-      },
-    });
-    await call(balanceWorld.routes, 'POST', '/', {});
-    await call(balanceWorld.routes, 'GET', STATUS);
-    expect(settlements).toEqual([{ capturedAmount: BRL(1380), settlesBalance: true }]);
-  });
-
-  it('adds nothing to the settlement of an ordinary payable', async () => {
-    const seen: Record<string, unknown>[] = [];
-    const world = setupCheckoutWorld({
-      chain: [{ name: 'alpha', adapter: testAdapter('alpha', { settledAmount: BRL(7500) }) }],
       config: {
         correlation: {
           attachPending: async () => undefined,
@@ -144,10 +124,23 @@ describe('a BALANCE payable', () => {
         },
       },
     });
-    await call(world.routes, 'POST', '/', {});
-    await call(world.routes, 'GET', STATUS);
+    await call(balanceWorld.routes, 'POST', '/', {});
+    await call(balanceWorld.routes, 'GET', STATUS);
+    // No balance mark (B4): the webhook and the sweep could never carry one, so
+    // the host tells the difference charge from its own record.
     expect(seen).toHaveLength(1);
-    expect(Object.hasOwn(seen[0] ?? {}, 'settlesBalance')).toBe(false);
+    expect(Object.keys(seen[0] ?? {}).sort()).toEqual(['capturedAmount', 'charge', 'method', 'ref']);
+    expect(seen[0]?.capturedAmount).toEqual(BRL(1380));
+  });
+
+  it('asks for its facts even while OPEN, and an ordinary OPEN payable does not (NB1)', async () => {
+    const balanceFacts = vi.fn(async (): Promise<CheckoutStatusFacts | null> => ({ shortfall: SHORT }));
+    const balance = setupCheckoutWorld({
+      config: { payables: { ...payablesWith(balanceFacts, 'OPEN'), load: balanceLoad } },
+    });
+    const { body } = await call(balance.routes, 'GET', STATUS);
+    expect(body).toEqual({ data: 'OPEN', shortfall: SHORT });
+    expect(balanceFacts).toHaveBeenCalledTimes(1);
   });
 
   it('voids the full-amount code a balance raise leaves behind', async () => {
@@ -199,4 +192,19 @@ function payablesWith(
     stateToken: (payable: { state: string }) => payable.state,
     statusFacts,
   };
+}
+
+/** A parked short loaded for its difference: OPEN, its amount the balance. */
+async function balanceLoad(_caller: unknown, ref: string) {
+  return ref === REF
+    ? {
+        ref: REF,
+        merchant: { kind: 'TENANT' as const, id: 'merchant-1' },
+        amount: BRL(1380),
+        method: 'PIX' as const,
+        customer: {},
+        state: 'OPEN' as const,
+        balance: true as const,
+      }
+    : null;
 }

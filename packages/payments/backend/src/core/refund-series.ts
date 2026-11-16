@@ -1,6 +1,6 @@
 import type { ProviderFailureReporter } from './provider-failure';
 import type { RefundRefusal } from './refund-retry';
-import { endSeries, firstAttempt, findLive, openDueSeries, pressSeries, reopenByHand, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
+import { endSeries, firstAttempt, firstFailedAnswer, findLive, openDueSeries, pressSeries, reopenByHand, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
 import type { RefundSeriesKey, RefundSeriesRow, RefundRetryStore } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { ChargeSnapshot, MerchantRef, RefundSnapshot } from './types';
@@ -86,6 +86,12 @@ export interface RefundSeriesView {
 
 export interface RefundRetrier {
   firstAttempt(key: RefundSeriesKey, input?: Partial<Pick<RefundInput, 'reason'>>): Promise<FirstAttemptResult>;
+  /**
+   * Attempt 1 came back as a refund the provider marked FAILED (FUT-612): open
+   * the series on the no-answer schedule and write the trail. Optional so a
+   * hand-written retrier keeps type-checking; `createRefundRetrier` has it.
+   */
+  failedAnswer?(key: RefundSeriesKey): Promise<FirstAttemptResult>;
   /** The sweep: run the attempts that are due. Answers how many were looked at. */
   runDue(limit?: number): Promise<number>;
   /** "Tentar estornar de novo": a new series, attempt 1 now with a consult; a no-op while one runs. */
@@ -107,6 +113,7 @@ export function createRefundRetrier(deps: RefundRetrierDeps): RefundRetrier {
   const ctx: SeriesContext = { ...deps, clock: deps.now ?? (() => new Date()) };
   return {
     firstAttempt: (key, input) => firstAttempt(ctx, key, input),
+    failedAnswer: (key) => firstFailedAnswer(ctx, key),
     runDue: (limit) => runDue(ctx, limit),
     press: (key) => pressSeries(ctx, key),
     openDue: (key) => openDueSeries(ctx, key),

@@ -1,6 +1,5 @@
 import type { ChargeSnapshot } from '../core/types';
 
-import { balanceSettlementOf } from './correlation-port';
 import type { RaiseChargeDeps } from './raise';
 import { attachedChargeOf, type CheckoutRuntime } from './runtime';
 import type { Payable } from './types';
@@ -55,6 +54,5 @@ export function settleEarlier<C, V extends object, D>(
     charge: attachedChargeOf(paid),
     capturedAmount: paid.amount,
     method: paid.method,
-    ...balanceSettlementOf(payable),
   });
 }

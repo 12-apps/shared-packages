@@ -1,8 +1,6 @@
 import type { SupersededWhy, VoidOutcome } from '../core/hosted-retire';
 import type { Money, PaymentMethodKind, ProviderName } from '../core/types';
 
-import type { Payable } from './types';
-
 /**
  * WRITING A CHARGE BACK ONTO THE PAYABLE.
  *
@@ -71,8 +69,6 @@ export interface ChargeCorrelationPort {
      * payable closes. A host on an older contract reads `retriable` alone.
      */
     keepsPayableOpen?: boolean;
-    /** The payable was a BALANCE (`Payable.balance`, FUT-612); see {@link BalanceSettlement}. */
-    settlesBalance?: true;
   }): Promise<string>;
   /**
    * A settlement the library has proof of. `capturedAmount` is what the
@@ -87,8 +83,6 @@ export interface ChargeCorrelationPort {
     charge: AttachedCharge;
     capturedAmount: Money;
     method: PaymentMethodKind;
-    /** The payable was a BALANCE (`Payable.balance`, FUT-612); see {@link BalanceSettlement}. */
-    settlesBalance?: true;
   }): Promise<string>;
   /** A payable whose payment window lapsed. Omit to never expire. */
   expire?(ref: string): Promise<string>;
@@ -147,19 +141,4 @@ export interface ChargeCorrelationPort {
     why: SupersededWhy;
     voidOutcome?: VoidOutcome;
   }): Promise<void>;
-}
-
-/**
- * What a settlement of a BALANCE payable carries (FUT-612): `settlesBalance:
- * true`, forwarded untouched. The library still reports only what THIS charge
- * captured (FUT-373); whether the earlier capture the balance was cut from
- * counts toward the total is the host's funding rule, and the flag is how the
- * host tells this settlement from an ordinary one without a second lookup. A
- * payable that is not a balance adds nothing, so an older host reads exactly
- * the input it always did.
- */
-export type BalanceSettlement = { settlesBalance: true } | Record<string, never>;
-
-export function balanceSettlementOf(payable: Pick<Payable, 'balance'>): BalanceSettlement {
-  return payable.balance ? { settlesBalance: true } : {};
 }

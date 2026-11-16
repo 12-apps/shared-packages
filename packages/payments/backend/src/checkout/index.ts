@@ -113,11 +113,3 @@ export {
   type PaymentStockGone,
   type ShortfallResolution,
 } from './status-facts';
-export { balanceSettlementOf, type BalanceSettlement } from './correlation-port';
-/** A balance raise's void, for a host composing its own raise (FUT-612). */
-export {
-  voidOtherLiveCharges,
-  type BalanceVoidDeps,
-  type BalanceVoidGateway,
-  type BalanceVoidScope,
-} from '../core/balance-supersede';
