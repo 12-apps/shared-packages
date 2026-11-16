@@ -387,7 +387,9 @@ sweep — endpoints and screens included.
     - **`caps`** takes RESOLVERS (`perRecipientDaily()`,
       `perTenantMonthly(tenantId)`, `timeZoneOf(tenantId)`), read per emit, a
       required `timeZone`, and `onTenantCapReached(tenantId, period)`. A
-      resolver that throws drops the paid channels of that emit.
+      resolver that throws, or a counter statement that fails, drops the paid
+      channels of that emit; the inbox row and the free channels are still
+      written. A seam without `notificationSendCounter` is reported at mount.
     - **Two more routes** (`/phone-confirmation/resend`, `/phone-confirmation/code`)
       are mounted when `consent` is configured; they are cookie-authenticated
       writes like the rest (rule 13).

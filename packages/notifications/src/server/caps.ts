@@ -192,6 +192,25 @@ async function admit(
   return false;
 }
 
+/**
+ * At mount: a `caps` config on a db seam with no `notificationSendCounter`
+ * delegate would drop every paid channel of every emit. Said once, loudly, as
+ * soon as the seam answers — the mount itself is synchronous, so it cannot wait.
+ */
+export function checkCountersSeam(db: NotificationsDbProvider, logger: NotificationLogger): void {
+  db().then(
+    (client) => {
+      if (!client.notificationSendCounter) {
+        logger.error(
+          '@12-apps/notifications: `caps` needs the `notificationSendCounter` delegate on the db seam; ' +
+            'until it is there every paid channel degrades to the free ones.',
+        );
+      }
+    },
+    () => undefined,
+  );
+}
+
 export function createCapsGate(
   db: NotificationsDbProvider,
   config: NotificationCapsConfig,
@@ -204,14 +223,24 @@ export function createCapsGate(
     async apply(userId, tenantId, channels) {
       const paid = channels.filter((channel) => capped.has(channel));
       if (paid.length === 0) return channels;
+      const free = (): NotificationChannel[] => channels.filter((channel) => !capped.has(channel));
       const limits = await resolveLimits(ctx, tenantId);
-      if (!limits) return channels.filter((channel) => !capped.has(channel));
-      const store = await counters(ctx);
+      if (!limits) return free();
       const refused = new Set<NotificationChannel>();
-      // Sequential: each paid delivery is one message, and a channel admitted
-      // later must see the count the earlier one left.
-      for (const channel of paid) {
-        if (!(await admit(ctx, store, userId, limits))) refused.add(channel);
+      try {
+        const store = await counters(ctx);
+        // Sequential: each paid delivery is one message, and a channel admitted
+        // later must see the count the earlier one left.
+        for (const channel of paid) {
+          if (!(await admit(ctx, store, userId, limits))) refused.add(channel);
+        }
+      } catch (error) {
+        // A counter that cannot be read or moved (a DB error, a seam without
+        // the delegate) degrades like a failing resolver: the paid channels go,
+        // never uncounted, and the inbox row and the free channels are still
+        // written — a cap must never cost a person the record of the event.
+        ctx.logger.error('[notifications] the send counter failed; degrading to the free channels:', error);
+        return free();
       }
       return channels.filter((channel) => !refused.has(channel));
     },
