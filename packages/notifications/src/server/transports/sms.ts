@@ -2,13 +2,16 @@ import type {
   NotificationContent,
   NotificationLogger,
   NotificationTransport,
+  TransportSendResult,
 } from '../../types';
 
 import {
   absoluteLink,
+  fakeProviderId,
   phoneChannel,
   postOrThrow,
   resolveDriver,
+  sentAs,
   type DriverDeclarationBase,
 } from './drivers';
 
@@ -31,7 +34,8 @@ export interface SmsMessage {
 }
 
 export interface SmsDriver {
-  send(toE164: string, message: SmsMessage): Promise<void>;
+  /** May answer the provider's id for the message (see `TransportSendResult`). */
+  send(toE164: string, message: SmsMessage): Promise<TransportSendResult | void>;
 }
 
 export interface SmsDriverDeclaration extends DriverDeclarationBase {
@@ -39,6 +43,12 @@ export interface SmsDriverDeclaration extends DriverDeclarationBase {
   accountSid?: string;
   authToken?: string;
   from?: string;
+  /**
+   * Where Twilio posts this message's status callbacks (`StatusCallback`), so a
+   * host can apply delivery receipts (`parseTwilioCallback` +
+   * `applyDeliveryReceipt`). Absent = no callback is asked for, as before.
+   */
+  statusCallbackUrl?: string;
   appUrl?: string;
   /**
    * Country calling code for a bare local number, digits only (`'55'`, `'1'`).
@@ -60,7 +70,9 @@ const twilioDriver = (declaration: SmsDriverDeclaration): SmsDriver => ({
       throw new Error('The twilio sms driver needs `accountSid`, `authToken` and `from`.');
     }
     const auth = Buffer.from(`${sid}:${declaration.authToken}`).toString('base64');
-    await postOrThrow(
+    const form = new URLSearchParams({ To: toE164, From: declaration.from, Body: message.body });
+    if (declaration.statusCallbackUrl) form.set('StatusCallback', declaration.statusCallbackUrl);
+    const answer = await postOrThrow(
       'Twilio',
       declaration.fetchImpl,
       `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,
@@ -69,13 +81,11 @@ const twilioDriver = (declaration: SmsDriverDeclaration): SmsDriver => ({
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${auth}`,
         },
-        body: new URLSearchParams({
-          To: toE164,
-          From: declaration.from,
-          Body: message.body,
-        }).toString(),
+        body: form.toString(),
       },
     );
+    // Twilio answers the Message resource; its `sid` is what callbacks carry.
+    return sentAs((answer as { sid?: unknown } | null)?.sid);
   },
 });
 
@@ -86,7 +96,7 @@ const logSmsDriver = (declaration: SmsDriverDeclaration): SmsDriver => ({
     declaration.logger?.info(
       `[notifications:sms] log driver suppressed a real send (body="${message.body}")`,
     );
-    return Promise.resolve();
+    return Promise.resolve(fakeProviderId('sms'));
   },
 });
 

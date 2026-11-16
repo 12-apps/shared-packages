@@ -78,6 +78,17 @@ export const DEFAULT_SWEEP_CUTOFF_MS = 5 * 60_000;
  */
 const RETRYABLE: DeliveryStatus[] = ['FAILED', 'QUEUED', 'SENDING'];
 
+/**
+ * The consent gate: of `channels`, the ones this person's number may
+ * be sent on. Applied before EVERY send, so a row queued (or failed) while the
+ * number was confirmed is never sent after an opt-out or a phone change.
+ */
+export type NotificationConsentGate = (
+  userId: string,
+  phone: string | null,
+  channels: NotificationChannel[],
+) => Promise<NotificationChannel[]>;
+
 /** What dispatch needs from the mount. */
 export interface NotificationDispatchDeps {
   db: NotificationsDbProvider;
@@ -86,6 +97,7 @@ export interface NotificationDispatchDeps {
   contacts: NotificationContactDirectory;
   logger: NotificationLogger;
   maxAttempts: number;
+  consentGate?: NotificationConsentGate;
 }
 
 /** Load the recipient's destinations once, for every transport's gate. */
@@ -175,10 +187,18 @@ async function sendClaimed(
   const transport = deps.transports.get(delivery.channel as NotificationChannel);
   try {
     if (!transport) throw new Error(`No transport declared for ${delivery.channel}.`);
-    await transport.send(transport.format(content) as never, recipient);
+    const result = await transport.send(transport.format(content) as never, recipient);
+    // The provider's id, when the transport answered one: what a receipt finds
+    // the row by. Absent, the key is not written at all.
+    const providerMessageId = result?.providerMessageId;
     await client.notificationDelivery.update({
       where: { id: delivery.id },
-      data: { status: 'SENT', sentAt: new Date(), error: null },
+      data: {
+        status: 'SENT',
+        sentAt: new Date(),
+        error: null,
+        ...(providerMessageId ? { providerMessageId } : {}),
+      },
     });
   } catch (error) {
     await settle(deps, client, delivery, error);
@@ -209,6 +229,32 @@ async function abandonUnreachable(
       data: { status: 'DEAD', error: 'The contact directory no longer knows this recipient.' },
     });
   }
+}
+
+/**
+ * The queued rows the consent gate still lets through; the others are written
+ * DEAD, guarded on QUEUED like a claim. DEAD and not FAILED: consent withdrawn
+ * is not a transient fault, and a sweep that re-queued the row would only meet
+ * the same gate. One consent read, and none for a notification whose rows are
+ * all on channels that need no consent.
+ */
+async function withConsent(
+  deps: NotificationDispatchDeps,
+  client: NotificationsDb,
+  queued: NotificationDeliveryRow[],
+  recipient: TransportRecipient,
+): Promise<NotificationDeliveryRow[]> {
+  if (!deps.consentGate) return queued;
+  const channels = queued.map((row) => row.channel as NotificationChannel);
+  const kept = new Set(await deps.consentGate(recipient.userId, recipient.phone, channels));
+  const withdrawn = queued.filter((row) => !kept.has(row.channel as NotificationChannel));
+  for (const row of withdrawn) {
+    await client.notificationDelivery.updateMany({
+      where: { id: row.id, status: 'QUEUED' },
+      data: { status: 'DEAD', error: 'No consent for this number on this channel any more.' },
+    });
+  }
+  return queued.filter((row) => kept.has(row.channel as NotificationChannel));
 }
 
 /**
@@ -244,10 +290,11 @@ export async function dispatchOne(
   }
 
   const content = contentOf(notification);
+  const sendable = await withConsent(deps, client, queued, recipient);
   // Sequential on purpose: one recipient's channels (2–4 sends) gain little
   // from parallelism, and providers rate-limit per sender anyway.
   let sent = 0;
-  for (const delivery of queued) {
+  for (const delivery of sendable) {
     if (await sendClaimed(deps, client, delivery, content, recipient)) sent += 1;
   }
   return sent;

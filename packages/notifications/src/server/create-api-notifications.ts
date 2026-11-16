@@ -18,7 +18,21 @@ import {
 } from './by-permission';
 import type { NotificationsRoute } from './context';
 import type { NotificationContactDirectory, NotificationsDbProvider } from './db';
-import { DEFAULT_MAX_DELIVERY_ATTEMPTS } from './dispatch';
+import { createCapsGate, type CapsGate, type NotificationCapsConfig } from './caps';
+import {
+  createConsentEngine,
+  resolveConsentConfig,
+  type ConsentEngine,
+  type NotificationConsentApi,
+} from './consent';
+import type { PaidChannel } from './consent-text';
+import type { NotificationConsentConfig } from './consent-types';
+import { DEFAULT_MAX_DELIVERY_ATTEMPTS, type NotificationConsentGate } from './dispatch';
+import {
+  applyDeliveryReceipt,
+  type AppliedDeliveryReceipt,
+  type DeliveryReceiptInput,
+} from './receipts';
 import { createInboxStore, type NotificationInboxStore } from './inbox';
 import { createPreferenceStore, type NotificationPreferenceStore } from './preferences';
 import {
@@ -133,6 +147,18 @@ export interface NotificationsServerConfig {
   messages: NotificationsCopySource<NotificationWireMessages>;
   /** The host's logger. Defaults to the console. */
   logger?: NotificationLogger;
+  /**
+   * The paid channels a person's NUMBER must have consented to before a
+   * message is created or sent on them. Default none — today's
+   * behaviour. Every channel named needs a method in `consent.methods`.
+   */
+  requireConsent?: readonly PaidChannel[];
+  /** The confirmed-destination engine's host half: methods, words, copy. */
+  consent?: NotificationConsentConfig;
+  /** Paid-message caps per person per day and per tenant per month. */
+  caps?: NotificationCapsConfig;
+  /** Told once per delivery receipt that moved a row. Never fails one. */
+  onDeliveryReceipt?: (receipt: AppliedDeliveryReceipt) => void;
 }
 
 export interface ApiNotifications {
@@ -157,6 +183,14 @@ export interface ApiNotifications {
   registerGenerator: NotificationGeneratorRegistry['register'];
   /** The declared transports, for diagnostics and availability probes. */
   transports: TransportRegistry;
+  /**
+   * A provider's delivery receipt, applied forward-only to the delivery row
+   * holding its id. `applied: false` = nothing moved (unknown id, a duplicate,
+   * or a receipt that raced its own SENT write — retry that one later).
+   */
+  applyDeliveryReceipt: (input: DeliveryReceiptInput) => Promise<{ applied: boolean }>;
+  /** The consent engine — present only when the host configured `consent`. */
+  consent?: NotificationConsentApi;
   /**
    * The copy source in force, so a host's own screens can reuse a sentence.
    *
@@ -229,6 +263,8 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     logger,
   );
 
+  const paid = paidPolicy(config, transports, logger);
+
   const router = createNotificationRouter({
     db: config.db,
     generators,
@@ -246,6 +282,8 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
       scheduleDispatch: config.scheduleDispatch,
       onCommitted: config.onCommitted,
       sideOf: config.sideOf,
+      consentGate: paid.gate,
+      caps: paid.caps,
     }),
   });
 
@@ -260,7 +298,7 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
       contacts: config.contacts,
       categories: taxonomy.categories,
       messages,
-      ...present({ onInboxChanged: config.onInboxChanged }),
+      ...present({ onInboxChanged: config.onInboxChanged, consent: paid.consent }),
     }),
     notify: router.notify,
     dispatchDeliveries: router.dispatchDeliveries,
@@ -272,5 +310,56 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     registerGenerator: generators.register,
     transports,
     messages,
+    applyDeliveryReceipt: receiptApplier(config, logger),
+    ...(paid.consent ? { consent: publicConsent(paid.consent) } : {}),
+  };
+}
+
+/**
+ * The paid-channel policy of one mount: the consent engine (when `consent` is
+ * configured), the gate it applies (only when `requireConsent` names a channel
+ * — a mount that merely COLLECTS consent sends as before), and the caps.
+ * Every part is absent unless the host asked for it.
+ */
+function paidPolicy(
+  config: NotificationsServerConfig,
+  transports: TransportRegistry,
+  logger: NotificationLogger,
+): { consent?: ConsentEngine; gate?: NotificationConsentGate; caps?: CapsGate } {
+  const requireConsent = config.requireConsent ?? [];
+  const consentConfig = resolveConsentConfig(config.consent, requireConsent);
+  const caps = config.caps ? createCapsGate(config.db, config.caps, logger) : null;
+  if (!consentConfig) return caps ? { caps } : {};
+  const consent = createConsentEngine(
+    { db: config.db, contacts: config.contacts, transports, config: consentConfig, caps, logger },
+    requireConsent,
+  );
+  return {
+    consent,
+    ...(requireConsent.length > 0 ? { gate: consent.allowed } : {}),
+    ...(caps ? { caps } : {}),
+  };
+}
+
+/** `applyDeliveryReceipt`, bound to this mount's db and observer. */
+function receiptApplier(
+  config: NotificationsServerConfig,
+  logger: NotificationLogger,
+): ApiNotifications['applyDeliveryReceipt'] {
+  const deps = { db: config.db, logger, ...present({ onDeliveryReceipt: config.onDeliveryReceipt }) };
+  return (input) => applyDeliveryReceipt(deps, input);
+}
+
+/** The engine without the two members only the mount's own parts call. */
+function publicConsent(engine: ConsentEngine): NotificationConsentApi {
+  return {
+    get: engine.get,
+    request: engine.request,
+    resend: engine.resend,
+    confirmCode: engine.confirmCode,
+    applyInbound: engine.applyInbound,
+    forgetDestination: engine.forgetDestination,
+    grandfather: engine.grandfather,
+    askGrandfathered: engine.askGrandfathered,
   };
 }

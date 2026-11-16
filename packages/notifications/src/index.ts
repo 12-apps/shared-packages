@@ -35,6 +35,7 @@ export {
   type NotificationTaxonomy,
   type NotificationTransport,
   type TransportRecipient,
+  type TransportSendResult,
 } from './types';
 
 export {

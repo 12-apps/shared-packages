@@ -48,11 +48,22 @@ export type NotificationCategory = string;
  * it is older than the cutoff.
  *
  * `DEAD` is terminal: the attempt ceiling was reached (or the recipient no
- * longer exists), and no sweep will pick the row up again. Without it a
- * permanently invalid destination is a billed provider call on every sweep,
- * forever, and the sweep's working set only grows.
+ * longer exists, or its consent was withdrawn), and no sweep will pick the row
+ * up again. Without it a permanently invalid destination is a billed provider
+ * call on every sweep, forever, and the sweep's working set only grows.
+ *
+ * `DELIVERED` and `UNDELIVERED` are the PROVIDER's answer, applied by a
+ * delivery receipt to a `SENT` row (`applyDeliveryReceipt`): forward only, the
+ * first terminal answer wins, and neither is ever re-sent by the sweep.
  */
-export type DeliveryStatus = 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED' | 'DEAD';
+export type DeliveryStatus =
+  | 'QUEUED'
+  | 'SENDING'
+  | 'SENT'
+  | 'FAILED'
+  | 'DEAD'
+  | 'DELIVERED'
+  | 'UNDELIVERED';
 
 /**
  * Channel-agnostic content a generator produces. This is what the inbox stores
@@ -67,13 +78,15 @@ export interface NotificationContent {
   /**
    * Structured extras for consumers that want more than text.
    *
-   * TWO KEYS ARE RESERVED. `attention` (`ATTENTION_DATA_KEY` in
+   * THREE KEYS ARE RESERVED. `attention` (`ATTENTION_DATA_KEY` in
    * `./attention`), set to `calm`, `late` or `spent`, makes this an attention
    * push: the WEB_PUSH transport sends it only to the devices whose own level
    * wants that severity. And `liveSubject` (`LIVE_SUBJECT_KEY` in `./live`) ties
    * this notification to a live activity, and the WEB_PUSH transport turns it
    * into the tray `tag` that collapses every push about one subject onto a
-   * single entry. A host already using that name for something else acquires
+   * single entry. A third, `whatsappTemplate` (`WHATSAPP_TEMPLATE_DATA_KEY` in
+   * `./server`), names the approved WhatsApp template ONE message is sent as.
+   * A host already using one of those names for something else acquires
    * that behaviour without asking for it — so it is named here, on the field a
    * generator actually writes, and not only where the feature is documented.
    */
@@ -243,8 +256,19 @@ export interface NotificationTransport<TMessage = unknown> {
   supports(recipient: TransportRecipient): boolean;
   /** Transform the agnostic content into this channel's message shape. */
   format(content: NotificationContent): TMessage;
-  /** Deliver the formatted message to the recipient. Throws on failure. */
-  send(message: TMessage, recipient: TransportRecipient): Promise<void>;
+  /**
+   * Deliver the formatted message to the recipient. Throws on failure.
+   *
+   * May resolve the provider's own id for the message, which the dispatcher
+   * keeps on the delivery row so a later receipt can find it. `void` stays
+   * legal: a transport that answers nothing simply gets no receipts.
+   */
+  send(message: TMessage, recipient: TransportRecipient): Promise<TransportSendResult | void>;
+}
+
+/** What a transport's `send` may answer: the provider's id for the message. */
+export interface TransportSendResult {
+  providerMessageId?: string;
 }
 
 /**

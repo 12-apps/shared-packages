@@ -2,13 +2,16 @@ import type {
   NotificationContent,
   NotificationLogger,
   NotificationTransport,
+  TransportSendResult,
 } from '../../types';
 
 import {
   absoluteLink,
+  fakeProviderId,
   phoneChannel,
   postOrThrow,
   resolveDriver,
+  sentAs,
   type DriverDeclarationBase,
 } from './drivers';
 
@@ -37,16 +40,48 @@ import {
  * moment a misconfiguration is cheap to notice.
  */
 
+/**
+ * The `content.data` key under which ONE notification names its own approved
+ * template, overriding the declaration's generic `templateName` for that send.
+ *
+ * A business-initiated message must be a template Meta approved, and some
+ * messages need their OWN: a phone confirmation with a reply button is not the
+ * generic "{{1}}: {{2}}" alert. The package names no template — the host
+ * registers it with Meta and passes its name and parameters (the consent
+ * engine does, from `consent.whatsAppTemplate`). A value that is not a
+ * {@link WhatsAppTemplateRef} is ignored and the declaration's template is used.
+ */
+export const WHATSAPP_TEMPLATE_DATA_KEY = 'whatsappTemplate';
+
+/** One approved template, as a notification names it. */
+export interface WhatsAppTemplateRef {
+  /** The template's name as registered with Meta. */
+  name: string;
+  /** Its language code; absent = the declaration's `templateLanguage`. */
+  language?: string;
+  /** The body's {{1}}…{{n}}, in order. */
+  bodyParameters: readonly string[];
+  /**
+   * The payload each QUICK-REPLY button returns, by button index. The button's
+   * TITLE is fixed in the approved template and is what arrives as the reply's
+   * text; the payload is only a tag the host can recognise it by.
+   */
+  quickReplyPayloads?: readonly string[];
+}
+
 /** The channel message the WhatsApp formatter produces. */
 export interface WhatsAppMessage {
   /** Free-form text used inside the session window / without a template. */
   text: string;
   /** Template body parameters ({{1}} title, {{2}} body) when templated. */
   templateParameters: [title: string, body: string];
+  /** This message's own template (see {@link WHATSAPP_TEMPLATE_DATA_KEY}). */
+  template?: WhatsAppTemplateRef;
 }
 
 export interface WhatsAppDriver {
-  send(toE164: string, message: WhatsAppMessage): Promise<void>;
+  /** May answer the provider's id for the message (see `TransportSendResult`). */
+  send(toE164: string, message: WhatsAppMessage): Promise<TransportSendResult | void>;
 }
 
 export interface WhatsAppDriverDeclaration extends DriverDeclarationBase {
@@ -99,6 +134,47 @@ function templatePayload(
   };
 }
 
+/** A message's own template: its body parameters and quick-reply payloads. */
+function ownTemplatePayload(
+  toDigits: string,
+  template: WhatsAppTemplateRef,
+  declaration: WhatsAppDriverDeclaration,
+): object {
+  const components: object[] = [
+    {
+      type: 'body',
+      parameters: template.bodyParameters.map((text) => ({ type: 'text', text })),
+    },
+    ...(template.quickReplyPayloads ?? []).map((payload, index) => ({
+      type: 'button',
+      sub_type: 'quick_reply',
+      index: String(index),
+      parameters: [{ type: 'payload', payload }],
+    })),
+  ];
+  return {
+    messaging_product: 'whatsapp',
+    to: toDigits,
+    type: 'template',
+    template: {
+      name: template.name,
+      language: { code: template.language ?? declaration.templateLanguage },
+      components,
+    },
+  };
+}
+
+function payloadOf(
+  toDigits: string,
+  message: WhatsAppMessage,
+  declaration: WhatsAppDriverDeclaration,
+): object {
+  if (message.template) return ownTemplatePayload(toDigits, message.template, declaration);
+  return declaration.templateName
+    ? templatePayload(toDigits, message, declaration)
+    : textPayload(toDigits, message);
+}
+
 function textPayload(toDigits: string, message: WhatsAppMessage): object {
   return {
     messaging_product: 'whatsapp',
@@ -115,11 +191,9 @@ const metaDriver = (declaration: WhatsAppDriverDeclaration): WhatsAppDriver => (
     }
     // The Cloud API addresses recipients by bare digits (no `+`).
     const toDigits = toE164.replace('+', '');
-    const payload = declaration.templateName
-      ? templatePayload(toDigits, message, declaration)
-      : textPayload(toDigits, message);
+    const payload = payloadOf(toDigits, message, declaration);
     const base = declaration.graphApiBase ?? DEFAULT_GRAPH_API_BASE;
-    await postOrThrow(
+    const answer = await postOrThrow(
       'WhatsApp Cloud API',
       declaration.fetchImpl,
       `${base}/${encodeURIComponent(declaration.phoneNumberId)}/messages`,
@@ -131,6 +205,8 @@ const metaDriver = (declaration: WhatsAppDriverDeclaration): WhatsAppDriver => (
         body: JSON.stringify(payload),
       },
     );
+    // The Cloud API answers `messages[0].id` (a `wamid`): what statuses carry.
+    return sentAs((answer as { messages?: { id?: unknown }[] } | null)?.messages?.[0]?.id);
   },
 });
 
@@ -141,7 +217,7 @@ const logWhatsAppDriver = (declaration: WhatsAppDriverDeclaration): WhatsAppDriv
     declaration.logger?.info(
       `[notifications:whatsapp] log driver suppressed a real send (text="${message.text}")`,
     );
-    return Promise.resolve();
+    return Promise.resolve(fakeProviderId('whatsapp'));
   },
 });
 
@@ -161,7 +237,29 @@ export function formatWhatsApp(
   const lines = [`*${content.title}*`, '', content.body];
   const href = absoluteLink(content.link, declaration.appUrl);
   if (href) lines.push('', href);
-  return { text: lines.join('\n'), templateParameters: [content.title, content.body] };
+  const template = templateRefOf(content.data?.[WHATSAPP_TEMPLATE_DATA_KEY]);
+  return {
+    text: lines.join('\n'),
+    templateParameters: [content.title, content.body],
+    ...(template ? { template } : {}),
+  };
+}
+
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+/** A {@link WhatsAppTemplateRef} out of `content.data`, or nothing. */
+function templateRefOf(value: unknown): WhatsAppTemplateRef | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const ref = value as Record<string, unknown>;
+  if (typeof ref.name !== 'string' || ref.name.length === 0) return null;
+  if (!isStringList(ref.bodyParameters)) return null;
+  return {
+    name: ref.name,
+    bodyParameters: ref.bodyParameters,
+    ...(typeof ref.language === 'string' ? { language: ref.language } : {}),
+    ...(isStringList(ref.quickReplyPayloads) ? { quickReplyPayloads: ref.quickReplyPayloads } : {}),
+  };
 }
 
 export function whatsAppTransport(
