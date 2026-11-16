@@ -67,7 +67,11 @@ export function ToggleField({
         // above names nothing; the group carries the question itself (FUT-4157).
         aria-label={label}
         // A group has no `error` prop; the invalid state is said here, and why
-        // by the message the description points at.
+        // by the message the description points at. ARIA 1.2 lists neither
+        // `group` nor the segments' `button` among `aria-invalid`'s roles (it
+        // is deprecated as global, not forbidden; axe-core treats it as global),
+        // and `radiogroup` would misname aria-pressed buttons, so it stays on
+        // the group, where the description is.
         aria-invalid={error ? true : undefined}
         aria-describedby={describedByWith(callerDescribedBy, messageId)}
         disabled={busy}

@@ -158,6 +158,76 @@ describe('FormContainer: a refused submit focuses the first invalid field', () =
   });
 });
 
+describe('FormContainer: an invalid field that cannot take focus is passed by', () => {
+  it.each([
+    ['display: none', { style: { display: 'none' } }],
+    ['the hidden attribute', { hidden: true }],
+    ['visibility: hidden', { style: { visibility: 'hidden' as const } }],
+  ])('skips one hidden by %s and focuses the next visible invalid field', async (_how, wrapper) => {
+    threeFields({
+      extra: (
+        <div {...wrapper}>
+          <input aria-invalid="true" aria-label="Escondido" data-testid="escondido" />
+        </div>
+      ),
+    });
+    // DOM order: the three fields, then the hidden control. Put it first.
+    const hidden = screen.getByTestId('escondido').parentElement as HTMLElement;
+    field('first').closest('form')?.prepend(hidden);
+
+    pressSubmit();
+
+    await waitFor(() => expect(field('second')).toHaveFocus());
+    expect(scrollIntoView.mock.contexts[0]).toBe(field('second'));
+  });
+
+  it('skips a disabled invalid control', async () => {
+    threeFields();
+    const disabled = document.createElement('input');
+    disabled.setAttribute('aria-invalid', 'true');
+    disabled.disabled = true;
+    field('first').closest('form')?.prepend(disabled);
+
+    pressSubmit();
+
+    await waitFor(() => expect(field('second')).toHaveFocus());
+  });
+});
+
+describe('FormContainer: two forms on one page', () => {
+  function namedForm(id: string) {
+    return (
+      <FormContainer<{ nome: string }>
+        initialValues={{ nome: '' }}
+        schema={{ nome: [filled] }}
+        onSubmit={vi.fn()}
+        dataTestId={`form-${id}`}
+      >
+        <TextField name="nome" label={`Nome ${id}`} />
+        <SubmitButton>{`Enviar ${id}`}</SubmitButton>
+      </FormContainer>
+    );
+  }
+
+  it("a refused submit in the second form focuses its own field, never the first form's", async () => {
+    render(
+      <>
+        {namedForm('A')}
+        {namedForm('B')}
+      </>,
+    );
+    const [nomeA, nomeB] = screen.getAllByTestId('total-form-field-nome');
+
+    fireEvent.click(screen.getByText('Enviar A'));
+    await waitFor(() => expect(nomeA).toHaveFocus());
+
+    // A's field is still invalid, and first in DOM order, when B is refused.
+    fireEvent.click(screen.getByText('Enviar B'));
+    await waitFor(() => expect(nomeB).toHaveFocus());
+    expect(nomeA).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
 describe('FormContainer: the focus lands on a control that can take it', () => {
   const OPTIONS = [
     { value: 'kg', label: 'Quilo' },

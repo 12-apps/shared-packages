@@ -169,13 +169,12 @@ function inputRenderer(
       'aria-describedby': ariaDescribedBy,
       'aria-busy': ariaBusy,
       inputMode,
-      readOnly,
       inputProps,
       ...rest
     },
     ref,
   ) => {
-    const { testId: dataTestId, rest: props } = splitTestId(rest);
+    const { testId: dataTestId, rest: { readOnly, ...props } } = splitTestId(rest);
     const generatedId = React.useId();
     const id = props.id ?? generatedId;
     return (
@@ -208,7 +207,8 @@ function inputRenderer(
          */
         inputProps={{
           'data-testid': dataTestId,
-          ...keyboardOf(inputMode), ...readOnlyOf(readOnly),
+          ...keyboardOf(inputMode),
+          ...readOnlyOf(readOnly),
           ...inputProps,
           ...inputAriaOf({ id, helperText, label: ariaLabel, describedBy: ariaDescribedBy, busy: ariaBusy }),
         }}
