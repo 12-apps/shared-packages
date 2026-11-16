@@ -18,7 +18,13 @@ import type { SavedReportRecord, SavedReportStore } from './saved';
 import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
-import { parksEditsInWorkingCopy, reportWorkingCopySchema } from './working-copy';
+import { readSchedule, reportScheduleInput, resolveSchedule } from './schedule';
+import {
+  parksEditsInWorkingCopy,
+  reportWorkingCopySchema,
+  type ReportWorkingCopy,
+} from './working-copy';
+import type { ReportSchedule } from '../schedule';
 import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
 import { REPORT_BUILDER_FEATURES } from './features';
 
@@ -122,7 +128,7 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
       const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
       try {
-        const input = parsePublishBody(body, record, messagesOf(config, locale));
+        const input = parsePublishBody(body, record, messagesOf(config, locale), config);
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const saved = await store.publishWorkingCopy(actor.clientId, record.id, input);
         return saved ? ok(toSummary(saved, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
@@ -169,6 +175,7 @@ function parsePublishBody(
   body: unknown,
   current: SavedReportRecord,
   messages: ReportServerMessages,
+  config: ReportBuilderServerConfig,
 ): {
   name: string;
   description: string | null;
@@ -177,6 +184,7 @@ function parsePublishBody(
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string | null;
+  schedule: ReportSchedule | null;
 } {
   const parsed = reportWorkingCopySchema.safeParse(body);
   if (!parsed.success) {
@@ -192,7 +200,27 @@ function parsePublishBody(
     visibility: input.visibility ?? current.visibility,
     visibilityRoles: input.visibilityRoles ?? visibilityRoleIds(current.visibilityRoles),
     defaultRange: input.defaultRange ?? current.defaultRange,
+    schedule: publishSchedule(input.schedule, current, messages, config),
   };
+}
+
+/**
+ * The schedule a publish lands on. The parked edit was only shape-checked, so
+ * it meets the STRICT rule here (an enabled schedule needs a recipient) before
+ * it can start sending anything.
+ */
+function publishSchedule(
+  parked: ReportWorkingCopy['schedule'],
+  current: SavedReportRecord,
+  messages: ReportServerMessages,
+  config: ReportBuilderServerConfig,
+): ReportSchedule | null {
+  const strict = parked ? reportScheduleInput.safeParse(parked) : null;
+  if (strict && !strict.success) throw invalidInputError(strict.error, messages.invalidBody);
+  return resolveSchedule(strict?.data ?? parked, readSchedule(current.schedule), {
+    timeZone: config.timeZone,
+    now: config.now ? config.now() : new Date(),
+  });
 }
 
 export function savedWorkingCopyRoutes(

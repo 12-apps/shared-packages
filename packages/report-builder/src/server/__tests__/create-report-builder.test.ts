@@ -963,3 +963,56 @@ describe('the ENGINE\'s words follow the reader too', () => {
   });
 });
 
+
+describe('the e-mail delivery schedule (FUT-776)', () => {
+  const body = {
+    name: 'Semanal',
+    spec: ORDERS_SPEC,
+    schedule: { enabled: true, cadence: 'weekly', weekday: 1, time: '08:00', recipients: ['user-2'] },
+  };
+  const scheduleOf = (response: ReportResponse): unknown =>
+    (response.body as { data: { schedule?: unknown } }).data.schedule;
+
+  it('is stamped with the store zone and persisted on create', async () => {
+    const harness = setup({ seed: [] });
+    const created = await harness.call('POST', '/reports/custom', { body });
+    expect(created.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual({
+      ...body.schedule,
+      timeZone: 'America/Sao_Paulo',
+      startsOn: '2026-07-14',
+    });
+  });
+
+  it('is echoed to an author and hidden from a reader, since it names people', async () => {
+    const harness = setup({ seed: [] });
+    await harness.call('POST', '/reports/custom', { body });
+    const id = harness.stored()[0]?.id ?? '';
+    const asAuthor = await harness.call('GET', '/reports/custom/:id', { params: { id } });
+    const asReader = await harness.call('GET', '/reports/custom/:id', {
+      params: { id },
+      actor: actor({ permissions: ['sales:read'] }),
+    });
+    expect(scheduleOf(asAuthor)).toMatchObject({ cadence: 'weekly', recipients: ['user-2'] });
+    expect(scheduleOf(asReader)).toBeNull();
+  });
+
+  it('is kept when an update omits it and removed by an explicit null', async () => {
+    const harness = setup({ seed: [] });
+    await harness.call('POST', '/reports/custom', { body });
+    const id = harness.stored()[0]?.id ?? '';
+    const { schedule: _omitted, ...withoutSchedule } = body;
+    await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: withoutSchedule });
+    expect(harness.stored()[0]?.schedule).toMatchObject({ enabled: true });
+    await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: { ...withoutSchedule, schedule: null } });
+    expect(harness.stored()[0]?.schedule).toBeNull();
+  });
+
+  it('refuses an enabled schedule with no recipient', async () => {
+    const harness = setup({ seed: [] });
+    const refused = await harness.call('POST', '/reports/custom', {
+      body: { ...body, schedule: { ...body.schedule, recipients: [] } },
+    });
+    expect(refused.status).toBe(422);
+  });
+});

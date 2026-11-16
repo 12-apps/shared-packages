@@ -16,6 +16,7 @@ import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './sa
 import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
+import { readSchedule, resolveSchedule } from './schedule';
 import { saveReportBody } from './wire';
 import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
 import { REPORT_BUILDER_FEATURES } from './features';
@@ -62,13 +63,21 @@ function parseSaveBody(body: unknown, messages: ReportServerMessages): SaveBody 
 function lifecycleFor(
   body: SaveBody,
   current: SavedReportRecord | null,
-): Pick<SavedReportInput, 'status' | 'visibility' | 'visibilityRoles' | 'defaultRange'> {
+  config: ReportBuilderServerConfig,
+): Pick<
+  SavedReportInput,
+  'status' | 'visibility' | 'visibilityRoles' | 'defaultRange' | 'schedule'
+> {
   return {
     status: body.status ?? current?.status ?? 'published',
     visibility: body.visibility ?? current?.visibility ?? 'tenant',
     visibilityRoles:
       body.visibilityRoles ?? (current ? visibilityRoleIds(current.visibilityRoles) : []),
     defaultRange: defaultRangeFor(body, current),
+    schedule: resolveSchedule(body.schedule, readSchedule(current?.schedule), {
+      timeZone: config.timeZone,
+      now: config.now ? config.now() : new Date(),
+    }),
   };
 }
 
@@ -84,12 +93,16 @@ function defaultRangeFor(body: SaveBody, current: SavedReportRecord | null): str
   return current?.defaultRange ?? null;
 }
 
-function toInput(body: SaveBody, current: SavedReportRecord | null): SavedReportInput {
+function toInput(
+  body: SaveBody,
+  current: SavedReportRecord | null,
+  config: ReportBuilderServerConfig,
+): SavedReportInput {
   return {
     name: body.name,
     description: body.description ?? null,
     spec: body.spec,
-    ...lifecycleFor(body, current),
+    ...lifecycleFor(body, current, config),
   };
 }
 
@@ -108,7 +121,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         // Authorship comes from the ACTOR, never from the body — a client
         // that could name its own `createdBy` could author as someone else,
         // and authorship is what `visibility: 'private'` is judged on.
-        const record = await store.create(actor.clientId, toInput(input, null), actor.userId);
+        const record = await store.create(actor.clientId, toInput(input, null, config), actor.userId);
         return ok(toSummary(record, actor.userId));
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);
@@ -136,7 +149,7 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         // author-permission holder learns nothing here they could not learn
         // from `GET /reports/custom/:id`.
         if (!current || !canViewSavedReport(current, actor)) return fail(404, messagesOf(config, locale).notFound);
-        const record = await store.update(actor.clientId, id, toInput(input, current));
+        const record = await store.update(actor.clientId, id, toInput(input, current, config));
         return record ? ok(toSummary(record, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
       } catch (error) {
         if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);

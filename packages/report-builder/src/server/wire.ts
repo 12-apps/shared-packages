@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
 
 import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
+import { reportScheduleInput, reportScheduleView } from './schedule';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 import { reportWorkingCopySchema } from './working-copy';
 
@@ -87,6 +88,12 @@ export const saveReportBody = z.strictObject({
    * this body is written by MCP authors too.
    */
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullish(),
+  /**
+   * The e-mail delivery schedule (FUT-776). Omitted keeps the stored one on an
+   * update; explicit `null` removes it. The zone and the fortnight anchor are
+   * stamped by the server, never read from here.
+   */
+  schedule: reportScheduleInput.nullish(),
 });
 
 /** One row of a report result, keyed by output-column alias. */
@@ -324,6 +331,8 @@ const savedLifecycleFields = {
   visibilityRoles: z.array(z.string()),
   /** The period the report opens on; null when it has no preference. */
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullable(),
+  /** The delivery schedule, echoed ONLY to a caller who may author: it names people. */
+  schedule: reportScheduleView.nullish(),
   /**
    * The author's parked edit, echoed ONLY to a caller who may author (FUT-755).
    * The rest of the payload is always the PUBLISHED document — a reader opening

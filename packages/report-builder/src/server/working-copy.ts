@@ -5,6 +5,7 @@ import { reportDocumentSchema } from '../spec';
 import { withoutUnrecognizedKeys } from '../strip-unknown';
 
 import { REPORT_DEFAULT_RANGES } from './range';
+import { reportScheduleDraftInput } from './schedule';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 
 /**
@@ -50,6 +51,7 @@ export const reportWorkingCopySchema = z.strictObject({
   visibility: z.enum(REPORT_VISIBILITIES).optional(),
   visibilityRoles: z.array(z.string().min(1).max(64)).max(20).optional(),
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullish(),
+  schedule: reportScheduleDraftInput.nullish(),
 });
 
 export type ReportWorkingCopy = z.infer<typeof reportWorkingCopySchema>;
