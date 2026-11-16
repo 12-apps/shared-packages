@@ -22,20 +22,22 @@ export const HEAT_MAP_METRICS = {
   minCell: 32,
   compactMinCell: 28,
   /**
-   * The dense step (FUT-4063), taken only when neither regular nor compact fits
-   * and the grid would otherwise turn round at a computer width: the cell is
-   * as narrow as a figure can be and still read, the labels thin out. The
-   * floor is a 3-character figure ("54%", or "902" with the unit dropped) at
-   * `denseFontSize`, bold and tabular, about 16px in Chromium, plus a hair.
+   * The dense step (FUT-4063), taken only when a measured figure fits and the
+   * grid would otherwise turn round at a computer width: smaller type, thinner
+   * gaps and row labels. How narrow a cell may be is NOT a number here: it is
+   * the widest dense figure the host's `formatValueDense` makes, measured in
+   * the table's own font, plus `figureMargin`. Row labels longer than the
+   * 28px column are cut with an ellipsis (a 3-letter weekday fits).
    */
-  denseMinCell: 17,
   denseFontSize: 9,
-  denseLabelColumn: 32,
-  denseGap: 2,
+  denseLabelColumn: 28,
+  denseGap: 1,
+  /** Air a measured figure keeps inside its cell, both sides together (every step). */
+  figureMargin: 1,
+  /** Air between two column labels, so that they never touch. */
+  denseLabelGap: 3,
   /** The dense header row's height: its labels are placed, so they give it none. */
   denseHeaderHeight: 14,
-  /** In the dense step the column labels show every Nth one; the rest are read, not drawn. */
-  denseLabelEvery: 2,
   swatch: 12,
   swatchRadius: 3,
   /**

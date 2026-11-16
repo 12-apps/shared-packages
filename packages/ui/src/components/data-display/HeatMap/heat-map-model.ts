@@ -66,7 +66,11 @@ export interface HeatMapFitMetrics {
   spacingPx: number;
   minCellPx: number;
   compactMinCellPx: number;
-  /** The dense step's own widths; without `denseMinCellPx` there is no dense step. */
+  /**
+   * The dense step's own widths. `denseMinCellPx` is the MEASURED width of the
+   * widest figure the dense step would draw, plus its margin; without it there
+   * is no dense step (a host that gave no shorter figure never gets one).
+   */
   denseLabelPx?: number;
   denseSpacingPx?: number;
   denseMinCellPx?: number;
@@ -95,8 +99,9 @@ function needed(fit: HeatMapFit, rowCount: number, columnCount: number, m: HeatM
  * grid never clips a number and never scrolls sideways.
  *
  * Tried in order, in the preferred way round: the regular step, the compact
- * step, then (when the metrics name one) the dense step; only then the other
- * way round at the same steps. So a computer width keeps its weekdays as rows
+ * step, then (when the metrics name a measured one, and the grid is not
+ * transposed) the dense step; only then the other way round at the same steps.
+ * When nothing fits, the compact step of the preferred way round, as ever. So a computer width keeps its weekdays as rows
  * and its hours as columns for as long as the dense step can hold them, and a
  * phone container, too narrow even for that, turns round. `fixed` is true when
  * the host fixed the orientation (only the step can change then), else
@@ -119,13 +124,34 @@ export function heatMapFit(
     { compact: true, dense: false },
     ...(metrics.denseMinCellPx === undefined ? [] : [{ compact: true, dense: true }]),
   ];
-  const tries = ways.flatMap((transposed) => steps.map((step) => ({ transposed, ...step })));
+  // Dense is only for the weekdays-as-rows way round: it exists to keep that
+  // orientation at a computer width. A transposed grid (the phone) stays at
+  // regular or compact, as it always did.
+  const tries = ways.flatMap((transposed) =>
+    steps.filter((step) => !(step.dense && transposed)).map((step) => ({ transposed, ...step })),
+  );
   const fits = tries.find((attempt) => needed(attempt, rowCount, columnCount, metrics) <= width);
   return (
     fits ?? {
       transposed: fixed ? preferTransposed : rowCount <= columnCount,
       compact: true,
-      dense: metrics.denseMinCellPx !== undefined,
+      dense: false,
     }
   );
+}
+
+/**
+ * Every Nth column label to draw at the dense step: 1 while the widest label
+ * (plus `gapPx` of air) fits one column's pitch, else as many columns as it
+ * takes. Never by default: a label that fits is drawn.
+ */
+export function denseLabelEvery(
+  width: number,
+  columnCount: number,
+  metrics: { labelPx: number; spacingPx: number; labelTextPx: number; gapPx: number },
+): number {
+  if (columnCount <= 0 || width <= 0) return 1;
+  const pitch = (width - metrics.labelPx - metrics.spacingPx) / columnCount;
+  if (pitch <= 0) return 1;
+  return Math.max(1, Math.ceil((metrics.labelTextPx + metrics.gapPx) / pitch));
 }

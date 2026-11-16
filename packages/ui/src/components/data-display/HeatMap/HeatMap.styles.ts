@@ -65,6 +65,7 @@ export function rowHeaderSx(step: FigureStep) {
     textAlign: 'left',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
+    textOverflow: 'ellipsis',
   };
 }
 
