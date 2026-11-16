@@ -22,17 +22,16 @@ import type { ReportScreensCopy } from '../screens-copy';
 
 /** A host-shaped pack as released before this feature: none of the new keys, the three old ones present. */
 function legacyScreens(base: ReportScreensCopy): ReportScreensCopy {
-  const { schedule: _schedule, ...settings } = base.settings;
-  const { needsRecipient: _needs, ...editor } = base.editor;
   return {
     ...base,
     settings: {
-      ...settings,
+      ...base.settings,
+      schedule: undefined,
       scheduleLabel: 'Envio automático (antigo)',
       scheduleValue: 'ignorado',
       scheduleReason: 'ignorado',
     },
-    editor,
+    editor: { ...base.editor, needsRecipient: undefined },
   };
 }
 

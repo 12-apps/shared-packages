@@ -4,7 +4,7 @@
  * section only to stay under the size gate.
  */
 import { useEffect, type JSX } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { Button } from "@12-apps/ui/form/Button";
 import { Checkbox } from "@12-apps/ui/form/Checkbox";
@@ -91,6 +91,49 @@ function RecipientList({
   );
 }
 
+/** The loading, failed, empty and populated stories of the list. */
+function RecipientsBody({
+  query,
+  value,
+  onToggle,
+  testId,
+}: {
+  query: UseQueryResult<ScheduleRecipient[]>;
+  value: ScheduleDraft;
+  onToggle: (id: string, checked: boolean) => void;
+  testId: string;
+}): JSX.Element {
+  const copy = useReportCopy().screens.settings.schedule;
+  const people = query.data;
+  if (query.isPending) {
+    return (
+      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-loading`}>
+        {copy.recipientsLoading}
+      </Text>
+    );
+  }
+  if (query.isError || !people) {
+    return (
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Text variant="body" size="sm" color="danger" data-testid={`${testId}-recipients-error`}>
+          {copy.recipientsFailed}
+        </Text>
+        <Button variant="ghost" size="sm" onClick={() => void query.refetch()} dataTestId={`${testId}-recipients-retry`}>
+          {copy.retry}
+        </Button>
+      </Stack>
+    );
+  }
+  if (people.length === 0) {
+    return (
+      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-empty`}>
+        {copy.recipientsEmpty}
+      </Text>
+    );
+  }
+  return <RecipientList recipients={people} selected={value.recipients} onToggle={onToggle} testId={testId} />;
+}
+
 /** The people the host offers, with the loading and failure stories a list needs. */
 export function Recipients({
   value,
@@ -134,35 +177,9 @@ export function Recipients({
     onChange({ ...value, recipients: [...new Set(next)].filter((current) => allowed.has(current)) });
   };
 
-  let body: JSX.Element;
-  if (query.isPending) {
-    body = (
-      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-loading`}>
-        {copy.recipientsLoading}
-      </Text>
-    );
-  } else if (query.isError || !people) {
-    body = (
-      <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-        <Text variant="body" size="sm" color="danger" data-testid={`${testId}-recipients-error`}>
-          {copy.recipientsFailed}
-        </Text>
-        <Button variant="ghost" size="sm" onClick={() => void query.refetch()} dataTestId={`${testId}-recipients-retry`}>
-          {copy.retry}
-        </Button>
-      </Stack>
-    );
-  } else if (people.length === 0) {
-    body = (
-      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-empty`}>
-        {copy.recipientsEmpty}
-      </Text>
-    );
-  } else {
-    body = (
-      <RecipientList recipients={people} selected={value.recipients} onToggle={toggle} testId={testId} />
-    );
-  }
+  const body = (
+    <RecipientsBody query={query} value={value} onToggle={toggle} testId={testId} />
+  );
   const nobody = query.isSuccess && !value.recipients.some((id) => allowed.has(id)) && (people?.length ?? 0) > 0;
   return (
     <Field label={copy.recipientsLabel}>
