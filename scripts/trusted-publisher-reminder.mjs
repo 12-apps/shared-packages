@@ -49,9 +49,9 @@ export function commentBody(packages) {
   ].join("\n");
 }
 
-/** Create, update or (when `body` is null) delete the one marked comment. Never throws. */
-export async function syncComment({ body, repo, pr, token, api = "https://api.github.com", fetchImpl = fetch }) {
-  const call = (path, init = {}) =>
+/** One GitHub issues-API call for the PR's comments. */
+function issuesApi({ api, repo, token, fetchImpl }) {
+  return (path, init = {}) =>
     fetchImpl(`${api}/repos/${repo}/issues${path}`, {
       ...init,
       headers: {
@@ -60,21 +60,31 @@ export async function syncComment({ body, repo, pr, token, api = "https://api.gi
         "content-type": "application/json",
       },
     });
+}
+
+/** What a write answered, as one line: `done` when it worked, else `refused (status)`. */
+const said = (response, done, refused) => (response.ok ? done : `${refused} (${response.status})`);
+
+/** The write that brings the marked comment `mine` (or none) to `body` (null: no comment). */
+async function writeComment(call, pr, mine, body) {
+  if (!mine && body === null) return "no comment";
+  if (!mine) {
+    return said(await call(`/${pr}/comments`, { method: "POST", body: JSON.stringify({ body }) }), "comment created", "comment refused");
+  }
+  if (body === null) {
+    return said(await call(`/comments/${mine.id}`, { method: "DELETE" }), "stale comment removed", "comment not removed");
+  }
+  return said(await call(`/comments/${mine.id}`, { method: "PATCH", body: JSON.stringify({ body }) }), "comment updated", "comment refused");
+}
+
+/** Create, update or (when `body` is null) delete the one marked comment. Never throws. */
+export async function syncComment({ body, repo, pr, token, api = "https://api.github.com", fetchImpl = fetch }) {
+  const call = issuesApi({ api, repo, token, fetchImpl });
   try {
     const list = await call(`/${pr}/comments?per_page=100`);
     if (!list.ok) return `could not list comments (${list.status})`;
     const mine = (await list.json()).find((c) => `${c.body ?? ""}`.includes(MARKER));
-    if (!mine && body === null) return "no comment";
-    if (!mine) {
-      const made = await call(`/${pr}/comments`, { method: "POST", body: JSON.stringify({ body }) });
-      return made.ok ? "comment created" : `comment refused (${made.status})`;
-    }
-    if (body === null) {
-      const gone = await call(`/comments/${mine.id}`, { method: "DELETE" });
-      return gone.ok ? "stale comment removed" : `comment not removed (${gone.status})`;
-    }
-    const edited = await call(`/comments/${mine.id}`, { method: "PATCH", body: JSON.stringify({ body }) });
-    return edited.ok ? "comment updated" : `comment refused (${edited.status})`;
+    return await writeComment(call, pr, mine, body);
   } catch (error) {
     return `comment skipped (${error.message})`;
   }
@@ -90,6 +100,25 @@ function baseDirsFrom(argv) {
   return shown.status === 0 ? parseDirs(shown.stdout) : null;
 }
 
+/** The sticky comment's outcome, or "" where this run cannot comment (no token, repository or PR). */
+async function commentOutcome(packages) {
+  const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, PR_NUMBER: pr, GITHUB_API_URL: api } = process.env;
+  if (!token || !repo || !pr) return "";
+  return syncComment({ body: packages.length > 0 ? commentBody(packages) : null, repo, pr, token, api });
+}
+
+/** The annotations and the step summary for the packages found. */
+function report(packages, outcome) {
+  for (const { name, dir } of packages) {
+    console.log(
+      `::warning title=Trusted Publisher needed::${name} (${dir}) is new in this PR. Register its Trusted Publisher on npmjs.com after the first publish: GitHub Actions, 12-apps/shared-packages, cd.yml.`,
+    );
+  }
+  if (outcome) console.log(`trusted-publisher-reminder: ${outcome}`);
+  const summary = process.env.GITHUB_STEP_SUMMARY;
+  if (summary) appendFileSync(summary, `${commentBody(packages).replace(MARKER, "").trimStart()}\n`);
+}
+
 async function main(argv) {
   const baseDirs = baseDirsFrom(argv);
   if (baseDirs === null) {
@@ -101,32 +130,8 @@ async function main(argv) {
     headDirs: declaredDirs(),
     existsOnRegistry: argv.includes("--offline") ? null : onRegistry,
   });
-
-  const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, PR_NUMBER: pr, GITHUB_STEP_SUMMARY: summary } = process.env;
-  const canComment = Boolean(token && repo && pr);
-  const outcome = canComment
-    ? await syncComment({
-        body: packages.length > 0 ? commentBody(packages) : null,
-        repo,
-        pr,
-        token,
-        api: process.env.GITHUB_API_URL ?? undefined,
-      })
-    : "";
-
-  if (packages.length === 0) return;
-  for (const { name, dir } of packages) {
-    console.log(
-      `::warning title=Trusted Publisher needed::${name} (${dir}) is new in this PR. Register its Trusted Publisher on npmjs.com after the first publish: GitHub Actions, 12-apps/shared-packages, cd.yml.`,
-    );
-  }
-  if (outcome) console.log(`trusted-publisher-reminder: ${outcome}`);
-  if (summary) {
-    appendFileSync(
-      summary,
-      `${commentBody(packages).replace(MARKER, "").trimStart()}\n`,
-    );
-  }
+  const outcome = await commentOutcome(packages);
+  if (packages.length > 0) report(packages, outcome);
 }
 
 // Never a gate: whatever goes wrong, the PR stays green.
