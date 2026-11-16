@@ -27,11 +27,32 @@ const ACCOUNT_HEADERS = [
 /** The SDKs' "extra headers" variables, as `Name: value` lines. */
 const CUSTOM_HEADER_VARIABLES = ["OPENAI_CUSTOM_HEADERS", "ANTHROPIC_CUSTOM_HEADERS"] as const;
 
-function platformHeaderNames(): string[] {
-  const lines = CUSTOM_HEADER_VARIABLES.flatMap((variable) =>
-    (typeof process === "undefined" ? "" : (process.env[variable] ?? "")).split(/\r?\n/),
-  );
-  return lines.map((line) => (line.split(":")[0] ?? "").trim().toLowerCase()).filter((name) => name.length > 0);
+/** The header a custom-headers line names, with its value; the SDKs skip a line with no colon. */
+function parseCustomHeaders(): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  for (const variable of CUSTOM_HEADER_VARIABLES) {
+    const text = typeof process === "undefined" ? "" : (process.env[variable] ?? "");
+    for (const line of text.split(/\r?\n/)) {
+      const colon = line.indexOf(":");
+      if (colon < 0) continue;
+      const name = line.slice(0, colon).trim().toLowerCase();
+      const value = line.slice(colon + 1).trim();
+      try {
+        new Headers().set(name, value);
+      } catch {
+        continue; // a name or value `Headers` rejects was never sent either
+      }
+      pairs.push([name, value]);
+    }
+  }
+  return pairs;
+}
+
+/** Drop the platform's custom headers, but never one the adapter set itself with another value. */
+function dropPlatformHeaders(headers: Headers): void {
+  for (const [name, value] of parseCustomHeaders()) {
+    if (headers.get(name) === value) headers.delete(name);
+  }
 }
 
 export interface SealOptions {
@@ -58,7 +79,8 @@ export function sealedFetch(options: SealOptions): typeof globalThis.fetch {
       throw new InvalidRequestError(options.provider, `Refused a request outside the adapter's base URL (${base.origin}${base.pathname}).`);
     }
     const headers = new Headers(outgoing.headers);
-    for (const name of [...ACCOUNT_HEADERS, ...platformHeaderNames()]) headers.delete(name);
+    for (const name of ACCOUNT_HEADERS) headers.delete(name);
+    dropPlatformHeaders(headers);
     for (const [name, value] of Object.entries(options.auth)) headers.set(name, value);
     const body = outgoing.method === "GET" || outgoing.method === "HEAD" ? undefined : await outgoing.arrayBuffer();
     return send(outgoing.url, { method: outgoing.method, headers, body, signal: outgoing.signal, redirect: outgoing.redirect });

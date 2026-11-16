@@ -75,7 +75,7 @@ result.message;     // the turn as a message, ready to append to the conversatio
 
 Every provider's strict mode guarantees the model's arguments validate against
 the schema, but each provider accepts a slightly different subset of JSON
-Schema. The client accepts only schemas inside the subset all three share, and
+Schema. The client accepts only schemas inside the subset all four share, and
 refuses any other schema with an `InvalidRequestError` before any call:
 
 - the root is `type: "object"`;
@@ -91,12 +91,12 @@ refuses any other schema with an `InvalidRequestError` before any call:
 the cache, so the four counters add up to everything billed and each can be
 priced at its own rate. `raw` is the provider's own usage object.
 
-| | Anthropic | OpenAI | Gemini |
-|---|---|---|---|
-| `inputTokens` | `input_tokens` | `prompt_tokens` − cached − cache writes | `promptTokenCount` (+ tool-use prompt) − cached |
-| `cacheCreationTokens` | `cache_creation_input_tokens` | `cache_write_tokens` | 0 |
-| `cacheReadTokens` | `cache_read_input_tokens` | `cached_tokens` | `cachedContentTokenCount` |
-| `outputTokens` | `output_tokens` | `completion_tokens` | `candidatesTokenCount` + `thoughtsTokenCount` |
+| | Anthropic | OpenAI | Gemini | xAI |
+|---|---|---|---|---|
+| `inputTokens` | `input_tokens` | `prompt_tokens` − cached − cache writes | `promptTokenCount` (+ tool-use prompt) − cached | same as OpenAI |
+| `cacheCreationTokens` | `cache_creation_input_tokens` | `cache_write_tokens` | 0 | same as OpenAI |
+| `cacheReadTokens` | `cache_read_input_tokens` | `cached_tokens` | `cachedContentTokenCount` | same as OpenAI |
+| `outputTokens` | `output_tokens` | `completion_tokens` | `candidatesTokenCount` + `thoughtsTokenCount` | same as OpenAI |
 
 ### Prompt caching per provider
 

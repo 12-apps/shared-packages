@@ -15,10 +15,12 @@ export {
   ANTHROPIC_PROVIDER,
   GEMINI_PROVIDER,
   OPENAI_PROVIDER,
+  XAI_PROVIDER,
   anthropicAdapter,
   builtInAdapters,
   geminiAdapter,
   openaiAdapter,
+  xaiAdapter,
 } from "./adapters";
 export type {
   AnthropicAdapterOptions,
@@ -27,6 +29,7 @@ export type {
   GeminiClientLike,
   OpenAIAdapterOptions,
   OpenAIClientLike,
+  XaiAdapterOptions,
 } from "./adapters";
 export type { ModelClient, ModelClientOptions, RetryPolicy } from "./client";
 export { createModelClient, retryTransient } from "./client";

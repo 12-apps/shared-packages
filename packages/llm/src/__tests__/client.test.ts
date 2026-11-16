@@ -174,6 +174,28 @@ describe("credentials", () => {
     expect(refresh).toHaveBeenCalledTimes(2);
   });
 
+  it("stamps a token with the generation seen BEFORE a slow token() read (B1)", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reads = 0;
+    const token = vi.fn(async () => {
+      reads += 1;
+      if (reads === 2) await gate;
+      return { accessToken: "old" };
+    });
+    const refresh = vi.fn(async () => ({ accessToken: "renewed" }));
+    const session = createCredentialSession({ kind: "oauth", token, refresh });
+    const first = await session.current();
+    const slow = session.current(); // reads before the refresh, resolves after it
+    await session.afterUnauthorized(first);
+    release();
+    const stale = await slow;
+    expect((await session.afterUnauthorized(stale))?.secret).toBe("renewed");
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("lets the next call refresh again after a refresh failed (B1)", async () => {
     const refresh = vi.fn().mockRejectedValueOnce(new Error("idp down")).mockResolvedValueOnce({ accessToken: "fresh" });
     const session = createCredentialSession({ kind: "oauth", token: () => ({ accessToken: "old" }), refresh });

@@ -268,3 +268,40 @@ describe("a store's own key reaches its provider alone (B3)", () => {
     expect(seen).toHaveLength(0);
   });
 });
+
+describe("custom-header variables (R1, R2)", () => {
+  const MALFORMED = "X-Tenant: platform\nnote without a colon";
+  const cases = [
+    { provider: "openai", adapter: (fetch: typeof globalThis.fetch) => openaiAdapter({ fetch }), reply: openaiCalls, model: "gpt-fixture-1" },
+    { provider: "xai", adapter: (fetch: typeof globalThis.fetch) => xaiAdapter({ fetch }), reply: openaiCalls, model: "grok-fixture-1" },
+    { provider: "anthropic", adapter: (fetch: typeof globalThis.fetch) => anthropicAdapter({ fetch }), reply: anthropicEnd, model: undefined },
+    { provider: "gemini", adapter: (fetch: typeof globalThis.fetch) => geminiAdapter({ fetch }), reply: geminiCall, model: "gemini-fixture-1" },
+  ];
+  for (const { provider, adapter, reply, model } of cases) {
+    it(`${provider}: a line without a colon never throws, and its named header is still dropped (R1)`, async () => {
+      vi.stubEnv("OPENAI_CUSTOM_HEADERS", MALFORMED);
+      vi.stubEnv("ANTHROPIC_CUSTOM_HEADERS", MALFORMED);
+      const { fetch, seen } = recordingFetch(reply);
+      const client = createModelClient({
+        provider,
+        model,
+        credentials: { kind: "apiKey", apiKey: "store-own" },
+        registry: createAdapterRegistry([adapter(fetch)]),
+      });
+      await client.chat(sampleRequest());
+      expect(only(seen).headers.get("x-tenant")).toBeNull();
+    });
+  }
+
+  it("anthropic OAuth keeps its own anthropic-beta when the environment names that header (R2)", async () => {
+    vi.stubEnv("ANTHROPIC_CUSTOM_HEADERS", "anthropic-beta: platform-beta");
+    const { fetch, seen } = recordingFetch(anthropicEnd);
+    const client = createModelClient({
+      provider: "anthropic",
+      credentials: { kind: "oauth", token: () => ({ accessToken: "store-oauth" }), refresh: () => ({ accessToken: "x" }) },
+      registry: createAdapterRegistry([anthropicAdapter({ fetch })]),
+    });
+    await client.chat(sampleRequest());
+    expect(only(seen).headers.get("anthropic-beta")).toBe("oauth-2025-04-20");
+  });
+});

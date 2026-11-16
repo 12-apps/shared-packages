@@ -82,6 +82,7 @@ async function defaultClient(credential: ResolvedCredential, options: OpenAIComp
     apiKey: credential.secret,
     organization: null,
     project: null,
+    adminAPIKey: null,
     baseURL,
     fetch: sealedFetch({ provider: options.id, baseURL, auth: { authorization: `Bearer ${credential.secret}` }, fetch: options.fetch }),
     maxRetries: 0,

@@ -149,10 +149,11 @@ export function createCredentialSession(
     kind: "oauth",
     async current() {
       if (inFlight) return inFlight;
+      const of = generation; // before the await: a refresh that lands meanwhile makes this token older
       const token = await oauth.token();
       const expiring = token.expiresAt !== undefined && token.expiresAt - now() <= skew;
       if (expiring) return refresh("expiring");
-      return stamped(nonEmpty(token.accessToken, "OAuth token provider"), generation);
+      return stamped(nonEmpty(token.accessToken, "OAuth token provider"), of);
     },
     afterUnauthorized(used) {
       if (inFlight) return inFlight;

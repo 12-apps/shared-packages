@@ -29,7 +29,7 @@ export interface ModelClientOptions {
   model?: string;
   credentials: Credentials;
   retry?: RetryPolicy;
-  /** Where to find adapters. Defaults to a registry of the built-in three. */
+  /** Where to find adapters. Defaults to a registry of the built-in four. */
   registry?: AdapterRegistry;
   /** Test seams. */
   sleep?: (ms: number) => Promise<void>;

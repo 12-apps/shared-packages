@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "A provider-agnostic model connector. One interface for a chat turn with tools (system blocks with cache breakpoints, strict JSON-schema tools, tool choice, output budget, effort hint) and one normalized result (text, tool calls, stop reason, usage with cache tokens). An abstract factory picks an adapter by provider id from a registry the host can extend; Anthropic, OpenAI and Gemini adapters ship over each provider's official SDK, loaded only when used. Credentials are a strategy: an API key or an OAuth access token with a host-supplied refresh. A tool-use loop reports every turn's usage. Typed errors and one host retry hook.",
+  "description": "A provider-agnostic model connector. One interface for a chat turn with tools (system blocks with cache breakpoints, strict JSON-schema tools, tool choice, output budget, effort hint) and one normalized result (text, tool calls, stop reason, usage with cache tokens). An abstract factory picks an adapter by provider id from a registry the host can extend; Anthropic, OpenAI, Gemini and xAI adapters ship over each provider's official SDK, loaded only when used. Credentials are a strategy: an API key or an OAuth access token with a host-supplied refresh. A tool-use loop reports every turn's usage. Typed errors and one host retry hook.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
