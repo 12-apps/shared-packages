@@ -1,3 +1,4 @@
+import { assertSafeUnsubscribe } from './escape';
 import type { EmailDocument } from './template';
 
 /**
@@ -32,6 +33,7 @@ export function renderEmailText(document: EmailDocument): string {
     ...textFacts(document),
     ...textAction(document),
     ...textNotes(document),
+    ...textUnsubscribe(document),
     "--",
     document.chrome.tagline(document.brand),
     document.chrome.automated,
@@ -60,3 +62,11 @@ function textNotes(document: EmailDocument): string[] {
   return notes.length === 0 ? [] : [...notes, ""];
 }
 
+
+/** The opt-out: the reason, when there is one, then label and URL; the same refusal as the html. */
+function textUnsubscribe(document: EmailDocument): string[] {
+  const link = document.unsubscribe;
+  if (!link) return [];
+  assertSafeUnsubscribe(link);
+  return [...(link.reason ? [link.reason] : []), `${link.label}: ${link.href}`, ""];
+}

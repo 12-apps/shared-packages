@@ -2,7 +2,6 @@ import { InvalidInputError, ReportBuilderError, type InputProblem } from '../err
 import type { ReportEngineCopy } from '../copy';
 import type { ReportSpec } from '../spec';
 import type { FieldCatalog, ReportDataSource } from '../types';
-
 import type { ReportWindow } from './adapter-shared';
 import { DEFAULT_AUTHOR_PERMISSION } from './contribution';
 import { REPORT_RUN_MAX_ROWS } from './policy';
@@ -10,6 +9,7 @@ import type { ReportServerMessages } from './messages';
 import type { SystemReportDef } from './system-reports';
 import { rangeFromQuery, resolveReportRange, type ResolvedReportRange, toReportRangeView } from './range';
 import type { SavedReportDb } from './saved';
+import type { ScheduleZoneConfig } from './schedule-zone';
 
 /**
  * What every route in this surface shares: the actor, the request, the
@@ -116,7 +116,7 @@ export type ReportAdapterFactory = (context: {
   window: ReportWindow;
 }) => ReportDataSource | Promise<ReportDataSource>;
 
-export interface ReportBuilderServerConfig {
+export interface ReportBuilderServerConfig extends ScheduleZoneConfig {
   /**
    * Every sentence this API answers with. REQUIRED: the routes used to carry
    * their own pt-BR, which made the origin host's Portuguese the silent default
