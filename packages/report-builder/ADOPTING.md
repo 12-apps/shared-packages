@@ -20,22 +20,34 @@ kind.
 
 ## Scheduled e-mail delivery of a saved report (FUT-776, minor)
 
-This package keeps the schedule and draws the control; **the host sends the e-mail**. Nothing changes for a
-host that does nothing except run the migration: the old "Em breve" row is gone and the control stays hidden
-until the host passes `surface.schedule`.
+This package keeps the schedule and draws the control; **the host sends the e-mail**. The change is not
+breaking: a host that does nothing except run the migration keeps compiling. The old "Em breve" row is gone and
+the control stays hidden until the host passes `surface.schedule`. The new copy keys (`screens.settings.schedule`,
+`screens.editor.needsRecipient`) are OPTIONAL: a pack without them gets the package's own words, Portuguese when
+its engine pack's `spec.locale` starts with `pt`, English otherwise. Pass them to word the section yourself. The
+three old keys (`scheduleLabel`, `scheduleValue`, `scheduleReason`) are still accepted, deprecated and ignored.
 
 | Piece | What it is |
 |---|---|
-| Column | `saved_reports.schedule` (nullable `jsonb`, migration `20261116120000_add_report_schedule`). Run `prisma:sync` and let the host's migration sync pick it up. |
-| Wire | `schedule` on the save body, on the working copy, and echoed on a saved view **to authors only** (it names people). Omitted keeps the stored one, `null` removes it. The server stamps `timeZone` (from `config.timeZone`) and `startsOn` (the date fortnights count from; kept while the cadence and weekday do not change). A client cannot send either. |
+| Column | `saved_reports.schedule` (nullable `jsonb`, migration `20261116120000_add_report_schedule`). Run `prisma:sync` and let the host's migration sync pick it up; run the migration BEFORE the rollout, the new code selects the column. |
+| Wire | `schedule` on the save body, on the working copy, and echoed on a saved view **to authors only** (it names people). Omitted: nothing is written (a stored schedule is never erased by an unrelated save); `null` removes it. The server stamps `timeZone` (from `config.timeZone`) and `startsOn`; a client cannot send either. |
 | Shape | `{ enabled, cadence: 'daily' \| 'weekly' \| 'biweekly' \| 'monthly', weekday? (0 Sunday), dayOfMonth?, time: 'HH:MM', timeZone, recipients: string[] (host user ids, at most 50), startsOn }`. An enabled schedule needs a recipient. |
-| Reading it | `readSchedule(record.schedule)` from `/server` answers a `ReportSchedule` or `null` for anything a job could not fully understand. A job must treat `null` as "do not send". |
-| Next run | `nextOccurrences(schedule, after, count)` and `occurrenceKey(schedule, occurrence)` from the root export. Pure. Wall clock in the schedule's zone; a skipped hour fires just after the gap, a repeated hour fires once at the first; Quinzenal counts every other week from `startsOn`; Mensal on the 29th to 31st fires on the last day of a shorter month. `occurrenceKey` (`YYYY-MM-DDTHH:MM`) is the idempotency key per (report, occurrence). |
-| Control | Pass `surface.schedule = { recipients({ tenantSlug, entities }) }` where each person is `{ id, name, detail?, canReceive, reason?, preselected? }`. The HOST decides `canReceive` from the entities the report reads; the package only renders a refused person disabled with the reason. Set `lockedReason` (a sentence in your words) to show the control locked, for a plan that excludes it. The package never gates a plan. |
+| Reading it | `readSchedule(record.schedule)` from `/server` answers a `ReportSchedule` or `null` for anything a job could not fully understand. A job treats `null` as "do not send". Read `schedule.timeZone` from the row, not the store's current zone: a store that changes zone keeps its schedule on the old clock until its author saves it again. |
+| Next run | `nextOccurrences(schedule, after, count)` from the root export. Pure. Wall clock in the schedule's zone; a skipped hour fires once, shifted forward by the length of the gap (02:30 on a night that jumps 02:00 to 03:00 fires at 03:30); a repeated hour fires once at the first. Mensal on the 29th to 31st fires on the last day of a shorter month. |
+| Quinzenal | Every other week from the FIRST send: `startsOn` is set to the date of the next matching weekday at the chosen time (saved on Monday before the time: today; after it: in 7 days), then every 14 days. It is kept while the same fortnight continues (still on, same weekday) and set again when the schedule is switched back on after being off. |
+| Idempotency | `occurrenceKey(schedule, occurrence)` (`YYYY-MM-DDTHH:MM`) names a firing by the wall clock the person chose. Combine it with the report id. Editing the time on the same day yields a second key for that day: the job should compare against what it already sent for that report and date. |
+| Control | Pass `surface.schedule = { recipients({ tenantSlug, entities }), lockedReason?, timeZoneLabel? }`. Each person is `{ id, name, detail?, canReceive, reason?, preselected? }`. The HOST decides `canReceive` from the entities the report reads; the package renders a refused person disabled with the reason. `lockedReason` shows the control locked. `timeZoneLabel` is the whole phrase for the store's clock; absent, the platform's name for the zone is used, never the IANA id. |
 
-What the package does **not** do: send, render a PDF, check who may receive at send time (re-check it in the
-job: a person's access can change after they were ticked), or stop the schedule when a report is archived or
-deleted. Those are the host's.
+What the package does **not** do, and the host must:
+
+- **Gate the plan on the server.** `lockedReason` only hides the control; the routes accept `schedule` on any plan.
+  Refuse the write in your middleware when the plan lacks the feature, and re-check the plan at send time. A locked
+  store cannot switch an existing schedule off from the dialog, so do that on the host side too.
+- **Re-check each recipient's access at send time.** A person's access can change after they were ticked; the
+  picker only unticks people the host refuses the next time the list is edited.
+- **Not forward `schedule` blindly from MCP.** `saveReportBody` is also the MCP author's body, so it now accepts
+  `schedule` (any recipient id, any plan). Apply the same plan and recipient checks to that tool.
+- Send, render a PDF, and stop the schedule when a report is archived or deleted.
 
 ## Next minor — neutral choices, a period label per surface, null ratios (FUT-4063)
 
