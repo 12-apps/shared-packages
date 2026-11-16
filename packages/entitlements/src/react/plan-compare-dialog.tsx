@@ -124,6 +124,35 @@ function AllPlansLink({
   );
 }
 
+/** The one ask: for the offered tier, then the all-plans link. */
+function SingleAskFooter({
+  offer,
+  feature,
+  config,
+  onClose,
+}: {
+  offer: CompareOffer;
+  feature: string | undefined;
+  config: ResolvedWebConfig;
+  onClose: () => void;
+}): JSX.Element {
+  const offered = offer.tier;
+  const requiredPlan = offered?.key ?? null;
+  const target = feature === undefined ? { requiredPlan } : { requiredPlan, feature };
+  return (
+    <Stack spacing={1} sx={{ width: '100%' }} data-testid="plan-compare-footer">
+      {offer.covered ? (
+        <Text as="div" data-testid="plan-compare-already-included">
+          {config.copy.planCompare.alreadyIncluded}
+        </Text>
+      ) : null}
+      <PlanPitchLine planName={offered?.name ?? null} config={config} />
+      <UpgradeCta target={target} planName={offered?.name ?? null} config={config} />
+      <AllPlansLink config={config} onClose={onClose} />
+    </Stack>
+  );
+}
+
 function CompareFooter({
   offer,
   each,
@@ -147,21 +176,7 @@ function CompareFooter({
       />
     );
   }
-  const offered = offer.tier;
-  const requiredPlan = offered?.key ?? null;
-  const target = feature === undefined ? { requiredPlan } : { requiredPlan, feature };
-  return (
-    <Stack spacing={1} sx={{ width: '100%' }} data-testid="plan-compare-footer">
-      {offer.covered ? (
-        <Text as="div" data-testid="plan-compare-already-included">
-          {config.copy.planCompare.alreadyIncluded}
-        </Text>
-      ) : null}
-      <PlanPitchLine planName={offered?.name ?? null} config={config} />
-      <UpgradeCta target={target} planName={offered?.name ?? null} config={config} />
-      <AllPlansLink config={config} onClose={onClose} />
-    </Stack>
-  );
+  return <SingleAskFooter offer={offer} feature={feature} config={config} onClose={onClose} />;
 }
 
 /** The matrix rows: the screen's own, or the payload's lines it named by key. */

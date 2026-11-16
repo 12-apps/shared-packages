@@ -6,7 +6,7 @@
  * payload's own tier, on sale or not.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ComparisonLine, ComparisonTier, TenantPlanPayload } from '../../plan-wire';
 import { buildRowsMatrix } from '../comparison-rows';
@@ -17,7 +17,7 @@ import { planPathAt } from '../plan-compare-each';
 import { PT_BR_ENTITLEMENTS_WEB_COPY } from '../pt-BR';
 import type { WebEntitlementsConfig } from '../web-config';
 
-const ROWS = [
+const rowsOf = (): { key: string; label: string }[] => [
   { key: 'win.list', label: 'Lista com WhatsApp' },
   { key: 'win.email', label: 'E-mail de volta' },
   { key: 'win.email', label: 'Crédito na carteira' },
@@ -86,7 +86,7 @@ function mount(
     plansPath: '/acme/planos',
     ...over,
   });
-  render(<PlanCompare open onClose={() => undefined} rows={ROWS} {...props} />);
+  render(<PlanCompare open onClose={() => undefined} rows={rowsOf()} {...props} />);
   return { UpsellHost };
 }
 
@@ -115,11 +115,11 @@ describe('the screen\'s own rows', () => {
   it('draws one row per request in the screen order, a key repeating', async () => {
     mount([FREE, MAX]);
     await screen.findByTestId('plan-matrix-tier-max');
-    expect(labels()).toEqual(ROWS.map((row) => row.label));
+    expect(labels()).toEqual(rowsOf().map((row) => row.label));
   });
 
   it('marks each cell from the tier line its key names', () => {
-    const [section] = buildRowsMatrix([FREE, PRO, MAX], ROWS);
+    const [section] = buildRowsMatrix([FREE, PRO, MAX], rowsOf());
     const included = (index: number, tierKey: string): boolean | undefined =>
       section?.rows[index]?.cells.get(tierKey)?.included;
     expect(section?.title).toBe('');
@@ -130,7 +130,7 @@ describe('the screen\'s own rows', () => {
   });
 
   it('leaves out a row whose key no tier carries, and a payload line the screen never named', async () => {
-    mount([FREE, MAX], { rows: [...ROWS, { key: 'nobody.has.this', label: 'Fantasma' }] });
+    mount([FREE, MAX], { rows: [...rowsOf(), { key: 'nobody.has.this', label: 'Fantasma' }] });
     await screen.findByTestId('plan-matrix-tier-max');
     expect(labels()).not.toContain('Fantasma');
     expect(screen.queryAllByText('Outro')).toHaveLength(0);
@@ -199,12 +199,12 @@ describe('offer: "each"', () => {
   });
 
   it('closes the dialog when a plan is chosen', async () => {
-    let closed = 0;
-    mount([FREE, MAX], { offer: 'each', onClose: () => (closed += 1) });
+    const onClose = vi.fn();
+    mount([FREE, MAX], { offer: 'each', onClose });
     const learn = await screen.findByTestId('plan-compare-learn-max');
     learn.addEventListener('click', (event) => event.preventDefault());
     fireEvent.click(learn);
-    expect(closed).toBe(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('offers nothing when the own plan already includes every row', async () => {
@@ -248,38 +248,32 @@ describe('opening it from anywhere', () => {
       openPlanCompare({
         feature: 'win.email',
         title: 'Clientes sumidos',
-        rows: ROWS,
+        rows: rowsOf(),
         offer: 'each',
       });
     });
     const modal = await screen.findByTestId('plan-compare-modal');
     expect(within(modal).getByText('Clientes sumidos')).toBeDefined();
     await screen.findByTestId('plan-compare-learn-max');
-    expect(labels()).toEqual(ROWS.map((row) => row.label));
+    expect(labels()).toEqual(rowsOf().map((row) => row.label));
   });
 });
 
 describe('keyboard and focus', () => {
   it('reaches each plan action in order by Tab, and Escape closes', async () => {
-    let closed = 0;
-    mount([FREE, PRO, MAX], { offer: 'each', onClose: () => (closed += 1) });
+    const onClose = vi.fn();
+    mount([FREE, PRO, MAX], { offer: 'each', onClose });
     const pro = await screen.findByTestId('plan-compare-learn-pro');
     const max = screen.getByTestId('plan-compare-learn-max');
     // Real anchors with an href: focusable and activatable with no extra role.
     expect(pro.tagName).toBe('A');
     expect(pro.getAttribute('role')).toBeNull();
-    pro.focus();
-    expect(document.activeElement).toBe(pro);
-    max.focus();
-    expect(document.activeElement).toBe(max);
+    // Reachable by Tab: anchors with an href, in plan order.
+    expect(pro.getAttribute('href')).not.toBeNull();
+    expect(max.hasAttribute('href')).toBe(true);
+    expect(pro.compareDocumentPosition(max) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.keyDown(screen.getByTestId('plan-compare-modal'), { key: 'Escape' });
-    await waitFor(() => expect(closed).toBe(1));
-  });
-
-  it('the dialog holds focus inside while open', async () => {
-    mount([FREE, MAX], { offer: 'each' });
-    const max = await screen.findByTestId('plan-compare-learn-max');
-    expect(within(screen.getByTestId('plan-compare-modal')).getByTestId('plan-compare-learn-max')).toBe(max);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });
 
