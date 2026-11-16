@@ -15,8 +15,8 @@ import type { ChargeSnapshot, MerchantRef, Money } from '../core/types';
 
 const TENANT: MerchantRef = { kind: 'TENANT', id: 'acme' };
 const BRL = (amountCents: number): Money => ({ amountCents, currency: 'BRL' });
-const LATER = new Date(Date.now() + 3_600_000).toISOString();
-const EARLIER = new Date(Date.now() - 3_600_000).toISOString();
+const LATER = '2999-01-01T00:00:00.000Z';
+const EARLIER = '2000-01-01T00:00:00.000Z';
 
 function snap(id: string, over: Partial<ChargeSnapshot> = {}): ChargeSnapshot {
   return {
