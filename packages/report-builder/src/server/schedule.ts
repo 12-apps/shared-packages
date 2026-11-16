@@ -66,7 +66,7 @@ const storedSchedule = z.strictObject({
 });
 
 /** The wire shape echoed to an author — the stored one. */
-export const reportScheduleView = storedSchedule;
+const reportScheduleView = storedSchedule;
 
 /** Spread into the save body: omitted keeps the stored schedule, `null` removes it. */
 export const scheduleBodyFields = { schedule: reportScheduleInput.nullish() } as const;

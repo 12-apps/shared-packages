@@ -122,7 +122,7 @@ function daysInMonth({ year, month }: Civil): number {
 }
 
 /** Whether `YYYY-MM-DD` names a real calendar day. */
-export function isValidCivilDate(value: string): boolean {
+function isValidCivilDate(value: string): boolean {
   if (!SCHEDULE_DATE_PATTERN.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number) as [number, number, number];
   const date = new Date(Date.UTC(year, month - 1, day));

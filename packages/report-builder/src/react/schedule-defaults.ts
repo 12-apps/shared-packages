@@ -4,7 +4,7 @@ import { PT_BR_REPORT_SCHEDULE_COPY } from "./pt-BR.schedule";
 import type { ReportScheduleCopy, ResolvedScreensCopy } from "./schedule-copy";
 
 /** The package's own delivery words for a pack's locale: Portuguese for `pt*`, English otherwise. */
-export function defaultScheduleCopy(locale: string): ReportScheduleCopy {
+function defaultScheduleCopy(locale: string): ReportScheduleCopy {
   return locale.toLowerCase().startsWith("pt") ? PT_BR_REPORT_SCHEDULE_COPY : EN_US_REPORT_SCHEDULE_COPY;
 }
 
