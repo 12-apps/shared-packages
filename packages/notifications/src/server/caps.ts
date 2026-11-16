@@ -198,7 +198,7 @@ async function admit(
  * soon as the seam answers — the mount itself is synchronous, so it cannot wait.
  */
 export function checkCountersSeam(db: NotificationsDbProvider, logger: NotificationLogger): void {
-  db().then(
+  Promise.resolve().then(db).then(
     (client) => {
       if (!client.notificationSendCounter) {
         logger.error(

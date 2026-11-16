@@ -94,6 +94,9 @@ gets a `notificationsConfirmation` query parameter, Meta's message a
 `confirmationOfWhatsAppStatus(status.biz_opaque_callback_data)`). Such a receipt
 answers `{ applied: false, reason: 'not-tracked' }`, which is FINAL: do not
 retry it. A permanent failure on it still drops a grandfathering.
+Verify Twilio's signature against the FULL URL Twilio called, query string
+included — a check against the bare `statusCallbackUrl` rejects every tagged
+confirmation callback.
 
 ## Paid channels: consent, opt-out and caps (all opt-in)
 
