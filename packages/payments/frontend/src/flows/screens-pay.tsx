@@ -19,7 +19,7 @@ import {
   useResolvedConfig,
   type FlowsRuntime,
 } from "./runtime";
-import type { CheckoutScreens } from "./types";
+import type { CheckoutScreens, PaymentStatusScreenProps } from "./types";
 
 function buildCardEntry(runtime: FlowsRuntime): CheckoutScreens["CardEntry"] {
   function CardEntryBody({
@@ -73,13 +73,7 @@ function buildPixPayment(runtime: FlowsRuntime): CheckoutScreens["PixPayment"] {
 }
 
 function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStatus"] {
-  return function PaymentStatus({
-    status,
-    payable,
-  }: {
-    status: OrderStatus | null;
-    payable?: CheckoutOrder | null;
-  }) {
+  return function PaymentStatus({ status, payable, ...money }: PaymentStatusScreenProps) {
     // The SAME door the chrome's back link takes (FUT-1240). Bound straight to
     // the port, this control ignored a registered `exit` — so one host got its
     // router from one way out of the checkout and a page load from the other.
@@ -96,6 +90,8 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
           onBackToMenu={backToMenu}
           paidExtra={confirmation?.extra}
           paidHero={confirmation?.hero}
+          // The money facts and their acts (FUT-612): the host's, passed through.
+          {...money}
         />
       </FlowsShell>
     );

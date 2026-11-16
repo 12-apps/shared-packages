@@ -53,6 +53,8 @@ function sentinel<T>(label: string): T {
 const portAnswers = {
   createOrder: sentinel<Awaited<ReturnType<CheckoutFlowProps["createOrder"]>>>("createOrder-answer"),
   validateApplePayMerchant: sentinel<unknown>("validateApplePayMerchant-answer"),
+  payDifference: sentinel<Awaited<ReturnType<CheckoutFlowProps["createOrder"]>>>("payDifference-answer"),
+  requestShortRefund: sentinel<unknown>("requestShortRefund-answer"),
 };
 
 /** What each wrapped port is called with, and the answer it must hand back. */
@@ -62,6 +64,8 @@ const portCalls: { [K in keyof CheckoutFlowProps]?: { args: unknown[]; answer: u
   onExitToMenu: { args: [], answer: undefined },
   onPaid: { args: [], answer: undefined },
   validateApplePayMerchant: { args: ["https://apple.example/validate"], answer: Promise.resolve(portAnswers.validateApplePayMerchant) },
+  payDifference: { args: [sentinel("payDifference-input")], answer: Promise.resolve(portAnswers.payDifference) },
+  requestShortRefund: { args: ["o-short"], answer: Promise.resolve(portAnswers.requestShortRefund) },
 };
 
 /** Every key REQUIRED, so a prop added to `CheckoutFlowProps` must be given a sentinel here to compile. */
@@ -89,6 +93,10 @@ function everyProp(): { [K in keyof Required<CheckoutFlowProps>]: CheckoutFlowPr
     onExitToMenu: vi.fn(),
     onPaid: vi.fn(),
     validateApplePayMerchant: vi.fn(() => portCalls.validateApplePayMerchant?.answer as Promise<unknown>),
+    payDifference: vi.fn(() => portCalls.payDifference?.answer as ReturnType<CheckoutFlowProps["createOrder"]>),
+    requestShortRefund: vi.fn(
+      () => portCalls.requestShortRefund?.answer as ReturnType<NonNullable<CheckoutFlowProps["requestShortRefund"]>>,
+    ),
     components: sentinel("components"),
     // Not the flow's own default (`true`).
     parkHostedOrders: false,

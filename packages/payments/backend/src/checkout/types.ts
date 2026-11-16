@@ -1,5 +1,7 @@
 import type { PaymentsRouteParams } from '../http/route-table';
 
+import type { CheckoutStatusBody, CheckoutStatusFacts } from './status-facts';
+
 import type {
   CardDetails,
   ChargeConfirmation,
@@ -64,6 +66,21 @@ export interface Payable {
    * has become an order.
    */
   state: 'OPEN' | 'SETTLED' | 'CLOSED';
+  /**
+   * `amount` is a BALANCE (FUT-612): the host's payable already holds a capture
+   * and asks only for what is still missing. NOT a fourth state — the payable is
+   * `OPEN` and chargeable as ever. A raise on it retires every other live charge
+   * of the payable (`core/balance-supersede.ts`), and the package `/status`
+   * asks `statusFacts` for it even while it is OPEN.
+   *
+   * The library sends NO mark of it on a settlement. A settlement reaches the
+   * host from paths that never load a payable — the webhook, the sweep — so a
+   * flag only some of them could carry would be a guarantee the library cannot
+   * keep. The host knows from its OWN record which charge it raised for a
+   * balance (the charge `attachPending` / `recordCardOutcome` wrote back for
+   * that raise), and decides what the earlier capture counts for from there.
+   */
+  balance?: true;
 }
 
 /**
@@ -238,6 +255,14 @@ export interface PayablePort<Caller, View extends object> {
   view?(ref: string): Promise<View | null>;
   /** The host's own state token for a poll answer when nothing changed. */
   stateToken(payable: Payable): string;
+  /**
+   * What a SETTLED or CLOSED payable's token cannot say (FUT-612): a capture
+   * that arrived short, or a full one the host could not fulfil. Asked on that
+   * branch and for a `balance` payable — never on an ordinary `OPEN` poll — so
+   * the waiting loop pays nothing for it. Omit it, or answer null, and
+   * `/status` answers the token alone.
+   */
+  statusFacts?(payable: Payable): Promise<CheckoutStatusFacts | null>;
 }
 
 /**
@@ -306,6 +331,12 @@ export interface CheckoutErrorBody {
 
 export interface CheckoutResponder {
   ok(data: unknown, status?: number): Response;
+  /**
+   * A `/status` answer that carries facts beside its token (FUT-612). Omitted,
+   * the body is sent as JSON as it stands — `{ data, shortfall | stockGone }`,
+   * the shape `@12-apps/payments-frontend`'s `getStatusDetail` reads.
+   */
+  status?(body: CheckoutStatusBody): Response;
   fail(body: CheckoutErrorBody, status: number): Response;
 }
 

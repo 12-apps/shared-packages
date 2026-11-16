@@ -3,6 +3,7 @@ import { ChargeIdentityError, chargeIdentityMismatch } from './charge-identity';
 import type { ChargeQueryStore } from './charge-queries';
 import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
+import { balanceMovedPast } from './balance-supersede';
 import { judgeParkedHosted, type ChainMember } from './hosted-landing';
 import { answerHeld, type HeldAnswer, type SupersededRecorder } from './hosted-retire';
 import type { ProviderFailureReporter } from './provider-failure';
@@ -146,6 +147,16 @@ export interface RaiseChargeRequest {
    * (`ChargeOptions.confirmation`) — a lane where nobody can press "Confirmar".
    */
   confirmation?: 'AUTOMATIC';
+  /**
+   * `amount` is a BALANCE (FUT-612): the reference already holds a capture and
+   * this raise asks only for what is still missing. Every OTHER live charge of
+   * the reference is then voided once the held one is good, whatever its
+   * method or price (`balance-supersede.ts`) — not only the reprice's stale
+   * PIX codes — and on a reuse too, so one difference charge is ever payable.
+   * They are retired as moved-past charges (`answerHeld`): only while the held
+   * charge is live, and one found paid by its void is settled or recorded.
+   */
+  supersedeOthers?: true;
 }
 
 /** A still-payable charge left behind by a reprice. */
@@ -264,8 +275,13 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
     const { live, movedPast } = await reusableCharge(deps, request);
     // A moved-past link the void finds PAID is the answer instead (FUT-4072):
     // the buyer paid it, and the charge they were about to hold is retired.
-    const answer = (held: ChargeSnapshot) =>
-      answerHeld(deps, { merchant: request.merchant, reference: request.reference, movedPast, held });
+    const answer = async (held: ChargeSnapshot) => {
+      const { merchant, reference } = request;
+      // A balance retires every other live charge with the moved-past links (FUT-612).
+      const balance = request.supersedeOthers === true;
+      const retire = await balanceMovedPast(deps, { merchant, reference, held, movedPast, balance });
+      return answerHeld(deps, { merchant, reference, movedPast: retire, held });
+    };
     if (live) return answer(live);
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);
@@ -295,7 +311,9 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
     // was, for an operator to reconcile, and the buyer simply retries.
     if (mismatch) throw new ChargeIdentityError(stored, mismatch);
 
-    await voidSuperseded(deps, request);
+    // A balance raise retires every other live charge inside `answer`; a reprice
+    // voids only the PIX codes priced at what the reference used to cost.
+    if (!request.supersedeOthers) await voidSuperseded(deps, request);
     return answer(stored.snapshot);
   };
 }

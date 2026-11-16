@@ -163,6 +163,8 @@ function buildCheckout(
         tenantSlug={tenantSlug}
         {...confirmationProps(confirmation)}
         validateApplePayMerchant={ports.validateApplePayMerchant}
+        payDifference={ports.payDifference}
+        requestShortRefund={ports.requestShortRefund}
         paymentList={paymentList}
         parkHostedOrders={parkHostedOrders}
         components={components}

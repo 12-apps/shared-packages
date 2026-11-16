@@ -1,7 +1,56 @@
 import { PT_BR_CARD_COPY } from "../../card/pt-BR";
 import { PT_BR_CHECKOUT_SCREENS_COPY } from "./screens-pt-BR";
 import type { CheckoutCopy } from "./copy-context";
+import type { ShortPaymentCopy } from "./short-copy";
 import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const AND = new Intl.ListFormat("pt-BR", { style: "long", type: "conjunction" });
+
+/**
+ * A capture that arrived short, and a full one the store could not fulfil
+ * (FUT-612, option C). Every sentence is read by somebody whose money
+ * ARRIVED, so none of them says "nenhum valor foi cobrado"; the secondary
+ * action says what it does (owner, decision 2).
+ */
+export const PT_BR_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
+  money: (cents) => BRL.format(cents / 100),
+  methodNames: { PIX: "Pix", CARD: "Cartão", BOLETO: "Boleto" },
+  heading: ({ due }) => `Faltam ${due} para fechar o pedido`,
+  support: ({ paid, total }) =>
+    `Recebemos ${paid} dos ${total} do pedido. Pague só a diferença para confirmar, ` +
+    "ou cancele e receba o valor de volta.",
+  totalLabel: "Total do pedido",
+  paidLabel: (method) => `Já pago (${method})`,
+  dueLabel: "Falta pagar",
+  payAction: ({ due }) => `Pagar ${due}`,
+  refundAction: ({ paid }) => `Cancelar e receber ${paid} de volta`,
+  reviewing: ({ paid }) => ({
+    heading: "A loja está conferindo o seu pagamento",
+    support: `Recebemos ${paid}. A loja vai confirmar o pedido ou devolver o valor; você recebe um aviso.`,
+  }),
+  refunded: ({ paid }) => ({
+    heading: `Devolvemos ${paid}`,
+    support: "O valor volta para você; você recebe um aviso quando cair.",
+  }),
+  refundPending: ({ paid }) => ({
+    heading: `A devolução de ${paid} está em andamento`,
+    support: "Você recebe um aviso quando o valor voltar.",
+  }),
+  settled: {
+    heading: "Pedido confirmado",
+    support: "A loja recebeu o valor que faltava e confirmou o pedido.",
+  },
+  stockGone: ({ received, missing, count }) => ({
+    heading: `Recebemos ${received}, mas ${count === 1 ? "acabou" : "acabaram"} ${missing}`,
+    support: "A loja vai confirmar ou devolver; você recebe um aviso.",
+  }),
+  stockGoneUnnamed: ({ received }) => ({
+    heading: `Recebemos ${received}, mas um item do pedido acabou`,
+    support: "A loja vai confirmar ou devolver; você recebe um aviso.",
+  }),
+  joinMissing: (names) => AND.format(names),
+};
 
 /**
  * The pt-BR pack — the exact sentences these views compiled in until 6.0.0,
@@ -90,6 +139,7 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
   amountLabel: "Valor pago",
   referenceLabel: "Pedido",
   receiptEmailLabel: "Comprovante enviado para",
+  short: PT_BR_SHORT_PAYMENT_COPY,
 };
 
 /**

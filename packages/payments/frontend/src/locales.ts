@@ -152,6 +152,7 @@ export {
   EN_US_CHECKOUT_COPY,
   EN_US_CHECKOUT_VIEW_COPY,
   EN_US_PAYMENT_STATUS_COPY,
+  EN_US_SHORT_PAYMENT_COPY,
 } from './components/checkout/en-US';
 export { EN_US_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-en-US';
 export { EN_US_PAYMENT_LIST_COPY } from './components/checkout/list/en-US';

@@ -19,7 +19,10 @@
  * `chain[].provider`, looked up in the tokenizer registry and used verbatim as
  * a `tokensByProvider` key. A host never types one.
  */
+import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
+
 import type { CheckoutPaymentList } from "../components/checkout/list/types";
+import type { CheckoutStatusDetail } from "../components/checkout/status-detail";
 import type { BackActionEmphasis } from "../components/checkout/payment-status-parts";
 import type { ComponentType, ReactNode } from "react";
 
@@ -85,6 +88,14 @@ export interface CheckoutPorts {
    * Apple Pay sheet cannot start and the card form remains the way to pay.
    */
   validateApplePayMerchant?(validationURL: string): Promise<unknown>;
+  /**
+   * A short-paid pedido's balance order (FUT-612): answered like
+   * `createPayable`, its amount the difference. Absent, "Pagar R$ X" is not
+   * offered. See `ShortPaymentPorts`.
+   */
+  payDifference?(input: CreateOrderRequest): Promise<CreateOrderResult>;
+  /** Cancel and have a short capture returned; answers `/status`'s detail after it (FUT-612). */
+  requestShortRefund?(orderId: string): Promise<Result<CheckoutStatusDetail>>;
   /** The remedy shown on the no-provider screen, AND the host's veto. */
   useAvailability?(): CheckoutAvailability;
 }
@@ -252,9 +263,26 @@ export type CheckoutController = ReturnType<typeof useCheckoutController>;
 export interface BoundCheckoutClient {
   getConfig(tenantSlug: string): Promise<Result<CheckoutProviderConfig>>;
   getStatus(ref: string): Promise<Result<OrderStatus>>;
+  /** `/status` with its money facts (FUT-612) — see `CheckoutClient.getStatusDetail`. */
+  getStatusDetail?(ref: string): Promise<Result<CheckoutStatusDetail>>;
   charge(input: ChargeCardInput): Promise<Result<ChargeOutcome>>;
   listInstruments(tenantSlug?: string): Promise<SavedCard[]>;
   refreshBrowserKey(input: { orderId: string }): Promise<Result<{ publicKey: string | null }>>;
+}
+
+/**
+ * The confirmation screen's props. The money facts and their two acts
+ * (FUT-612) are the host's to read (`getStatusDetail`) and bind; absent, the
+ * screen is exactly what it was.
+ */
+export interface PaymentStatusScreenProps {
+  status: OrderStatus | null;
+  payable?: CheckoutOrder | null;
+  shortfall?: PaymentShortfall | null;
+  stockGone?: PaymentStockGone | null;
+  onPayDifference?(): void;
+  onRequestRefund?(): void;
+  shortBusy?: "pay" | "refund" | null;
 }
 
 /** The screens a host may nest itself. Every one works standalone. */
@@ -263,7 +291,7 @@ export interface CheckoutScreens {
   PixPayment: ComponentType<{ payable: CheckoutOrder; onResolved(s: OrderStatus): void }>;
   HostedHandoff: ComponentType<{ url: string; payable: CheckoutOrder; onCancel?(): void }>;
   HostedReturn: ComponentType<{ onResolved(s: OrderStatus): void }>;
-  PaymentStatus: ComponentType<{ status: OrderStatus | null; payable?: CheckoutOrder | null }>;
+  PaymentStatus: ComponentType<PaymentStatusScreenProps>;
   PaymentsUnavailable: ComponentType<Record<string, never>>;
   SavedCards: ComponentType<{ selection: string; onSelect(id: string): void }>;
   EmptyCart: ComponentType<Record<string, never>>;

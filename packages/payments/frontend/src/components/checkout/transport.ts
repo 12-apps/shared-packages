@@ -22,6 +22,7 @@ import { err, ok, type Result } from "../../result";
 
 import type { ThreeDSecureSessionView } from "./debit-types";
 import type { CheckoutTransportCopy } from "./screens-copy";
+import { statusDetailOf, type CheckoutStatusDetail } from "./status-detail";
 
 import type {
   ChargeCardInput,
@@ -101,6 +102,13 @@ export type CheckoutTransportBinding = Omit<CheckoutTransport, "copy"> &
 export interface CheckoutClient {
   getConfig(tenantSlug: string): Promise<Result<CheckoutProviderConfig>>;
   getStatus(ref: string): Promise<Result<OrderStatus>>;
+  /**
+   * `/status` with the money facts beside the token (FUT-612): a short capture
+   * or a stock-gone payable, as the server states them. `getStatus` keeps its
+   * shape; optional so a hand-written client keeps type-checking — every
+   * client `createCheckoutClient` builds has it.
+   */
+  getStatusDetail?(ref: string): Promise<Result<CheckoutStatusDetail>>;
   /**
    * `POST /release` (FUT-1146): the buyer says they did not pay, and the
    * charge they were sent away for has no terminal state of its own.
@@ -198,6 +206,11 @@ function returnedSettlement(): Record<string, string> {
   };
 }
 
+/** The poll's route: the payable, and any settlement pair the page came back with. */
+function statusRoute(ref: string): string {
+  return `/status?${new URLSearchParams({ orderId: ref, ...returnedSettlement() }).toString()}`;
+}
+
 /** A POST naming the payable — the body every payable-scoped row takes. */
 function orderBody(input: { orderId: string }): RequestInit {
   return { method: "POST", body: JSON.stringify({ orderId: input.orderId }) };
@@ -253,6 +266,43 @@ function completeVaultBody(input: CompleteVaultInput): string {
   });
 }
 
+/** The host's per-request headers, when it has any. */
+async function extraHeaders(transport: CheckoutTransport): Promise<HeadersInit | undefined> {
+  return transport.headers ? transport.headers() : undefined;
+}
+
+/** A success envelope: `data`, and anything the route stated beside it. */
+type Envelope<T> = ApiEnvelope<T> & { data: T } & Record<string, unknown>;
+
+/**
+ * Call a checkout route and keep the WHOLE envelope — `data` and whatever the
+ * route stated beside it (`/status`'s money facts, FUT-612).
+ */
+async function requestEnvelope<T>(
+  transport: CheckoutTransport,
+  route: string,
+  init?: RequestInit,
+): Promise<Result<Envelope<T>>> {
+  const copy = transport.copy;
+  // Resolved here, not captured at build time: a suite (or a story) that
+  // replaces the global afterwards must still be the one that answers.
+  const doFetch = transport.fetchImpl ?? ambientFetch;
+  try {
+    const res = await doFetch(`${transport.baseUrl ?? DEFAULT_CHECKOUT_BASE_URL}${route}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(await extraHeaders(transport)), ...init?.headers },
+    });
+    const json = (await res.json().catch(() => null)) as (ApiEnvelope<T> & Record<string, unknown>) | null;
+    if (!res.ok) return refused<Envelope<T>>(json as ApiEnvelope<Envelope<T>> | null, copy);
+    if (!json || json.data === undefined) {
+      return err(json?.error ?? copy.invalidResponse);
+    }
+    return ok(json as Envelope<T>);
+  } catch {
+    return err(copy.offline);
+  }
+}
+
 /**
  * The checkout calls, bound to one transport.
  *
@@ -262,29 +312,10 @@ function completeVaultBody(input: CompleteVaultInput): string {
  * pick that would be right for the next host (FUT-760).
  */
 export function createCheckoutClient(transport: CheckoutTransport): CheckoutClient {
-  const baseUrl = transport.baseUrl ?? DEFAULT_CHECKOUT_BASE_URL;
-  const copy = transport.copy;
-
   /** Call a checkout route and normalize the response into a {@link Result}. */
   async function call<T>(route: string, init?: RequestInit): Promise<Result<T>> {
-    // Resolved here, not captured at build time: a suite (or a story) that
-    // replaces the global afterwards must still be the one that answers.
-    const doFetch = transport.fetchImpl ?? ambientFetch;
-    try {
-      const extra = transport.headers ? await transport.headers() : undefined;
-      const res = await doFetch(`${baseUrl}${route}`, {
-        ...init,
-        headers: { "Content-Type": "application/json", ...extra, ...init?.headers },
-      });
-      const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
-      if (!res.ok) return refused(json, copy);
-      if (!json || json.data === undefined) {
-        return err(json?.error ?? copy.invalidResponse);
-      }
-      return ok(json.data);
-    } catch {
-      return err(copy.offline);
-    }
+    const answered = await requestEnvelope<T>(transport, route, init);
+    return answered.ok ? ok(answered.data.data) : answered;
   }
 
   return {
@@ -293,11 +324,12 @@ export function createCheckoutClient(transport: CheckoutTransport): CheckoutClie
         method: "GET",
       }),
 
-    getStatus: (ref) =>
-      call<OrderStatus>(
-        `/status?${new URLSearchParams({ orderId: ref, ...returnedSettlement() }).toString()}`,
-        { method: "GET" },
-      ),
+    getStatus: (ref) => call<OrderStatus>(statusRoute(ref), { method: "GET" }),
+
+    getStatusDetail: async (ref) => {
+      const answered = await requestEnvelope<OrderStatus>(transport, statusRoute(ref), { method: "GET" });
+      return answered.ok ? ok(statusDetailOf(answered.data.data, answered.data)) : answered;
+    },
 
     releaseCheckout: (input) =>
       // The settlement hints ride in the QUERY, exactly as the poll's do: they

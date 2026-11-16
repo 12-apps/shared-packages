@@ -9,7 +9,7 @@ import { vi } from "vitest";
 import { render } from "@testing-library/react";
 
 import { CheckoutClientProvider } from "../client-context";
-import { CheckoutFlow } from "../checkout-flow";
+import { CheckoutFlow, type CheckoutFlowProps } from "../checkout-flow";
 import type { CheckoutPaymentList } from "../list/types";
 import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import { CheckoutNavigateProvider } from "../navigate-context";
@@ -230,6 +230,8 @@ interface ListHost {
   onPaid?: () => void;
   /** `CheckoutFlow`'s `parkHostedOrders`; absent ⇒ the prop is not passed at all. */
   parkHostedOrders?: boolean;
+  /** A short capture's two ports (FUT-612); absent ⇒ not passed. */
+  flow?: Pick<CheckoutFlowProps, "payDifference" | "requestShortRefund">;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -263,6 +265,7 @@ export function listFlow(host: ListHost): JSX.Element {
           components={host.components}
           settlement={host.settlement}
           {...(host.parkHostedOrders === undefined ? {} : { parkHostedOrders: host.parkHostedOrders })}
+          {...host.flow}
         />
       </CheckoutNavigateProvider>
     </CheckoutClientProvider>

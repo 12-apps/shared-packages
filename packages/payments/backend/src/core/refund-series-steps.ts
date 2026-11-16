@@ -127,6 +127,17 @@ async function firstRefusal(ctx: SeriesContext, key: RefundSeriesKey, error: unk
   return { kind: refusal, error, row };
 }
 
+/**
+ * Attempt 1 the provider ANSWERED with a FAILED refund (FUT-612): nothing went
+ * back, and the answer does not say whether a later one would take. Read as no
+ * answer, so the series opens on the no-answer schedule — every later attempt
+ * consults the charge first, and a refund that landed after all is adopted —
+ * and the trail is written, as for any refusal of attempt 1.
+ */
+export function firstFailedAnswer(ctx: SeriesContext, key: RefundSeriesKey): Promise<FirstAttemptResult> {
+  return firstRefusal(ctx, key, new Error(`the provider answered the refund of ${key.providerChargeId} FAILED`));
+}
+
 /** Attempt 1, from the host's request: the ONE place it is sent. */
 export async function firstAttempt(
   ctx: SeriesContext,

@@ -146,6 +146,55 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["payment-awaiting_payment", "payment-pending"],
     text: ["Confirmando seu pagamento"],
   },
+  // FUT-612 — option C. The decline pin above (`StatusFailed`) is the other half:
+  // a FAILED screen with no fact still says nothing was charged, byte for byte.
+  "Screens/StatusShort": {
+    testIds: ["payment-short", "payment-short-chip", "payment-short-receipt", "payment-short-actions", "payment-short-pay", "payment-short-refund"],
+    text: [
+      "Faltam R$ 13,80 para fechar o pedido",
+      "Recebemos R$ 6,90 dos R$ 20,70 do pedido. Pague só a diferença para confirmar, ou cancele e receba o valor de volta.",
+      "Total do pedido",
+      "Já pago (Pix)",
+      "Falta pagar",
+      "Pagar R$ 13,80",
+      "Cancelar e receber R$ 6,90 de volta",
+    ],
+    absentTestIds: ["payment-failed", "payment-retry", "payment-back-to-menu"],
+    absentText: ["Nenhum valor foi cobrado"],
+  },
+  "Screens/StatusShortReviewing": {
+    testIds: ["payment-short-reviewing"],
+    text: ["A loja está conferindo o seu pagamento"],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+    absentText: ["Nenhum valor foi cobrado"],
+  },
+  "Screens/StatusShortRefunded": {
+    testIds: ["payment-short-refunded", "payment-back-to-menu"],
+    text: ["Devolvemos R$ 6,90", "O valor volta para você; você recebe um aviso quando cair."],
+    absentText: ["A loja devolveu", "mesmo meio de pagamento"],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+  },
+  "Screens/StatusShortRefundPending": {
+    testIds: ["payment-short-refund-pending"],
+    text: ["A devolução de R$ 6,90 está em andamento", "Você recebe um aviso quando o valor voltar."],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+  },
+  "Screens/StatusShortSettled": {
+    testIds: ["payment-short-settled", "payment-back-to-menu"],
+    text: ["Pedido confirmado", "A loja recebeu o valor que faltava e confirmou o pedido."],
+  },
+  "Screens/StatusStockGone": {
+    testIds: ["payment-stock-gone"],
+    text: ["Recebemos R$ 20,70, mas acabou Pão de queijo", "A loja vai confirmar ou devolver; você recebe um aviso."],
+    absentTestIds: ["payment-short-pay", "payment-short-refund", "payment-back-to-menu", "payment-retry"],
+    absentText: ["Nenhum valor foi cobrado", "queijo."],
+  },
+  "Screens/StatusStockGoneUnnamed": {
+    testIds: ["payment-stock-gone"],
+    text: ["Recebemos R$ 20,70, mas um item do pedido acabou", "A loja vai confirmar ou devolver; você recebe um aviso."],
+    absentTestIds: ["payment-short-pay", "payment-short-refund", "payment-back-to-menu", "payment-retry"],
+    absentText: ["Nenhum valor foi cobrado", "acabou ."],
+  },
   "Screens/UnavailableNoRemedy": {
     testIds: ["checkout-payments-disabled"],
     text: ["Pagamento online indisponível"],

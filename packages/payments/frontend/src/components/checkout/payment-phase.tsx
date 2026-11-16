@@ -22,9 +22,12 @@ function settlementTotalOverride(
 export function PaymentPhase({
   props,
   c,
+  differenceLabel,
 }: {
   props: Omit<CheckoutFlowProps, "components">;
   c: ReturnType<typeof useCheckoutController>;
+  /** A short capture's difference is being paid (FUT-612): the bar shows it, not the cart. */
+  differenceLabel?: string;
 }): JSX.Element {
   const { cart, settlement, providerConfig, tenantSlug, validateApplePayMerchant, paymentList } = props;
   return (
@@ -32,7 +35,7 @@ export function PaymentPhase({
       c={c}
       list={paymentList}
       cart={cart}
-      totalOverride={settlementTotalOverride(settlement)}
+      totalOverride={differenceLabel ? { label: differenceLabel, items: cart.totalItems } : settlementTotalOverride(settlement)}
       providerConfig={providerConfig}
       tenantSlug={tenantSlug}
       taxIdOnFile={props.taxIdOnFile ?? false}

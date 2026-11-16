@@ -1,5 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
+import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
+
 import type { CheckoutBasketIdentity } from "./basket";
 import { EmptyCart } from "./empty-cart";
 import { PaymentStatus } from "./payment-status";
@@ -14,6 +16,8 @@ import type { CheckoutDeliverySummary, CheckoutSummaryLine } from "./payment-sum
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 import type { CheckoutPaymentList } from "./list/types";
 import { PaymentPhase } from "./payment-phase";
+import { StatusFactsReporterProvider } from "./status-facts-context";
+import { useFactsOnSettle, useShortPayment, type ShortPayment, type ShortPaymentPorts } from "./use-short-payment";
 
 
 /** What the flow reads off the host's cart — display facts, never money math. */
@@ -60,7 +64,7 @@ export interface CheckoutCartView {
  * arrive through {@link CheckoutHostPorts} + {@link CheckoutCartView};
  * pixels render through the slot contract (`components`, see `ui.tsx`).
  */
-export interface CheckoutFlowProps extends CheckoutHostPorts {
+export interface CheckoutFlowProps extends CheckoutHostPorts, ShortPaymentPorts {
   /**
    * Every sentence the flow's own chrome renders — the consent line, the
    * empty cart, the confirmation screen. REQUIRED, with no default:
@@ -169,9 +173,12 @@ function StatusStep({
   confirmationHero,
   confirmationFooter,
   backActionEmphasis,
+  short,
 }: {
   copy: CheckoutViewCopy;
   c: ReturnType<typeof useCheckoutController>;
+  /** A short capture's facts and its two acts (FUT-612) — see {@link shortStatusProps}. */
+  short: ShortStatusProps;
   settlement: SettlementCheckout | null | undefined;
   cart: CheckoutCartView;
   confirmationExtra: ReactNode;
@@ -212,8 +219,65 @@ function StatusStep({
       // A Pix the store confirms by hand ends without proof either way
       // (FUT-3232), so its refusal and lapse get their own sentences.
       manual={c.order?.pix?.confirmation === "MANUAL"}
+      // What `/status` said about the money, and the buyer's acts on it (FUT-612).
+      {...short}
     />
   );
+}
+
+/** What the status screen is handed of a short capture (FUT-612). */
+interface ShortStatusProps {
+  shortfall: PaymentShortfall | null;
+  stockGone: PaymentStockGone | null;
+  onPayDifference?: () => void;
+  onRequestRefund?: () => void;
+  shortBusy: "refund" | null;
+}
+
+/**
+ * The facts of the order on screen, and the two acts bound to the host's ports.
+ * "Pagar R$ X" goes back to the flow's own Pagamento step, where the bar now
+ * raises the balance order; an act whose port the host did not bind is absent.
+ */
+function shortStatusProps(
+  props: Pick<CheckoutFlowProps, "payDifference" | "requestShortRefund">,
+  c: ReturnType<typeof useCheckoutController>,
+  short: ShortPayment,
+): ShortStatusProps {
+  const orderId = c.order?.orderId ?? null;
+  const shortfall = factsOf(orderId, short)?.shortfall ?? null;
+  const stockGone = factsOf(orderId, short)?.stockGone ?? null;
+  return {
+    shortfall,
+    stockGone,
+    shortBusy: short.busy,
+    ...shortActs(props, c, short, { orderId, dueCents: shortfall ? shortfall.dueCents : 0 }),
+  };
+}
+
+/** The facts read for the order on screen, or none: another order's never apply. */
+function factsOf(orderId: string | null, short: ShortPayment): ShortPayment["facts"] {
+  return orderId !== null && short.facts?.orderId === orderId ? short.facts : null;
+}
+
+/** The two acts, each only when the host bound its port. */
+function shortActs(
+  props: Pick<CheckoutFlowProps, "payDifference" | "requestShortRefund">,
+  c: ReturnType<typeof useCheckoutController>,
+  short: ShortPayment,
+  target: { orderId: string | null; dueCents: number },
+): Pick<ShortStatusProps, "onPayDifference" | "onRequestRefund"> {
+  const { orderId, dueCents } = target;
+  const acts: Pick<ShortStatusProps, "onPayDifference" | "onRequestRefund"> = {};
+  if (props.payDifference) {
+    acts.onPayDifference = () => {
+      short.startDifference(dueCents);
+      c.dropOrder();
+      c.setStep("payment");
+    };
+  }
+  if (props.requestShortRefund && orderId !== null) acts.onRequestRefund = () => void short.refund(orderId);
+  return acts;
 }
 
 /**
@@ -240,8 +304,10 @@ function nothingToPayFor(
   settlement: SettlementCheckout | null | undefined,
   cart: CheckoutCartView,
   c: ReturnType<typeof useCheckoutController>,
+  payingDifference: boolean,
 ): boolean {
-  if (settlement || !cart.empty || !cartLoaded(cart)) return false;
+  // A difference pays a pedido that already exists, whatever the cart holds (FUT-612).
+  if (settlement || payingDifference || !cart.empty || !cartLoaded(cart)) return false;
   return !c.order && !c.creating && c.step !== "status";
 }
 
@@ -253,16 +319,18 @@ function nothingToPayFor(
  */
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
   const { copy, cart, defaultBuyer, settlement, tenantSlug, confirmationExtra, confirmationHero, confirmationFooter, backActionEmphasis } = props;
-  const ports = { createOrder: props.createOrder, saveBuyerContact: props.saveBuyerContact, onExitToMenu: props.onExitToMenu, onPaid: props.onPaid };
+  const short = useShortPayment(props);
+  const ports = { createOrder: short.routedCreateOrder, saveBuyerContact: props.saveBuyerContact, onExitToMenu: props.onExitToMenu, onPaid: props.onPaid };
   // The list asks a missing CPF at the top of Pagamento, so the controller
   // always opens there (FUT-465, FUT-4028).
   const c = useCheckoutController(ports, defaultBuyer, tenantSlug, cart.identity);
+  useFactsOnSettle({ orderId: c.order?.orderId ?? null, status: c.finalStatus, onStatusStep: c.step === "status", short });
 
   // A settlement pays already-sent kitchen items — the cart is legitimately
   // empty there, so the empty-cart guard only applies to cart mode. It holds
   // until an order exists: once one does, its lines are snapshotted
   // server-side and the cart no longer speaks for it.
-  if (nothingToPayFor(settlement, cart, c)) {
+  if (nothingToPayFor(settlement, cart, c, short.payingCents !== null)) {
     return <EmptyCart copy={copy.emptyCart} onBack={c.goToMenu} />;
   }
 
@@ -270,8 +338,11 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // confirmation included: no second "Etapa N de M" nested in the host's card,
   // and no "Voltar" into a payment that already happened (FUT-3999).
   return (
+    <StatusFactsReporterProvider report={short.report}>
     <CheckoutFrame payment={c.step === "payment"}>
-      {c.step === "payment" ? <PaymentPhase props={props} c={c} /> : null}
+      {c.step === "payment" ? (
+        <PaymentPhase props={props} c={c} differenceLabel={differenceLabel(copy, short.payingCents)} />
+      ) : null}
 
       {c.step === "status" ? (
         <StatusStep
@@ -283,10 +354,18 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           confirmationHero={confirmationHero}
           confirmationFooter={confirmationFooter}
           backActionEmphasis={backActionEmphasis}
+          short={shortStatusProps(props, c, short)}
         />
       ) : null}
     </CheckoutFrame>
+    </StatusFactsReporterProvider>
   );
+}
+
+/** The pay bar's total while a difference is being paid: the difference, in the pack's money. */
+function differenceLabel(copy: CheckoutViewCopy, payingCents: number | null): string | undefined {
+  const money = copy.status.short?.money;
+  return payingCents !== null && money ? money(payingCents) : undefined;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { CheckoutCopy } from "./copy-context";
 import type { CheckoutDeclineReason } from "./decline";
+import type { ShortPaymentCopy } from "./short-copy";
 
 /**
  * Every string the legacy checkout views render — required props, with NO
@@ -116,6 +117,12 @@ export interface PaymentStatusCopy {
   amountLabel: string;
   referenceLabel: string;
   receiptEmailLabel: string;
+  /**
+   * A capture that arrived SHORT of the total, and a full one the store could
+   * not fulfil (FUT-612) — rendered only when the server states that fact.
+   * Absent, the screen renders exactly as before whatever the server says.
+   */
+  short?: ShortPaymentCopy;
 }
 
 /** What the legacy `CheckoutFlow` itself renders and must be handed. */
