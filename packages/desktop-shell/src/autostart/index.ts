@@ -37,6 +37,12 @@ export {
   type FirstRunAutostartOptions,
 } from "./first-run";
 
+/**
+ * Where Windows keeps "start with the computer" for a Microsoft Store (MSIX)
+ * app. The system owns the switch there, so the shell sends the person to it.
+ */
+export const SYSTEM_STARTUP_SETTINGS_URL = "ms-settings:startupapps";
+
 /** Electron's `app` login-item surface, narrowed to what is used. */
 export interface LoginItemPort {
   /**
@@ -85,6 +91,12 @@ export interface AutostartOptions {
   loginItem?: LoginItemPort;
   files?: FilePort;
   env?: AutostartEnv;
+  /**
+   * The operating system owns the switch (a Microsoft Store install): the
+   * result reports `managedBySystem`, answers "off" and changes nothing.
+   * Default `false`.
+   */
+  managedBySystem?: boolean;
 }
 
 export interface Autostart {
@@ -93,6 +105,13 @@ export interface Autostart {
   disable(): Promise<void>;
   /** Flip to `next`. The shape a settings checkbox actually calls. */
   set(next: boolean): Promise<void>;
+  /**
+   * `true` when the operating system owns the switch: `enable`, `disable` and
+   * `set` change nothing and `isEnabled` answers `false` (the system's own
+   * list is not readable from here). A UI sends the person to
+   * {@link SYSTEM_STARTUP_SETTINGS_URL} instead of toggling. Absent means not.
+   */
+  readonly managedBySystem?: boolean;
 }
 
 /**
@@ -105,6 +124,14 @@ export interface Autostart {
  * after setting it — which is the only honest check on any of the three
  * platforms anyway.
  */
+const SYSTEM_MANAGED: Autostart = {
+  isEnabled: () => Promise.resolve(false),
+  enable: () => Promise.resolve(),
+  disable: () => Promise.resolve(),
+  set: () => Promise.resolve(),
+  managedBySystem: true,
+};
+
 const DISABLED: Autostart = {
   isEnabled: () => Promise.resolve(false),
   enable: () => Promise.resolve(),
@@ -113,6 +140,7 @@ const DISABLED: Autostart = {
 };
 
 export function createAutostart(options: AutostartOptions): Autostart {
+  if (options.managedBySystem === true) return SYSTEM_MANAGED;
   const args = [...(options.backgroundArgs ?? [])];
   if (options.platform === "linux") {
     const { files } = options;

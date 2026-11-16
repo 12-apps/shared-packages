@@ -104,6 +104,23 @@ make an agent maintainable from a distance:
   byte-for-byte the file's size. A missing file is reported and skipped; no
   bucket configured is exit 0 with a note.
 
+## Microsoft Store (MSIX) installs
+
+Electron sets `process.windowsStore === true` inside an MSIX package, and
+`isWindowsStoreApp()` (root export; takes a fake `process` in tests) reads it.
+In that mode the shell steps aside from two things Windows owns, and changes
+nothing anywhere else:
+
+- **Updates.** `wireUpdates` never calls `create`, so no manager, check,
+  download, install or timer exists; the menu shows the version only and the
+  manager it returns is inert (`unsupported`). Pass `windowsStore` to override
+  the detection.
+- **Start with the computer.** The autostart reports `managedBySystem: true`,
+  answers off and changes nothing. The tray entry stays, and a click opens
+  `ms-settings:startupapps` (`SYSTEM_STARTUP_SETTINGS_URL`) instead of toggling.
+  The first-time question (`createFirstRunAutostart`) is never asked and never
+  calls `set`.
+
 ## It carries no words
 
 Not one sentence, in any language. A tray menu, a tooltip, a window title and a

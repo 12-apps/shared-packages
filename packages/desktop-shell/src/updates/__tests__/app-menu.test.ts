@@ -137,3 +137,18 @@ describe("updateText", () => {
     ).toBe("Downloading 0.1.56…");
   });
 });
+
+describe("a menu for an app the Store updates", () => {
+  it("shows the version only: no check, no install, no updater line", () => {
+    const bar = buildAppMenu({
+      copy: COPY,
+      version: "0.1.49",
+      updates: { kind: "ready", version: "2.0.0" },
+      platform: "win32",
+      updatesManagedBy: "store",
+      actions: { checkUpdates: noop, installUpdate: noop, quit: noop },
+    });
+
+    expect(labels(bar.at(-1)?.submenu ?? [])).toEqual(["Version 0.1.49"]);
+  });
+});
