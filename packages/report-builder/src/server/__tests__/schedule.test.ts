@@ -57,10 +57,10 @@ describe('the schedule on the save body (FUT-776)', () => {
 });
 
 describe('resolveSchedule', () => {
-  it('keeps what is stored when omitted and removes it on null', () => {
+  it('writes nothing when omitted (never erases what it may not read) and removes on null', () => {
     const stored = resolveSchedule(weekly, null, clock);
-    expect(resolveSchedule(undefined, stored, clock)).toBe(stored);
-    expect(resolveSchedule(null, stored, clock)).toBeNull();
+    expect(resolveSchedule(undefined, stored ?? null, clock)).toBeUndefined();
+    expect(resolveSchedule(null, stored ?? null, clock)).toBeNull();
   });
 
   it('stamps the store zone and today as the anchor, and drops fields the cadence ignores', () => {
@@ -82,15 +82,39 @@ describe('resolveSchedule', () => {
     ]);
   });
 
-  it('keeps the fortnight anchor while the fortnight does not move, restarts it when it does', () => {
-    const first = resolveSchedule({ ...weekly, cadence: 'biweekly' }, null, clock);
-    const later = { timeZone: clock.timeZone, now: new Date('2026-12-20T12:00:00Z') };
-    expect(resolveSchedule({ ...weekly, cadence: 'biweekly', time: '09:30' }, first, later)?.startsOn).toBe(
-      '2026-11-16',
-    );
-    expect(resolveSchedule({ ...weekly, cadence: 'biweekly', weekday: 3 }, first, later)?.startsOn).toBe(
-      '2026-12-20',
-    );
+  describe('the Quinzenal anchor is the date of the first send (owner, 2026-11-16)', () => {
+    const biweekly = { ...weekly, cadence: 'biweekly' as const }; // Monday 08:00 in Sao Paulo
+    const at = (iso: string) => ({ timeZone: 'America/Sao_Paulo', now: new Date(iso) });
+
+    it('enabled on the chosen weekday AFTER the time: first send is in 7 days', () => {
+      // Monday 2026-11-16 15:00 local = 18:00Z, past 08:00.
+      expect(resolveSchedule(biweekly, null, at('2026-11-16T18:00:00Z'))?.startsOn).toBe('2026-11-23');
+    });
+
+    it('enabled on the chosen weekday BEFORE the time: first send is today', () => {
+      expect(resolveSchedule(biweekly, null, at('2026-11-16T09:00:00Z'))?.startsOn).toBe('2026-11-16');
+    });
+
+    it('enabled on another weekday: the next such weekday', () => {
+      // Wednesday 2026-11-18.
+      expect(resolveSchedule(biweekly, null, at('2026-11-18T12:00:00Z'))?.startsOn).toBe('2026-11-23');
+    });
+
+    it('keeps the anchor while the same fortnight continues', () => {
+      const first = resolveSchedule(biweekly, null, at('2026-11-16T09:00:00Z')) ?? null;
+      const later = at('2026-12-20T12:00:00Z');
+      expect(resolveSchedule({ ...biweekly, time: '09:30' }, first, later)?.startsOn).toBe('2026-11-16');
+      expect(resolveSchedule({ ...biweekly, weekday: 3 }, first, later)?.startsOn).toBe('2026-12-23');
+    });
+
+    it('re-anchors when switched back on after a long pause', () => {
+      const first = resolveSchedule(biweekly, null, at('2026-11-16T09:00:00Z')) ?? null;
+      const off = resolveSchedule({ ...biweekly, enabled: false }, first, at('2026-11-17T12:00:00Z')) ?? null;
+      expect(off?.enabled).toBe(false);
+      // Back on in March, a Thursday: parity restarts from the next Monday.
+      const again = resolveSchedule(biweekly, off, at('2027-03-04T12:00:00Z'));
+      expect(again?.startsOn).toBe('2027-03-08');
+    });
   });
 });
 

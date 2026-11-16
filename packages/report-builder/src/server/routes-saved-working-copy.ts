@@ -184,7 +184,7 @@ function parsePublishBody(
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string | null;
-  schedule: ReportSchedule | null;
+  schedule: ReportSchedule | null | undefined;
 } {
   const parsed = reportWorkingCopySchema.safeParse(body);
   if (!parsed.success) {
@@ -214,7 +214,7 @@ function publishSchedule(
   current: SavedReportRecord,
   messages: ReportServerMessages,
   config: ReportBuilderServerConfig,
-): ReportSchedule | null {
+): ReportSchedule | null | undefined {
   const strict = parked ? reportScheduleInput.safeParse(parked) : null;
   if (strict && !strict.success) throw invalidInputError(strict.error, messages.invalidBody);
   return resolveSchedule(strict?.data ?? parked, readSchedule(current.schedule), {

@@ -1016,3 +1016,84 @@ describe('the e-mail delivery schedule (FUT-776)', () => {
     expect(refused.status).toBe(422);
   });
 });
+
+describe('the schedule through a parked edit and its publish (FUT-776)', () => {
+  const parked = (schedule: unknown): Record<string, unknown> => ({
+    name: 'Publicado',
+    spec: ORDERS_SPEC,
+    schedule,
+  });
+  const weekly = { enabled: true, cadence: 'weekly', weekday: 1, time: '08:00', recipients: ['user-2'] };
+  const PARK = '/reports/custom/:id/working-copy' as const;
+  const PUBLISH = '/reports/custom/:id/working-copy/publish' as const;
+  const stamped = {
+    ...weekly,
+    timeZone: 'America/Sao_Paulo',
+    startsOn: '2026-07-01',
+  };
+
+  it('accepts parking an enabled schedule with nobody ticked yet', async () => {
+    const harness = setup();
+    const response = await harness.call('PUT', PARK, {
+      params: { id: 'r1' },
+      body: parked({ ...weekly, recipients: [] }),
+    });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.workingCopy).toMatchObject({ schedule: { recipients: [] } });
+  });
+
+  it('refuses publishing that schedule (422) and writes nothing', async () => {
+    const harness = setup();
+    const before = harness.stored()[0];
+    const response = await harness.call('POST', PUBLISH, {
+      params: { id: 'r1' },
+      body: parked({ ...weekly, recipients: [] }),
+    });
+    expect(response.status).toBe(422);
+    expect(harness.stored()[0]).toEqual(before);
+  });
+
+  it('publishes a schedule stamped with the store zone and the first-send date, and clears the park', async () => {
+    const harness = setup({ seed: [record({ workingCopy: { name: 'x', spec: ORDERS_SPEC } })] });
+    const response = await harness.call('POST', PUBLISH, { params: { id: 'r1' }, body: parked(weekly) });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual({ ...stamped, startsOn: '2026-07-14' });
+    expect(harness.stored()[0]?.workingCopy).toBeNull();
+  });
+
+  it('keeps the stored schedule when the publish body does not mention it', async () => {
+    const harness = setup({ seed: [record({ schedule: stamped })] });
+    const response = await harness.call('POST', PUBLISH, {
+      params: { id: 'r1' },
+      body: { name: 'Publicado', spec: ORDERS_SPEC },
+    });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual(stamped);
+  });
+
+  it('removes it on an explicit null', async () => {
+    const harness = setup({ seed: [record({ schedule: stamped })] });
+    await harness.call('POST', PUBLISH, { params: { id: 'r1' }, body: parked(null) });
+    expect(harness.stored()[0]?.schedule).toBeNull();
+  });
+
+  it('refuses a zone or anchor the client names, on the park', async () => {
+    const harness = setup();
+    for (const extra of [{ timeZone: 'UTC' }, { startsOn: '2026-01-01' }]) {
+      const response = await harness.call('PUT', PARK, {
+        params: { id: 'r1' },
+        body: parked({ ...weekly, ...extra }),
+      });
+      expect(response.status).toBe(422);
+    }
+  });
+
+  it('never erases a stored schedule on an update that omits it', async () => {
+    const harness = setup({ seed: [record({ schedule: { unreadable: 'shape from a newer release' } })] });
+    await harness.call('PUT', '/reports/custom/:id', {
+      params: { id: 'r1' },
+      body: { name: 'Renomeado', spec: ORDERS_SPEC },
+    });
+    expect(harness.stored()[0]?.schedule).toEqual({ unreadable: 'shape from a newer release' });
+  });
+});

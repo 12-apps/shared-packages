@@ -7,6 +7,7 @@ import {
   SCHEDULE_TIME_PATTERN,
   civilDateOf,
   isRunnable,
+  nextOccurrences,
   type ReportSchedule,
 } from '../schedule';
 
@@ -90,29 +91,64 @@ function dayFields(input: ReportScheduleInput): { weekday?: number; dayOfMonth?:
   return input.cadence === 'daily' ? {} : { weekday: input.weekday };
 }
 
+/** Whether the stored schedule is the same fortnight this write continues. */
+function continuesFortnight(input: ReportScheduleInput, current: ReportSchedule | null): boolean {
+  return (
+    current !== null &&
+    current.enabled &&
+    input.enabled &&
+    current.cadence === input.cadence &&
+    current.weekday === input.weekday &&
+    isRunnable(current)
+  );
+}
+
+/**
+ * The date the first send lands on: the next time the chosen weekday and time
+ * come round, so a Monday-08:00 schedule saved on Monday at 15:00 starts next
+ * Monday, and one saved at 06:00 starts today.
+ */
+function firstSendDate(input: ReportScheduleInput, clock: { timeZone: string; now: Date }): string {
+  const probe: ReportSchedule = {
+    enabled: true,
+    cadence: 'weekly',
+    weekday: input.weekday ?? 0,
+    time: input.time,
+    timeZone: clock.timeZone,
+    recipients: [],
+    startsOn: civilDateOf(clock.now, clock.timeZone),
+  };
+  const first = nextOccurrences(probe, clock.now, 1)[0];
+  return civilDateOf(first ?? clock.now, clock.timeZone);
+}
+
 /**
  * The schedule a write lands on.
  *
- * `undefined` keeps what is stored and an explicit `null` removes it — the
- * omitted-keeps rule every other saved field follows, so an MCP author
- * patching a spec never switches off a delivery.
+ * `undefined` means "the body did not mention it": nothing is written, so a
+ * stored schedule this release cannot read is never erased by an unrelated
+ * save. An explicit `null` removes it. That is the omitted-keeps rule every
+ * other saved field follows, so an MCP author patching a spec never switches
+ * off a delivery.
  *
- * The fortnight anchor survives an edit that does not move the fortnight (the
- * same cadence on the same weekday) and restarts today when it does; saving
- * the dialog twice must not shuffle which weeks a report goes out.
+ * The fortnight anchor (`startsOn`) is the date of the first send. It survives
+ * an edit that continues the same fortnight (still on, same cadence, same
+ * weekday) and restarts at the next matching weekday when the schedule is
+ * switched back on or the weekday moves, so a report re-enabled after a long
+ * pause does not inherit a parity from months ago.
  */
 export function resolveSchedule(
   input: ReportScheduleInput | null | undefined,
   current: ReportSchedule | null,
   clock: { timeZone: string; now: Date },
-): ReportSchedule | null {
-  if (input === undefined) return current;
-  if (input === null) return null;
-  const sameFortnight =
-    current !== null &&
-    current.cadence === input.cadence &&
-    current.weekday === input.weekday &&
-    isRunnable(current);
+): ReportSchedule | null | undefined {
+  if (input === undefined || input === null) return input;
+  const startsOn =
+    continuesFortnight(input, current) && current
+      ? current.startsOn
+      : input.cadence === 'biweekly'
+        ? firstSendDate(input, clock)
+        : civilDateOf(clock.now, clock.timeZone);
   return {
     enabled: input.enabled,
     cadence: input.cadence,
@@ -120,7 +156,6 @@ export function resolveSchedule(
     time: input.time,
     timeZone: clock.timeZone,
     recipients: [...new Set(input.recipients)],
-    startsOn:
-      sameFortnight && current ? current.startsOn : civilDateOf(clock.now, clock.timeZone),
+    startsOn,
   };
 }

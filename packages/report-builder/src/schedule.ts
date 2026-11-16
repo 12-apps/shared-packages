@@ -12,12 +12,14 @@
  *   zone's calendar, so the instant moves with daylight saving; it is never a
  *   fixed UTC offset frozen at the moment the schedule was saved.
  * - **A time that does not exist** (the hour skipped when clocks go forward)
- *   fires at the first real instant after the gap, once.
+ *   fires once, shifted forward by the length of the gap: 02:30 on a night
+ *   that jumps 02:00 to 03:00 fires at 03:30.
  * - **A time that happens twice** (the hour repeated when clocks go back)
  *   fires at the first of the two, once.
  * - **Quinzenal is every OTHER week**, counted from the first matching weekday
- *   on or after `startsOn`. `startsOn` is stored, never recomputed from "now",
- *   so the fortnight does not slip when a job restarts.
+ *   on or after `startsOn`, which the server sets to the date of the FIRST
+ *   send. `startsOn` is stored, never recomputed from "now", so the fortnight
+ *   does not slip when a job restarts.
  * - **Mensal on the 29th, 30th or 31st** fires on the LAST day of a shorter
  *   month, so a schedule never skips February.
  */

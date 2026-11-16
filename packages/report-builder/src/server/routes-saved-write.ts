@@ -91,7 +91,7 @@ function scheduleFor(
   body: SaveBody,
   current: SavedReportRecord | null,
   config: ReportBuilderServerConfig,
-): ReportSchedule | null {
+): ReportSchedule | null | undefined {
   return resolveSchedule(body.schedule, readSchedule(current?.schedule), {
     timeZone: config.timeZone,
     now: config.now ? config.now() : new Date(),

@@ -58,7 +58,7 @@ export interface SavedReportInput {
   visibilityRoles: string[];
   /** Omitted or null clears the preference back to the reader's default. */
   defaultRange?: string | null;
-  /** The resolved schedule (zone and anchor stamped); null removes it. */
+  /** The resolved schedule (zone and anchor stamped); null removes it; undefined leaves the column alone. */
   schedule?: ReportSchedule | null;
 }
 
@@ -91,7 +91,7 @@ function documentData(input: SavedReportInput): {
   visibility: string;
   visibilityRoles: string[];
   defaultRange: string | null;
-  schedule: ReportSchedule | null;
+  schedule?: ReportSchedule | null;
 } {
   return {
     name: input.name,
@@ -101,7 +101,8 @@ function documentData(input: SavedReportInput): {
     visibility: input.visibility,
     visibilityRoles: input.visibilityRoles,
     defaultRange: input.defaultRange ?? null,
-    schedule: input.schedule ?? null,
+    // Absent from the data when the body never mentioned it (never erase).
+    ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
   };
 }
 
