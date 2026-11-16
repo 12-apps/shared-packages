@@ -34,4 +34,9 @@ export interface ReportScheduleSurface {
    * reason. The host words it.
    */
   lockedReason?: string;
+  /**
+   * The whole phrase the dialog calls the store's clock, such as "Horário de
+   * São Paulo". Absent: the platform's name for the surface's zone.
+   */
+  timeZoneLabel?: string;
 }

@@ -36,6 +36,7 @@ export interface ReportScheduleCopy {
   recipientsFailed: string;
   recipientsEmpty: string;
   /** The footnote under the people list: whose clock, and who is left out. */
+  /** `zoneName` is the whole phrase for the clock, such as "Horário de Brasília". */
   zoneNote(zoneName: string): string;
   /** Why a save is held with the switch on and nobody ticked. */
   needsRecipient: string;

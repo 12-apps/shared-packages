@@ -117,11 +117,19 @@ function held(): ScheduleDraft | null {
 }
 
 describe('the delivery section', () => {
-  it('is off by default: the switch alone, none of the controls', () => {
+  it('is off by default: the switch alone, claiming nothing is being sent', () => {
     renderSection(null);
     expect(screen.getByTestId('report-settings-schedule-switch')).toBeTruthy();
-    expect(screen.getByText('Enviar por e-mail toda segunda, 8h')).toBeTruthy();
+    expect(screen.queryAllByText(/Enviar por e-mail/)).toEqual([]);
     expect(screen.queryAllByTestId('report-settings-frequency')).toEqual([]);
+  });
+
+  it('says what is chosen only while it is on, and the title is a label for the switch', () => {
+    renderSection(on());
+    expect(screen.getByText('Enviar por e-mail toda segunda, 8h')).toBeTruthy();
+    expect(screen.getByText('Envio automático').closest('label')?.getAttribute('for')).toBe(
+      screen.getByTestId('report-settings-schedule-switch').id,
+    );
   });
 
   it('turning it on opens Semanal, Monday 08:00, and ticks the person who saved', async () => {
@@ -171,15 +179,27 @@ describe('the delivery section', () => {
     renderSection(on());
     const refused = await screen.findByTestId('report-settings-recipient-rafa');
     expect(refused.getAttribute('aria-disabled')).toBe('true');
-    expect(screen.getByTestId('report-settings-recipient-rafa-helper').textContent).toBe(
-      'Garçom · sem acesso a vendas',
-    );
+    const reason = screen.getByTestId('report-settings-recipient-rafa-helper');
+    expect(reason.textContent).toBe('Garçom · sem acesso a vendas');
+    // The reason is tied to the checkbox it explains.
+    const input = refused.querySelector('input');
+    expect(input?.getAttribute('aria-describedby')).toBe(reason.id);
     expect(screen.getByTestId('report-settings-recipient-ana').getAttribute('aria-disabled')).not.toBe('true');
   });
 
-  it('drops a ticked person the host now refuses', async () => {
+  it('opening a saved schedule changes nothing, even with a person the host now refuses', async () => {
     renderSection({ ...on(), recipients: ['me', 'rafa'] });
-    await waitFor(() => expect(held()?.recipients).toEqual(['me']));
+    await screen.findByTestId('report-settings-recipient-ana');
+    expect(held()?.recipients).toEqual(['me', 'rafa']);
+    // The next edit of the list drops them.
+    fireEvent.click(screen.getByTestId('report-settings-recipient-ana'));
+    await waitFor(() => expect(held()?.recipients).toEqual(['me', 'ana']));
+  });
+
+  it('opening an enabled schedule with nobody ticked does not tick anyone', async () => {
+    renderSection({ ...on(), recipients: [] });
+    await screen.findByTestId('report-settings-recipient-ana');
+    expect(held()?.recipients).toEqual([]);
   });
 
   it('ticks and unticks people', async () => {
@@ -194,12 +214,31 @@ describe('the delivery section', () => {
     renderSection({ ...on(), recipients: [] }, () => Promise.resolve(people().map((p) => ({ ...p, preselected: false }))));
     await screen.findByTestId('report-settings-recipient-ana');
     expect(screen.getByTestId('report-settings-schedule-needs-recipient').textContent).toContain('Escolha quem recebe');
-    expect(screen.getByText(/Horário de America\/Sao_Paulo \(fuso da loja\)/)).toBeTruthy();
+    expect(screen.getByText(/fuso da loja/)).toBeTruthy();
   });
 
-  it('says so, in its own words, when the people cannot be loaded', async () => {
-    renderSection(on(), () => Promise.reject(new Error('boom')));
+  it('does not ask for a recipient while the list is still loading', () => {
+    renderSection({ ...on(), recipients: [] }, () => new Promise(() => undefined));
+    expect(screen.getByTestId('report-settings-recipients-loading')).toBeTruthy();
+    expect(screen.queryAllByTestId('report-settings-schedule-needs-recipient')).toEqual([]);
+  });
+
+  it('says so, in its own words, when the people cannot be loaded, and offers to retry', async () => {
+    const recipients = vi.fn(() => Promise.reject(new Error('boom')));
+    renderSection(on(), recipients);
     expect((await screen.findByTestId('report-settings-recipients-error')).textContent).toContain('Não foi possível');
+    fireEvent.click(screen.getByTestId('report-settings-recipients-retry'));
+    await waitFor(() => expect(recipients).toHaveBeenCalledTimes(2));
+  });
+
+  it('names the store clock in words, never by its IANA id, unless the host words it', async () => {
+    renderSection(on());
+    const note = await screen.findByText(/fuso da loja/);
+    expect(note.textContent).not.toContain('America/Sao_Paulo');
+    expect(note.textContent).toMatch(/Brasília/);
+    cleanup();
+    renderSection(on(), () => Promise.resolve(people()), { timeZoneLabel: 'Horário de São Paulo' });
+    expect((await screen.findByText(/fuso da loja/)).textContent).toContain('Horário de São Paulo (fuso da loja)');
   });
 
   it('says so when the store has nobody to choose', async () => {

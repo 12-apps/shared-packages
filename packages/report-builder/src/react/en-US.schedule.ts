@@ -42,5 +42,5 @@ export const EN_US_REPORT_SCHEDULE_COPY: ReportScheduleCopy = {
   needsRecipient: "Choose who receives the automatic delivery, or turn it off.",
   retry: "Try again",
   zoneNote: (zoneName) =>
-    `Time in ${zoneName} (the store's zone). Only people with access to this report's data receive it.`,
+    `${zoneName} (the store's zone). Only people with access to this report's data receive it.`,
 };

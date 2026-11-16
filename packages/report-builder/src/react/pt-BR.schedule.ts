@@ -45,5 +45,5 @@ export const PT_BR_REPORT_SCHEDULE_COPY: ReportScheduleCopy = {
   needsRecipient: "Escolha quem recebe o envio automático, ou desligue o envio.",
   retry: "Tentar de novo",
   zoneNote: (zoneName) =>
-    `Horário de ${zoneName} (fuso da loja). Só recebe quem tem acesso às informações deste relatório.`,
+    `${zoneName} (fuso da loja). Só recebe quem tem acesso às informações deste relatório.`,
 };

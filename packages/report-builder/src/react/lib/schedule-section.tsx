@@ -10,23 +10,23 @@
  * answer — a person who cannot is shown disabled with the reason beside them,
  * never hidden, so the author sees why somebody they expected is missing.
  */
-import { useEffect, useRef, type JSX } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useRef, type JSX } from "react";
 
-import { Checkbox } from "@12-apps/ui/form/Checkbox";
 import { Select } from "@12-apps/ui/form/Select";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
+import { fieldBorder } from "@12-apps/ui/tokens";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { SCHEDULE_CADENCES, type ScheduleCadence } from "../../schedule";
-import { CONTROL_RADIUS_PX } from "./report-surface";
+import { CONTROL_HEIGHT, CONTROL_RADIUS_PX } from "./report-surface";
 import { DEFAULT_SCHEDULE, type ScheduleDraft } from "./schedule-draft";
+import { Recipients } from "./schedule-recipients";
 import { Field } from "./settings-fields";
+import { zoneDisplayName } from "./schedule-zone";
 import { useReportCopy, useReportSurface } from "../transport-context";
-import type { ScheduleRecipient } from "../schedule-surface";
 
 /** Half-hour steps, which is as fine as a person asks for a report to arrive. */
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
@@ -67,109 +67,39 @@ function LockedRow({ reason, testId }: { reason: string; testId: string }): JSX.
   );
 }
 
-function RecipientList({
-  recipients,
-  selected,
-  onToggle,
-  testId,
-}: {
-  recipients: ScheduleRecipient[];
-  selected: string[];
-  onToggle: (id: string, checked: boolean) => void;
-  testId: string;
-}): JSX.Element {
-  return (
-    <Stack spacing={0.25} data-testid={`${testId}-recipients`}>
-      {recipients.map((person) => (
-        <Checkbox
-          key={person.id}
-          label={person.name}
-          helperText={person.canReceive ? person.detail : (person.reason ?? person.detail)}
-          disabled={!person.canReceive}
-          checked={person.canReceive && selected.includes(person.id)}
-          onChange={(_event, checked) => onToggle(person.id, checked)}
-          data-testid={`${testId}-recipient-${person.id}`}
-        />
-      ))}
-    </Stack>
-  );
-}
-
-/** The people the host offers, with the loading and failure stories a list needs. */
-function Recipients({
-  value,
-  onChange,
-  tenantSlug,
-  entities,
-  testId,
-}: {
-  value: ScheduleDraft;
-  onChange: (next: ScheduleDraft) => void;
-  tenantSlug: string;
-  entities: string[];
-  testId: string;
-}): JSX.Element {
-  const copy = useReportCopy().screens.settings.schedule;
-  const surface = useReportSurface().schedule;
-  const query = useQuery({
-    queryKey: ["report-schedule-recipients", tenantSlug, entities.join(",")],
-    queryFn: () => surface?.recipients({ tenantSlug, entities }) ?? Promise.resolve([]),
-    enabled: surface !== undefined,
-  });
-  const people = query.data;
-  const settled = useRef(false);
-
-  // Once per opening: the person who saved starts ticked, and anyone ticked
-  // who the host now says cannot receive is dropped, so a save never carries
-  // someone the report would be withheld from.
-  useEffect(() => {
-    if (!people || settled.current) return;
-    settled.current = true;
-    const allowed = new Set(people.filter((person) => person.canReceive).map((person) => person.id));
-    const kept = value.recipients.filter((id) => allowed.has(id));
-    const next =
-      kept.length === 0 && value.recipients.length === 0
-        ? people.filter((person) => person.canReceive && person.preselected).map((person) => person.id)
-        : kept;
-    if (next.length !== value.recipients.length || next.some((id, i) => id !== value.recipients[i])) {
-      onChange({ ...value, recipients: next });
-    }
-  }, [people, value, onChange]);
-
-  const toggle = (id: string, checked: boolean): void =>
-    onChange({
-      ...value,
-      recipients: checked
-        ? [...new Set([...value.recipients, id])]
-        : value.recipients.filter((current) => current !== id),
-    });
-
-  let body: JSX.Element;
-  if (query.isPending) {
-    body = (
-      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-loading`}>
-        {copy.recipientsLoading}
-      </Text>
-    );
-  } else if (query.isError || !people) {
-    body = (
-      <Text variant="body" size="sm" color="danger" data-testid={`${testId}-recipients-error`}>
-        {copy.recipientsFailed}
-      </Text>
-    );
-  } else if (people.length === 0) {
-    body = (
-      <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-recipients-empty`}>
-        {copy.recipientsEmpty}
-      </Text>
-    );
-  } else {
-    body = (
-      <RecipientList recipients={people} selected={value.recipients} onToggle={toggle} testId={testId} />
-    );
-  }
-  return <Field label={copy.recipientsLabel}>{body}</Field>;
-}
+/**
+ * The package's own segmented frame (`range-toggle`: the field border and the
+ * control radius), so the chosen part has a neighbour to sit inside of and a
+ * focused part reads differently from the chosen one. One label size, because
+ * `caption` fits the four words at 320 and a viewport breakpoint would be the
+ * wrong thing to measure in a dialog of fixed width.
+ */
+const FREQUENCY_SX = {
+  width: "100%",
+  height: CONTROL_HEIGHT,
+  boxSizing: "border-box",
+  flexWrap: "nowrap",
+  p: 0.25,
+  border: fieldBorder,
+  borderRadius: `${CONTROL_RADIUS_PX}px`,
+  bgcolor: "background.paper",
+  "& .MuiToggleButtonGroup-grouped": {
+    flex: "1 1 0",
+    minWidth: 0,
+    m: 0,
+    px: 0.25,
+    height: "100%",
+    minHeight: 0,
+    whiteSpace: "nowrap",
+    typography: "caption",
+    borderRadius: `${CONTROL_RADIUS_PX}px !important`,
+  },
+  "& .MuiToggleButtonGroup-grouped.Mui-focusVisible": {
+    outline: "2px solid",
+    outlineColor: "primary.main",
+    outlineOffset: -2,
+  },
+} as const;
 
 /** The frequency: four equal parts on ONE line at every width (ADR 0190). */
 function Frequency({
@@ -196,20 +126,7 @@ function Frequency({
         }}
         aria-label={copy.frequencyLabel}
         dataTestId={`${testId}-frequency`}
-        sx={{
-          width: "100%",
-          flexWrap: "nowrap",
-          // Four equal parts that still fit the narrowest phone: the group's
-          // own margin round each part goes, and the label steps down a size.
-          "& .MuiToggleButton-root": {
-            flex: "1 1 0",
-            minWidth: 0,
-            m: 0,
-            px: 0.25,
-            whiteSpace: "nowrap",
-            typography: { xs: "caption", sm: "body2" },
-          },
-        }}
+        sx={FREQUENCY_SX}
       />
     </Field>
   );
@@ -273,6 +190,43 @@ function WhenFields({
   );
 }
 
+/** The switch row: a semibold title, the line saying what is chosen (only while on), the switch. */
+function SwitchRow({
+  draft,
+  onChange,
+  testId,
+}: {
+  draft: ScheduleDraft;
+  onChange: (next: ScheduleDraft) => void;
+  testId: string;
+}): JSX.Element {
+  const copy = useReportCopy().screens.settings.schedule;
+  const inputId = `${testId}-schedule-switch-input`;
+  return (
+    <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
+      <Stack sx={{ flex: 1, minWidth: 0 }}>
+        <Box component="label" htmlFor={inputId} sx={{ cursor: "pointer" }}>
+          <Text variant="body" size="md" weight="semibold" as="span">
+            {copy.label}
+          </Text>
+        </Box>
+        {draft.enabled ? (
+          <Text variant="body" size="xs" color="secondary" id={`${testId}-schedule-summary`}>
+            {copy.summary({ ...draft })}
+          </Text>
+        ) : null}
+      </Stack>
+      <Switch
+        id={inputId}
+        checked={draft.enabled}
+        onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
+        inputProps={{ "aria-label": copy.label }}
+        data-testid={`${testId}-schedule-switch`}
+      />
+    </Stack>
+  );
+}
+
 export function ScheduleSection({
   value,
   onChange,
@@ -288,23 +242,22 @@ export function ScheduleSection({
   testId: string;
 }): JSX.Element | null {
   const copy = useReportCopy().screens.settings.schedule;
+  const locale = useReportCopy().engine.spec.locale;
   const surface = useReportSurface();
-  const needsRecipient = useReportCopy().screens.editor.needsRecipient;
+  const preselect = useRef(false);
   const schedule = surface.schedule;
   if (!schedule) return null;
   if (schedule.lockedReason !== undefined) {
     return <LockedRow reason={schedule.lockedReason} testId={`${testId}-schedule`} />;
   }
   const draft = value ?? DEFAULT_SCHEDULE;
+  const turn = (next: ScheduleDraft): void => {
+    if (next.enabled && !draft.enabled && next.recipients.length === 0) preselect.current = true;
+    onChange(next);
+  };
   return (
     <Stack spacing={1.5} data-testid={`${testId}-schedule`}>
-      <Switch
-        label={copy.label}
-        description={copy.summary({ ...draft })}
-        checked={draft.enabled}
-        onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
-        data-testid={`${testId}-schedule-switch`}
-      />
+      <SwitchRow draft={draft} onChange={turn} testId={testId} />
       {draft.enabled ? (
         <>
           <Frequency value={draft.cadence} onChange={(cadence) => onChange({ ...draft, cadence })} testId={testId} />
@@ -314,15 +267,11 @@ export function ScheduleSection({
             onChange={onChange}
             tenantSlug={tenantSlug}
             entities={entities}
+            preselect={preselect}
             testId={testId}
           />
-          {draft.recipients.length === 0 ? (
-            <Text variant="body" size="xs" color="danger" role="alert" data-testid={`${testId}-schedule-needs-recipient`}>
-              {needsRecipient}
-            </Text>
-          ) : null}
           <Text variant="body" size="xs" color="secondary">
-            {copy.zoneNote(surface.timeZone)}
+            {copy.zoneNote(zoneDisplayName(surface.timeZone, locale, schedule.timeZoneLabel))}
           </Text>
         </>
       ) : null}
