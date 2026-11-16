@@ -57,8 +57,10 @@ const SUMS: CycleCharge = {
   ],
 };
 
-function collection(breakdown: CycleCharge | null) {
+function collection(breakdown: CycleCharge | null, providerChargeId: string | null = null) {
+  const quoteInstallments = vi.fn(async () => []);
   const gateway = fakeGateway({
+    quoteInstallments,
     charge: vi.fn(async () => ({
       provider: "acquirer-a",
       providerChargeId: "chg-1",
@@ -67,7 +69,7 @@ function collection(breakdown: CycleCharge | null) {
   });
   const { payments } = fakePayments(gateway);
   const store = {
-    read: async () => ({ cycle: CYCLE, providerChargeId: null }),
+    read: async () => ({ cycle: CYCLE, providerChargeId }),
     recordRaised: vi.fn(async () => undefined),
   } as unknown as CycleStore;
   const breakdowns: CycleBreakdownLookup = vi.fn(async () => breakdown);
@@ -82,7 +84,7 @@ function collection(breakdown: CycleCharge | null) {
     }),
     breakdowns,
   } as SubscriptionCollectionDeps;
-  return { gateway, breakdowns, collect: createSubscriptionCollection(deps) };
+  return { gateway, quoteInstallments, breakdowns, store, collect: createSubscriptionCollection(deps) };
 }
 
 /** The name of what `run` rejected with, or null when it resolved. */
@@ -127,5 +129,50 @@ describe("a cycle whose breakdown sums", () => {
     expect(gateway.charge).toHaveBeenCalledTimes(1);
     const [, request] = gateway.charge.mock.calls[0] ?? [];
     expect(request).toMatchObject({ amount: { amountCents: 41_750, currency: "BRL" }, idempotencyKey: "cycle-1" });
+  });
+});
+
+describe("a cycle with no breakdown, the port wired", () => {
+  it("is charged by card exactly as before, under the cycle id", async () => {
+    const { collect, gateway, breakdowns } = collection(null);
+    await collect.collectByCard("cycle-1");
+    expect(breakdowns).toHaveBeenCalledWith("cycle-1");
+    expect(gateway.charge).toHaveBeenCalledTimes(1);
+    const [, request] = gateway.charge.mock.calls[0] ?? [];
+    expect(request).toMatchObject({ amount: { amountCents: 41_750, currency: "BRL" }, idempotencyKey: "cycle-1" });
+  });
+
+  it("is charged by push exactly as before, under the cycle id", async () => {
+    const { collect, gateway } = collection(null);
+    await collect.collectByPush("cycle-1");
+    expect(gateway.charge).toHaveBeenCalledTimes(1);
+    const [, request] = gateway.charge.mock.calls[0] ?? [];
+    expect(request).toMatchObject({ amount: { amountCents: 41_750, currency: "BRL" }, idempotencyKey: "cycle-1" });
+  });
+});
+
+describe("a mismatched breakdown stops before any provider call", () => {
+  it("quotes no instalment and raises no charge, by card", async () => {
+    const { collect, gateway, quoteInstallments } = collection({ ...SUMS, amountCents: 29_900 });
+    await rejectedName(() => collect.collectByCard("cycle-1", { installments: 3 } as never));
+    expect(quoteInstallments).not.toHaveBeenCalled();
+    expect(gateway.charge).not.toHaveBeenCalled();
+  });
+
+  it("raises no charge, by push", async () => {
+    const { collect, gateway, quoteInstallments } = collection({ ...SUMS, amountCents: 29_900 });
+    await rejectedName(() => collect.collectByPush("cycle-1"));
+    expect(quoteInstallments).not.toHaveBeenCalled();
+    expect(gateway.charge).not.toHaveBeenCalled();
+  });
+});
+
+describe("a row the collector skips as already charged", () => {
+  it("stays a skip when its breakdown mismatches: no throw, no charge, no lookup", async () => {
+    const { collect, gateway, breakdowns } = collection({ ...SUMS, amountCents: 29_900 }, "chg-0");
+    expect(await rejectedName(() => collect.collectByCard("cycle-1"))).toBeNull();
+    expect(await rejectedName(() => collect.collectByPush("cycle-1"))).toBeNull();
+    expect(breakdowns).not.toHaveBeenCalled();
+    expect(gateway.charge).not.toHaveBeenCalled();
   });
 });

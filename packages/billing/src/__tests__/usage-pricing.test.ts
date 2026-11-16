@@ -177,9 +177,11 @@ describe("a count that is not final when the next charge is composed", () => {
   });
 
   it("OWNER: a late commit counts in the period it commits in — billed once, on the cycle after", () => {
-    // 1000 committed by the boundary, 10 more that commit after it: the ended
-    // period bills nothing; the 10 are the next period's, and that period's
-    // own overage (1005 + 10 against 1000) lands on the cycle after it.
+    // 1000 committed by the boundary, so the ended period bills nothing. The
+    // dating rule itself is the host's (a count is dated by its commit); this
+    // test only composes what the host then hands in. The 10 that commit after
+    // the boundary join the next period's own 1005, so its reading is 1015:
+    // 15 over the allowance of 1000, billed on the cycle after it.
     expect(charge({ readings: [reading({ used: 1000 })] })?.amountCents).toBe(29_900);
     const AFTER: UsagePeriod = { start: NEXT.end, end: utc("2027-01-10") };
     const next = charge({
@@ -423,5 +425,89 @@ describe("a refund or chargeback of a charge that carried overage", () => {
     expect(c?.amountCents).toBe(29_900);
     expect(c?.lines.some((line) => line.kind === "OVERAGE")).toBe(false);
     expect(charge({ base: null, readings: [reading({ used: 1237 })], alreadyBilled: refunded })).toBeNull();
+  });
+});
+
+describe("the guards behind compose", () => {
+  const expectUsageError = (over: Partial<ComposeInput>) =>
+    expect(thrownName(() => createUsagePricing(POLICY).compose(input(over)))).toBe("BillingUsageError");
+
+  it("refuses a fractional or negative base", () => {
+    for (const amountCents of [299.5, -100]) {
+      expectUsageError({ base: { amountCents, currency: "BRL", period: NEXT } });
+    }
+  });
+
+  it("refuses a fractional or negative allowance on a reading", () => {
+    for (const allowance of [10.5, -1]) expectUsageError({ readings: [reading({ used: 1500, allowance })] });
+  });
+
+  it("refuses a usage period that does not start before it ends", () => {
+    expectUsageError({ usagePeriod: { start: ENDED.end, end: ENDED.start }, base: null, readings: [] });
+    const empty: UsagePeriod = { start: ENDED.end, end: ENDED.end };
+    expectUsageError({ usagePeriod: empty, readings: [reading({ period: empty })] });
+  });
+
+  it("refuses a sum past safe integers", () => {
+    const policy = { currency: "BRL", meters: [{ meter: METER, allowance: 0, unitPriceCents: 1 }] };
+    const run = () =>
+      createUsagePricing(policy).compose(input({
+        base: { amountCents: Number.MAX_SAFE_INTEGER, currency: "BRL", period: NEXT },
+        readings: [reading({ used: 1 })],
+      }));
+    expect(thrownName(run)).toBe("BillingUsageError");
+  });
+
+  it("returns charge null, not a cancellation, for a base of 0 with no overage", () => {
+    const result = createUsagePricing(POLICY).compose(
+      input({ base: { amountCents: 0, currency: "BRL", period: NEXT }, readings: [reading({ used: 10 })] }),
+    );
+    expect(result).toEqual({ ready: true, charge: null });
+  });
+});
+
+describe("several meters", () => {
+  const MULTI = {
+    currency: "BRL",
+    meters: [
+      { meter: "a", allowance: 0, unitPriceCents: 10 },
+      { meter: "b", allowance: 10, unitPriceCents: 30 },
+    ],
+  };
+  const a = (used: number) => reading({ meter: "a", used });
+  const b = (used: number) => reading({ meter: "b", used });
+
+  it("sums every meter's overage, with an allowance of 0, whatever the readings' order", () => {
+    // base 29900 + a: 10 x 10 = 100 + b: 15 over 10 = 5 x 30 = 150 -> 30150
+    const forward = createUsagePricing(MULTI).compose(input({ readings: [a(10), b(15)] }));
+    const reversed = createUsagePricing(MULTI).compose(input({ readings: [b(15), a(10)] }));
+    expect(reversed).toEqual(forward);
+    expect(forward).toMatchObject({ ready: true, charge: { amountCents: 29_900 + 100 + 150 } });
+    if (forward.ready && forward.charge) {
+      expect(forward.charge.lines.map((line) => (line.kind === "BASE" ? "BASE" : line.meter))).toEqual(["BASE", "a", "b"]);
+    }
+  });
+});
+
+describe("the breakdown check, branch by branch", () => {
+  const BASE_LINE = { kind: "BASE" as const, amountCents: 100, period: NEXT };
+  const overage = (over: object) => ({
+    kind: "OVERAGE" as const, meter: METER, period: ENDED, used: 20, allowance: 10, quantity: 10,
+    unitPriceCents: 5, amountCents: 50, ...over,
+  });
+  const name = (c: CycleCharge) => thrownName(() => checkBreakdown(c));
+
+  it("refuses a blank currency", () => {
+    expect(name({ amountCents: 100, currency: " ", lines: [BASE_LINE] })).toBe("BillingBreakdownError");
+  });
+
+  it("refuses an overage line of quantity 0", () => {
+    const line = overage({ used: 10, quantity: 0, amountCents: 0 });
+    expect(name({ amountCents: 100, currency: "BRL", lines: [BASE_LINE, line] })).toBe("BillingBreakdownError");
+  });
+
+  it("refuses a second BASE line", () => {
+    const other = { ...BASE_LINE, period: ENDED };
+    expect(name({ amountCents: 200, currency: "BRL", lines: [BASE_LINE, other] })).toBe("BillingBreakdownError");
   });
 });
