@@ -65,6 +65,7 @@ export async function createTrayController(
           status,
           copy: options.copy,
           autostartEnabled: view.autostartEnabled,
+          autostartManagedBySystem: options.autostart.managedBySystem === true,
           actions: { ...options.actions, toggleAutostart: () => void toggleAutostart() },
         }),
       ),

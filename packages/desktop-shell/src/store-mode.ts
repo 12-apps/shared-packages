@@ -18,6 +18,6 @@ export interface StoreProcess {
 }
 
 /** Whether this process runs from a Microsoft Store (MSIX) install. */
-export function isWindowsStoreApp(proc: StoreProcess = process): boolean {
+export function isWindowsStoreApp(proc: StoreProcess = typeof process === "undefined" ? {} : process): boolean {
   return proc.windowsStore === true;
 }

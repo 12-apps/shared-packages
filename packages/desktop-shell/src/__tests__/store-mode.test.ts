@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { isWindowsStoreApp } from "../store-mode";
 
@@ -14,5 +14,16 @@ describe("isWindowsStoreApp", () => {
 
   it("reads the real process by default, which is no Store install here", () => {
     expect(isWindowsStoreApp()).toBe(false);
+  });
+});
+
+describe("isWindowsStoreApp without a process", () => {
+  it("does not throw where `process` does not exist, as in a browser", () => {
+    vi.stubGlobal("process", undefined);
+    try {
+      expect(isWindowsStoreApp()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

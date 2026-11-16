@@ -50,6 +50,12 @@ export interface TrayMenuInput {
   autostartEnabled: boolean;
   /** Hidden entirely where the platform has no autostart port. */
   autostartSupported?: boolean;
+  /**
+   * The system owns the switch (a Store install): the entry is a plain item
+   * with no checkbox, since its state cannot be read, and its click opens the
+   * system's startup settings.
+   */
+  autostartManagedBySystem?: boolean;
   actions: TrayActions;
 }
 
@@ -81,12 +87,16 @@ export function buildTrayMenu(input: TrayMenuInput): TrayMenuItem[] {
 
   if (input.autostartSupported !== false) {
     items.push({ type: "separator" });
-    items.push({
-      label: copy.startAtLogin,
-      type: "checkbox",
-      checked: input.autostartEnabled,
-      click: actions.toggleAutostart,
-    });
+    items.push(
+      input.autostartManagedBySystem === true
+        ? { label: copy.startAtLogin, click: actions.toggleAutostart }
+        : {
+            label: copy.startAtLogin,
+            type: "checkbox",
+            checked: input.autostartEnabled,
+            click: actions.toggleAutostart,
+          },
+    );
   }
 
   items.push({ type: "separator" });
