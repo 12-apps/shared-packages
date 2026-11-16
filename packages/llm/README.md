@@ -16,6 +16,8 @@ interface onto the provider's official SDK and maps the answer back.
   refresh hook, both behind one interface.
 - **A tool-use loop** that reports every turn's usage.
 - **Typed errors** and one retry hook the host supplies.
+- **A support ladder**: automation, then model tiers that escalate, then a
+  person, with least-privilege tools per tier bound to the host's scope.
 
 Only chat ships today. The `Capability` union leaves room for others (a
 transcription capability is planned), and an adapter declares what it can do.
@@ -249,7 +251,7 @@ const outcome = await runToolLoop({
   onUsage: (usage, turn) => meter.record(usage), // once per turn, refused turns included
 });
 
-outcome.status;   // "completed" | "refused" | "max_turns" | "max_tokens" | "stopped"
+outcome.status;   // "completed" | "refused" | "max_turns" | "max_tokens" | "stopped" | "halted"
 outcome.messages; // the conversation with every turn and tool result appended
 outcome.usage;    // the summed usage
 outcome.refusal;  // set when status is "refused"
@@ -258,7 +260,100 @@ outcome.refusal;  // set when status is "refused"
 The loop runs every tool call of a turn and sends all the results back
 together. An unknown tool, or an executor that throws, becomes an error result
 the model can read and recover from. When the turn limit is reached, the loop
-stops without running the last turn's calls.
+stops without running the last turn's calls. An executor that returns
+`{ output, halt: true }` ends the loop with `status: "halted"` once every call
+of that turn has its result, and no further model call is made.
+
+## The support ladder
+
+`createSupportLadder` routes each customer message up a ladder. Automation
+answers what the host recognises with no model call. Anything else goes to
+the first model tier, which answers or escalates. A tier escalates to the next
+tier, which runs on the same message in the same call, or to a person. The
+ladder carries no domain: tiers, tools, copy and the person are all the host's.
+
+```ts
+import { createSupportLadder, mcpTools } from "@12-apps/llm";
+
+const ladder = createSupportLadder<{ accountId: string }, { locale: string }>({
+  automation: {
+    greeting: () => "Hi! Reply 1 for opening hours, 2 to reset your password.",
+    match: (message) => (message.trim() === "1" ? { reply: "We answer 9 to 5, Monday to Friday." } : null),
+  },
+  tiers: [
+    {
+      id: "triage",
+      client: { provider: "openai", model: "gpt-5-mini", credentials },     // or a ModelClient
+      instructions: "You answer simple helpdesk questions from the knowledge base.",
+      tools: [searchArticles],                                              // read-only
+    },
+    {
+      id: "specialist",
+      client: { provider: "anthropic", model: "claude-opus-5-5", credentials },
+      instructions: "You resolve account problems, or hand them to a person.",
+      tools: [
+        searchArticles,
+        mcpTools({
+          connect: (scope) => accountServer.connectAs(scope.accountId),     // the scope's own token
+          allow: ["reset_password"],                                        // nothing else of the server's
+        }),
+      ],
+    },
+  ],
+  person: { handOff: ({ conversationId, reason, fromTier }) => queue.push({ conversationId, reason, fromTier }) },
+  state: { get: (id) => levels.get(id), set: (id, level) => levels.set(id, level) },
+  scopeFields: ["accountId"],                 // the model may never set these
+  onUsage: (tier, usage) => meter.record(tier, usage),
+});
+
+const result = await ladder.handle({
+  conversationId: "conv-42",
+  message: "I can't sign in",
+  transcript,                                 // the conversation before this message
+  context: { locale: "en" },
+  scope: { accountId: "acct-7" },             // from the host's session, never from the model
+});
+
+switch (result.kind) {
+  case "automation": send(result.reply); break;          // source: "greeting" | "match"
+  case "model":      send(result.reply); break;          // result.tier answered
+  case "person":     notifyAgent(result); break;         // fromTier, reason, handedOff
+}
+result.usage;        // [{ tier, turns, usage }] per tier that ran, to meter each model separately
+result.escalations;  // [{ from, to, reason }]
+```
+
+- **Each tier answers or escalates.** Every tier gets the ladder's `escalate`
+  tool, `{ to: "next" | "person", reason }`; `"next"` is not offered on the last
+  tier. A refusal escalates with reason `"refused"`, and a turn with no words
+  with `"no_answer"`: to the next tier, or to a person from the last.
+- **A conversation stays where it reached.** The `state` port stores the tier
+  that answered, or `"person"` (`WITH_PERSON`). The next message goes straight
+  to that tier; automation is consulted only before a conversation reached a
+  tier. Once a person has it, `handle` returns `{ kind: "person", handedOff:
+  false }` and never calls a model or `handOff` again. The host resets the
+  level when it decides the conversation is over.
+- **Least privilege per tier.** A tier's model sees exactly that tier's tools
+  plus `escalate`. A call to another tier's tool is answered as an unknown
+  tool and never runs.
+- **Tools from MCP.** `mcpTools({ connect, allow, overrides? })` connects for
+  each call's scope and offers ONLY the allow-listed tools; the rest of the
+  server's list is never shown, and a call to one never reaches the server.
+  An allowed tool the server lacks is refused (`tool_missing`). The client is
+  structural (`listTools`, `callTool`, as the official MCP SDK's `Client`), so
+  the package depends on no MCP SDK. Tool schemas must be strict; `overrides`
+  replaces a description or schema the server ships loose.
+- **Scope binding.** `scope` is opaque to the ladder. Every tool's `run` gets
+  it in its context, and an MCP server gets it through the host's `connect`,
+  never through the model. A tool whose schema declares a `scopeFields` name
+  is refused (`scope_exposed`), and a model call whose arguments carry one is
+  refused without running, so a conversation for one account cannot reach
+  another's data even when both use the same tools.
+- **Refused configurations** throw `SupportLadderError` (an
+  `InvalidRequestError`) with a `code`: `empty_tiers`, `escalation_loop` (a tier
+  id listed twice), `reserved_tier` (a tier named `"person"`), `unknown_tier`
+  (a level from the state port that is no tier), `tool_conflict`,
+  `tool_missing`, `scope_exposed`.
 
 ## Errors and retries
 
@@ -271,6 +366,7 @@ stops without running the last turn's calls.
 | `InvalidResponseError` | an answer the adapter cannot read (tool arguments that are not JSON) |
 | `RefusalError` | thrown only by `ensureNotRefused` |
 | `UnsupportedError` | an unknown provider, an undeclared credential kind, a missing optional SDK |
+| `SupportLadderError` | a support ladder's configuration or state refused; see `code` |
 
 All of them extend `LlmError`, which has `kind`, `provider` and `status`. The
 SDKs' own retries are switched off. The host's `retry` hook is the whole
