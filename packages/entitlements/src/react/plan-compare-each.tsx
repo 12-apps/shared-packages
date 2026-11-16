@@ -161,13 +161,13 @@ export function EachPlanActions({
               fullWidth
               aria-label={label}
               data-testid={`plan-compare-learn-${tier.key}`}
-              sx={{ justifyContent: 'center', textAlign: 'center' }}
             >
               <Box
                 component="span"
                 data-compare-label=""
                 sx={{
                   display: 'block',
+                  textAlign: 'center',
                   minWidth: 0,
                   maxWidth: '100%',
                   whiteSpace: 'nowrap',
