@@ -14,6 +14,7 @@ import type {
 } from './db';
 import type { PushSubscriptionStore } from './push-subscriptions';
 import type { TransportRegistry } from './transports/registry';
+import { twilioRejectionOf, type ProviderRejection } from './twilio';
 
 /**
  * Handing a delivery to its transport, and the retry sweep that re-hands the
@@ -89,6 +90,16 @@ export type NotificationConsentGate = (
   channels: NotificationChannel[],
 ) => Promise<NotificationChannel[]>;
 
+/** A send the provider refused because of the NUMBER (see `./twilio.ts`). */
+export interface NotificationRejectedSend {
+  deliveryId: string;
+  userId: string;
+  /** The phone on file when the send was refused. */
+  phone: string | null;
+  channel: NotificationChannel;
+  kind: ProviderRejection;
+}
+
 /** What dispatch needs from the mount. */
 export interface NotificationDispatchDeps {
   db: NotificationsDbProvider;
@@ -98,6 +109,12 @@ export interface NotificationDispatchDeps {
   logger: NotificationLogger;
   maxAttempts: number;
   consentGate?: NotificationConsentGate;
+  /**
+   * Told once per send refused for the number itself, after its row is DEAD:
+   * the consent engine drops a grandfathering (a bad number) or records the
+   * opt-out (the person replied STOP to the provider). Never fails the send.
+   */
+  onRejected?: (rejection: NotificationRejectedSend) => Promise<void>;
 }
 
 /** Load the recipient's destinations once, for every transport's gate. */
@@ -201,9 +218,44 @@ async function sendClaimed(
       },
     });
   } catch (error) {
-    await settle(deps, client, delivery, error);
+    await failed(deps, client, delivery, recipient, error);
   }
   return true;
+}
+
+/**
+ * A send that threw. A provider refusal of the NUMBER (`./twilio.ts`) is DEAD at
+ * once — no retry can change the answer, and each one would spend a claim, a
+ * cap and a provider call — and the consent engine is told; anything else is
+ * an ordinary failure, retried up to the ceiling.
+ */
+async function failed(
+  deps: NotificationDispatchDeps,
+  client: NotificationsDb,
+  delivery: NotificationDeliveryRow,
+  recipient: TransportRecipient,
+  error: unknown,
+): Promise<void> {
+  const kind = twilioRejectionOf(error);
+  if (kind === null) {
+    await settle(deps, client, delivery, error);
+    return;
+  }
+  await client.notificationDelivery.update({
+    where: { id: delivery.id },
+    data: { status: 'DEAD', error: `${messageOf(error)} (permanent: ${kind})` },
+  });
+  try {
+    await deps.onRejected?.({
+      deliveryId: delivery.id,
+      userId: recipient.userId,
+      phone: recipient.phone,
+      channel: delivery.channel as NotificationChannel,
+      kind,
+    });
+  } catch (hookError) {
+    deps.logger.error(`[notifications] recording the refusal of ${delivery.id} failed:`, hookError);
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { NotificationChannel } from '../types';
 
 import type { ChannelConsentDelegate, ChannelConsentRow } from './consent-db';
+import type { NotificationRejectedSend } from './dispatch';
 import { applyInboundConsent } from './consent-inbound';
 import { askOneGrandfathered, startConfirmation } from './consent-send';
 import {
@@ -66,12 +67,14 @@ export interface NotificationConsentApi {
   askGrandfathered(options?: { take?: number }): Promise<{ asked: number }>;
 }
 
-/** The engine, plus the two things only the mount's own parts call. */
+/** The engine, plus the things only the mount's own parts call. */
 export interface ConsentEngine extends NotificationConsentApi {
   /** The gate: `channels` minus the required ones this number has not consented to. */
   allowed(userId: string, phone: string | null, channels: NotificationChannel[]): Promise<NotificationChannel[]>;
   /** A preferences save turned paid channels on: ask where nothing stands. */
   startTurnedOn(userId: string, channels: readonly PaidChannel[]): Promise<void>;
+  /** The provider refused a send for the number itself (see `./dispatch.ts`). */
+  rejected(rejection: Omit<NotificationRejectedSend, 'deliveryId'> & { ref: string }): Promise<void>;
 }
 
 const DEFAULTS = { resendCooldownMs: 60_000, maxSendsPerDay: 3, codeTtlMs: 10 * 60_000, maxCodeAttempts: 5 };
@@ -244,6 +247,41 @@ async function allowedFor(
   return input.channels.filter((channel) => !required.has(channel) || ok.has(channel));
 }
 
+/**
+ * The provider refused a send because of the number. A BAD number loses its
+ * grandfathering (owner, 2026-11-16: a permanent failure on a grandfathered
+ * phone stops sends); a confirmed number is not touched, its owner proved it.
+ * An OPT-OUT the provider holds (the person replied STOP to the provider's
+ * sender) is recorded like a reply opt-out: every account holding the number on
+ * that channel, and this account's own row even when it had none or held an
+ * older number.
+ */
+async function recordRejection(
+  deps: ConsentDeps,
+  input: Omit<NotificationRejectedSend, 'deliveryId'> & { ref: string },
+): Promise<void> {
+  const { userId, channel } = input;
+  if (!isPaidChannel(channel)) return;
+  const store = await consentStore(deps);
+  if (input.kind === 'BAD_NUMBER') {
+    await store.deleteMany({ where: { userId, channel, status: 'GRANDFATHERED' } });
+    return;
+  }
+  const destination = storedDestination(input.phone, deps.config.defaultCountryCode);
+  if (!destination) return;
+  const at = new Date();
+  await applyInboundConsent(deps, { channel, from: destination, optOut: true, at, externalId: input.ref });
+  const method = deps.config.methods[channel] ?? 'REPLY';
+  await store.createMany({
+    data: [{ userId, channel, destination, status: 'OPTED_OUT', method }],
+    skipDuplicates: true,
+  });
+  await store.updateMany({
+    where: { userId, channel },
+    data: { destination, status: 'OPTED_OUT', optedOutAt: at, codeHash: null, codeExpiresAt: null },
+  });
+}
+
 /** A save turned paid channels on: ask where nothing stands for the number. */
 async function startTurnedOn(deps: ConsentDeps, userId: string, channels: readonly PaidChannel[]): Promise<void> {
   const asking = channels.filter((channel) => deps.config.methods[channel] !== undefined);
@@ -278,5 +316,6 @@ export function createConsentEngine(deps: ConsentDeps, requireConsent: readonly 
     askGrandfathered: (options = {}) => askGrandfatheredRows(deps, options.take ?? 100),
     allowed: (userId, phone, channels) => allowedFor(deps, required, { userId, phone, channels }),
     startTurnedOn: (userId, channels) => startTurnedOn(deps, userId, channels),
+    rejected: (rejection) => recordRejection(deps, rejection),
   };
 }

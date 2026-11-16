@@ -51,13 +51,21 @@ export interface DriverDeclarationBase {
   fetchImpl?: FetchImpl;
 }
 
-/** A vendor rejection, carrying what the provider actually said. */
+/**
+ * A vendor rejection, carrying what the provider actually said: `detail` is the
+ * response body as received, which is where a vendor puts its own error code
+ * (`./../twilio.ts` reads Twilio's to tell a bad number from a bad moment).
+ */
 export class NotificationProviderError extends Error {
+  readonly vendor: string;
   readonly status: number;
+  readonly detail: string;
   constructor(vendor: string, status: number, detail: string) {
     super(`${vendor} rejected the message (${status} ${detail}).`);
     this.name = 'NotificationProviderError';
+    this.vendor = vendor;
     this.status = status;
+    this.detail = detail;
     Object.setPrototypeOf(this, NotificationProviderError.prototype);
   }
 }

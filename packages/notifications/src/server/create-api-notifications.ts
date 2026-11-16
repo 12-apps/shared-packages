@@ -27,7 +27,11 @@ import {
 } from './consent';
 import type { PaidChannel } from './consent-text';
 import type { NotificationConsentConfig } from './consent-types';
-import { DEFAULT_MAX_DELIVERY_ATTEMPTS, type NotificationConsentGate } from './dispatch';
+import {
+  DEFAULT_MAX_DELIVERY_ATTEMPTS,
+  type NotificationConsentGate,
+  type NotificationDispatchDeps,
+} from './dispatch';
 import {
   applyDeliveryReceipt,
   type AppliedDeliveryReceipt,
@@ -283,6 +287,7 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
       onCommitted: config.onCommitted,
       sideOf: config.sideOf,
       consentGate: paid.gate,
+      onRejected: paid.onRejected,
       caps: paid.caps,
     }),
   });
@@ -318,14 +323,20 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
 /**
  * The paid-channel policy of one mount: the consent engine (when `consent` is
  * configured), the gate it applies (only when `requireConsent` names a channel
- * — a mount that merely COLLECTS consent sends as before), and the caps.
- * Every part is absent unless the host asked for it.
+ * — a mount that merely COLLECTS consent sends as before), what a provider
+ * refusal of a number records, and the caps. Every part is absent unless the
+ * host asked for it.
  */
 function paidPolicy(
   config: NotificationsServerConfig,
   transports: TransportRegistry,
   logger: NotificationLogger,
-): { consent?: ConsentEngine; gate?: NotificationConsentGate; caps?: CapsGate } {
+): {
+  consent?: ConsentEngine;
+  gate?: NotificationConsentGate;
+  onRejected?: NotificationDispatchDeps['onRejected'];
+  caps?: CapsGate;
+} {
   const requireConsent = config.requireConsent ?? [];
   const consentConfig = resolveConsentConfig(config.consent, requireConsent);
   const caps = config.caps ? createCapsGate(config.db, config.caps, logger) : null;
@@ -337,6 +348,8 @@ function paidPolicy(
   return {
     consent,
     ...(requireConsent.length > 0 ? { gate: consent.allowed } : {}),
+    onRejected: ({ deliveryId, ...rejection }) =>
+      consent.rejected({ ...rejection, ref: `provider-refusal:${deliveryId}` }),
     ...(caps ? { caps } : {}),
   };
 }

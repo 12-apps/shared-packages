@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+import { NotificationProviderError } from './transports/drivers';
+
 /**
  * Twilio's webhook helpers — the twin of `@12-apps/messaging`'s Meta
  * ones. The ROUTE is the host's (its path, its body parser, its auth token);
@@ -44,12 +46,55 @@ export type TwilioCallback =
   | { kind: 'ignored'; reason: string };
 
 /**
- * The error codes that say the NUMBER is bad rather than the moment:
- * unknown/unreachable handset (30005), landline (30006), invalid 'To' (21211),
- * not a mobile number (21614). The rest (30003 unreachable, 30008 unknown,
- * 30001 queue overflow, …) are transient.
+ * The status-callback `ErrorCode`s that say the NUMBER is bad rather than the
+ * moment: unknown handset (30005) and landline or unreachable carrier (30006).
+ * The rest (30003 unreachable, 30008 unknown, 30001 queue overflow, …) are
+ * transient.
+ *
+ * 21211 (invalid 'To') and 21614 (not a mobile number) are REST API errors:
+ * Twilio answers them with HTTP 400 when the message is CREATED, so they reach
+ * the dispatcher synchronously and are classified there
+ * ({@link twilioRejectionOf}). They stay in this set only because a message
+ * queued through a Messaging Service can report them later, on its callback.
  */
 const PERMANENT_ERROR_CODES = new Set(['30005', '30006', '21211', '21614']);
+
+/** What a synchronous provider rejection says about the NUMBER. */
+export type ProviderRejection = 'BAD_NUMBER' | 'OPTED_OUT';
+
+/**
+ * Twilio's REST error codes that are about the number, never the moment:
+ * invalid 'To' (21211), not a mobile number (21614), and 21610 — the recipient
+ * replied STOP to the sender, so Twilio refuses every message to it until they
+ * reply START.
+ */
+const REST_REJECTIONS: Record<string, ProviderRejection> = {
+  '21211': 'BAD_NUMBER',
+  '21614': 'BAD_NUMBER',
+  '21610': 'OPTED_OUT',
+};
+
+/** The `code` of a Twilio REST error body, or null when it carries none. */
+function restCodeOf(detail: string): string | null {
+  try {
+    const code = (JSON.parse(detail) as { code?: unknown } | null)?.code;
+    return typeof code === 'number' || typeof code === 'string' ? String(code) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A send that Twilio refused SYNCHRONOUSLY, classified: `BAD_NUMBER` and
+ * `OPTED_OUT` are permanent (retrying spends a claim, a cap and a provider
+ * call on an answer that will not change), anything else is `null` and keeps
+ * the ordinary retry. Only the built-in twilio driver's errors are read.
+ */
+export function twilioRejectionOf(error: unknown): ProviderRejection | null {
+  if (!(error instanceof NotificationProviderError) || error.vendor !== 'Twilio') return null;
+  const code = restCodeOf(error.detail);
+  return code === null ? null : (REST_REJECTIONS[code] ?? null);
+}
 
 const STATUS_OF: Record<string, 'SENT' | 'DELIVERED' | 'UNDELIVERED'> = {
   sent: 'SENT',
