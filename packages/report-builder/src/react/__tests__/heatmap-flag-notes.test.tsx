@@ -106,6 +106,28 @@ describe("a heat map", () => {
     expect(screen.getByTestId("r-heatmap-legend-unmeasured").textContent).toBe("— sem custo na hora");
   });
 
+  it("keeps weekdays as rows at 500px and draws a percent without its sign, read whole", () => {
+    const hours = Array.from({ length: 24 }, (_, hour) => ({ key: `${hour}`, label: `${hour}h` }));
+    const wide: ReportRender = {
+      ...HEATMAP,
+      columnAxis: hours,
+      cells: [{ row: "1-seg", column: "16", value: 9.02 }],
+    };
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = () => ({ width: 500, height: 100 }) as DOMRect;
+    try {
+      render(<ReportRenderView render={wide} dataTestId="r" caption="Custo / vendas por hora" />);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+    }
+    const root = screen.getByTestId("r-heatmap");
+    expect(root.getAttribute("data-transposed")).toBe("false");
+    expect(root.getAttribute("data-dense")).toBe("true");
+    const cell = screen.getByTestId("r-heatmap-cell-1-seg-16");
+    expect(cell.querySelector("[aria-hidden='true']")?.textContent).toBe("902");
+    expect(within(root).getByRole("cell", { name: "902% acima da meta" })).toBeTruthy();
+  });
+
   it("exports the long form it was folded from", () => {
     const columns = exportColumnsFor(HEATMAP, PT_BR_REPORT_ENGINE_COPY.values);
     expect(columns.map((column) => column.header)).toEqual(["Dia da semana", "Hora", "Custo / vendas"]);

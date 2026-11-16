@@ -159,27 +159,102 @@ describe("HeatMap", () => {
 
 describe("heatMapFit", () => {
   const metrics = { labelPx: 44, labelTransposedPx: 36, spacingPx: 3, minCellPx: 32, compactMinCellPx: 28 };
+  const denseMetrics = { ...metrics, denseLabelPx: 32, denseSpacingPx: 2, denseMinCellPx: 17 };
+  const regular = { compact: false, dense: false };
 
   it("keeps the asked orientation at the regular step when every figure fits", () => {
-    expect(heatMapFit(560, 7, 14, metrics, false)).toEqual({ transposed: false, compact: false });
+    expect(heatMapFit(560, 7, 14, metrics, false)).toEqual({ transposed: false, ...regular });
   });
 
   it("takes the compact step before turning the grid round", () => {
     // 14 hours in ~480px: 44 + 14 × 35 + 3 = 537 does not fit, 44 + 14 × 31 + 3 = 481 does.
-    expect(heatMapFit(482, 7, 14, metrics, false)).toEqual({ transposed: false, compact: true });
+    expect(heatMapFit(482, 7, 14, metrics, false)).toEqual({ transposed: false, compact: true, dense: false });
   });
 
-  it("turns 24 hours round at the owner's 1280-with-menu width rather than clip them", () => {
-    expect(heatMapFit(546, 7, 24, metrics, false)).toEqual({ transposed: true, compact: false });
+  it("turns 24 hours round when the metrics name no dense step", () => {
+    expect(heatMapFit(546, 7, 24, metrics, false)).toEqual({ transposed: true, ...regular });
   });
 
   it("goes compact at 320 transposed, and keeps a fixed orientation", () => {
-    expect(heatMapFit(250, 7, 14, metrics, true)).toEqual({ transposed: true, compact: true });
-    expect(heatMapFit(546, 7, 24, metrics, false, true)).toEqual({ transposed: false, compact: true });
+    expect(heatMapFit(250, 7, 14, metrics, true)).toEqual({ transposed: true, compact: true, dense: false });
+    expect(heatMapFit(546, 7, 24, metrics, false, true)).toEqual({ transposed: false, compact: true, dense: false });
   });
 
   it("keeps the preference until the width is measured", () => {
-    expect(heatMapFit(0, 7, 24, metrics, true)).toEqual({ transposed: true, compact: false });
+    expect(heatMapFit(0, 7, 24, metrics, true)).toEqual({ transposed: true, ...regular });
+  });
+
+  describe("24 hours × 7 weekdays, weekdays preferred as rows (a computer width)", () => {
+    // 24 columns need 32 + 24 × 19 + 2 = 490px at the dense step.
+    it.each([
+      [1000, { transposed: false, compact: false, dense: false }],
+      [700, { transposed: false, compact: true, dense: true }],
+      [500, { transposed: false, compact: true, dense: true }],
+      [490, { transposed: false, compact: true, dense: true }],
+      [380, { transposed: true, compact: false, dense: false }],
+    ])("at a container of %ipx", (width, expected) => {
+      expect(heatMapFit(width, 7, 24, denseMetrics, false)).toEqual(expected);
+    });
+
+    it("turns the grid round only below what the dense step needs", () => {
+      expect(heatMapFit(489, 7, 24, denseMetrics, false).transposed).toBe(true);
+    });
+  });
+
+  it("keeps hours as rows on a phone, where the preference is transposed", () => {
+    expect(heatMapFit(380, 7, 24, denseMetrics, true)).toEqual({ transposed: true, ...regular });
+  });
+});
+
+describe("HeatMap at the dense step", () => {
+  const HOURS = Array.from({ length: 24 }, (_, hour) => ({ key: `${hour}`, label: `${hour}h` }));
+
+  function renderAt(width: number, overrides: Partial<HeatMapProps> = {}): void {
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = () => ({ width, height: 100 }) as DOMRect;
+    try {
+      render(
+        <HeatMap
+          rows={[{ key: "1", label: "Seg" }]}
+          columns={HOURS}
+          cells={[{ row: "1", column: "15", value: 9.02 }]}
+          scale={SCALE}
+          formatValue={(value) => `${Math.round(value * 100)}%`}
+          labels={LABELS}
+          caption="Custo / vendas"
+          dataTestId="hm"
+          {...overrides}
+        />,
+      );
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+    }
+  }
+
+  it("keeps weekdays as rows at 500px, with every hour still a named column", () => {
+    renderAt(500);
+    expect(screen.getByTestId("hm")).toHaveAttribute("data-transposed", "false");
+    expect(screen.getByTestId("hm")).toHaveAttribute("data-dense", "true");
+    expect(screen.getAllByRole("columnheader")).toHaveLength(24);
+    expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)[23]).toBe("23h");
+  });
+
+  it("turns the hours into rows at 380px", () => {
+    renderAt(380);
+    expect(screen.getByTestId("hm")).toHaveAttribute("data-transposed", "true");
+    expect(screen.getByTestId("hm")).toHaveAttribute("data-dense", "false");
+  });
+
+  it("draws the shorter figure but names the cell with the full one", () => {
+    renderAt(500, { formatValueDense: (value) => `${Math.round(value * 100)}` });
+    const cell = screen.getByTestId("hm-cell-1-15");
+    expect(cell.querySelector("[aria-hidden='true']")?.textContent).toBe("902");
+    expect(cell).toHaveAccessibleName("902% acima da meta");
+  });
+
+  it("draws the host's figure at the dense step when it gave no shorter one", () => {
+    renderAt(500);
+    expect(screen.getByTestId("hm-cell-1-15")).toHaveTextContent("902%");
   });
 });
 

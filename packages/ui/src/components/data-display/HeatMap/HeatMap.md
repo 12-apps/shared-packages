@@ -29,7 +29,16 @@ for any grid of figures judged against one threshold.
 - **Fits its container**: `table-layout: fixed` over the full width, so the
   columns share what there is and the grid never scrolls sideways.
 - **Transposes**: `transpose="auto"` (default) swaps the axes below the theme's
-  `md` breakpoint (seven weekday columns fit a phone; twenty-four hours do not).
+  `md` breakpoint (seven weekday columns fit a phone; twenty-four hours do not),
+  and wherever the preferred way round cannot be held even at the dense step.
+- **Keeps its orientation at a computer width** (FUT-4063): 24 hour columns in
+  a ~500px container (a 1280 screen with the menu open) are not turned into 24
+  rows. Steps, in order: regular (cell >= 32px, 11px type), compact (>= 28px,
+  10px), dense (>= 17px, 9px type, 2px gaps, labels every 2nd column and the
+  rest read, not drawn). The grid turns round only when even dense needs more
+  than the container has (24 columns: 490px). 17px is the floor because a bold,
+  tabular 3-character figure ("902") measures about 16px at 9px in Chromium; a
+  figure with its sign ("52%") does not fit, hence `formatValueDense`.
 - **No default copy and no number formatting**: `labels` and `formatValue` are
   the host's.
 
@@ -44,6 +53,7 @@ for any grid of figures judged against one threshold.
 | `formatValue` | `(value: number) => string`       | —        | A figure as text. |
 | `labels`      | `HeatMapLabels`                   | —        | `{ above, below, empty, emptyValue?, unmeasured? }`. |
 | `caption`     | `string`                          | —        | The table's accessible name (visually hidden). |
+| `formatValueDense` | `(value: number) => string`  | `formatValue` | A shorter figure for the dense step ("54" for "54%"). The cell is still read with `formatValue`'s full text. |
 | `transpose`   | `boolean \| 'auto'`                | `'auto'` | Swap the axes; `'auto'` = below `md`. |
 | `legend`      | `boolean`                         | `true`   | Draw the legend. |
 | `dataTestId`  | `string`                          | `heat-map` | Root test id; cells are `<id>-cell-<row>-<column>`, the legend `<id>-legend`. |

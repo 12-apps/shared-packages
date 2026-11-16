@@ -55,6 +55,8 @@ export function heatMapGrid(
 export interface HeatMapFit {
   transposed: boolean;
   compact: boolean;
+  /** The narrowest step: smallest type, thinnest gaps, labels every Nth. */
+  dense: boolean;
 }
 
 /** The widths `heatMapFit` weighs, in px. */
@@ -64,21 +66,43 @@ export interface HeatMapFitMetrics {
   spacingPx: number;
   minCellPx: number;
   compactMinCellPx: number;
+  /** The dense step's own widths; without `denseMinCellPx` there is no dense step. */
+  denseLabelPx?: number;
+  denseSpacingPx?: number;
+  denseMinCellPx?: number;
 }
 
 function needs(columns: number, label: number, cell: number, spacing: number): number {
   return label + columns * (cell + spacing) + spacing;
 }
 
+/** The width one arrangement needs for its columns. */
+function needed(fit: HeatMapFit, rowCount: number, columnCount: number, m: HeatMapFitMetrics): number {
+  const columns = fit.transposed ? rowCount : columnCount;
+  if (fit.dense) {
+    return needs(columns, m.denseLabelPx ?? m.labelPx, m.denseMinCellPx ?? m.compactMinCellPx, m.denseSpacingPx ?? m.spacingPx);
+  }
+  return needs(
+    columns,
+    fit.transposed ? m.labelTransposedPx : m.labelPx,
+    fit.compact ? m.compactMinCellPx : m.minCellPx,
+    m.spacingPx,
+  );
+}
+
 /**
  * The first arrangement in which EVERY figure shows whole (FUT-4063), so the
  * grid never clips a number and never scrolls sideways.
  *
- * Tried in order: as asked at the regular step, as asked at the compact step,
- * then the other way round at each step. `orientation` is `'rows'` or
- * `'columns'` when the host fixed it (only the step can change then), else the
- * preferred way round (the phone prefers transposed). A width of 0 (not yet
- * measured, or no layout at all) keeps the preference at the regular step.
+ * Tried in order, in the preferred way round: the regular step, the compact
+ * step, then (when the metrics name one) the dense step; only then the other
+ * way round at the same steps. So a computer width keeps its weekdays as rows
+ * and its hours as columns for as long as the dense step can hold them, and a
+ * phone container, too narrow even for that, turns round. `fixed` is true when
+ * the host fixed the orientation (only the step can change then), else
+ * `preferTransposed` is the preference (the phone prefers transposed). A width
+ * of 0 (not yet measured, or no layout at all) keeps the preference at the
+ * regular step.
  */
 export function heatMapFit(
   width: number,
@@ -88,19 +112,20 @@ export function heatMapFit(
   preferTransposed: boolean,
   fixed = false,
 ): HeatMapFit {
-  if (width <= 0) return { transposed: preferTransposed, compact: false };
+  if (width <= 0) return { transposed: preferTransposed, compact: false, dense: false };
   const ways = fixed ? [preferTransposed] : [preferTransposed, !preferTransposed];
-  const tries: HeatMapFit[] = ways.flatMap((transposed) => [
-    { transposed, compact: false },
-    { transposed, compact: true },
-  ]);
-  const fits = tries.find(({ transposed, compact }) =>
-    needs(
-      transposed ? rowCount : columnCount,
-      transposed ? metrics.labelTransposedPx : metrics.labelPx,
-      compact ? metrics.compactMinCellPx : metrics.minCellPx,
-      metrics.spacingPx,
-    ) <= width,
+  const steps: Pick<HeatMapFit, 'compact' | 'dense'>[] = [
+    { compact: false, dense: false },
+    { compact: true, dense: false },
+    ...(metrics.denseMinCellPx === undefined ? [] : [{ compact: true, dense: true }]),
+  ];
+  const tries = ways.flatMap((transposed) => steps.map((step) => ({ transposed, ...step })));
+  const fits = tries.find((attempt) => needed(attempt, rowCount, columnCount, metrics) <= width);
+  return (
+    fits ?? {
+      transposed: fixed ? preferTransposed : rowCount <= columnCount,
+      compact: true,
+      dense: metrics.denseMinCellPx !== undefined,
+    }
   );
-  return fits ?? { transposed: fixed ? preferTransposed : rowCount <= columnCount, compact: true };
 }
