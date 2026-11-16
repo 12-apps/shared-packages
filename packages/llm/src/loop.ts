@@ -8,6 +8,10 @@
  * loop. A refusal is a typed RESULT (`status: "refused"`), never an error, so
  * the host can hand the conversation to a person.
  *
+ * An executor may HALT the loop (`{ output, halt: true }`): the turn's tool
+ * results are appended and the loop ends with `status: "halted"` without
+ * another model call. A hand-off tool uses it to leave the conversation.
+ *
  * The returned `messages` are always a valid request for the NEXT turn (B2):
  * a turn the loop ends on keeps its text but never a tool call that was not
  * run (no tool_use without its tool_result), and a turn with neither text nor
@@ -18,8 +22,11 @@ import type { ModelClient } from "./client";
 import { RefusalError } from "./errors";
 import type { AssistantMessage, ChatRequest, ChatResult, Message, Refusal, ToolCall, ToolResult, Usage } from "./types";
 
-/** What an executor returns: the output text, or the text marked as an error. */
-export type ToolOutput = string | { output: string; isError?: boolean };
+/**
+ * What an executor returns: the output text, or the text marked as an error.
+ * `halt` ends the loop once this turn's calls have all run.
+ */
+export type ToolOutput = string | { output: string; isError?: boolean; halt?: boolean };
 
 export type ToolExecutor = (input: unknown, context: { call: ToolCall; turn: number }) => Promise<ToolOutput> | ToolOutput;
 
@@ -34,7 +41,7 @@ export interface ToolLoopOptions {
   onUsage?: (usage: Usage, turn: number, result: ChatResult) => void | Promise<void>;
 }
 
-export type ToolLoopStatus = "completed" | "refused" | "max_turns" | "max_tokens" | "stopped";
+export type ToolLoopStatus = "completed" | "refused" | "max_turns" | "max_tokens" | "stopped" | "halted";
 
 export interface ToolLoopResult {
   status: ToolLoopStatus;
@@ -60,18 +67,23 @@ function addUsage(total: Omit<Usage, "raw">, usage: Usage): Omit<Usage, "raw"> {
   };
 }
 
-async function runCall(call: ToolCall, turn: number, executors: ToolLoopOptions["executors"]): Promise<ToolResult> {
+interface CallOutcome {
+  result: ToolResult;
+  halt: boolean;
+}
+
+async function runCall(call: ToolCall, turn: number, executors: ToolLoopOptions["executors"]): Promise<CallOutcome> {
   const executor = Object.hasOwn(executors, call.name) ? executors[call.name] : undefined;
-  if (!executor) return { callId: call.id, name: call.name, output: UNKNOWN_TOOL, isError: true };
+  if (!executor) return { result: { callId: call.id, name: call.name, output: UNKNOWN_TOOL, isError: true }, halt: false };
   try {
     const out = await executor(call.input, { call, turn });
-    return typeof out === "string"
-      ? { callId: call.id, name: call.name, output: out }
-      : { callId: call.id, name: call.name, output: out.output, ...(out.isError ? { isError: true } : {}) };
+    if (typeof out === "string") return { result: { callId: call.id, name: call.name, output: out }, halt: false };
+    const result = { callId: call.id, name: call.name, output: out.output, ...(out.isError ? { isError: true } : {}) };
+    return { result, halt: out.halt === true };
   } catch (error) {
     // The model gets the failure as an error result and may recover from it.
     const message = error instanceof Error ? error.message : String(error);
-    return { callId: call.id, name: call.name, output: message, isError: true };
+    return { result: { callId: call.id, name: call.name, output: message, isError: true }, halt: false };
   }
 }
 
@@ -114,8 +126,10 @@ export async function runToolLoop(options: ToolLoopOptions): Promise<ToolLoopRes
     if (status) return ended(status, messages, final, turn, usage);
     messages.push(final.message);
 
-    const results = await Promise.all(final.toolCalls.map((call) => runCall(call, turn, options.executors)));
-    messages.push({ role: "tool", results });
+    const outcomes = await Promise.all(final.toolCalls.map((call) => runCall(call, turn, options.executors)));
+    messages.push({ role: "tool", results: outcomes.map((outcome) => outcome.result) });
+    // Every call of the turn is answered, so the transcript stays a valid request.
+    if (outcomes.some((outcome) => outcome.halt)) return { status: "halted", messages, final, turns: turn, usage, refusal: null };
   }
 }
 

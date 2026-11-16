@@ -132,6 +132,27 @@ describe("runToolLoop", () => {
     });
   });
 
+  it("halts when an executor asks to, after answering every call of the turn, with no further model call", async () => {
+    const { client, calls } = setup([{ toolCalls: [call("a"), { id: "h", name: "leave", input: {} }] }, { text: "never" }]);
+    const result = await runToolLoop({
+      client,
+      request: sampleRequest({ messages: [{ role: "user", text: "go" }] }),
+      executors: { search_menu: () => "ok", leave: () => ({ output: "left", halt: true }) },
+    });
+    expect(result.status).toBe("halted");
+    expect(result.turns).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(result.refusal).toBeNull();
+    expect(result.messages.at(-1)).toEqual({
+      role: "tool",
+      results: [
+        { callId: "a", name: "search_menu", output: "ok" },
+        { callId: "h", name: "leave", output: "left" },
+      ],
+    });
+    expectEveryCallAnswered(result.messages);
+  });
+
   it("reports a max_tokens stop", async () => {
     const { client } = setup([{ text: "cut", stopReason: "max_tokens" }]);
     expect((await runToolLoop({ client, request: sampleRequest(), executors: {} })).status).toBe("max_tokens");
