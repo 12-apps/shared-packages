@@ -12,8 +12,10 @@ export {
   type ChargePolicy,
   type ChargeRetryPolicy,
 } from "./charge-policy";
+export { BillingBreakdownError } from "../errors";
 export {
   createSubscriptionCollection,
+  type CycleBreakdownLookup,
   type SubscriptionCollection,
   type SubscriptionCollectionDeps,
 } from "./collect";

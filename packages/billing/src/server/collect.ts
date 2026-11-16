@@ -4,7 +4,11 @@ import {
   type CollectionResult,
 } from "@12-apps/payments-backend";
 
-import type { BillingPlatformDeps, CycleStoreFactory, InstrumentLookup } from "./ports";
+import { checkBreakdown } from "../breakdown";
+import { BillingBreakdownError } from "../errors";
+import type { CycleCharge } from "../usage-types";
+
+import type { BillingPlatformDeps, CycleStore, CycleStoreFactory, InstrumentLookup } from "./ports";
 
 /**
  * Subscription COLLECTION (FUT-132) — the platform-scoped binding of the
@@ -47,8 +51,26 @@ import type { BillingPlatformDeps, CycleStoreFactory, InstrumentLookup } from ".
  * charge can be PENDING, so settlement stays the webhook's — the only place a
  * cycle should ever become paid.
  *
+ * ## The breakdown guard (FUT-5094)
+ *
+ * With `breakdowns`, a cycle that carries a breakdown is charged only when
+ * the breakdown passes `checkBreakdown` AND states the very amount and
+ * currency the row will charge. Otherwise `BillingBreakdownError` is THROWN
+ * and nothing reaches the provider: a row whose lines and amount disagree is
+ * a deployment bug, and a skip would hide it. The check runs only for a row that would actually be
+ * charged (no provider charge yet): a row the collector skips as already
+ * charged keeps being skipped, never thrown on. A null breakdown (every cycle
+ * before FUT-5094) charges exactly as before. The amount charged is always
+ * the row's, unchanged.
+ *
  * Server-only.
  */
+
+/**
+ * The breakdown the host persisted for one cycle, or null for a cycle that
+ * has none.
+ */
+export type CycleBreakdownLookup = (cycleId: string) => Promise<CycleCharge | null>;
 
 export interface SubscriptionCollection {
   /** Raise the charge that settles one due cycle without an instrument. */
@@ -71,6 +93,8 @@ export interface SubscriptionCollectionDeps extends BillingPlatformDeps {
   cycles: CycleStoreFactory;
   /** Which instrument this subscription can be charged with, at one provider. */
   instruments: InstrumentLookup;
+  /** Optional: the cycle's persisted breakdown, checked before every charge. */
+  breakdowns?: CycleBreakdownLookup;
 }
 
 export function createSubscriptionCollection(
@@ -82,7 +106,7 @@ export function createSubscriptionCollection(
     return createCycleCollector({
       gateway,
       credentials,
-      cycles: await deps.cycles(),
+      cycles: guarded(await deps.cycles(), deps.breakdowns),
       instruments: deps.instruments,
       merchant: deps.merchant,
       enabled: deps.enabled,
@@ -97,4 +121,34 @@ export function createSubscriptionCollection(
       return (await collector()).collectByCard(cycleId, options);
     },
   };
+}
+
+/** The host's store, with every chargeable read held to its breakdown. */
+function guarded(store: CycleStore, breakdowns: CycleBreakdownLookup | undefined): CycleStore {
+  if (!breakdowns) return store;
+  return {
+    async read(cycleId) {
+      const row = await store.read(cycleId);
+      if (typeof row === "string") return row;
+      // A row the collector skips as already charged stays a skip.
+      if (row.providerChargeId !== null) return row;
+      const breakdown = await breakdowns(cycleId);
+      if (breakdown) assertBreakdownCharges(cycleId, breakdown, row.cycle.amount);
+      return row;
+    },
+    recordRaised: (cycleId, charge) => store.recordRaised(cycleId, charge),
+  };
+}
+
+function assertBreakdownCharges(
+  cycleId: string,
+  breakdown: CycleCharge,
+  amount: { amountCents: number; currency: string },
+): void {
+  checkBreakdown(breakdown);
+  if (breakdown.amountCents !== amount.amountCents || breakdown.currency !== amount.currency) {
+    throw new BillingBreakdownError(
+      `cycle ${cycleId} charges ${amount.amountCents} ${amount.currency}, but its breakdown states ${breakdown.amountCents} ${breakdown.currency}`,
+    );
+  }
 }
