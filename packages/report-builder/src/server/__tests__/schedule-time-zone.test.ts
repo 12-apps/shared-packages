@@ -68,7 +68,7 @@ function existing(overrides: Partial<SavedReportRecord> = {}): SavedReportRecord
   } as SavedReportRecord;
 }
 
-function setup(resolveTimeZone?: (actor: ReportActor) => string | Promise<string>) {
+function setup(resolveTimeZone?: (actor: ReportActor) => string | Promise<string>, onTimeZoneError?: (error: unknown) => void) {
   const written: { schedule?: ReportSchedule | null }[] = [];
   const db = {
     savedReport: {
@@ -97,6 +97,7 @@ function setup(resolveTimeZone?: (actor: ReportActor) => string | Promise<string
     timeZone: 'America/Sao_Paulo',
     now: () => NOW,
     ...(resolveTimeZone ? { resolveTimeZone } : {}),
+    ...(onTimeZoneError ? { onTimeZoneError } : {}),
   });
   const call = (method: ReportRoute['method'], path: string, body: unknown) => {
     const route = routes.find((candidate) => candidate.method === method && candidate.path === path);
@@ -148,5 +149,23 @@ describe('the zone a schedule is stamped in', () => {
     await call('POST', '/reports/custom', { ...SAVE, schedule: null });
     expect(hook).not.toHaveBeenCalled();
     expect(written[0]?.schedule).toBeNull();
+  });
+});
+
+describe('a hook that fails never fails the save', () => {
+  it('falls back to the config zone when the hook throws or rejects, and tells the host', async () => {
+    const heard = vi.fn();
+    for (const hook of [
+      () => {
+        throw new Error('lookup failed');
+      },
+      () => Promise.reject(new Error('lookup failed')),
+    ]) {
+      const { call, written } = setup(hook, heard);
+      const response = await call('POST', '/reports/custom', { ...SAVE, schedule: SCHEDULE });
+      expect(response.status).toBe(200);
+      expect(written[0]?.schedule).toMatchObject({ timeZone: 'America/Sao_Paulo' });
+    }
+    expect(heard).toHaveBeenCalledTimes(2);
   });
 });
