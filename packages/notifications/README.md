@@ -157,6 +157,10 @@ other link. A mail client's own "unsubscribe" button reads `List-Unsubscribe` /
 `List-Unsubscribe-Post` headers, which belong to the host's driver, not to this
 document. Absent, both halves are byte-for-byte what they were.
 
+```ts
+renderEmail({ ...document, unsubscribe: { label: 'Parar de receber', href: signedUrl } });
+```
+
 **The EMAIL transport opts in.** Declare `layout` on the driver declaration and
 `formatEmail` renders the shared document; omit it and you keep the previous
 rendering byte for byte. Opt-in rather than automatic because `brand` and
