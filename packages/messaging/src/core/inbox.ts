@@ -74,6 +74,8 @@ export async function processDelivery(ctx: EngineContext, deliveryId: string): P
   try {
     const outcomes: EventOutcome[] = [];
     for (const event of events) outcomes.push(await handleEvent(ctx, row.channel, event));
+    // Inside the try: a throwing hook settles the row FAILED for the sweep.
+    await handOverUnclaimed(ctx, row.channel, events, outcomes);
     // A receipt for a message nobody stored yet (it raced the sender's own
     // write of the channel id) changed nothing: settle FAILED, not PROCESSED,
     // so the reconciliation sweep applies it once the id exists.
@@ -90,6 +92,26 @@ export async function processDelivery(ctx: EngineContext, deliveryId: string): P
     await store.settleDelivery(deliveryId, { state: "FAILED", error: errorText(error), at: clock.now() });
     throw error;
   }
+}
+
+/**
+ * The events whose account nobody connected, handed to the host's
+ * `onUnclaimedEvents` (its own number on the shared app). Only `unknown-account`
+ * drops: a revoked or errored account is a tenant's, never the host's.
+ */
+async function handOverUnclaimed(
+  ctx: EngineContext,
+  channel: string,
+  events: readonly NormalizedEvent[],
+  outcomes: readonly EventOutcome[],
+): Promise<void> {
+  const hook = ctx.config.hooks?.onUnclaimedEvents;
+  if (!hook) return;
+  const unclaimed = events.filter((_, index) => {
+    const outcome = outcomes[index];
+    return outcome?.kind === "dropped" && outcome.reason === "unknown-account";
+  });
+  if (unclaimed.length > 0) await hook(channel, unclaimed);
 }
 
 /**

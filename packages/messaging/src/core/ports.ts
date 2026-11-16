@@ -1,6 +1,6 @@
 import type { ChannelAdapter } from "./channel";
 import type { MessagingStore } from "./store";
-import type { ConversationState, ConversationView, MessageView } from "./types";
+import type { ConversationState, ConversationView, MessageView, NormalizedEvent } from "./types";
 
 /**
  * What the engine needs FROM its host. The mechanism (the inbox, the tenant
@@ -70,6 +70,23 @@ export interface MessagingHooks {
    * it, and an answer that slips through anyway is read as `AGENT`.
    */
   reopenState?(conversation: ConversationView): ReopenState | Promise<ReopenState>;
+  /**
+   * Events of a channel account NOBODY connected: a message, an opt-out or a
+   * delivery receipt of a number the host itself owns on the same app (its
+   * platform notification number, typically), which no tenant row resolves.
+   *
+   * Without this hook they are dropped, exactly as before. With it, the host is
+   * handed them once per processed delivery: already signature-checked,
+   * persisted and parsed, and still stored nowhere here (no conversation, no
+   * message). An event of a CONNECTED, revoked or errored tenant account is
+   * never handed over: a tenant's traffic is the tenant's, and the host's
+   * platform path must not see it.
+   *
+   * A throw settles the delivery FAILED, so the reconciliation sweep runs it
+   * again: the host's handler must be idempotent on the provider's message id.
+   * Default: nothing.
+   */
+  onUnclaimedEvents?(channel: string, events: NormalizedEvent[]): Promise<void> | void;
 }
 
 /** Everything a host hands `createMessagingEngine`. */
