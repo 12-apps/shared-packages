@@ -149,8 +149,16 @@ export function parseTwilioCallback(
   if (raw === undefined || raw === 'received') return inboundOf(sid, params);
   const status = STATUS_OF[raw];
   if (!status) return { kind: 'ignored', reason: `in-flight status ${raw}` };
-  const errorCode = params.ErrorCode ? params.ErrorCode : null;
-  const confirmation = confirmationOfUrl(options.url);
+  return statusOf(sid, status, params.ErrorCode || null, confirmationOfUrl(options.url));
+}
+
+/** A terminal or `sent` status callback, classified. */
+function statusOf(
+  sid: string,
+  status: 'SENT' | 'DELIVERED' | 'UNDELIVERED',
+  errorCode: string | null,
+  confirmation: string | null,
+): TwilioCallback {
   return {
     kind: 'status',
     providerMessageId: sid,

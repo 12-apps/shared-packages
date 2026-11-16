@@ -1,4 +1,6 @@
-/* eslint-disable test-flakiness/no-global-state-mutation --
+/* eslint-disable test-flakiness/no-test-isolation, test-flakiness/no-global-state-mutation --
+   every `api`, `db`, `sends` and double is a LOCAL of its own case (the isolation
+   rule reads a name reused across cases as shared state);
    the fetch double COUNTS the provider calls it answers; each case builds its own. */
 import { describe, expect, it } from 'vitest';
 
