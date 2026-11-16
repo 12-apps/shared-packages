@@ -46,8 +46,26 @@ export type {
   RefreshReason,
 } from "./credentials";
 export { ResolvedCredential, createCredentialSession } from "./credentials";
+export {
+  ELEVENLABS_DEFAULT_MODEL,
+  ELEVENLABS_PROVIDER,
+  elevenLabsAdapter,
+} from "./adapters";
+export type { ElevenLabsAdapterOptions } from "./adapters";
+export type {
+  TranscribeCall,
+  Transcriber,
+  TranscriberOptions,
+  TranscriptionAdapter,
+  TranscriptionRegistry,
+  TranscriptionRequest,
+  TranscriptionResult,
+  TranscriptionUsage,
+} from "./transcription";
+export { builtInTranscriptionAdapters, createTranscriber, createTranscriptionRegistry } from "./transcription";
 export type { LlmErrorKind, SupportLadderErrorCode } from "./errors";
 export {
+  AudioTooLongError,
   AuthError,
   CredentialRevokedError,
   InvalidRequestError,

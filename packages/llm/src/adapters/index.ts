@@ -13,3 +13,4 @@ export * from "./anthropic";
 export * from "./gemini";
 export * from "./openai";
 export * from "./xai";
+export * from "./elevenlabs";
