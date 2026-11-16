@@ -1,6 +1,6 @@
 /**
  * The database seam (12-15) — the exact, narrow slice of a Prisma-shaped
- * client this surface reads and writes on the four models the package owns
+ * client this surface reads and writes on the six models the package owns
  * (`prisma/notifications.prisma`). Structural on purpose, never generated: a
  * real host passes its Prisma client; the harness passes hand-written SQL, and
  * the stores cannot tell.

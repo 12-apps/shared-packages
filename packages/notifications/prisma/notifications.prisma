@@ -1,4 +1,4 @@
-// @12-apps/notifications (12-15) — the four models the notification system
+// @12-apps/notifications (12-15) — the six models the notification system
 // owns, COPIED into a host's schema folder by
 // `pnpm --filter @12-apps/notifications prisma:sync` (never symlinked: Prisma
 // lstats a migration directory, so a symlinked migration is silently skipped
@@ -58,8 +58,8 @@ model Notification {
 // provider error when a send fails. `channel` is EMAIL | SMS | WHATSAPP |
 // WEB_PUSH (CHECK in the migration).
 //
-// The lifecycle is QUEUED -> SENDING -> SENT | FAILED | DEAD (String + DB
-// CHECK), and the two states beyond the obvious three each remove a way to send
+// The lifecycle is QUEUED -> SENDING -> SENT | FAILED | DEAD, then a provider
+// receipt's SENT -> DELIVERED | UNDELIVERED (String + DB CHECK), and the two states beyond the obvious three each remove a way to send
 // somebody a duplicate paid message:
 //
 //   - SENDING is the CLAIM. A dispatcher moves the row out of QUEUED with one
@@ -83,12 +83,20 @@ model NotificationDelivery {
   /// a dispatcher that dies mid-send still spends one and cannot loop forever.
   attempts       Int       @default(0)
   sentAt         DateTime? @map("sent_at")
+  /// The provider's id for the sent message (Twilio `sid`, Meta `wamid`),
+  /// written with SENT: what a delivery receipt finds the row by.
+  providerMessageId String?   @map("provider_message_id")
+  /// When the provider said the message reached the handset (DELIVERED).
+  deliveredAt       DateTime? @map("delivered_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, channel])
+  // A receipt's lookup. NULLs are distinct in Postgres, so every row without
+  // an id (sent before the column, or on a channel that answers none) is free.
+  @@unique([channel, providerMessageId])
   // Serves the retry sweep: `status IN (…) AND updated_at < cutoff`. On
   // `updatedAt`, because "stale" is a question about the last write and
   // `createdAt` cannot answer it — a row re-queued a second ago has an ancient
@@ -165,4 +173,62 @@ model PushSubscription {
   // The send path's one query: owner, then the origin rule above.
   @@index([userId, clientId])
   @@map("push_subscriptions")
+}
+
+// Paid-channel consent: one row per (user, SMS | WHATSAPP). Consent belongs to
+// a NUMBER (`destination`, E.164) on ONE channel; a person whose phone changed
+// has no consent for the new number until it is confirmed. Status PENDING |
+// CONFIRMED | GRANDFATHERED | OPTED_OUT and method REPLY | CODE | GRANDFATHERED
+// are CHECKed in the migration ("no consent" is the absence of a row). The
+// code is kept only as a salted hash; its tries are counted here, so a guess
+// is spent by one conditional UPDATE. `user_id` is by value, as everywhere in
+// this partial.
+model NotificationChannelConsent {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  channel             String
+  destination         String
+  status              String
+  method              String
+  codeHash            String?   @map("code_hash")
+  codeExpiresAt       DateTime? @map("code_expires_at")
+  codeAttempts        Int       @default(0) @map("code_attempts")
+  /// Confirmation sends inside the 24 h window that started at `sendWindowStartedAt`.
+  sendCount           Int       @default(0) @map("send_count")
+  sendWindowStartedAt DateTime? @map("send_window_started_at")
+  lastSentAt          DateTime? @map("last_sent_at")
+  confirmedAt         DateTime? @map("confirmed_at")
+  optedOutAt          DateTime? @map("opted_out_at")
+  /// The consent RECORD: what the person replied, the provider's id, when.
+  consentText         String?   @map("consent_text")
+  consentExternalId   String?   @map("consent_external_id")
+  consentAt           DateTime? @map("consent_at")
+  /// When a grandfathered number was asked to confirm — once, ever.
+  askedAt             DateTime? @map("asked_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, channel])
+  // An inbound reply's lookup: every account holding a number on a channel.
+  @@index([destination, channel])
+  @@index([status, askedAt])
+  @@map("notification_channel_consents")
+}
+
+// Paid messages counted per (scope, subject, period): a person's day
+// (`recipient`, YYYY-MM-DD in the host's zone) or a tenant's month (`tenant`,
+// YYYY-MM in the tenant's zone). Only ever moved by a conditional UPDATE whose
+// WHERE carries `count < cap`, so concurrent emits never pass a cap.
+// `notifiedAt` makes the tenant's cap notice once per period.
+model NotificationSendCounter {
+  scope      String
+  subjectId  String    @map("subject_id")
+  period     String
+  count      Int       @default(0)
+  notifiedAt DateTime? @map("notified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@id([scope, subjectId, period])
+  @@map("notification_send_counters")
 }
