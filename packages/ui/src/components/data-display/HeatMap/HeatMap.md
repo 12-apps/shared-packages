@@ -32,13 +32,23 @@ for any grid of figures judged against one threshold.
   `md` breakpoint (seven weekday columns fit a phone; twenty-four hours do not),
   and wherever the preferred way round cannot be held even at the dense step.
 - **Keeps its orientation at a computer width** (FUT-4063): 24 hour columns in
-  a ~500px container (a 1280 screen with the menu open) are not turned into 24
-  rows. Steps, in order: regular (cell >= 32px, 11px type), compact (>= 28px,
-  10px), dense (>= 17px, 9px type, 2px gaps, labels every 2nd column and the
-  rest read, not drawn). The grid turns round only when even dense needs more
-  than the container has (24 columns: 490px). 17px is the floor because a bold,
-  tabular 3-character figure ("902") measures about 16px at 9px in Chromium; a
-  figure with its sign ("52%") does not fit, hence `formatValueDense`.
+  a ~575px container (a 1280 screen with the menu open) are not turned into 24
+  rows, when the host gives `formatValueDense`. Steps, in order: regular
+  (cell >= 32px, 11px type), compact (>= 28px, 10px), dense (9px type, 1px
+  gaps, 28px row-label column), and only then the other way round. How wide a
+  cell must be is MEASURED, never assumed: the widest figure of each step (the
+  formatter's text in the table's own font, bold, digits at the widest digit,
+  plus 1px) sets the step's minimum cell, so a step is taken only where every
+  figure fits whole (a three-character "902" is ~17.5px in Inter, ~16px in
+  Roboto/Arial at 9px). With no `formatValueDense`, or one whose widest figure
+  does not fit ("1.250"), there is no dense step and the grid turns round, as
+  it did before. The transposed (phone) grid never goes dense.
+- **Dense details**: the row-label column is 28px, so a row label longer than
+  a 3-letter weekday is cut with an ellipsis. Column labels are all drawn
+  while they fit one column's pitch (measured), and thinned to every Nth only
+  when they would touch. A dense cell's only text is the short figure; the full
+  figure and the side's words are its `aria-label` (so `textContent` reads
+  "902" while the accessible name reads "902% acima da meta").
 - **No default copy and no number formatting**: `labels` and `formatValue` are
   the host's.
 
@@ -53,7 +63,7 @@ for any grid of figures judged against one threshold.
 | `formatValue` | `(value: number) => string`       | —        | A figure as text. |
 | `labels`      | `HeatMapLabels`                   | —        | `{ above, below, empty, emptyValue?, unmeasured? }`. |
 | `caption`     | `string`                          | —        | The table's accessible name (visually hidden). |
-| `formatValueDense` | `(value: number) => string`  | `formatValue` | A shorter figure for the dense step ("54" for "54%"). The cell is still read with `formatValue`'s full text. |
+| `formatValueDense` | `(value: number) => string`  | none | A shorter figure for the dense step ("54" for "54%"). Absent: no dense step. The cell is still named with `formatValue`'s full text. |
 | `transpose`   | `boolean \| 'auto'`                | `'auto'` | Swap the axes; `'auto'` = below `md`. |
 | `legend`      | `boolean`                         | `true`   | Draw the legend. |
 | `dataTestId`  | `string`                          | `heat-map` | Root test id; cells are `<id>-cell-<row>-<column>`, the legend `<id>-legend`. |

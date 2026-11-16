@@ -171,6 +171,13 @@ usually 12–14 columns. `transpose: 'auto'` keeps weekdays as rows while every
 figure fits whole: in a span-8 block of a ~924px canvas (1280 with the menu
 open) that is up to 14 hour columns at the regular type step, and up to 16 at
 the compact step; past that it draws hours as rows rather than clip a figure.
+For a percent without a declared precision, the view also hands the map a sign-less
+short figure ("54" for "54%"), which lets 24 hour columns stay columns, dense, down
+to the width their measured figures fit (about 500 to 575px, by font), with the
+full figure still the cell's accessible name (`aria-label`; `textContent` reads the
+short one). Any other measure, or a declared precision, has no short figure: it
+turns round as before. The dense row-label column is 28px, so a weekday longer
+than three letters is cut with an ellipsis there.
 
 ## Heat maps, flags, phone cards, derived notes (FUT-4063, 5.22.0)
 

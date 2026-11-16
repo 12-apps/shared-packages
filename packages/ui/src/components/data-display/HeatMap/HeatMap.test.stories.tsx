@@ -99,3 +99,48 @@ export const PhoneWidth: Story = {
     });
   },
 };
+
+export const DenseStep: Story = {
+  name: '🧪 At 575px (a 1280 screen with the menu) 24 hours stay columns, drawn dense, with no clipped figure',
+  args: {
+    // "902" is the widest short figure; the full "902%" is the cell's accessible name.
+    formatValueDense: (value: number) => `${Math.round(value * 100)}`,
+    cells: Array.from({ length: 24 }, (_, hour) => ({ row: '1', column: `${hour}`, value: hour === 16 ? 9.02 : hour / 50 })),
+  },
+  render: (args) => (
+    <Box sx={{ width: '35.9375rem' }} data-testid="frame">
+      <HeatMap {...args} transpose="auto" />
+    </Box>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step('The weekdays stay rows and the grid is dense', async () => {
+      await waitFor(async () => {
+        await expect(canvas.getByTestId('hm')).toHaveAttribute('data-transposed', 'false');
+        await expect(canvas.getByTestId('hm')).toHaveAttribute('data-dense', 'true');
+      });
+    });
+    await step('No figure is clipped, and the full figure names the cell', async () => {
+      await expectNoClippedFigure(canvasElement);
+      await expect(canvas.getByRole('cell', { name: '902% acima da meta' })).toBeInTheDocument();
+    });
+  },
+};
+
+export const NoShortFigure: Story = {
+  name: '🧪 Without a shorter figure, 24 hours in 500px turn round rather than clip',
+  render: (args) => (
+    <Box sx={{ width: '31.25rem' }} data-testid="frame">
+      <HeatMap {...args} transpose="auto" />
+    </Box>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step('The grid turns round and nothing is clipped', async () => {
+      await waitFor(async () => {
+        await expect(canvas.getByTestId('hm')).toHaveAttribute('data-transposed', 'true');
+      });
+      await expectNoClippedFigure(canvasElement);
+    });
+  },
+};
