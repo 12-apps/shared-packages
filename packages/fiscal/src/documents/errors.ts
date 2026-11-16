@@ -35,7 +35,13 @@ export type FiscalDocumentErrorCode =
    * A `RETURN` asked of an NFC-e. An NFC-e has no return purpose: the return is
    * an NF-e (model 55) of entry that references the NFC-e's key.
    */
-  | "RETURN_ON_NFCE";
+  | "RETURN_ON_NFCE"
+  /**
+   * `cancelOrReturn` past SEFAZ's window on a document that is not an NFC-e:
+   * the buyer's return NF-e of entry answers a consumer's NFC-e only; an NF-e
+   * past its window is the issuer's own correction, not this path's.
+   */
+  | "RETURN_OF_NFCE_ONLY";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;

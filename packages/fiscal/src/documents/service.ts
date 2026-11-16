@@ -176,6 +176,95 @@ async function cancel(
   return { document: cancelled, failure: null };
 }
 
+/** SEFAZ's refusals of a cancel that came too late: "prazo de cancelamento superior ao previsto". */
+export const LATE_CANCEL_CODES = ["501"] as const;
+
+const isLateCancel = (code: string | null): boolean => code !== null && (LATE_CANCEL_CODES as readonly string[]).includes(code);
+
+export interface CancelOrReturnInput {
+  readonly ownerId: string;
+  readonly documentId: string;
+  /** SEFAZ's 15–255 characters, sent with the cancel. */
+  readonly reason: string;
+  /** The NF-e (model 55) issuing point a return is numbered on. */
+  readonly returnPointId: string;
+}
+
+export interface CancelOrReturnResult {
+  /**
+   * `CANCELLED` inside the window; `RETURNED` past it (the return may itself
+   * still be SUBMITTED: the sweep settles it like any document); `REFUSED`
+   * when the issuer refused the cancel for any other reason (nothing changed).
+   */
+  readonly outcome: "CANCELLED" | "RETURNED" | "REFUSED";
+  /** The document asked about, as it stands: CANCELLED, or still AUTHORIZED beside its return. */
+  readonly document: FiscalDocument;
+  readonly returnDocument: FiscalDocument | null;
+  readonly failure: IssuerFailure | null;
+}
+
+/** The subject's live return NF-e that quotes this key, if one was issued already. */
+async function liveReturnOf(deps: Deps, document: FiscalDocument): Promise<FiscalDocument | null> {
+  const returns = (await deps.config.store.listBySubject(document.ownerId, document.subjectId, "NFE")).filter(isLive);
+  const quoting = returns.filter((candidate) => returnsDocument(candidate, document));
+  return quoting[quoting.length - 1] ?? null;
+}
+
+/**
+ * Cancel an authorised document; when SEFAZ refuses the cancel as LATE (501),
+ * issue the buyer's return instead: an NF-e of entry on `returnPointId`, the
+ * host's `SaleSource` answering the return sale for the document's subject
+ * (`model: "NFE"`), which must quote this document's key. The document itself
+ * stays AUTHORIZED: a return never cancels it.
+ *
+ * Idempotent: a document already cancelled, or already answered with a live
+ * return, is answered as it stands, with no call to the issuer. A return the
+ * sale source does not quote is refused before a number is drawn.
+ */
+async function cancelOrReturn(deps: Deps, input: CancelOrReturnInput): Promise<CancelOrReturnResult> {
+  assertReason(input.reason, "reason");
+  const document = await requireDocument(deps, input.ownerId, input.documentId);
+  if (document.status === "CANCELLED") return { outcome: "CANCELLED", document, returnDocument: null, failure: null };
+  const existing = document.accessKey === null ? null : await liveReturnOf(deps, document);
+  if (existing !== null) return { outcome: "RETURNED", document, returnDocument: existing, failure: null };
+  const cancelled = await cancel(deps, input);
+  if (cancelled.failure === null) return { outcome: "CANCELLED", document: cancelled.document, returnDocument: null, failure: null };
+  const late = cancelled.failure.class === "REJECTED" && isLateCancel(cancelled.failure.code);
+  if (!late) return { outcome: "REFUSED", document: cancelled.document, returnDocument: null, failure: cancelled.failure };
+  return { outcome: "RETURNED", document: cancelled.document, returnDocument: await issueReturn(deps, document, input.returnPointId), failure: cancelled.failure };
+}
+
+/** Whether `candidate` is a buyer's return NF-e of entry quoting `document`. */
+function returnsDocument(candidate: Pick<FiscalDocument, "model" | "sale">, document: FiscalDocument): boolean {
+  const quotes = (candidate.sale.referencedDocuments ?? []).some((reference) => reference.accessKey === document.accessKey);
+  return candidate.model === "NFE" && candidate.sale.purpose === "RETURN" && quotes;
+}
+
+/**
+ * The return of a late-cancelled NFC-e. Refused, before any number is drawn,
+ * for anything but an NFC-e, for a subject that already holds a live NF-e that
+ * is not this return (the live index allows one per subject and model), and
+ * for a sale source whose return does not quote the document.
+ */
+async function issueReturn(deps: Deps, document: FiscalDocument, returnPointId: string): Promise<FiscalDocument> {
+  if (document.model !== "NFCE") {
+    throw new FiscalDocumentError("RETURN_OF_NFCE_ONLY", `document ${document.id} is an ${document.model}: only an NFC-e is answered with a buyer's return.`);
+  }
+  const live = (await deps.config.store.listBySubject(document.ownerId, document.subjectId, "NFE")).filter(isLive);
+  if (live.length > 0) {
+    throw new FiscalDocumentError("SUBJECT_HAS_DOCUMENT", `subject ${document.subjectId} already holds a live NF-e that is not document ${document.id}'s return.`);
+  }
+  const draft = await deps.config.sales.saleFor({ ownerId: document.ownerId, subjectId: document.subjectId, model: "NFE" });
+  if (!returnsDocument({ model: "NFE", sale: draft as FiscalDocument["sale"] }, document)) {
+    throw new FiscalDocumentError("INVALID_INPUT", `the return the sale source answered for subject ${document.subjectId} does not quote document ${document.id}.`);
+  }
+  const returned = await issue(deps, { ownerId: document.ownerId, subjectId: document.subjectId, issuingPointId: returnPointId, model: "NFE" });
+  if (returned.id === document.id || !returnsDocument(returned, document)) {
+    throw new FiscalDocumentError("CONFLICT", `subject ${document.subjectId}'s live NF-e is not document ${document.id}'s return.`);
+  }
+  return returned;
+}
+
 /** Whether a lookup's answer moves this document (a settled number moves only while it is owed one). */
 function lookupMoves(document: FiscalDocument): boolean {
   if (!canTransition(document.status, "LOOKUP")) return false;
@@ -272,6 +361,11 @@ export function createFiscalDocuments(config: FiscalDocumentsServiceConfig) {
     resendContingency: resendContingency.bind(null, deps),
     /** Cancel an authorised document. A refusal (late, say) answers the issuer's failure and changes nothing. */
     cancel: cancel.bind(null, deps),
+    /**
+     * Cancel an authorised document, or — when SEFAZ says the cancel is too late
+     * (501) — issue the buyer's return NF-e of entry quoting it. Idempotent.
+     */
+    cancelOrReturn: cancelOrReturn.bind(null, deps),
     /** Ask SEFAZ what it knows of the key; a state the answer moves is recorded. */
     lookup: lookup.bind(null, deps),
     /** A person takes a document back from `attention`; the sweep tries it again. */
