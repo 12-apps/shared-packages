@@ -217,8 +217,11 @@ nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
   `returnPointId`, from the sale the host's `SaleSource` answers for the
   document's subject with `model: "NFE"` — which must quote the document's
   key, or it is refused before a number is drawn. The document stays
-  AUTHORIZED beside its return. It answers `CANCELLED`, `RETURNED` or
-  `REFUSED` (any other refusal, nothing changed), and is idempotent: a
+  AUTHORIZED beside its return. It answers `CANCELLED`, `RETURNED` (the
+  return may still be SUBMITTED; the sweep settles it like any document) or
+  `REFUSED` (the issuer refused the cancel for another reason; nothing
+  changed); a document that is not AUTHORIZED throws `TRANSITION_REFUSED`, and
+  a late NF-e (not an NFC-e) throws `RETURN_OF_NFCE_ONLY`. It is idempotent: a
   document already cancelled, or already answered by a live return, is
   answered with no call to the issuer.
 - **An authorised document always has its XML.** A lookup that finds a

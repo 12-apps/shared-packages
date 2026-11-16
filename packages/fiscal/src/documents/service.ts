@@ -177,7 +177,9 @@ async function cancel(
 }
 
 /** SEFAZ's refusals of a cancel that came too late: "prazo de cancelamento superior ao previsto". */
-export const LATE_CANCEL_CODES: readonly string[] = ["501"];
+export const LATE_CANCEL_CODES = ["501"] as const;
+
+const isLateCancel = (code: string | null): boolean => code !== null && (LATE_CANCEL_CODES as readonly string[]).includes(code);
 
 export interface CancelOrReturnInput {
   readonly ownerId: string;
@@ -189,7 +191,11 @@ export interface CancelOrReturnInput {
 }
 
 export interface CancelOrReturnResult {
-  /** `CANCELLED` inside the window; `RETURNED` past it; `REFUSED` for any other refusal (nothing changed). */
+  /**
+   * `CANCELLED` inside the window; `RETURNED` past it (the return may itself
+   * still be SUBMITTED: the sweep settles it like any document); `REFUSED`
+   * when the issuer refused the cancel for any other reason (nothing changed).
+   */
   readonly outcome: "CANCELLED" | "RETURNED" | "REFUSED";
   /** The document asked about, as it stands: CANCELLED, or still AUTHORIZED beside its return. */
   readonly document: FiscalDocument;
@@ -200,7 +206,7 @@ export interface CancelOrReturnResult {
 /** The subject's live return NF-e that quotes this key, if one was issued already. */
 async function liveReturnOf(deps: Deps, document: FiscalDocument): Promise<FiscalDocument | null> {
   const returns = (await deps.config.store.listBySubject(document.ownerId, document.subjectId, "NFE")).filter(isLive);
-  const quoting = returns.filter((candidate) => (candidate.sale.referencedDocuments ?? []).some((reference) => reference.accessKey === document.accessKey));
+  const quoting = returns.filter((candidate) => returnsDocument(candidate, document));
   return quoting[quoting.length - 1] ?? null;
 }
 
@@ -223,15 +229,40 @@ async function cancelOrReturn(deps: Deps, input: CancelOrReturnInput): Promise<C
   if (existing !== null) return { outcome: "RETURNED", document, returnDocument: existing, failure: null };
   const cancelled = await cancel(deps, input);
   if (cancelled.failure === null) return { outcome: "CANCELLED", document: cancelled.document, returnDocument: null, failure: null };
-  const late = cancelled.failure.class === "REJECTED" && cancelled.failure.code !== null && LATE_CANCEL_CODES.includes(cancelled.failure.code);
+  const late = cancelled.failure.class === "REJECTED" && isLateCancel(cancelled.failure.code);
   if (!late) return { outcome: "REFUSED", document: cancelled.document, returnDocument: null, failure: cancelled.failure };
-  const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: document.subjectId, model: "NFE" });
-  const quotes = (draft.referencedDocuments ?? []).some((reference) => reference.accessKey === document.accessKey);
-  if (draft.purpose !== "RETURN" || !quotes) {
+  return { outcome: "RETURNED", document: cancelled.document, returnDocument: await issueReturn(deps, document, input.returnPointId), failure: cancelled.failure };
+}
+
+/** Whether `candidate` is a buyer's return NF-e of entry quoting `document`. */
+function returnsDocument(candidate: Pick<FiscalDocument, "model" | "sale">, document: FiscalDocument): boolean {
+  const quotes = (candidate.sale.referencedDocuments ?? []).some((reference) => reference.accessKey === document.accessKey);
+  return candidate.model === "NFE" && candidate.sale.purpose === "RETURN" && quotes;
+}
+
+/**
+ * The return of a late-cancelled NFC-e. Refused, before any number is drawn,
+ * for anything but an NFC-e, for a subject that already holds a live NF-e that
+ * is not this return (the live index allows one per subject and model), and
+ * for a sale source whose return does not quote the document.
+ */
+async function issueReturn(deps: Deps, document: FiscalDocument, returnPointId: string): Promise<FiscalDocument> {
+  if (document.model !== "NFCE") {
+    throw new FiscalDocumentError("RETURN_OF_NFCE_ONLY", `document ${document.id} is an ${document.model}: only an NFC-e is answered with a buyer's return.`);
+  }
+  const live = (await deps.config.store.listBySubject(document.ownerId, document.subjectId, "NFE")).filter(isLive);
+  if (live.length > 0) {
+    throw new FiscalDocumentError("SUBJECT_HAS_DOCUMENT", `subject ${document.subjectId} already holds a live NF-e that is not document ${document.id}'s return.`);
+  }
+  const draft = await deps.config.sales.saleFor({ ownerId: document.ownerId, subjectId: document.subjectId, model: "NFE" });
+  if (!returnsDocument({ model: "NFE", sale: draft as FiscalDocument["sale"] }, document)) {
     throw new FiscalDocumentError("INVALID_INPUT", `the return the sale source answered for subject ${document.subjectId} does not quote document ${document.id}.`);
   }
-  const returned = await issue(deps, { ownerId: input.ownerId, subjectId: document.subjectId, issuingPointId: input.returnPointId, model: "NFE" });
-  return { outcome: "RETURNED", document: cancelled.document, returnDocument: returned, failure: cancelled.failure };
+  const returned = await issue(deps, { ownerId: document.ownerId, subjectId: document.subjectId, issuingPointId: returnPointId, model: "NFE" });
+  if (returned.id === document.id || !returnsDocument(returned, document)) {
+    throw new FiscalDocumentError("CONFLICT", `subject ${document.subjectId}'s live NF-e is not document ${document.id}'s return.`);
+  }
+  return returned;
 }
 
 /** Whether a lookup's answer moves this document (a settled number moves only while it is owed one). */

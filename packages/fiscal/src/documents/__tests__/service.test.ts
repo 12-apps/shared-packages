@@ -283,6 +283,33 @@ describe("the document service", () => {
       expect(store.counters.get("11222333000181|homologacao|NFE|5")).toBe(1);
     });
 
+    it("an NF-e sale past the window: refused by name, and nothing is issued", async () => {
+      const env = await setup({ issue: ["nfce-issue-authorized"], cancel: ["nfce-cancel-late"] });
+      await env.service.createIssuingPoint("owner-1", RETURNS_POINT);
+      const sale = await env.service.issue({ ...ISSUE, issuingPointId: "returns", model: "NFE" });
+      await expect(
+        env.service.cancelOrReturn({ ownerId: "owner-1", documentId: sale.id, reason: REASON, returnPointId: "returns" }),
+      ).rejects.toThrow(expect.objectContaining({ code: "RETURN_OF_NFCE_ONLY" }));
+      expect(env.calls.map((call) => call.method)).toEqual(["issue", "cancel"]);
+      expect((await env.store.getDocument("owner-1", sale.id))?.status).toBe("AUTHORIZED");
+    });
+
+    it("a subject already holding another live NF-e: refused, never answered as its return", async () => {
+      const { service, document, calls, store, sources } = await authorised({ issue: ["nfce-issue-authorized"], cancel: ["nfce-cancel-late"] });
+      const returnDraft = sources.returnDraft;
+      // A sale NF-e on the same subject (no return), issued before the late cancel.
+      sources.returnDraft = null;
+      const other = await service.issue({ ...ISSUE, issuingPointId: "returns", model: "NFE" });
+      expect(other).toMatchObject({ model: "NFE", sale: { purpose: "NORMAL" } });
+      sources.returnDraft = returnDraft;
+      const before = calls.length;
+      await expect(
+        service.cancelOrReturn({ ownerId: "owner-1", documentId: document.id, reason: REASON, returnPointId: "returns" }),
+      ).rejects.toThrow(expect.objectContaining({ code: "SUBJECT_HAS_DOCUMENT" }));
+      expect(calls.slice(before).map((call) => call.method)).toEqual(["cancel"]);
+      expect((await store.getDocument("owner-1", document.id))?.status).toBe("AUTHORIZED");
+    });
+
     it("past the window with no return point: refused by name, and the document stays AUTHORIZED", async () => {
       expect(LATE_CANCEL_CODES).toEqual(["501"]);
       const { service, document, store } = await authorised({ cancel: ["nfce-cancel-late"] });
