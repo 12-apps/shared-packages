@@ -19,7 +19,7 @@ export const EN_US_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
   heading: ({ due }) => `${due} still to pay to complete the order`,
   support: ({ paid, total }) =>
     `We received ${paid} of the order's ${total}. Pay only the difference to confirm it, ` +
-    "or ask the store to return what was paid.",
+    "or cancel and get the money back.",
   totalLabel: "Order total",
   paidLabel: (method) => `Already paid (${method})`,
   dueLabel: "Still to pay",
@@ -30,19 +30,23 @@ export const EN_US_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
     support: `We received ${paid}. The store will confirm the order or return the money; you will be told.`,
   }),
   refunded: ({ paid }) => ({
-    heading: `The store returned ${paid}`,
-    support: "The money goes back the way you paid it.",
+    heading: `We returned ${paid}`,
+    support: "The money is on its way back to you; you will be told when it arrives.",
   }),
   refundPending: ({ paid }) => ({
-    heading: `We are returning ${paid}`,
-    support: "The refund is under way; you will be told when the money is back.",
+    heading: `The refund of ${paid} is under way`,
+    support: "You will be told when the money is back.",
   }),
   settled: {
     heading: "Order confirmed",
     support: "The store received the rest of the payment and confirmed the order.",
   },
-  stockGone: ({ received, missing }) => ({
-    heading: `We received ${received}, but ${missing} ran out.`,
+  stockGone: ({ received, missing, count }) => ({
+    heading: `We received ${received}, but ${missing} ${count === 1 ? "has" : "have"} run out`,
+    support: "The store will confirm or return the money; you will be told.",
+  }),
+  stockGoneUnnamed: ({ received }) => ({
+    heading: `We received ${received}, but an item of the order has run out`,
     support: "The store will confirm or return the money; you will be told.",
   }),
   joinMissing: (names) => AND.format(names),

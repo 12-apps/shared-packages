@@ -72,7 +72,7 @@ describe("the SHORT outcome (option C)", () => {
     const page = text();
     expect(page).toContain("Faltam R$ 13,80 para fechar o pedido");
     expect(page).toContain(
-      "Recebemos R$ 6,90 dos R$ 20,70 do pedido. Pague só a diferença para confirmar, ou peça à loja para devolver o que foi pago.",
+      "Recebemos R$ 6,90 dos R$ 20,70 do pedido. Pague só a diferença para confirmar, ou cancele e receba o valor de volta.",
     );
     expect(page).toContain("Total do pedido");
     expect(page).toContain("Já pago (Pix)");
@@ -115,8 +115,8 @@ describe("the SHORT outcome (option C)", () => {
 
   it.each([
     ["REVIEWING", { dueCents: 0 }, "payment-short-reviewing", "A loja está conferindo o seu pagamento"],
-    ["REFUNDED", { resolution: "REFUNDED" as const }, "payment-short-refunded", "A loja devolveu R$ 6,90"],
-    ["REFUND_PENDING", { resolution: "REFUND_PENDING" as const }, "payment-short-refund-pending", "Estamos devolvendo R$ 6,90"],
+    ["REFUNDED", { resolution: "REFUNDED" as const }, "payment-short-refunded", "Devolvemos R$ 6,90"],
+    ["REFUND_PENDING", { resolution: "REFUND_PENDING" as const }, "payment-short-refund-pending", "A devolução de R$ 6,90 está em andamento"],
   ])("the %s face offers neither pay nor refund", (_face, over, testId, heading) => {
     renderStatus({ shortfall: { ...SHORT, ...over }, onPayDifference: () => undefined, onRequestRefund: () => undefined });
     expect(screen.getByTestId(testId)).toBeTruthy();
@@ -156,10 +156,45 @@ describe("the stock-gone notice (decision 3)", () => {
       onPayDifference: () => undefined,
       onRequestRefund: () => undefined,
     });
-    expect(text()).toContain("Recebemos R$ 20,70, mas acabou Pão de queijo e Café.");
+    // Two names: the verb agrees, the names are the host's own, and the heading has no period.
+    expect(screen.getByRole("heading").textContent?.replace(/\s/g, " ")).toBe("Recebemos R$ 20,70, mas acabaram Pão de queijo e Café");
     expect(text()).toContain("A loja vai confirmar ou devolver; você recebe um aviso.");
     expect(document.querySelectorAll("button")).toHaveLength(0);
     expect(text()).not.toContain("Nenhum valor foi cobrado");
+  });
+});
+
+describe("the stock-gone notice's words (B6, U3)", () => {
+  const heading = (): string => (screen.getByRole("heading").textContent ?? "").replace(/\s/g, " ");
+
+  it("one item: 'acabou', the name exactly as the host sent it", () => {
+    renderStatus({ stockGone: { receivedCents: 2070, missing: ["Pão de Queijo"] } });
+    expect(heading()).toBe("Recebemos R$ 20,70, mas acabou Pão de Queijo");
+  });
+
+  it.each([
+    ["no name at all", []],
+    ["only blank names", ["", "  "]],
+  ])("%s: its own sentence, never a dangling 'acabou .'", (_what, missing) => {
+    renderStatus({ stockGone: { receivedCents: 2070, missing } });
+    expect(heading()).toBe("Recebemos R$ 20,70, mas um item do pedido acabou");
+    expect(text()).toContain("A loja vai confirmar ou devolver; você recebe um aviso.");
+  });
+
+  it("en-US has the same unnamed sentence", () => {
+    renderStatus({ copy: EN_US_PAYMENT_STATUS_COPY, stockGone: { receivedCents: 2070, missing: [] } });
+    expect(heading()).toBe("We received $20.70, but an item of the order has run out");
+  });
+});
+
+describe("the short screen's look (U1, U2)", () => {
+  it("puts the two acts in one wrapping row and the glyph in a tinted chip", () => {
+    renderStatus({ shortfall: SHORT, onPayDifference: () => undefined, onRequestRefund: () => undefined });
+    const row = screen.getByTestId("payment-short-actions");
+    expect(row.querySelectorAll("button")).toHaveLength(2);
+    expect(getComputedStyle(row).flexWrap).toBe("wrap");
+    expect(screen.getByTestId("payment-short-chip").getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByRole("heading").tagName).toBe("H2");
   });
 });
 

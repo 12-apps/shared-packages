@@ -1,5 +1,6 @@
 import { Box } from "@mui/material";
-import type { JSX } from "react";
+import { alpha } from "@mui/material/styles";
+import type { JSX, ReactNode } from "react";
 
 import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
 
@@ -36,6 +37,13 @@ const GLYPH: Record<Glyph, typeof ScheduleIcon> = {
 
 const TONE_COLOR: Record<Tone, string> = { success: "success.main", warning: "warning.main" };
 
+/** The approved screen's chip: the glyph in a disc of its own tone, faintly tinted. */
+const CHIP_SIZE = 7;
+const CHIP_TINT = 0.14;
+
+/** Under this the two actions stand one under the other; above it they share a row. */
+const ACTION_MIN_PX = 224;
+
 /** Which face a shortfall shows, from the server's facts alone. */
 type ShortFace = "OPEN" | "REVIEWING" | "REFUNDED" | "REFUND_PENDING" | "SETTLED";
 
@@ -52,17 +60,47 @@ function Headline({ outcome, tone, glyph, testId }: { outcome: StatusOutcomeCopy
   return (
     <Box
       data-testid={testId}
-      sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, textAlign: "center" }}
+      sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5, textAlign: "center" }}
     >
-      <Box sx={{ color: TONE_COLOR[tone], display: "flex" }}>
+      <Box
+        aria-hidden="true"
+        data-testid="payment-short-chip"
+        sx={{
+          width: (theme) => theme.spacing(CHIP_SIZE),
+          height: (theme) => theme.spacing(CHIP_SIZE),
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: TONE_COLOR[tone],
+          bgcolor: (theme) => alpha(theme.palette[tone].main, CHIP_TINT),
+        }}
+      >
         <Icon fontSize="large" />
       </Box>
-      <Text variant="heading" size="md" weight="bold" as="h2">
+      {/* The approved headline is a step above the slot's largest text: the
+          theme's own h6 (1.25rem at MUI's defaults), so a host scale moves it. */}
+      <Box component="h2" sx={{ typography: "h6", fontWeight: "fontWeightBold", m: 0 }}>
         {outcome.heading}
-      </Text>
+      </Box>
       <Text variant="body" size="sm" as="p" style={{ opacity: 0.75 }}>
         {outcome.support}
       </Text>
+    </Box>
+  );
+}
+
+/**
+ * The two actions: side by side when both fit at {@link ACTION_MIN_PX} each (a
+ * computer), each across the row when they do not (a phone, 320 px).
+ */
+function ActionRow({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <Box
+      data-testid="payment-short-actions"
+      sx={{ display: "flex", flexWrap: "wrap", gap: 1, "& > *": { flex: (theme) => `1 1 ${theme.typography.pxToRem(ACTION_MIN_PX)}`, minWidth: 0 } }}
+    >
+      {children}
     </Box>
   );
 }
@@ -164,7 +202,7 @@ export function ShortOutcome(props: ShortOutcomeProps): JSX.Element {
         testId="payment-short"
       />
       <ShortReceipt copy={copy} shortfall={shortfall} />
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <ActionRow>
         {props.onPayDifference ? (
           <Button
             variant="solid"
@@ -173,6 +211,7 @@ export function ShortOutcome(props: ShortOutcomeProps): JSX.Element {
             onClick={props.onPayDifference}
             disabled={busy !== null}
             loading={busy === "pay"}
+            fullWidth
             dataTestId="payment-short-pay"
           >
             {copy.payAction({ due })}
@@ -186,12 +225,13 @@ export function ShortOutcome(props: ShortOutcomeProps): JSX.Element {
             onClick={props.onRequestRefund}
             disabled={busy !== null}
             loading={busy === "refund"}
+            fullWidth
             dataTestId="payment-short-refund"
           >
             {copy.refundAction({ paid })}
           </Button>
         ) : null}
-      </Box>
+      </ActionRow>
     </Box>
   );
 }
@@ -203,9 +243,13 @@ export function ShortOutcome(props: ShortOutcomeProps): JSX.Element {
  * "refund" would race a store about to restock and confirm.
  */
 export function StockGoneNotice({ copy, stockGone }: { copy: ShortPaymentCopy; stockGone: PaymentStockGone }): JSX.Element {
-  const outcome = copy.stockGone({
-    received: copy.money(stockGone.receivedCents),
-    missing: copy.joinMissing(stockGone.missing),
-  });
+  const received = copy.money(stockGone.receivedCents);
+  // The names exactly as the host sent them; none at all is its own sentence
+  // (a product that vanished, a stock race the host could not attribute).
+  const names = stockGone.missing.filter((name) => name.trim() !== "");
+  const outcome =
+    names.length === 0
+      ? copy.stockGoneUnnamed({ received })
+      : copy.stockGone({ received, missing: copy.joinMissing(names), count: names.length });
   return <Headline outcome={outcome} tone="warning" glyph="clock" testId="payment-stock-gone" />;
 }

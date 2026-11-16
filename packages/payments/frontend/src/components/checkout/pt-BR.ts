@@ -19,7 +19,7 @@ export const PT_BR_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
   heading: ({ due }) => `Faltam ${due} para fechar o pedido`,
   support: ({ paid, total }) =>
     `Recebemos ${paid} dos ${total} do pedido. Pague só a diferença para confirmar, ` +
-    "ou peça à loja para devolver o que foi pago.",
+    "ou cancele e receba o valor de volta.",
   totalLabel: "Total do pedido",
   paidLabel: (method) => `Já pago (${method})`,
   dueLabel: "Falta pagar",
@@ -30,19 +30,23 @@ export const PT_BR_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
     support: `Recebemos ${paid}. A loja vai confirmar o pedido ou devolver o valor; você recebe um aviso.`,
   }),
   refunded: ({ paid }) => ({
-    heading: `A loja devolveu ${paid}`,
-    support: "O valor volta pelo mesmo meio de pagamento que você usou.",
+    heading: `Devolvemos ${paid}`,
+    support: "O valor volta para você; você recebe um aviso quando cair.",
   }),
   refundPending: ({ paid }) => ({
-    heading: `Estamos devolvendo ${paid}`,
-    support: "A devolução está em andamento; você recebe um aviso quando o valor voltar.",
+    heading: `A devolução de ${paid} está em andamento`,
+    support: "Você recebe um aviso quando o valor voltar.",
   }),
   settled: {
     heading: "Pedido confirmado",
     support: "A loja recebeu o valor que faltava e confirmou o pedido.",
   },
-  stockGone: ({ received, missing }) => ({
-    heading: `Recebemos ${received}, mas acabou ${missing}.`,
+  stockGone: ({ received, missing, count }) => ({
+    heading: `Recebemos ${received}, mas ${count === 1 ? "acabou" : "acabaram"} ${missing}`,
+    support: "A loja vai confirmar ou devolver; você recebe um aviso.",
+  }),
+  stockGoneUnnamed: ({ received }) => ({
+    heading: `Recebemos ${received}, mas um item do pedido acabou`,
     support: "A loja vai confirmar ou devolver; você recebe um aviso.",
   }),
   joinMissing: (names) => AND.format(names),

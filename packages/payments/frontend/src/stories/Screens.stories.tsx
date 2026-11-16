@@ -172,6 +172,10 @@ export const StatusShortSettled: StoryObj = factStory("PAID", { shortfall: { ...
 export const StatusStockGone: StoryObj = factStory("FAILED", {
   stockGone: { receivedCents: 2070, missing: ["Pão de queijo"] },
 });
+/** The same notice when the host could not name what ran out. */
+export const StatusStockGoneUnnamed: StoryObj = factStory("FAILED", {
+  stockGone: { receivedCents: 2070, missing: [] },
+});
 
 // ---------------------------------------------------------------------------
 // PaymentsUnavailable / SavedCards / EmptyCart

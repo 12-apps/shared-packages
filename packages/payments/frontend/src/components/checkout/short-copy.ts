@@ -34,18 +34,32 @@ export interface ShortPaymentCopy {
   refundAction(amounts: { paid: string }): string;
   /** Nothing is left to ask of the buyer (the total moved under it): the store is checking. */
   reviewing(amounts: { paid: string }): StatusOutcomeCopy;
-  /** The capture went back. */
+  /**
+   * The capture went back. Says only that it did: the fact names no channel,
+   * and a store may settle a pending refund another way than the one paid.
+   */
   refunded(amounts: { paid: string }): StatusOutcomeCopy;
-  /** A refund was asked and is on its way, or waits for the store. */
+  /**
+   * A refund was asked and is not back yet — a provider series retrying it, or
+   * the store finishing it by hand. True for both.
+   */
   refundPending(amounts: { paid: string }): StatusOutcomeCopy;
-  /** The store collected the difference itself and confirmed. */
+  /**
+   * The store collected the difference ITSELF, off the platform, and confirmed.
+   * The host sends `resolution: "SETTLED"` for that and nothing else: a buyer
+   * who paid the difference here is answered a plain PAID with no shortfall,
+   * and gets the ordinary paid receipt.
+   */
   settled: StatusOutcomeCopy;
   /**
    * The WHOLE amount arrived and an item ran out: its own notice, with no
    * action — the store confirms or returns the money. `missing` is the host's
-   * names of what ran out, already joined by {@link joinMissing}.
+   * names of what ran out, exactly as it sent them, joined by
+   * {@link joinMissing}; `count` is how many there are, for the verb.
    */
-  stockGone(amounts: { received: string; missing: string }): StatusOutcomeCopy;
+  stockGone(amounts: { received: string; missing: string; count: number }): StatusOutcomeCopy;
+  /** The same notice when the host could not name what ran out. */
+  stockGoneUnnamed(amounts: { received: string }): StatusOutcomeCopy;
   /** Join the names of what ran out into one phrase ("A, B e C"). */
   joinMissing(names: readonly string[]): string;
 }

@@ -140,6 +140,17 @@ its own dialog, sheet or page. In `legs`, the last tender that was only tapped
 carries no amount. It is "the rest", divided against the total the host's
 server composes. See `src/tender-split/math.ts`.
 
+### A short capture: option C (FUT-612)
+
+When a capture arrives short of the total, `/status` answers the host's token with a `shortfall` beside it (`checkoutStatusBody`, `{ totalCents, paidCents, dueCents, paidMethod, resolution }`). When the whole amount arrived but an item ran out, it answers a `stockGone` instead. `<CheckoutFlow>` reads both from the same poll and shows them on its confirmation step. The host binds two ports: `payDifference` raises the balance order, and `requestShortRefund` returns the capture through `refundCaptureOnRequest`. A decline sends no fact, so it keeps today's screen.
+
+`resolution` says where the short stands:
+
+- `null` while the buyer can still act.
+- `REFUND_PENDING` once a refund was asked and is not back yet, whether a provider series is still retrying it or a person at the store will finish it.
+- `REFUNDED` once the capture went back.
+- `SETTLED` only when the store collected the difference itself, off the platform, and confirmed. A buyer who paid the difference through the checkout must be answered a plain `PAID` with no shortfall. Otherwise they lose the ordinary paid receipt and read "A loja recebeu o valor que faltava".
+
 ### Sizes are rem, through the theme (density)
 
 Every size a frontend component draws, whether font, height, width, padding, gap, radius or offset, goes through `src/components/rem.ts`: `sxRem(px)` in `sx`, and `rem(theme, px)` / `rems(theme, …)` in a theme callback. Each one returns `theme.typography.pxToRem(px)`. The 1px hairline border is the one literal left.
