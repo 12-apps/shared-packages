@@ -61,6 +61,19 @@ over. A throw settles the delivery `FAILED` and the reconciliation sweep runs
 it again, so the handler is idempotent on the provider's message id. Without
 the hook those events are dropped, as before.
 
+**Filter on your OWN account id.** The hook is handed every account the app
+posts for that no connection names — not only the platform's number. A host
+that wants its own number's events keeps `event.accountId === <its phone
+number id>` and drops the rest; anything else would act on a stranger's
+messages.
+
+**Meta's `wa_id` is not always the stored number.** For many Brazilian mobiles
+Meta reports the sender WITHOUT the 9th digit (`55 11 8765-4321` for
+`+55 11 98765-4321`). A host matching a reply to a stored number (a consent
+reply, `@12-apps/notifications`' `applyInbound`) normalises `from` first: for a
+`55` number with a 2-digit area code and an 8-digit subscriber starting 6–9,
+insert the `9` — or the reply misses the account that sent it.
+
 **Opt-out.** On WhatsApp, a message that is exactly `PARAR`, `SAIR`, `STOP` or
 `CANCELAR` — case- and accent-insensitive, ignoring punctuation and emoji
 around it ("PARAR.", "Parar!") — opts the contact out, as does Meta's own

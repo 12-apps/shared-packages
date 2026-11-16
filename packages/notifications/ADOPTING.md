@@ -372,8 +372,12 @@ sweep — endpoints and screens included.
       their own template; a notification's `data` cannot name one. Body
       parameters are sent without newlines or tabs (Meta rejects them).
     - **The inbound route is yours.** Verify and parse (Meta: `@12-apps/messaging`,
-      whose `hooks.onUnclaimedEvents` hands you the events of YOUR number on a
-      shared app; Twilio: `verifyTwilioSignature` + `parseTwilioCallback`), then
+      whose `hooks.onUnclaimedEvents` hands you the events of EVERY account no
+      connection names on a shared app — keep only those whose `accountId` is
+      YOUR number's; Twilio: `verifyTwilioSignature` + `parseTwilioCallback`).
+      Normalise Meta's `wa_id` before passing it as `from`: for many Brazilian
+      mobiles it lacks the 9th digit, and an exact match against the stored
+      `+55…9…` number would miss the SIM or SAIR. Then
       call `api.consent.applyInbound({ channel, from, text | optOut, at,
       externalId })` for a reply and `api.applyDeliveryReceipt(...)` for a
       status. Retry a receipt that answered `applied: false` later: it may have
