@@ -41,6 +41,12 @@ export type TwilioCallback =
       errorCode: string | null;
       /** The number itself is bad: a receipt that should stop sends to it. */
       permanent: boolean;
+      /**
+       * Only on a CONFIRMATION message's callback (read off `options.url`):
+       * the consent row it was sent for. Pass it on as the receipt's
+       * `confirmation`.
+       */
+      confirmation?: string;
     }
   | { kind: 'inbound'; externalId: string; from: string; to: string; text: string }
   | { kind: 'ignored'; reason: string };
@@ -116,7 +122,27 @@ function inboundOf(sid: string, params: Record<string, string>): TwilioCallback 
  * (queued, accepted, sending, scheduled) and anything unrecognised are
  * `ignored` — never thrown on, since Twilio retries a callback that errors.
  */
-export function parseTwilioCallback(params: Record<string, string>): TwilioCallback {
+/** The query parameter a confirmation's `StatusCallback` carries its consent row in. */
+export const TWILIO_CONFIRMATION_PARAM = 'notificationsConfirmation';
+
+/** The consent row a callback URL names, or null (also for a URL that does not parse). */
+function confirmationOfUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get(TWILIO_CONFIRMATION_PARAM) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `options.url` is the URL Twilio called (the one the signature is checked
+ * against): a confirmation message's callback is told apart by it.
+ */
+export function parseTwilioCallback(
+  params: Record<string, string>,
+  options: { url?: string } = {},
+): TwilioCallback {
   const sid = params.MessageSid ?? params.SmsSid;
   if (!sid) return { kind: 'ignored', reason: 'no MessageSid' };
   const raw = params.MessageStatus ?? params.SmsStatus;
@@ -124,11 +150,13 @@ export function parseTwilioCallback(params: Record<string, string>): TwilioCallb
   const status = STATUS_OF[raw];
   if (!status) return { kind: 'ignored', reason: `in-flight status ${raw}` };
   const errorCode = params.ErrorCode ? params.ErrorCode : null;
+  const confirmation = confirmationOfUrl(options.url);
   return {
     kind: 'status',
     providerMessageId: sid,
     status,
     errorCode,
     permanent: status === 'UNDELIVERED' && errorCode !== null && PERMANENT_ERROR_CODES.has(errorCode),
+    ...(confirmation ? { confirmation } : {}),
   };
 }

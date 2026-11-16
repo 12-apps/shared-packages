@@ -14,6 +14,7 @@ import {
   sentAs,
   type DriverDeclarationBase,
 } from './drivers';
+import { WHATSAPP_CONFIRMATION_CALLBACK_PREFIX } from '../receipts';
 
 /**
  * WHATSAPP transport — Meta's WhatsApp Cloud API behind the driver port.
@@ -70,6 +71,12 @@ export interface WhatsAppMessage {
   templateParameters: [title: string, body: string];
   /** This message's own template (see {@link WhatsAppTemplateRef}). */
   template?: WhatsAppTemplateRef;
+  /**
+   * Set by the consent engine on a confirmation message (the consent row's
+   * id): sent as `biz_opaque_callback_data`, which Meta echoes on the
+   * message's statuses (`confirmationOfWhatsAppStatus`).
+   */
+  confirmation?: string;
 }
 
 export interface WhatsAppDriver {
@@ -176,10 +183,14 @@ function payloadOf(
   message: WhatsAppMessage,
   declaration: WhatsAppDriverDeclaration,
 ): object {
-  if (message.template) return ownTemplatePayload(toDigits, message.template, declaration);
-  return declaration.templateName
-    ? templatePayload(toDigits, message, declaration)
-    : textPayload(toDigits, message);
+  const payload = message.template
+    ? ownTemplatePayload(toDigits, message.template, declaration)
+    : declaration.templateName
+      ? templatePayload(toDigits, message, declaration)
+      : textPayload(toDigits, message);
+  return message.confirmation
+    ? { ...payload, biz_opaque_callback_data: `${WHATSAPP_CONFIRMATION_CALLBACK_PREFIX}${message.confirmation}` }
+    : payload;
 }
 
 function textPayload(toDigits: string, message: WhatsAppMessage): object {

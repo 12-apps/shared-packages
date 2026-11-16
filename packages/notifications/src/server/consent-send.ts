@@ -9,6 +9,7 @@ import {
   type ConfirmationResult,
   type ConsentDeps,
 } from './consent-types';
+import { twilioRejectionOf } from './twilio';
 
 /**
  * Sending a confirmation: the first ask, a resend, and the one ask a
@@ -129,13 +130,18 @@ async function rowFor(
   return store.findUnique({ where: unique });
 }
 
-/** Build the host's message and hand it to the channel's transport. */
+/**
+ * Build the host's message and hand it to the channel's transport. The
+ * formatted message carries the consent row's id (`confirmation`), which the
+ * built-in drivers put on the provider's callback, so this message's receipt
+ * is told apart from a notification's (`./receipts.ts`).
+ */
 async function deliverConfirmation(
   deps: ConsentDeps,
   contact: Contact,
-  input: ConfirmationMessageInput & { userId: string },
+  input: ConfirmationMessageInput & { userId: string; rowId: string },
 ): Promise<void> {
-  const { userId, ...message } = input;
+  const { userId, rowId, ...message } = input;
   const transport = deps.transports.get(input.channel);
   if (!transport) throw new Error(`@12-apps/notifications: no ${input.channel} transport is declared.`);
   const content: NotificationContent = deps.config.message(message);
@@ -145,7 +151,9 @@ async function deliverConfirmation(
   const template = input.channel === 'WHATSAPP' ? deps.config.whatsAppTemplate?.(message) : null;
   const formatted: unknown = transport.format(content);
   const outgoing =
-    template && typeof formatted === 'object' && formatted !== null ? { ...formatted, template } : formatted;
+    typeof formatted === 'object' && formatted !== null
+      ? { ...formatted, confirmation: rowId, ...(template ? { template } : {}) }
+      : formatted;
   const recipient: TransportRecipient = {
     userId,
     email: contact.email,
@@ -225,7 +233,11 @@ export async function startConfirmation(
   if (!(await claimSlot(deps, store, row, codeData(deps, row.id, code, now), now))) {
     return lostSlot(deps, store, row);
   }
-  await deliverConfirmation(deps, contact, { userId, ...messageInput(channel, method, contact, reason, code) });
+  await deliverConfirmation(deps, contact, {
+    userId,
+    rowId: row.id,
+    ...messageInput(channel, method, contact, reason, code),
+  });
   return { status: 'SENT', retryAfterMs: deps.config.resendCooldownMs };
 }
 
@@ -263,12 +275,38 @@ export async function askOneGrandfathered(
   try {
     await deliverConfirmation(deps, contact, {
       userId: row.userId,
+      rowId: row.id,
       ...messageInput(channel, method, contact, 'GRANDFATHERED', code),
     });
     return true;
   } catch (error) {
     deps.logger.error(`[notifications] grandfathered ask failed for ${row.userId}:`, error);
-    await release();
+    await settleFailedAsk(store, row, error, release);
     return false;
+  }
+}
+
+/**
+ * A grandfathered ask the provider refused. Refused for the NUMBER (a bad
+ * number, or a STOP the provider holds: `./twilio.ts`), the grandfathering
+ * ends — dropped, or opted out — exactly as a delivery refused for it would
+ * end it; any other failure releases the claim for the next run.
+ */
+async function settleFailedAsk(
+  store: ChannelConsentDelegate,
+  row: ChannelConsentRow,
+  error: unknown,
+  release: () => Promise<{ count: number }>,
+): Promise<void> {
+  const kind = twilioRejectionOf(error);
+  if (kind === 'BAD_NUMBER') {
+    await store.deleteMany({ where: { id: row.id, status: 'GRANDFATHERED' } });
+  } else if (kind === 'OPTED_OUT') {
+    await store.updateMany({
+      where: { id: row.id, status: 'GRANDFATHERED' },
+      data: { status: 'OPTED_OUT', optedOutAt: new Date(), codeHash: null, codeExpiresAt: null },
+    });
+  } else {
+    await release();
   }
 }

@@ -36,6 +36,7 @@ import {
   applyDeliveryReceipt,
   type AppliedDeliveryReceipt,
   type DeliveryReceiptInput,
+  type DeliveryReceiptOutcome,
 } from './receipts';
 import { createInboxStore, type NotificationInboxStore } from './inbox';
 import { createPreferenceStore, type NotificationPreferenceStore } from './preferences';
@@ -191,8 +192,9 @@ export interface ApiNotifications {
    * A provider's delivery receipt, applied forward-only to the delivery row
    * holding its id. `applied: false` = nothing moved (unknown id, a duplicate,
    * or a receipt that raced its own SENT write — retry that one later).
+   * `reason: 'not-tracked'` = a confirmation message's receipt: final.
    */
-  applyDeliveryReceipt: (input: DeliveryReceiptInput) => Promise<{ applied: boolean }>;
+  applyDeliveryReceipt: (input: DeliveryReceiptInput) => Promise<DeliveryReceiptOutcome>;
   /** The consent engine — present only when the host configured `consent`. */
   consent?: NotificationConsentApi;
   /**

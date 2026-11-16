@@ -22,7 +22,33 @@ import type { NotificationsDb, NotificationsDbProvider } from './db';
  * A PERMANENT failure (the provider says the number itself is bad) on a
  * grandfathered number drops the grandfathering, so the number stops receiving
  * (owner, 2026-11-16). A confirmed number is not touched: its owner proved it.
+ *
+ * A CONFIRMATION message (the ask, the code) has no delivery row: it is not a
+ * notification. Its callback carries a tag naming the consent row it was sent
+ * for (`confirmation`: Twilio's `parseTwilioCallback(params, { url })`, Meta's
+ * `biz_opaque_callback_data` read with `confirmationOfWhatsAppStatus`), and its
+ * receipt answers `{ applied: false, reason: 'not-tracked' }` — final, never
+ * to be retried. A permanent failure on it still drops a grandfathering.
  */
+
+/** The `biz_opaque_callback_data` prefix a WhatsApp confirmation is sent with. */
+export const WHATSAPP_CONFIRMATION_CALLBACK_PREFIX = 'notifications-confirmation:';
+
+/** The consent row a WhatsApp status's `biz_opaque_callback_data` names, or null. */
+export function confirmationOfWhatsAppStatus(callbackData: string | null | undefined): string | null {
+  if (!callbackData?.startsWith(WHATSAPP_CONFIRMATION_CALLBACK_PREFIX)) return null;
+  const id = callbackData.slice(WHATSAPP_CONFIRMATION_CALLBACK_PREFIX.length);
+  return id.length > 0 ? id : null;
+}
+
+/**
+ * What a receipt did. `applied: false` alone may be retried (it may have raced
+ * its own SENT write); with `reason: 'not-tracked'` it is final.
+ */
+export interface DeliveryReceiptOutcome {
+  applied: boolean;
+  reason?: 'not-tracked';
+}
 
 export type DeliveryReceiptStatus = 'SENT' | 'DELIVERED' | 'READ' | 'UNDELIVERED';
 
@@ -34,6 +60,11 @@ export interface DeliveryReceiptInput {
   error?: string | null;
   /** The provider said the number itself is bad (invalid, landline, unknown). */
   permanent?: boolean;
+  /**
+   * The consent row a CONFIRMATION message was sent for, from its callback's
+   * tag. Present, the receipt is not a delivery row's: see above.
+   */
+  confirmation?: string | null;
 }
 
 /** What `onDeliveryReceipt` is told, once per receipt that moved a row. */
@@ -92,10 +123,22 @@ async function afterApplied(
   }
 }
 
+/** A confirmation's receipt: only a permanent failure on a grandfathered ask means anything. */
+async function confirmationReceipt(deps: ReceiptDeps, input: DeliveryReceiptInput, rowId: string): Promise<DeliveryReceiptOutcome> {
+  if (input.status === 'UNDELIVERED' && input.permanent === true) {
+    const client = await deps.db();
+    await client.notificationChannelConsent?.deleteMany({
+      where: { id: rowId, channel: input.channel, status: 'GRANDFATHERED' },
+    });
+  }
+  return { applied: false, reason: 'not-tracked' };
+}
+
 export async function applyDeliveryReceipt(
   deps: ReceiptDeps,
   input: DeliveryReceiptInput,
-): Promise<{ applied: boolean }> {
+): Promise<DeliveryReceiptOutcome> {
+  if (input.confirmation) return confirmationReceipt(deps, input, input.confirmation);
   const status = input.status === 'READ' ? 'DELIVERED' : input.status;
   // SENT (or anything in flight) moves nothing: the row is already SENT.
   if (status !== 'DELIVERED' && status !== 'UNDELIVERED') return { applied: false };

@@ -86,6 +86,15 @@ finds no `SENT` row answers `{ applied: false }` (a duplicate, an unknown id, or
 one that raced its own `SENT` write — retry that one). `onDeliveryReceipt` is told
 once per receipt that moved a row.
 
+A phone CONFIRMATION (the consent engine's ask or code) is not a notification
+and has no delivery row. The built-in drivers tag it — Twilio's `StatusCallback`
+gets a `notificationsConfirmation` query parameter, Meta's message a
+`biz_opaque_callback_data` — and the host passes the tag on as the receipt's
+`confirmation` (`parseTwilioCallback(params, { url })` reads it; for Meta,
+`confirmationOfWhatsAppStatus(status.biz_opaque_callback_data)`). Such a receipt
+answers `{ applied: false, reason: 'not-tracked' }`, which is FINAL: do not
+retry it. A permanent failure on it still drops a grandfathering.
+
 ## Paid channels: consent, opt-out and caps (all opt-in)
 
 SMS and WhatsApp are billed per message, so a mount can hold them to three

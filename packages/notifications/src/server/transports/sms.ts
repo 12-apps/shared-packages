@@ -14,6 +14,7 @@ import {
   sentAs,
   type DriverDeclarationBase,
 } from './drivers';
+import { TWILIO_CONFIRMATION_PARAM } from '../twilio';
 
 /**
  * SMS transport — Twilio behind the same driver port as email.
@@ -31,6 +32,12 @@ import {
 /** The channel message the SMS formatter produces: one plain text body. */
 export interface SmsMessage {
   body: string;
+  /**
+   * Set by the consent engine on a confirmation message (the consent row's
+   * id): its `StatusCallback` names it, so its receipt is told apart from a
+   * notification's (see `../twilio.ts`).
+   */
+  confirmation?: string;
 }
 
 export interface SmsDriver {
@@ -63,6 +70,14 @@ export interface SmsDriverDeclaration extends DriverDeclarationBase {
 /** SMS bodies are billed per 160-char segment — keep one message ≤ 3 segments. */
 const MAX_SMS_CHARS = 480;
 
+/** The callback URL, tagged with the consent row on a confirmation message. */
+function statusCallbackOf(url: string, confirmation: string | undefined): string {
+  if (!confirmation) return url;
+  const tagged = new URL(url);
+  tagged.searchParams.set(TWILIO_CONFIRMATION_PARAM, confirmation);
+  return tagged.toString();
+}
+
 const twilioDriver = (declaration: SmsDriverDeclaration): SmsDriver => ({
   async send(toE164, message) {
     const sid = declaration.accountSid;
@@ -71,7 +86,9 @@ const twilioDriver = (declaration: SmsDriverDeclaration): SmsDriver => ({
     }
     const auth = Buffer.from(`${sid}:${declaration.authToken}`).toString('base64');
     const form = new URLSearchParams({ To: toE164, From: declaration.from, Body: message.body });
-    if (declaration.statusCallbackUrl) form.set('StatusCallback', declaration.statusCallbackUrl);
+    if (declaration.statusCallbackUrl) {
+      form.set('StatusCallback', statusCallbackOf(declaration.statusCallbackUrl, message.confirmation));
+    }
     const answer = await postOrThrow(
       'Twilio',
       declaration.fetchImpl,

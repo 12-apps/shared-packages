@@ -377,7 +377,11 @@ sweep — endpoints and screens included.
       call `api.consent.applyInbound({ channel, from, text | optOut, at,
       externalId })` for a reply and `api.applyDeliveryReceipt(...)` for a
       status. Retry a receipt that answered `applied: false` later: it may have
-      raced its own SENT write.
+      raced its own SENT write — but never one that answered `reason:
+      'not-tracked'`: that is a confirmation message's receipt, final. Pass
+      Twilio's callback URL to `parseTwilioCallback(params, { url })` and Meta's
+      `biz_opaque_callback_data` through `confirmationOfWhatsAppStatus`, and hand
+      the result on as the receipt's `confirmation`.
     - **A phone change** calls `api.consent.forgetDestination(userId)`. Even
       without it a changed number is unconfirmed (every check compares the
       stored number with the current one), but the call clears the stale rows.

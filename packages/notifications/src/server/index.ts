@@ -79,10 +79,13 @@ export {
   DEFAULT_PER_TENANT_MONTHLY_CAP,
   type NotificationCapsConfig,
 } from './caps';
-export type {
-  AppliedDeliveryReceipt,
-  DeliveryReceiptInput,
-  DeliveryReceiptStatus,
+export {
+  WHATSAPP_CONFIRMATION_CALLBACK_PREFIX,
+  confirmationOfWhatsAppStatus,
+  type AppliedDeliveryReceipt,
+  type DeliveryReceiptInput,
+  type DeliveryReceiptOutcome,
+  type DeliveryReceiptStatus,
 } from './receipts';
 export { parseTwilioCallback, verifyTwilioSignature, type TwilioCallback } from './twilio';
 
