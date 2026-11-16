@@ -42,8 +42,29 @@ export const record = (value: unknown): Json | null =>
 
 export const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
 
-export const list = (value: unknown): Json[] =>
-  Array.isArray(value) ? value.flatMap((entry) => (record(entry) ? [entry as Json] : [])) : [];
+/**
+ * The objects of a JSON array, and every other entry it held (a string, a
+ * number, a nested array), so the caller can SAY what it could not read rather
+ * than lose it. Not an array: no entries, nothing else.
+ */
+export function entriesOf(value: unknown): { entries: Json[]; others: unknown[] } {
+  const entries: Json[] = [];
+  const others: unknown[] = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    const object = record(entry);
+    if (object) entries.push(object);
+    else others.push(entry);
+  }
+  return { entries, others };
+}
+
+/**
+ * The lookup lists (`products`, `optionGroups`, `options`) keep only objects
+ * with an id: an entry is only ever reached through an id that names it, and a
+ * reference that finds nothing is warned about where it is made
+ * (OPTION_GROUP_UNREADABLE, OPTION_UNREADABLE, or the item's ITEM_UNREADABLE).
+ */
+const list = (value: unknown): Json[] => entriesOf(value).entries;
 
 /** iFood's `status`: anything but UNAVAILABLE is on sale (an absent status included). */
 export const availableOf = (status: unknown): boolean => status !== "UNAVAILABLE";
@@ -77,7 +98,19 @@ export function photoOf(imagePath: unknown, subject: string | null): { url: stri
   if (path === null) return { url: null, warning: warning("PHOTO_UNREADABLE", subject, imagePath) };
   if (/^https:\/\//i.test(path)) return { url: path };
   if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return { url: null, warning: warning("PHOTO_UNREADABLE", subject, path) };
-  return { url: `${IFOOD_IMAGE_BASE_URL}${encodeURI(path.replace(/^\/+/, ""))}` };
+  return { url: `${IFOOD_IMAGE_BASE_URL}${urlSafePath(path.replace(/^\/+/, ""))}` };
+}
+
+/**
+ * The path as a URL path: kept as it is when it is already one (an encoded
+ * `%20` stays `%20`, never `%2520`); only a character a URL may not carry
+ * (a space, a quote, a non-ASCII letter) is encoded, and a `%` that starts no
+ * escape becomes `%25`.
+ */
+export function urlSafePath(path: string): string {
+  return path
+    .replace(/%(?![0-9A-Fa-f]{2})/g, "%25")
+    .replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@/%]/g, (character) => encodeURIComponent(character));
 }
 
 /** The words and photo of an item or option: its product's (`productId`), else its own. */
@@ -135,7 +168,16 @@ function boundsOf(link: Json, group: Json): { min: number; max: number } | null 
   return low >= 0 && high >= 1 && high >= low ? { min: low, max: high } : null;
 }
 
-const idsOf = (value: unknown): string[] => (Array.isArray(value) ? value.flatMap((entry) => text(entry) ?? []) : []);
+/** A group's option ids; an entry that is not an id is an OPTION_UNREADABLE warning, never dropped. */
+function idsOf(groupId: string, value: unknown, warnings: CatalogueReadWarning[]): string[] {
+  const ids: string[] = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    const id = text(entry);
+    if (id === null) warnings.push(warning("OPTION_UNREADABLE", groupId, entry));
+    else ids.push(id);
+  }
+  return ids;
+}
 
 /** One group a product links to (`products[].optionGroups[]`), or the warning that leaves it out. */
 function groupOf(link: Json, index: IfoodCatalogueIndex, warnings: CatalogueReadWarning[]): CatalogueSnapshotOptionGroup | null {
@@ -147,7 +189,7 @@ function groupOf(link: Json, index: IfoodCatalogueIndex, warnings: CatalogueRead
     warnings.push(warning("OPTION_GROUP_UNREADABLE", id, { link, group }));
     return null;
   }
-  const options = idsOf(group.optionIds).flatMap((optionId) => optionOf(optionId, index, warnings) ?? []);
+  const options = idsOf(id, group.optionIds, warnings).flatMap((optionId) => optionOf(optionId, index, warnings) ?? []);
   if (options.length === 0) {
     warnings.push(warning("OPTION_GROUP_UNREADABLE", id, "no readable option"));
     return null;
@@ -164,10 +206,18 @@ function itemWarnings(raw: Json, priceCents: number | null): CatalogueReadWarnin
   return warnings;
 }
 
-/** The group links of an item: on its product (CONFIRMED, the PUT example), else on the item itself. */
-function linksOf(index: IfoodCatalogueIndex, raw: Json): Json[] {
+/**
+ * The group links of an item: on its product (CONFIRMED, the PUT example),
+ * else on the item itself. Links that are not objects, or a value that is not
+ * a list at all, are an OPTION_GROUP_UNREADABLE warning each.
+ */
+function linksOf(index: IfoodCatalogueIndex, raw: Json, warnings: CatalogueReadWarning[]): Json[] {
   const product = index.products.get(text(raw.productId) ?? "");
-  return list(product?.optionGroups ?? raw.optionGroups);
+  const value = product?.optionGroups ?? raw.optionGroups;
+  if (value !== undefined && value !== null && !Array.isArray(value)) warnings.push(warning("OPTION_GROUP_UNREADABLE", null, value));
+  const { entries, others } = entriesOf(value);
+  for (const other of others) warnings.push(warning("OPTION_GROUP_UNREADABLE", null, other));
+  return entries;
 }
 
 /** One item of a category, or the notice that says why it could not be read. */
@@ -181,7 +231,7 @@ export function itemOf(raw: Json, index: IfoodCatalogueIndex, categoryId: string
   const priceCents = priceCentsOf(raw.price);
   const warnings = itemWarnings(raw, priceCents);
   const photoUrl = photoInto(described.imagePath, null, warnings);
-  const optionGroups = linksOf(index, raw).flatMap((link) => groupOf(link, index, warnings) ?? []);
+  const optionGroups = linksOf(index, raw, warnings).flatMap((link) => groupOf(link, index, warnings) ?? []);
   return {
     externalId: id,
     externalCode: described.externalCode,

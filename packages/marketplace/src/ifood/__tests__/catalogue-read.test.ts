@@ -4,7 +4,7 @@ import type { MarketplaceHttpRequest, MarketplaceHttpResponse } from "../../core
 import type { CatalogueReadContext } from "../../core/catalogue-read-port";
 import { createIfoodAdapter } from "..";
 import { IFOOD_CATALOGUE_READER } from "../catalogue-read";
-import { IFOOD_IMAGE_BASE_URL } from "../catalogue-snapshot";
+import { IFOOD_IMAGE_BASE_URL, photoOf } from "../catalogue-snapshot";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../en-US";
 
 /**
@@ -286,6 +286,92 @@ describe("iFood catalogue read, what it cannot map is said, never dropped", () =
       "CATEGORY_UNREADABLE:none",
       "CATEGORY_UNREADABLE:cat-gone",
     ]);
+  });
+});
+
+describe("iFood catalogue read, an unexpected shape is said, never an empty menu", () => {
+  const snapshotOf = async (categories: unknown, itemsByCategory: Record<string, MarketplaceHttpResponse>) => {
+    const result = await IFOOD_CATALOGUE_READER.read(context(ifood(categories, itemsByCategory)).ctx);
+    if (result.kind !== "snapshot") throw new Error(`expected a snapshot, got ${result.kind}`);
+    return result.snapshot;
+  };
+  const codes = (snapshot: { notices: { code: string; categoryExternalId: string | null; externalId: string | null }[] }) =>
+    snapshot.notices.map((notice) => `${notice.code}:${notice.categoryExternalId ?? "none"}:${notice.externalId ?? "none"}`);
+
+  it("a category answered without an `items` list is CATEGORY_UNREADABLE, and the other categories are still read", async () => {
+    const snapshot = await snapshotOf(
+      [
+        { id: "cat-renamed", name: "Renamed" },
+        { id: "cat-array", name: "Array" },
+        { id: "cat-1", name: "Burgers" },
+      ],
+      {
+        "cat-renamed": respond(200, { data: [{ id: "it-9", productId: "pr-9" }] }),
+        "cat-array": respond(200, [{ id: "it-9" }]),
+        "cat-1": respond(200, BURGERS_ITEMS),
+      },
+    );
+
+    expect(snapshot.categories.map((category) => category.name)).toEqual(["Burgers"]);
+    expect(codes(snapshot)).toEqual(["CATEGORY_UNREADABLE:cat-renamed:none", "CATEGORY_UNREADABLE:cat-array:none"]);
+    expect(snapshot.notices[0]?.detail).toContain('"data"');
+  });
+
+  it("a category entry that is not an object is CATEGORY_UNREADABLE", async () => {
+    const snapshot = await snapshotOf(["Burgers", 7, { id: "cat-1", name: "Burgers" }], { "cat-1": respond(200, BURGERS_ITEMS) });
+
+    expect(snapshot.categories).toHaveLength(1);
+    expect(codes(snapshot)).toEqual(["CATEGORY_UNREADABLE:none:none", "CATEGORY_UNREADABLE:none:none"]);
+    expect(snapshot.notices.map((notice) => notice.detail)).toEqual(["Burgers", "7"]);
+  });
+
+  it("an item entry that is not an object is ITEM_UNREADABLE in its category", async () => {
+    const snapshot = await snapshotOf([{ id: "cat-1", name: "Burgers" }], {
+      "cat-1": respond(200, { ...BURGERS_ITEMS, items: ["it-1", null, ...BURGERS_ITEMS.items] }),
+    });
+
+    expect(snapshot.categories[0]?.items.map((item) => item.name)).toEqual(["X-Burger"]);
+    expect(codes(snapshot)).toEqual(["ITEM_UNREADABLE:cat-1:none", "ITEM_UNREADABLE:cat-1:none"]);
+  });
+
+  it("a group link that is not an object, or links that are not a list, are OPTION_GROUP_UNREADABLE", async () => {
+    const products = (optionGroups: unknown) => [{ ...BURGERS_ITEMS.products[0], optionGroups }, ...BURGERS_ITEMS.products.slice(1)];
+    const listed = await snapshotOf([{ id: "cat-1", name: "Burgers" }], {
+      "cat-1": respond(200, { ...BURGERS_ITEMS, products: products(["og-size", { id: "og-extra", min: 0, max: 2 }]) }),
+    });
+    const notAList = await snapshotOf([{ id: "cat-1", name: "Burgers" }], {
+      "cat-1": respond(200, { ...BURGERS_ITEMS, products: products({ id: "og-size" }) }),
+    });
+
+    const item = listed.categories[0]?.items[0];
+    expect(item?.optionGroups.map((group) => group.name)).toEqual(["Extras"]);
+    expect(item?.warnings).toEqual([{ code: "OPTION_GROUP_UNREADABLE", subject: null, detail: '"og-size"' }]);
+    expect(notAList.categories[0]?.items[0]?.optionGroups).toEqual([]);
+    expect(notAList.categories[0]?.items[0]?.warnings).toEqual([{ code: "OPTION_GROUP_UNREADABLE", subject: null, detail: '{"id":"og-size"}' }]);
+  });
+
+  it("an option id that is not an id is OPTION_UNREADABLE on its group", async () => {
+    const optionGroups = [{ ...BURGERS_ITEMS.optionGroups[0], optionIds: ["op-small", 5, { id: "op-large" }] }, BURGERS_ITEMS.optionGroups[1]];
+    const snapshot = await snapshotOf([{ id: "cat-1", name: "Burgers" }], { "cat-1": respond(200, { ...BURGERS_ITEMS, optionGroups }) });
+
+    const item = snapshot.categories[0]?.items[0];
+    expect(item?.optionGroups[0]?.options.map((option) => option.name)).toEqual(["Small"]);
+    expect(item?.warnings).toEqual([
+      { code: "OPTION_UNREADABLE", subject: "og-size", detail: "5" },
+      { code: "OPTION_UNREADABLE", subject: "og-size", detail: '{"id":"op-large"}' },
+    ]);
+  });
+});
+
+describe("iFood catalogue read, photo paths", () => {
+  it.each([
+    ["202611/a%20b.jpg", "202611/a%20b.jpg"],
+    ["/202611/a b.jpg", "202611/a%20b.jpg"],
+    ["202611/100%.jpg", "202611/100%25.jpg"],
+    ["202611/pão.jpg", "202611/p%C3%A3o.jpg"],
+    ["202611/x-burger_1.jpg", "202611/x-burger_1.jpg"],
+  ])("%s is served as %s, never encoded twice", (path, served) => {
+    expect(photoOf(path, null)).toEqual({ url: `${IFOOD_IMAGE_BASE_URL}${served}` });
   });
 });
 

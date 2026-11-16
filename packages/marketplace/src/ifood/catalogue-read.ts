@@ -7,7 +7,7 @@ import type {
   CatalogueSnapshotCategory,
   CatalogueSnapshotItem,
 } from "../core/catalogue-read-port";
-import { availableOf, indexOf, itemOf, list, record, text } from "./catalogue-snapshot";
+import { availableOf, entriesOf, indexOf, itemOf, record, text } from "./catalogue-snapshot";
 import { IFOOD_API, bearer, ifoodTokenKey } from "./outbound";
 
 /**
@@ -36,8 +36,11 @@ import { IFOOD_API, bearer, ifoodTokenKey } from "./outbound";
  *   such merchant for this app, ESTIMATED) are `NOT_AUTHORIZED`;
  * - 429, 408, 425, 5xx and a call with no answer are `retry`;
  * - any other 4xx is `REFUSED`, with iFood's words.
- * A category whose own items answer 404 (deleted between the two calls) is
- * left out with a CATEGORY_UNREADABLE notice rather than failing the read.
+ * A category whose own items answer 404 (deleted between the two calls), or
+ * answer in a shape other than `{ items: [...] }`, is left out with a
+ * CATEGORY_UNREADABLE notice rather than failing the read; an entry of a list
+ * that is not an object is a notice too. Only a category LIST that is not a
+ * list refuses the read (REFUSED): without it there is no menu to keep.
  */
 
 const catalogUrl = (merchantId: string, path: string): string =>
@@ -102,27 +105,54 @@ async function categoryOf(
   const id = text(raw.id);
   const name = text(raw.name);
   if (id === null || name === null) {
-    notices.push({ code: "CATEGORY_UNREADABLE", categoryExternalId: id, externalId: null, detail: JSON.stringify(raw).slice(0, 300) });
+    notices.push(unreadableCategory(id, raw));
     return null;
   }
   const answered = await get(ctx, `categories/${encodeURIComponent(id)}/items`);
   if ("kind" in answered) return answered;
   if (answered.status === 404) {
-    notices.push({ code: "CATEGORY_UNREADABLE", categoryExternalId: id, externalId: null, detail: "its items answered 404" });
+    notices.push(unreadableCategory(id, "its items answered 404"));
     return null;
   }
   if (!ok(answered)) return failureOf(answered);
-  const body = record(parse(answered.body));
-  // ESTIMATED: the answer is `{ items, products, optionGroups, options }`, the PUT's four lists.
-  if (!body) return unexpected("category items", answered.body);
+  const items = itemsOf(answered.body, id, notices);
+  return items && { externalId: id, externalCode: text(raw.externalCode), name, available: availableOf(raw.status), items };
+}
+
+const unreadableCategory = (categoryExternalId: string | null, detail: unknown): CatalogueReadNotice => ({
+  code: "CATEGORY_UNREADABLE",
+  categoryExternalId,
+  externalId: null,
+  detail: (typeof detail === "string" ? detail : JSON.stringify(detail) ?? String(detail)).slice(0, 300),
+});
+
+/**
+ * One category's items, each one it cannot read an ITEM_UNREADABLE notice; or
+ * null, with a CATEGORY_UNREADABLE notice, when the answer is not the expected
+ * `{ items: [...] }` (ESTIMATED: the PUT's four lists, `items` plural). A
+ * notice rather than refusing the whole read: one category answered in an odd
+ * shape keeps the rest of the menu importable, and the host shows which
+ * category did not come over; a shape iFood changed everywhere leaves a notice
+ * on every category, never a silent empty menu.
+ */
+function itemsOf(rawBody: string, categoryId: string, notices: CatalogueReadNotice[]): CatalogueSnapshotItem[] | null {
+  const body = record(parse(rawBody));
+  if (!body || !Array.isArray(body.items)) {
+    notices.push(unreadableCategory(categoryId, `unexpected items answer: ${rawBody}`));
+    return null;
+  }
   const index = indexOf(body);
+  const { entries, others } = entriesOf(body.items);
+  for (const other of others) {
+    notices.push({ code: "ITEM_UNREADABLE", categoryExternalId: categoryId, externalId: null, detail: String(JSON.stringify(other)).slice(0, 300) });
+  }
   const items: CatalogueSnapshotItem[] = [];
-  for (const entry of list(body.items)) {
-    const mapped = itemOf(entry, index, id);
+  for (const entry of entries) {
+    const mapped = itemOf(entry, index, categoryId);
     if ("code" in mapped) notices.push(mapped);
     else items.push(mapped);
   }
-  return { externalId: id, externalCode: text(raw.externalCode), name, available: availableOf(raw.status), items };
+  return items;
 }
 
 async function read(ctx: CatalogueReadContext): Promise<CatalogueReadResult> {
@@ -133,7 +163,10 @@ async function read(ctx: CatalogueReadContext): Promise<CatalogueReadResult> {
   if (!Array.isArray(parsed)) return unexpected("category list", listed.body);
   const categories: CatalogueSnapshotCategory[] = [];
   const notices: CatalogueReadNotice[] = [];
-  for (const raw of list(parsed)) {
+  const { entries, others } = entriesOf(parsed);
+  // A category entry that is not an object is said, never skipped.
+  for (const other of others) notices.push(unreadableCategory(null, other));
+  for (const raw of entries) {
     const category = await categoryOf(ctx, raw, notices);
     if (category === null) continue;
     if ("kind" in category) return category;
