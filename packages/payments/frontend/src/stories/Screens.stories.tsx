@@ -1,7 +1,7 @@
 import { useState, type JSX } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { CheckoutScreens, PaymentFlows } from "../flows/types";
+import type { CheckoutScreens, PaymentFlows, PaymentStatusScreenProps } from "../flows/types";
 import type { CheckoutOrder, OrderStatus } from "../index";
 
 import { StoryFlow, type StoryHost } from "./host";
@@ -135,6 +135,43 @@ export const StatusPaidWithHostHero: StoryObj = screen(
     ),
   },
 );
+
+// ---------------------------------------------------------------------------
+// The money facts on a settled screen (FUT-612, option C)
+// ---------------------------------------------------------------------------
+
+/** The contract's figures: a 2070 pedido, 690 arrived by Pix. */
+const SHORT = { totalCents: 2070, paidCents: 690, dueCents: 1380, paidMethod: "PIX", resolution: null } as const;
+
+type ShortFacts = Pick<PaymentStatusScreenProps, "shortfall" | "stockGone">;
+
+const factStory = (status: OrderStatus, facts: ShortFacts): StoryObj =>
+  screen({}, (flows) => (
+    <flows.screens.PaymentStatus
+      status={status}
+      payable={{ ...PAYABLE, status, totalCents: 2070, totalLabel: "R$ 20,70" }}
+      onPayDifference={() => undefined}
+      onRequestRefund={() => undefined}
+      {...facts}
+    />
+  ));
+
+/** A short capture: what is missing, the receipt, pay the difference or cancel and get it back. */
+export const StatusShort: StoryObj = factStory("FAILED", { shortfall: SHORT });
+/** A person moved the total under the capture: nothing to pay, the store is checking. */
+export const StatusShortReviewing: StoryObj = factStory("FAILED", { shortfall: { ...SHORT, dueCents: 0 } });
+/** The capture went back. */
+export const StatusShortRefunded: StoryObj = factStory("FAILED", { shortfall: { ...SHORT, resolution: "REFUNDED" } });
+/** A refund on its way, or waiting for the store ("Estorno pendente"). */
+export const StatusShortRefundPending: StoryObj = factStory("FAILED", {
+  shortfall: { ...SHORT, resolution: "REFUND_PENDING" },
+});
+/** The store collected the difference itself and confirmed. */
+export const StatusShortSettled: StoryObj = factStory("PAID", { shortfall: { ...SHORT, resolution: "SETTLED" } });
+/** The whole amount arrived and an item ran out: its own notice, no action. */
+export const StatusStockGone: StoryObj = factStory("FAILED", {
+  stockGone: { receivedCents: 2070, missing: ["Pão de queijo"] },
+});
 
 // ---------------------------------------------------------------------------
 // PaymentsUnavailable / SavedCards / EmptyCart

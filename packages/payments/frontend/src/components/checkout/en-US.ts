@@ -1,7 +1,52 @@
 import { EN_US_CARD_COPY } from "../../card/en-US";
 import { EN_US_CHECKOUT_SCREENS_COPY } from "./screens-en-US";
 import type { CheckoutCopy } from "./copy-context";
+import type { ShortPaymentCopy } from "./short-copy";
 import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
+
+const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const AND = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" });
+
+/**
+ * A capture that arrived short, and a full one the store could not fulfil
+ * (FUT-612). Read by somebody whose money ARRIVED: none of these says
+ * "nothing was charged". A host charging in another currency passes its own
+ * `money`.
+ */
+export const EN_US_SHORT_PAYMENT_COPY: ShortPaymentCopy = {
+  money: (cents) => USD.format(cents / 100),
+  methodNames: { PIX: "Pix", CARD: "Card", BOLETO: "Boleto" },
+  heading: ({ due }) => `${due} still to pay to complete the order`,
+  support: ({ paid, total }) =>
+    `We received ${paid} of the order's ${total}. Pay only the difference to confirm it, ` +
+    "or ask the store to return what was paid.",
+  totalLabel: "Order total",
+  paidLabel: (method) => `Already paid (${method})`,
+  dueLabel: "Still to pay",
+  payAction: ({ due }) => `Pay ${due}`,
+  refundAction: ({ paid }) => `Cancel and get ${paid} back`,
+  reviewing: ({ paid }) => ({
+    heading: "The store is checking your payment",
+    support: `We received ${paid}. The store will confirm the order or return the money; you will be told.`,
+  }),
+  refunded: ({ paid }) => ({
+    heading: `The store returned ${paid}`,
+    support: "The money goes back the way you paid it.",
+  }),
+  refundPending: ({ paid }) => ({
+    heading: `We are returning ${paid}`,
+    support: "The refund is under way; you will be told when the money is back.",
+  }),
+  settled: {
+    heading: "Order confirmed",
+    support: "The store received the rest of the payment and confirmed the order.",
+  },
+  stockGone: ({ received, missing }) => ({
+    heading: `We received ${received}, but ${missing} ran out.`,
+    support: "The store will confirm or return the money; you will be told.",
+  }),
+  joinMissing: (names) => AND.format(names),
+};
 
 /**
  * The en-US packs for the checkout views — NAMED exports a host passes by hand,
@@ -97,6 +142,7 @@ export const EN_US_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
   amountLabel: "Amount paid",
   referenceLabel: "Order",
   receiptEmailLabel: "Receipt sent to",
+  short: EN_US_SHORT_PAYMENT_COPY,
 };
 
 /**

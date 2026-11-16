@@ -33,4 +33,5 @@ export {
   type CheckoutScreens,
   type PaymentFlows,
   type PaymentFlowsConfig,
+  type PaymentStatusScreenProps,
 } from './types';

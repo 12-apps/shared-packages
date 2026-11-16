@@ -81,10 +81,13 @@ export type {
   PaymentStatusCopy,
   StatusOutcomeCopy,
 } from './components/checkout/view-copy';
+export type { ShortPaymentCopy } from './components/checkout/short-copy';
+export type { CheckoutStatusDetail } from './components/checkout/status-detail';
 export {
   PT_BR_CHECKOUT_COPY,
   PT_BR_CHECKOUT_VIEW_COPY,
   PT_BR_PAYMENT_STATUS_COPY,
+  PT_BR_SHORT_PAYMENT_COPY,
 } from './components/checkout/pt-BR';
 // The provider the card fields and buyer inputs read their words from — a host
 // mounting a screen BELOW `CheckoutFlow` (or composing by hand) opens it

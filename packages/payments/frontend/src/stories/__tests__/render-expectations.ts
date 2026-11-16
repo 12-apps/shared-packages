@@ -146,6 +146,48 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["payment-awaiting_payment", "payment-pending"],
     text: ["Confirmando seu pagamento"],
   },
+  // FUT-612 — option C. The decline pin above (`StatusFailed`) is the other half:
+  // a FAILED screen with no fact still says nothing was charged, byte for byte.
+  "Screens/StatusShort": {
+    testIds: ["payment-short", "payment-short-receipt", "payment-short-pay", "payment-short-refund"],
+    text: [
+      "Faltam R$ 13,80 para fechar o pedido",
+      "Recebemos R$ 6,90 dos R$ 20,70 do pedido. Pague só a diferença para confirmar, ou peça à loja para devolver o que foi pago.",
+      "Total do pedido",
+      "Já pago (Pix)",
+      "Falta pagar",
+      "Pagar R$ 13,80",
+      "Cancelar e receber R$ 6,90 de volta",
+    ],
+    absentTestIds: ["payment-failed", "payment-retry", "payment-back-to-menu"],
+    absentText: ["Nenhum valor foi cobrado"],
+  },
+  "Screens/StatusShortReviewing": {
+    testIds: ["payment-short-reviewing"],
+    text: ["A loja está conferindo o seu pagamento"],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+    absentText: ["Nenhum valor foi cobrado"],
+  },
+  "Screens/StatusShortRefunded": {
+    testIds: ["payment-short-refunded", "payment-back-to-menu"],
+    text: ["A loja devolveu R$ 6,90"],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+  },
+  "Screens/StatusShortRefundPending": {
+    testIds: ["payment-short-refund-pending"],
+    text: ["Estamos devolvendo R$ 6,90"],
+    absentTestIds: ["payment-short-pay", "payment-short-refund"],
+  },
+  "Screens/StatusShortSettled": {
+    testIds: ["payment-short-settled", "payment-back-to-menu"],
+    text: ["Pedido confirmado", "A loja recebeu o valor que faltava e confirmou o pedido."],
+  },
+  "Screens/StatusStockGone": {
+    testIds: ["payment-stock-gone"],
+    text: ["Recebemos R$ 20,70, mas acabou Pão de queijo.", "A loja vai confirmar ou devolver; você recebe um aviso."],
+    absentTestIds: ["payment-short-pay", "payment-short-refund", "payment-back-to-menu", "payment-retry"],
+    absentText: ["Nenhum valor foi cobrado"],
+  },
   "Screens/UnavailableNoRemedy": {
     testIds: ["checkout-payments-disabled"],
     text: ["Pagamento online indisponível"],

@@ -211,7 +211,7 @@ export const RECEIPT_STACK_BELOW_PX = 440;
 const STACKED = `@container receipt (max-width: ${RECEIPT_STACK_BELOW_PX - 0.05}px)`;
 
 /** One label/value row of the paid receipt block; `long` lets it stack under {@link RECEIPT_STACK_BELOW_PX}. */
-function Fact({ label, value, testId, long = false }: { label: string; value: string; testId?: string; long?: boolean }): JSX.Element {
+export function Fact({ label, value, testId, long = false }: { label: string; value: string; testId?: string; long?: boolean }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
     <Box

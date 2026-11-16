@@ -1,6 +1,8 @@
 import { Box } from "@mui/material";
 import type { JSX, ReactNode } from "react";
 
+import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
+
 import type { CheckoutDecline } from "./decline";
 import {
   OutcomeHero,
@@ -9,6 +11,8 @@ import {
   type BackActionEmphasis,
   type WaitState,
 } from "./payment-status-parts";
+import { ShortOutcome, StockGoneNotice } from "./payment-status-short";
+import type { ShortPaymentCopy } from "./short-copy";
 import type { OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
 import type { PaymentStatusCopy } from "./view-copy";
@@ -123,6 +127,41 @@ interface PaymentStatusProps {
    * was charged.
    */
   manual?: boolean;
+  /**
+   * A capture arrived SHORT of the total (FUT-612) — the server's fact, from
+   * `getStatusDetail`, never inferred here. With `copy.short`, a settled
+   * screen shows what is missing and the two acts below instead of the
+   * refusal; without either, the screen is exactly what it was.
+   */
+  shortfall?: PaymentShortfall | null;
+  /** The whole amount arrived and an item ran out (FUT-612): its own notice, no action. */
+  stockGone?: PaymentStockGone | null;
+  /** Pay only what is missing. Not offered when absent. */
+  onPayDifference?: () => void;
+  /** Cancel and have the capture returned. Not offered when absent. */
+  onRequestRefund?: () => void;
+  /** One of those two acts is in flight. */
+  shortBusy?: "pay" | "refund" | null;
+}
+
+/**
+ * Which money fact this screen shows, if any (FUT-612). Only on a SETTLED
+ * screen — a wait has no answer yet — and only with the host's words for it.
+ * A confirmed order keeps its paid receipt, unless the confirmation IS the
+ * store settling the short, which says so.
+ */
+type MoneyFact =
+  | { kind: "stock"; copy: ShortPaymentCopy; stockGone: PaymentStockGone }
+  | { kind: "short"; copy: ShortPaymentCopy; shortfall: PaymentShortfall };
+
+function moneyFact(props: PaymentStatusProps): MoneyFact | null {
+  const status = props.status ?? "AWAITING_PAYMENT";
+  const copy = props.copy.short;
+  if (!copy || status === "AWAITING_PAYMENT") return null;
+  if (props.stockGone && status !== "PAID") return { kind: "stock", copy, stockGone: props.stockGone };
+  const shortfall = props.shortfall;
+  if (!shortfall) return null;
+  return status !== "PAID" || shortfall.resolution === "SETTLED" ? { kind: "short", copy, shortfall } : null;
 }
 
 /**
@@ -187,6 +226,38 @@ function statusView(props: PaymentStatusProps): StatusView {
 }
 
 export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
+  const fact = moneyFact(props);
+  return fact ? <MoneyFactStatus props={props} fact={fact} /> : <OutcomeStatus {...props} />;
+}
+
+/** A settled screen whose money ARRIVED and is not yet an order (FUT-612). */
+function MoneyFactStatus({ props, fact }: { props: PaymentStatusProps; fact: MoneyFact }): JSX.Element {
+  return (
+    <Box
+      data-testid="payment-status"
+      data-status={props.status ?? undefined}
+      data-money-fact={fact.kind}
+      sx={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", py: 2 }}
+    >
+      {fact.kind === "stock" ? (
+        <StockGoneNotice copy={fact.copy} stockGone={fact.stockGone} />
+      ) : (
+        <ShortOutcome
+          copy={fact.copy}
+          shortfall={fact.shortfall}
+          onPayDifference={props.onPayDifference}
+          onRequestRefund={props.onRequestRefund}
+          busy={props.shortBusy ?? null}
+          backAction={props.copy.backAction}
+          onBackToMenu={props.onBackToMenu}
+        />
+      )}
+    </Box>
+  );
+}
+
+/** Every outcome but a money fact — the screen as it always was. */
+function OutcomeStatus(props: PaymentStatusProps): JSX.Element {
   const { copy, totalLabel, orderId, buyerEmail, onRetry, onRegenerate, onBackToMenu } = props;
   const { LoadingState } = useCheckoutComponents();
   const view = statusView(props);
