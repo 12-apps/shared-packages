@@ -5,9 +5,10 @@ import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useEffect, useRef, type RefObject } from 'react';
 
 import { physicalScrollLeft, toRawScrollLeft, watchVisitorScroll } from './SettingsSectionChips.scroll';
-import { SettingsStatusMarker } from './SettingsStatusMarker';
+import { SettingsStatusMarker, SettingsStatusWord, visibleStatusWord } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
+import { softSignal } from '../../../tokens/surfaces';
 
 /**
  * The chip's drawn height, against `TOUCH_TARGET`'s 44 for the tappable one.
@@ -155,6 +156,28 @@ function useCentreActiveChip(
   }, [stripRef, activeItemId, itemsKey]);
 }
 
+/**
+ * A chip's fill and border. The open section's is the primary wash; an
+ * `attention` chip's is the theme's soft warning surface, so the chip that
+ * needs action is findable while the strip is scrolled; every other chip is
+ * outlined.
+ */
+function chipTone(theme: Theme, active: boolean, attention: boolean): Record<string, string> {
+  if (active) {
+    return {
+      bgcolor: alpha(theme.palette.primary.main, 0.12),
+      border: `1px solid ${alpha(theme.palette.primary.main, 0.4)}`,
+    };
+  }
+  if (attention) {
+    return {
+      bgcolor: softSignal(theme, 'warning'),
+      border: `1px solid ${alpha(theme.palette.warning.main, 0.5)}`,
+    };
+  }
+  return { bgcolor: 'transparent', border: `1px solid ${theme.palette.divider}` };
+}
+
 /** One chip: a link when the host gave it a target, else a button. */
 function SectionChip({
   item,
@@ -172,6 +195,7 @@ function SectionChip({
   testIdPrefix: string;
 }): React.JSX.Element {
   const asLink = item.href !== undefined && linkComponent !== undefined;
+  const word = visibleStatusWord(item);
   const behaviour = asLink
     ? { component: linkComponent, href: item.href }
     : { component: 'button' as const, type: 'button' as const, onClick: () => onSelectItem?.(item.id) };
@@ -205,8 +229,7 @@ function SectionChip({
         textDecoration: 'none',
         whiteSpace: 'nowrap',
         color: active ? 'primary.main' : 'text.secondary',
-        bgcolor: active ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
-        border: `1px solid ${active ? alpha(theme.palette.primary.main, 0.4) : theme.palette.divider}`,
+        ...chipTone(theme, active, item.status === 'attention'),
         // Spans the chip's width only, so neighbours never overlap: the strip
         // is a row, and the extra reach is vertical.
         '&::after': {
@@ -223,11 +246,14 @@ function SectionChip({
       {item.status ? (
         <SettingsStatusMarker
           status={item.status}
-          label={item.statusLabel}
+          label={item.statusLabel ?? word}
           testId={`${testIdPrefix}-chip-status-${item.id}`}
         />
       ) : null}
       {item.label}
+      {word ? (
+        <SettingsStatusWord text={word} separated testId={`${testIdPrefix}-chip-status-text-${item.id}`} />
+      ) : null}
     </Box>
   );
 }

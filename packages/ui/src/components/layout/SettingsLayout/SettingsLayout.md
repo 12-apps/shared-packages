@@ -70,8 +70,29 @@ An item may carry a host-resolved `status`, shown as a marker beside its label:
 | --- | --- | --- |
 | `ok` | green dot | set up and working |
 | `off` | grey dot | exists, switched off |
-| `new` | red dot | never opened |
+| `new` | hollow ring in `primary.main` | never opened |
+| `attention` | larger amber dot (`warning.main`) **plus a visible word** | needs the viewer to act |
 | `locked` | padlock | the plan does not include it |
+
+The marks differ in SHAPE as well as colour — a small filled dot, a ring, a
+larger dot, a padlock — so a reader who cannot tell the colours apart can still
+tell them apart.
+
+**`new` is not red.** Not having opened a section is not lateness, failure or
+money owed. It was drawn in `error.main` until a fresh store showed ten red dots,
+and the one row that did need action drowned among them. It is a hollow ring in
+the primary colour now, so it follows the host's brand.
+
+**`attention` carries a visible word**, supplied by the host as `statusText`
+("Pending"). The package ships no copy for it: without `statusText` the marker is
+drawn without a word. The word is drawn before the dot on the rail row and after
+the label (behind a middle dot) on a narrow-width chip, whose fill turns to the
+theme's soft warning surface. It is hidden from assistive technology, since
+`statusLabel` — the full sentence, "Pending: the phone number is missing" —
+already says it; with no `statusLabel` the word becomes the hidden label. The row
+does not move: the rail never reorders for a status. `statusText` is ignored for
+every other status — they repeat on most rows, and a word on each would bury the
+one that needs action.
 
 `locked` is a padlock rather than a fourth colour on purpose: a locked section
 has no configuration state at all, and a grey dot would claim it is merely off.
@@ -227,8 +248,9 @@ does not ask.
 | icon     | ReactNode | Optional leading icon                                  |
 | href     | string    | Optional link target (rendered via `linkComponent`)   |
 | keywords | string[]  | Extra search terms beyond the label                   |
-| status   | `'ok' \| 'off' \| 'new' \| 'locked'` | Host-resolved situation marker    |
+| status   | `'ok' \| 'off' \| 'new' \| 'attention' \| 'locked'` | Host-resolved situation marker |
 | statusLabel | string | What the marker means — read aloud with the row        |
+| statusText | string | Short visible word beside an `attention` marker ("Pending"); ignored otherwise |
 | inert    | boolean   | Listed, but not a control (not the same as disabled)  |
 
 ## Accessibility
@@ -276,5 +298,7 @@ does not ask.
 | Chip strip     | `{testIdPrefix}-chips`             |
 | Chip           | `{testIdPrefix}-chip-{itemId}`     |
 | Chip marker    | `{testIdPrefix}-chip-status-{itemId}` |
+| Attention word (rail) | `{testIdPrefix}-status-text-{itemId}` |
+| Attention word (chip) | `{testIdPrefix}-chip-status-text-{itemId}` |
 
 `testIdPrefix` defaults to `settings`.

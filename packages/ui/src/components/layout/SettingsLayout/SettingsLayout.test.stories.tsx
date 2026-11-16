@@ -175,7 +175,7 @@ export const KeyboardNavigation: Story = {
   },
 };
 
-/** The four sections of a Loja rail, one per situation the host can resolve. */
+/** The five sections of a Loja rail, one per situation the host can resolve. */
 const MARKED: SettingsNavGroup[] = [
   {
     id: 'store',
@@ -184,6 +184,13 @@ const MARKED: SettingsNavGroup[] = [
       { id: 'profile', label: 'Perfil e marca', status: 'ok', statusLabel: 'Ligado' },
       { id: 'address', label: 'Endereço', status: 'off', statusLabel: 'Desligado' },
       { id: 'hours', label: 'Horários', status: 'new', statusLabel: 'Não visitado' },
+      {
+        id: 'contact',
+        label: 'Contato',
+        status: 'attention',
+        statusText: 'Pendente',
+        statusLabel: 'Pendente: falta o telefone',
+      },
       {
         id: 'domain',
         label: 'Domínio e app',
@@ -221,6 +228,15 @@ export const SituationMarkers: Story = {
         'data-status',
         'locked',
       );
+      await expect(canvas.getByTestId('settings-status-contact')).toHaveAttribute(
+        'data-status',
+        'attention',
+      );
+    });
+
+    await step('Only the attention row carries a visible word, the caller’s', async () => {
+      await expect(canvas.getByTestId('settings-status-text-contact')).toHaveTextContent('Pendente');
+      await expect(canvas.getByTestId('settings-status-text-contact')).toBeVisible();
     });
 
     await step('Colour is never the only carrier: the meaning is in the row name', async () => {

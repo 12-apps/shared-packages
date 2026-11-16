@@ -13,7 +13,7 @@ import React from 'react';
 
 import { atLeastRail, TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
-import { SettingsStatusMarker } from './SettingsStatusMarker';
+import { SettingsStatusMarker, SettingsStatusWord, visibleStatusWord } from './SettingsStatusMarker';
 import type {
   SettingsLayoutProps,
   SettingsNavGroup,
@@ -51,6 +51,7 @@ function RailItemContent({
   active: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const word = visibleStatusWord(item);
   return (
     <>
       {item.icon ? (
@@ -60,10 +61,11 @@ function RailItemContent({
         primary={item.label}
         primaryTypographyProps={{ variant: 'body2', noWrap: true, fontWeight: active ? 600 : 500 }}
       />
+      {word ? <SettingsStatusWord text={word} testId={`${testIdPrefix}-status-text-${item.id}`} /> : null}
       {item.status ? (
         <SettingsStatusMarker
           status={item.status}
-          label={item.statusLabel}
+          label={item.statusLabel ?? word}
           testId={`${testIdPrefix}-status-${item.id}`}
         />
       ) : null}

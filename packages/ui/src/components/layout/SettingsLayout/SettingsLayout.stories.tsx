@@ -368,3 +368,42 @@ export const SeededSearch: Story = {
     </Box>
   ),
 };
+
+/** Every situation a host can resolve, on a rail and on the narrow-width chips. */
+const MARKED_ITEMS: SettingsNavGroup['items'] = [
+  { id: 'profile', label: 'Profile', status: 'ok', statusLabel: 'On' },
+  { id: 'notifications', label: 'Notifications', status: 'off', statusLabel: 'Off' },
+  { id: 'appearance', label: 'Appearance', status: 'new', statusLabel: 'Not opened yet' },
+  {
+    id: 'contact',
+    label: 'Contact',
+    status: 'attention',
+    statusText: 'Pending',
+    statusLabel: 'Pending: the phone number is missing',
+  },
+  { id: 'billing', label: 'Billing', status: 'locked', statusLabel: 'In a higher plan' },
+];
+
+/**
+ * `ok` and `off` are small dots, `new` a ring in the primary colour, `attention`
+ * a larger amber dot with the host's word, `locked` a padlock. Narrow the canvas
+ * below `md` to see the chips: the attention chip has an amber wash and its word
+ * after the label.
+ */
+export const SituationMarkers: Story = {
+  render: () => (
+    <Box sx={{ p: 3, minHeight: 420 }}>
+      <SettingsLayout
+        title="Settings"
+        groups={[{ id: 'account', label: 'Account', items: MARKED_ITEMS }]}
+        activeItemId="profile"
+        navVariant="drilldown"
+        atIndex={false}
+        sectionChips={MARKED_ITEMS}
+        sectionTitle="Profile"
+      >
+        <ExamplePanel itemId="profile" />
+      </SettingsLayout>
+    </Box>
+  ),
+};
