@@ -9,7 +9,6 @@ import {
   type ConfirmationResult,
   type ConsentDeps,
 } from './consent-types';
-import { WHATSAPP_TEMPLATE_DATA_KEY } from './transports/whatsapp';
 
 /**
  * Sending a confirmation: the first ask, a resend, and the one ask a
@@ -139,11 +138,14 @@ async function deliverConfirmation(
   const { userId, ...message } = input;
   const transport = deps.transports.get(input.channel);
   if (!transport) throw new Error(`@12-apps/notifications: no ${input.channel} transport is declared.`);
-  const built = deps.config.message(message);
+  const content: NotificationContent = deps.config.message(message);
+  // The confirmation's own approved template goes on the FORMATTED message, so
+  // only a message this engine builds can name one — never a notification's
+  // `data`. A transport whose message is not an object ignores it.
   const template = input.channel === 'WHATSAPP' ? deps.config.whatsAppTemplate?.(message) : null;
-  const content: NotificationContent = template
-    ? { ...built, data: { ...built.data, [WHATSAPP_TEMPLATE_DATA_KEY]: template } }
-    : built;
+  const formatted: unknown = transport.format(content);
+  const outgoing =
+    template && typeof formatted === 'object' && formatted !== null ? { ...formatted, template } : formatted;
   const recipient: TransportRecipient = {
     userId,
     email: contact.email,
@@ -152,7 +154,7 @@ async function deliverConfirmation(
     side: null,
     pushSubscriptionCount: 0,
   };
-  await transport.send(transport.format(content) as never, recipient);
+  await transport.send(outgoing as never, recipient);
 }
 
 /** The message input for one send, without the keys an absent value must not carry. */

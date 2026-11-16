@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import type { NotificationTransport, TransportRecipient } from '../../types';
 import type { FetchImpl } from '../transports/drivers';
 import {
-  WHATSAPP_TEMPLATE_DATA_KEY,
   formatWhatsApp,
   whatsAppTransport,
   type WhatsAppDriverDeclaration,
@@ -20,8 +19,10 @@ import { createMemoryDb } from './memory-db';
  * FUT-285 — the WhatsApp confirmation goes out as an APPROVED TEMPLATE the
  * host names (owner, 2026-11-16). Meta rejects a business-initiated free-form
  * message outside the 24 h window, and a confirmation is not the declaration's
- * generic "{{1}}: {{2}}" alert, so one message can name its own template under
- * `data.whatsappTemplate`, and the consent engine puts the host's there.
+ * generic "{{1}}: {{2}}" alert, so the consent engine puts the host's template
+ * on the confirmation it builds. Review N6: only there — a notification's
+ * `data` cannot name a template — and a body parameter carries no newline or
+ * tab, which Meta rejects.
  */
 
 const recipient: TransportRecipient = {
@@ -58,22 +59,14 @@ function recordingFetch(): { fetchImpl: FetchImpl; bodies: unknown[] } {
   };
 }
 
-describe('a message that names its own template', () => {
+describe('a message that carries its own template', () => {
   it('is sent as that template: name, language, body parameters and quick-reply payloads', async () => {
     const { fetchImpl, bodies } = recordingFetch();
     const transport = whatsAppTransport({ ...declaration, fetchImpl });
-    const message = transport.format({
-      title: 'Confirm',
-      body: 'Reply YES',
-      data: {
-        [WHATSAPP_TEMPLATE_DATA_KEY]: {
-          name: 'phone_confirmation',
-          language: 'pt_BR',
-          bodyParameters: ['Ana'],
-          quickReplyPayloads: ['CONFIRM'],
-        },
-      },
-    });
+    const message: WhatsAppMessage = {
+      ...transport.format({ title: 'Confirm', body: 'Reply YES' }),
+      template: { name: 'phone_confirmation', language: 'pt_BR', bodyParameters: ['Ana'], quickReplyPayloads: ['CONFIRM'] },
+    };
     await transport.send(message, recipient);
     expect(bodies[0]).toMatchObject({
       type: 'template',
@@ -88,17 +81,31 @@ describe('a message that names its own template', () => {
     });
   });
 
-  it('falls back to the declaration language, and ignores a malformed reference', () => {
-    const own = formatWhatsApp(
-      { title: 't', body: 'b', data: { [WHATSAPP_TEMPLATE_DATA_KEY]: { name: 'x', bodyParameters: [] } } },
-      declaration,
+  it('a notification\'s data cannot name one: `data.whatsappTemplate` is ignored', async () => {
+    const { fetchImpl, bodies } = recordingFetch();
+    const transport = whatsAppTransport({ ...declaration, fetchImpl });
+    const formatted = transport.format({
+      title: 'T',
+      body: 'B',
+      data: { whatsappTemplate: { name: 'phone_confirmation', bodyParameters: ['x'] } },
+    });
+    expect(formatted.template).toBeUndefined();
+    await transport.send(formatted, recipient);
+    expect(bodies[0]).toMatchObject({ template: { name: 'generic_alert', language: { code: 'en_US' } } });
+  });
+
+  it('body parameters are sent without newlines or tabs (Meta rejects them)', async () => {
+    const { fetchImpl, bodies } = recordingFetch();
+    const transport = whatsAppTransport({ ...declaration, fetchImpl });
+    await transport.send(
+      { ...transport.format({ title: 'T', body: 'B' }), template: { name: 'ask', bodyParameters: ['Ana\nMaria\t '] } },
+      recipient,
     );
-    expect(own.template).toEqual({ name: 'x', bodyParameters: [] });
-    const malformed = formatWhatsApp(
-      { title: 't', body: 'b', data: { [WHATSAPP_TEMPLATE_DATA_KEY]: { name: 'x', bodyParameters: [1] } } },
-      declaration,
-    );
-    expect(malformed.template).toBeUndefined();
+    await transport.send(transport.format({ title: 'Order\tready', body: 'line one\r\nline two' }), recipient);
+    expect(bodies[0]).toMatchObject({ template: { components: [{ parameters: [{ text: 'Ana Maria' }] }] } });
+    expect(bodies[1]).toMatchObject({
+      template: { components: [{ parameters: [{ text: 'Order ready' }, { text: 'line one line two' }] }] },
+    });
   });
 
   it('without one, the declaration template is sent exactly as before', async () => {

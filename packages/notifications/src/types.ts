@@ -78,15 +78,13 @@ export interface NotificationContent {
   /**
    * Structured extras for consumers that want more than text.
    *
-   * THREE KEYS ARE RESERVED. `attention` (`ATTENTION_DATA_KEY` in
+   * TWO KEYS ARE RESERVED. `attention` (`ATTENTION_DATA_KEY` in
    * `./attention`), set to `calm`, `late` or `spent`, makes this an attention
    * push: the WEB_PUSH transport sends it only to the devices whose own level
    * wants that severity. And `liveSubject` (`LIVE_SUBJECT_KEY` in `./live`) ties
    * this notification to a live activity, and the WEB_PUSH transport turns it
    * into the tray `tag` that collapses every push about one subject onto a
-   * single entry. A third, `whatsappTemplate` (`WHATSAPP_TEMPLATE_DATA_KEY` in
-   * `./server`), names the approved WhatsApp template ONE message is sent as.
-   * A host already using one of those names for something else acquires
+   * single entry. A host already using that name for something else acquires
    * that behaviour without asking for it — so it is named here, on the field a
    * generator actually writes, and not only where the feature is documented.
    */

@@ -143,7 +143,6 @@ export {
 
 export {
   WHATSAPP_DRIVERS,
-  WHATSAPP_TEMPLATE_DATA_KEY,
   formatWhatsApp,
   whatsAppTransport,
   type WhatsAppDriver,

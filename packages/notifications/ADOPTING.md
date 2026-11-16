@@ -368,8 +368,9 @@ sweep — endpoints and screens included.
       and answer it from `consent.whatsAppTemplate(input)` as `{ name,
       language?, bodyParameters, quickReplyPayloads? }`; the reply button's
       TITLE (fixed in the template) arrives as the reply's text, so make it one
-      of your `confirmKeywords`. Any notification can name its own template the
-      same way, under `data.whatsappTemplate` (`WHATSAPP_TEMPLATE_DATA_KEY`).
+      of your `confirmKeywords`. Only the confirmations the engine builds carry
+      their own template; a notification's `data` cannot name one. Body
+      parameters are sent without newlines or tabs (Meta rejects them).
     - **The inbound route is yours.** Verify and parse (Meta: `@12-apps/messaging`,
       whose `hooks.onUnclaimedEvents` hands you the events of YOUR number on a
       shared app; Twilio: `verifyTwilioSignature` + `parseTwilioCallback`), then

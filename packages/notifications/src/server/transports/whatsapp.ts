@@ -41,19 +41,12 @@ import {
  */
 
 /**
- * The `content.data` key under which ONE notification names its own approved
- * template, overriding the declaration's generic `templateName` for that send.
- *
- * A business-initiated message must be a template Meta approved, and some
- * messages need their OWN: a phone confirmation with a reply button is not the
- * generic "{{1}}: {{2}}" alert. The package names no template — the host
- * registers it with Meta and passes its name and parameters (the consent
- * engine does, from `consent.whatsAppTemplate`). A value that is not a
- * {@link WhatsAppTemplateRef} is ignored and the declaration's template is used.
+ * One approved template a single message is sent as, instead of the
+ * declaration's generic `templateName`. Set ONLY by the package's own consent
+ * engine on the confirmations it builds (from `consent.whatsAppTemplate`): a
+ * notification's `data` cannot name one, so a generator that spreads a payload
+ * into `data` never changes what Meta is asked to send.
  */
-export const WHATSAPP_TEMPLATE_DATA_KEY = 'whatsappTemplate';
-
-/** One approved template, as a notification names it. */
 export interface WhatsAppTemplateRef {
   /** The template's name as registered with Meta. */
   name: string;
@@ -75,7 +68,7 @@ export interface WhatsAppMessage {
   text: string;
   /** Template body parameters ({{1}} title, {{2}} body) when templated. */
   templateParameters: [title: string, body: string];
-  /** This message's own template (see {@link WHATSAPP_TEMPLATE_DATA_KEY}). */
+  /** This message's own template (see {@link WhatsAppTemplateRef}). */
   template?: WhatsAppTemplateRef;
 }
 
@@ -112,6 +105,20 @@ export interface WhatsAppDriverDeclaration extends DriverDeclarationBase {
 
 const DEFAULT_GRAPH_API_BASE = 'https://graph.facebook.com/v20.0';
 
+/**
+ * A template BODY parameter as Meta accepts it: no newline or tab, and no run
+ * of more than four spaces (Meta rejects the message otherwise, so a first name
+ * typed with a line break would fail the send). Each such run becomes one space.
+ */
+function templateParameterText(text: string): string {
+  return text.replace(/[\r\n\t]+/g, ' ').replace(/ {5,}/g, ' ').trim();
+}
+
+const bodyParameter = (text: string): { type: 'text'; text: string } => ({
+  type: 'text',
+  text: templateParameterText(text),
+});
+
 function templatePayload(
   toDigits: string,
   message: WhatsAppMessage,
@@ -127,7 +134,7 @@ function templatePayload(
       components: [
         {
           type: 'body',
-          parameters: message.templateParameters.map((text) => ({ type: 'text', text })),
+          parameters: message.templateParameters.map(bodyParameter),
         },
       ],
     },
@@ -143,7 +150,7 @@ function ownTemplatePayload(
   const components: object[] = [
     {
       type: 'body',
-      parameters: template.bodyParameters.map((text) => ({ type: 'text', text })),
+      parameters: template.bodyParameters.map(bodyParameter),
     },
     ...(template.quickReplyPayloads ?? []).map((payload, index) => ({
       type: 'button',
@@ -237,28 +244,9 @@ export function formatWhatsApp(
   const lines = [`*${content.title}*`, '', content.body];
   const href = absoluteLink(content.link, declaration.appUrl);
   if (href) lines.push('', href);
-  const template = templateRefOf(content.data?.[WHATSAPP_TEMPLATE_DATA_KEY]);
   return {
     text: lines.join('\n'),
     templateParameters: [content.title, content.body],
-    ...(template ? { template } : {}),
-  };
-}
-
-const isStringList = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
-
-/** A {@link WhatsAppTemplateRef} out of `content.data`, or nothing. */
-function templateRefOf(value: unknown): WhatsAppTemplateRef | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const ref = value as Record<string, unknown>;
-  if (typeof ref.name !== 'string' || ref.name.length === 0) return null;
-  if (!isStringList(ref.bodyParameters)) return null;
-  return {
-    name: ref.name,
-    bodyParameters: ref.bodyParameters,
-    ...(typeof ref.language === 'string' ? { language: ref.language } : {}),
-    ...(isStringList(ref.quickReplyPayloads) ? { quickReplyPayloads: ref.quickReplyPayloads } : {}),
   };
 }
 
