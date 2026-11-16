@@ -141,6 +141,11 @@ describe('Input (native)', () => {
     expect(screen.getByTestId('q')).toHaveAttribute('aria-disabled', 'true');
   });
 
+  it('makes the field read-only with readOnly, as the web Input does', () => {
+    render(<Input dataTestId="q" readOnly defaultValue="x" />);
+    expect(screen.getByTestId('q')).toHaveAttribute('readonly');
+  });
+
   it('names the busy spinner with the caller loadingLabel, else "loading"', () => {
     const { rerender } = render(<Input dataTestId="q" loading loadingLabel="Carregando" />);
     expect(screen.getByTestId('q-loading')).toHaveAttribute('aria-label', 'Carregando');

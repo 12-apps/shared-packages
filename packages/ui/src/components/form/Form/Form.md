@@ -70,11 +70,20 @@ function MyForm() {
 | children | `ReactNode` | - | Message content |
 | id | `string` | - | The message's element id, for the control's `aria-describedby` |
 
-`total-form`'s `TextField` uses it: while the field shows an error, the input's
+`total-form`'s fields use it: while a field shows an error, its control's
 `aria-describedby` points at the message by an id from `useId()` (unique on the
-page; not part of the contract). So far only `TextField` links its error this
-way. `SelectField` and `ToggleField` still show the message without linking it;
-a follow-up ticket covers them.
+page; not part of the contract), after any ids the caller passed. That control
+is `TextField`'s `<input>`, `SelectField`'s combobox (the menu's display div, or
+the search box's input from six options on) and `ToggleField`'s `role="group"`,
+which also carries `aria-invalid` while the error shows. The link goes when the
+error does.
+
+On a refused submit, client validation or a server error handed to the
+`onSubmit` helpers' `setFieldErrors`, `FormContainer` focuses the first control
+with `aria-invalid="true"` in DOM order and scrolls it into view (no smooth
+scroll under `prefers-reduced-motion`). A toggle group hands the focus to its
+pressed segment, else its first. A submit that passes moves nothing, and nor
+does the context's own `setFieldErrors`.
 
 ## Layout Variants
 

@@ -29,7 +29,7 @@ The Input component provides a flexible text input field with comprehensive vali
 
 ### State Props
 - `disabled`: Disables the input
-- `readOnly`: Makes input read-only
+- `readOnly`: Makes input read-only. On the web it reaches the `<input>` itself (not the field's root `<div>`); an `inputProps.readOnly` wins over it. Natively it makes the `TextInput` non-editable
 - `required`: Marks input as required
 - `error`: Error state flag
 - `helperText`: Helper or error text displayed below input

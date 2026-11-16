@@ -4,6 +4,7 @@ import MenuItem from '@mui/material/MenuItem/index.js';
 import MuiSelect from '@mui/material/Select/index.js';
 import React from 'react';
 
+import { joinIds } from './Select.aria';
 import { formControlSize, SelectFieldControl } from './Select.styles';
 import type { MenuSelectProps, SelectProps } from './Select.types';
 
@@ -90,10 +91,10 @@ const MenuField = React.forwardRef<HTMLDivElement, SelectProps>(
           labelId={label ? labelId : undefined}
           label={label}
           displayEmpty={Boolean(placeholder)}
-          aria-describedby={helperText ? helperTextId : undefined}
           data-testid={dataTestId ? `${dataTestId}-select` : 'select'}
           value={value ?? ''}
           {...props}
+          aria-describedby={joinIds(helperText ? helperTextId : undefined, props['aria-describedby'])}
           /*
            * `role="combobox"` sits on MUI's display DIV, not on the hidden
            * native input that `{...props}` reaches — so an `aria-label` passed

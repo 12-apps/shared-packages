@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useId } from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { Select } from '../../Select';
 import type { SelectOption } from '../../Select';
 import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
+import { describedByWith } from './described-by';
 
 /** Props for the `total-form` {@link SelectField}. */
 export interface SelectFieldProps {
@@ -18,6 +19,11 @@ export interface SelectFieldProps {
   label?: string;
   /** Placeholder shown when no option is selected. */
   placeholder?: string;
+  /**
+   * Ids of the caller's own description for the select (a hint, say). They
+   * stay first; the error message's id is added after them while it shows.
+   */
+  'aria-describedby'?: string;
 }
 
 /**
@@ -26,14 +32,24 @@ export interface SelectFieldProps {
  * value/error from context and writing the chosen value back through it.
  *
  * Renders its error via `total-form-field-<name>-message` and the select via
- * `total-form-field-<name>`.
+ * `total-form-field-<name>`. While it shows an error, the combobox's
+ * `aria-describedby` points at the message, by an id from `useId()`, as
+ * `TextField` does: unique on the page, and not part of the contract.
  */
-export function SelectField({ name, options, label, placeholder }: SelectFieldProps): React.ReactElement {
+export function SelectField({
+  name,
+  options,
+  label,
+  placeholder,
+  'aria-describedby': callerDescribedBy,
+}: SelectFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   // Held while the form waits on an upload (`useFormHold`), like the submit.
   const busy = useFormBusy();
   const error = errors[name];
   const testId = `total-form-field-${name}`;
+  const generatedId = useId();
+  const messageId = error ? `${generatedId}-message` : undefined;
 
   return (
     <FormControl fullWidth>
@@ -51,12 +67,13 @@ export function SelectField({ name, options, label, placeholder }: SelectFieldPr
         // display div, not a labelable element. `Select` puts `aria-label` on
         // that div, so the question names the control (FUT-4157).
         aria-label={label}
+        aria-describedby={describedByWith(callerDescribedBy, messageId)}
         disabled={busy}
         data-testid={testId}
         onChange={(event) => setFieldValue(name, String(event.target.value))}
       />
       {error && (
-        <FormMessage error dataTestId={`${testId}-message`}>
+        <FormMessage error id={messageId} dataTestId={`${testId}-message`}>
           {error}
         </FormMessage>
       )}

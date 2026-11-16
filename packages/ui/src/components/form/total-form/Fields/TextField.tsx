@@ -7,6 +7,7 @@ import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { Input } from '../../Input';
 import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
+import { describedByWith } from './described-by';
 
 /** Props for the `total-form` {@link TextField}. */
 export interface TextFieldProps {
@@ -80,16 +81,6 @@ function callerInputProps(
     ...(describedBy === undefined ? {} : { 'aria-describedby': describedBy }),
     'data-testid': testId,
   };
-}
-
-/**
- * The caller's own `aria-describedby` (a hint, say), with the error message's
- * id after it while the field shows one. The error is how a screen reader
- * learns WHY the field is invalid; `aria-invalid` alone only says that it is.
- */
-function describedByWith(callerIds: unknown, messageId: string | undefined): string | undefined {
-  const ids = [typeof callerIds === 'string' ? callerIds.trim() : '', messageId ?? ''].filter(Boolean);
-  return ids.length > 0 ? ids.join(' ') : undefined;
 }
 
 /**

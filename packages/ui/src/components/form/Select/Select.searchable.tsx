@@ -6,6 +6,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import React from 'react';
 
+import { joinIds } from './Select.aria';
 import { SEARCHABLE_MIN_OPTIONS, SELECT_SEARCH } from './Select.metrics';
 import { formControlSize, SelectFieldControl } from './Select.styles';
 import type { SelectOption, SelectProps } from './Select.types';
@@ -65,11 +66,16 @@ interface FieldProps {
   params: AutocompleteRenderInputParams;
   field: Pick<SelectProps, 'label' | 'placeholder' | 'helperText' | 'error' | 'name' | 'required' | 'autoFocus' | 'onBlur' | 'onFocus'>;
   ariaLabel: string | undefined;
+  ariaDescribedBy: string | undefined;
   disabled: boolean | undefined;
   triggerTestId: string;
 }
 
-function renderField({ params, field, ariaLabel, disabled, triggerTestId }: FieldProps): React.JSX.Element {
+function renderField({ params, field, ariaLabel, ariaDescribedBy, disabled, triggerTestId }: FieldProps): React.JSX.Element {
+  // MUI's text field writes `<id>-helper-text`; `inputProps` would replace it,
+  // so the helper's id goes first and a caller's (an error message) after it.
+  const helperId = field.helperText ? `${params.id}-helper-text` : undefined;
+  const describedBy = joinIds(helperId, ariaDescribedBy);
   return (
     <TextField
       {...params}
@@ -88,6 +94,7 @@ function renderField({ params, field, ariaLabel, disabled, triggerTestId }: Fiel
       inputProps={{
         ...params.inputProps,
         'aria-label': ariaLabel,
+        ...(describedBy === undefined ? {} : { 'aria-describedby': describedBy }),
         // The menu's display div carried `aria-disabled`; the input keeps it.
         'aria-disabled': disabled ? true : undefined,
         'data-testid': triggerTestId,
@@ -191,6 +198,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SelectProps>((p
             params,
             field: props,
             ariaLabel: props['aria-label'],
+            ariaDescribedBy: props['aria-describedby'],
             disabled,
             triggerTestId: dataTestId ? `${dataTestId}-select` : 'select',
           })
