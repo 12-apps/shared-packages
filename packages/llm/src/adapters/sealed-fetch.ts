@@ -27,25 +27,25 @@ const ACCOUNT_HEADERS = [
 /** The SDKs' "extra headers" variables, as `Name: value` lines. */
 const CUSTOM_HEADER_VARIABLES = ["OPENAI_CUSTOM_HEADERS", "ANTHROPIC_CUSTOM_HEADERS"] as const;
 
-/** The header a custom-headers line names, with its value; the SDKs skip a line with no colon. */
-function parseCustomHeaders(): Array<[string, string]> {
-  const pairs: Array<[string, string]> = [];
-  for (const variable of CUSTOM_HEADER_VARIABLES) {
-    const text = typeof process === "undefined" ? "" : (process.env[variable] ?? "");
-    for (const line of text.split(/\r?\n/)) {
-      const colon = line.indexOf(":");
-      if (colon < 0) continue;
-      const name = line.slice(0, colon).trim().toLowerCase();
-      const value = line.slice(colon + 1).trim();
-      try {
-        new Headers().set(name, value);
-      } catch {
-        continue; // a name or value `Headers` rejects was never sent either
-      }
-      pairs.push([name, value]);
-    }
+/** The header a custom-headers line names, with its value; null for a line the SDKs skip or `Headers` rejects. */
+function parseLine(line: string): [string, string] | null {
+  const colon = line.indexOf(":");
+  if (colon < 0) return null;
+  const name = line.slice(0, colon).trim().toLowerCase();
+  const value = line.slice(colon + 1).trim();
+  try {
+    new Headers().set(name, value);
+  } catch {
+    return null; // a name or value `Headers` rejects was never sent either
   }
-  return pairs;
+  return [name, value];
+}
+
+function parseCustomHeaders(): Array<[string, string]> {
+  const lines = CUSTOM_HEADER_VARIABLES.flatMap((variable) =>
+    (typeof process === "undefined" ? "" : (process.env[variable] ?? "")).split(/\r?\n/),
+  );
+  return lines.map(parseLine).filter((pair): pair is [string, string] => pair !== null);
 }
 
 /** Drop the platform's custom headers, but never one the adapter set itself with another value. */
