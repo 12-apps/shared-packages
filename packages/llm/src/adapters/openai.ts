@@ -64,7 +64,7 @@ export interface OpenAIAdapterOptions {
 }
 
 /** An OpenAI-compatible API: OpenAI itself, or a provider that speaks its Chat Completions (xAI). */
-export interface OpenAICompatibleOptions extends OpenAIAdapterOptions {
+interface OpenAICompatibleOptions extends OpenAIAdapterOptions {
   id: string;
   /** The provider's own API root, used when the host passes no `baseURL`. */
   defaultBaseURL: string;

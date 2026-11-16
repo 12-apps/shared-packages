@@ -62,7 +62,7 @@ export interface SealRoute {
   path: string | RegExp;
 }
 
-export interface SealOptions {
+interface SealOptions {
   provider: string;
   /** The only origin and path prefix a request may go to. */
   baseURL: string;
