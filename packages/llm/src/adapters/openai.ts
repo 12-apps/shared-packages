@@ -24,6 +24,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Message, StopReason, ToolCall, Usage } from "../types";
 import { loadSdk } from "./load";
+import { sealedFetch } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 type ChatParams = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
@@ -33,6 +34,9 @@ type CompletionMessage = OpenAI.Chat.Completions.ChatCompletionMessage;
 type FunctionToolCall = OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall;
 
 export const OPENAI_PROVIDER = "openai";
+
+/** Where OpenAI's API lives; never read from the environment (B3). */
+export const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 /**
  * The slice of the SDK client this adapter calls. `params` is the SDK's
@@ -56,9 +60,32 @@ export interface OpenAIAdapterOptions {
   defaultModel?: string;
 }
 
-async function defaultClient(credential: ResolvedCredential, options: OpenAIAdapterOptions): Promise<OpenAIClientLike> {
-  const sdk = await loadSdk(OPENAI_PROVIDER, "openai", () => import("openai"));
-  return new sdk.default({ apiKey: credential.secret, baseURL: options.baseURL, fetch: options.fetch, maxRetries: 0 });
+/** An OpenAI-compatible API: OpenAI itself, or a provider that speaks its Chat Completions (xAI). */
+export interface OpenAICompatibleOptions extends OpenAIAdapterOptions {
+  id: string;
+  /** The provider's own API root, used when the host passes no `baseURL`. */
+  defaultBaseURL: string;
+  /** Whether the provider takes `prompt_cache_key`. */
+  promptCacheKey: boolean;
+}
+
+/**
+ * Every account option is passed explicitly: with `organization`, `project`
+ * or `baseURL` left unset the SDK reads `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`
+ * and `OPENAI_BASE_URL`, so a store's own key would be billed to, or routed
+ * through, the platform's account (B3). The sealed fetch is the second layer.
+ */
+async function defaultClient(credential: ResolvedCredential, options: OpenAICompatibleOptions): Promise<OpenAIClientLike> {
+  const sdk = await loadSdk(options.id, "openai", () => import("openai"));
+  const baseURL = options.baseURL ?? options.defaultBaseURL;
+  return new sdk.default({
+    apiKey: credential.secret,
+    organization: null,
+    project: null,
+    baseURL,
+    fetch: sealedFetch({ provider: options.id, baseURL, auth: { authorization: `Bearer ${credential.secret}` }, fetch: options.fetch }),
+    maxRetries: 0,
+  });
 }
 
 const ERROR_PREFIX = "[tool error] ";
@@ -82,7 +109,7 @@ function toMessages(messages: readonly Message[]): ChatMessageParam[] {
   });
 }
 
-export function toOpenAIParams(call: ChatCall): ChatParams {
+export function toOpenAIParams(call: ChatCall, promptCacheKey = true): ChatParams {
   const { request, model } = call;
   const messages: ChatMessageParam[] = [];
   if (request.system && request.system.length > 0) {
@@ -96,10 +123,15 @@ export function toOpenAIParams(call: ChatCall): ChatParams {
       function: { name: tool.name, description: tool.description, parameters: tool.inputSchema, strict: true },
     }));
   }
+  return withHints(params, request, promptCacheKey);
+}
+
+/** The request's optional hints, each only when set. */
+function withHints(params: ChatParams, request: ChatCall["request"], promptCacheKey: boolean): ChatParams {
   if (request.toolChoice) params.tool_choice = request.toolChoice;
   if (request.effort) params.reasoning_effort = request.effort;
   if (request.temperature !== undefined) params.temperature = request.temperature;
-  if (request.cacheKey) params.prompt_cache_key = request.cacheKey;
+  if (request.cacheKey && promptCacheKey) params.prompt_cache_key = request.cacheKey;
   return params;
 }
 
@@ -124,18 +156,18 @@ function toUsage(usage: Completion["usage"]): Usage {
   };
 }
 
-function parseArguments(call: FunctionToolCall): unknown {
+function parseArguments(provider: string, call: FunctionToolCall): unknown {
   try {
     return JSON.parse(call.function.arguments || "{}");
   } catch {
-    throw new InvalidResponseError(OPENAI_PROVIDER, `Tool call ${call.id} (${call.function.name}) carries arguments that are not JSON.`);
+    throw new InvalidResponseError(provider, `Tool call ${call.id} (${call.function.name}) carries arguments that are not JSON.`);
   }
 }
 
-function toolCallsOf(message: CompletionMessage): ToolCall[] {
+function toolCallsOf(provider: string, message: CompletionMessage): ToolCall[] {
   return (message.tool_calls ?? [])
     .filter((call): call is FunctionToolCall => call.type === "function")
-    .map((call) => ({ id: call.id, name: call.function.name, input: parseArguments(call) }));
+    .map((call) => ({ id: call.id, name: call.function.name, input: parseArguments(provider, call) }));
 }
 
 /** A refusal is the message's own `refusal` text, or a content-filter stop. */
@@ -143,16 +175,16 @@ function refusalText(message: CompletionMessage): string | null {
   return typeof message.refusal === "string" && message.refusal.length > 0 ? message.refusal : null;
 }
 
-function fromOpenAICompletion(response: Completion, model: string): ChatResult {
+function fromOpenAICompletion(provider: string, response: Completion, model: string): ChatResult {
   const choice = response?.choices?.[0];
-  if (!choice) throw new InvalidResponseError(OPENAI_PROVIDER, "The response carries no choice.");
+  if (!choice) throw new InvalidResponseError(provider, "The response carries no choice.");
   const { message } = choice;
-  const toolCalls = toolCallsOf(message);
+  const toolCalls = toolCallsOf(provider, message);
   const refused = refusalText(message);
   const stopReason: StopReason = refused ? "refusal" : (STOP_REASONS[choice.finish_reason] ?? "other");
   const text = message.content ?? "";
   return {
-    provider: OPENAI_PROVIDER,
+    provider,
     model: response.model || model,
     text,
     toolCalls,
@@ -160,27 +192,33 @@ function fromOpenAICompletion(response: Completion, model: string): ChatResult {
     providerStopReason: choice.finish_reason ?? null,
     refusal: refused ? refusalOf(stopReason, null, refused) : refusalOf(stopReason, choice.finish_reason, null),
     usage: toUsage(response.usage),
-    message: { role: "assistant", text, toolCalls, raw: { provider: OPENAI_PROVIDER, content: message } },
+    message: { role: "assistant", text, toolCalls, raw: { provider, content: message } },
   };
 }
 
-export function openaiAdapter(options: OpenAIAdapterOptions = {}): ProviderAdapter {
+/** An adapter for any API that speaks OpenAI's Chat Completions. */
+export function openAICompatibleAdapter(options: OpenAICompatibleOptions): ProviderAdapter {
   const build = options.client ?? ((credential: ResolvedCredential) => defaultClient(credential, options));
+  const provider = options.id;
   return {
-    id: OPENAI_PROVIDER,
+    id: provider,
     defaultModel: options.defaultModel,
     capabilities: ["chat"],
     credentialKinds: ["apiKey"],
     async chat(call) {
-      const params = toOpenAIParams(call);
+      const params = toOpenAIParams(call, options.promptCacheKey);
       const client = await build(call.credential);
       let response: unknown;
       try {
         response = await client.chat.completions.create(params as never, call.request.signal ? { signal: call.request.signal } : undefined);
       } catch (error) {
-        throw mapProviderError(OPENAI_PROVIDER, error, [call.credential.secret]);
+        throw mapProviderError(provider, error, [call.credential.secret]);
       }
-      return fromOpenAICompletion(response as Completion, call.model);
+      return fromOpenAICompletion(provider, response as Completion, call.model);
     },
   };
+}
+
+export function openaiAdapter(options: OpenAIAdapterOptions = {}): ProviderAdapter {
+  return openAICompatibleAdapter({ ...options, id: OPENAI_PROVIDER, defaultBaseURL: OPENAI_BASE_URL, promptCacheKey: true });
 }

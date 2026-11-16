@@ -4,7 +4,7 @@ import { createAdapterRegistry } from "../adapter";
 import { createModelClient } from "../client";
 import { RefusalError } from "../errors";
 import { ensureNotRefused, runToolLoop } from "../loop";
-import type { Usage } from "../types";
+import type { Message, Usage } from "../types";
 import { scriptedAdapter, turnResult } from "./fake-adapter";
 import { sampleRequest } from "./helpers";
 
@@ -15,6 +15,17 @@ function setup(script: Parameters<typeof scriptedAdapter>[0]) {
 }
 
 const call = (id: string) => ({ id, name: "search_menu", input: { query: id, limit: null } });
+
+/** Every assistant tool call is answered by the tool message right after it. */
+function expectEveryCallAnswered(messages: Message[]): void {
+  messages.forEach((message, index) => {
+    if (message.role !== "assistant" || message.toolCalls.length === 0) return;
+    const next = messages[index + 1];
+    expect(next?.role).toBe("tool");
+    const answered = next?.role === "tool" ? next.results.map((result) => result.callId) : [];
+    expect(answered.sort()).toEqual(message.toolCalls.map((toolCall) => toolCall.id).sort());
+  });
+}
 
 describe("runToolLoop", () => {
   it("runs tools until the model stops calling them, reporting every turn's usage", async () => {
@@ -59,7 +70,37 @@ describe("runToolLoop", () => {
     expect(calls).toHaveLength(2);
     expect(search).toHaveBeenCalledTimes(1);
     expect(onUsage).toHaveBeenCalledTimes(2);
-    expect(result.messages.at(-1)).toMatchObject({ role: "assistant" });
+    // B2: the last turn's call was never run, so it is not in the transcript: the
+    // conversation ends on turn 1's answered tool results and is a valid next request.
+    expect(result.messages.at(-1)).toMatchObject({ role: "tool" });
+    expectEveryCallAnswered(result.messages);
+  });
+
+  it("keeps the words of a turn cut off at max_tokens, but never its unanswered tool call (B2)", async () => {
+    const raw = { provider: "fake", content: [{ type: "tool_use", id: "c1" }] };
+    const { client } = setup([{ text: "Let me check the menu", toolCalls: [call("c1")], stopReason: "max_tokens" }]);
+    const original = client.chat.bind(client);
+    const withRaw = { ...client, chat: async (request: Parameters<typeof client.chat>[0]) => {
+      const result = await original(request);
+      return { ...result, message: { ...result.message, raw } };
+    } };
+    const result = await runToolLoop({ client: withRaw, request: sampleRequest(), executors: { search_menu: () => "ok" } });
+    expect(result.status).toBe("max_tokens");
+    expect(result.messages.at(-1)).toEqual({ role: "assistant", text: "Let me check the menu", toolCalls: [] });
+    expectEveryCallAnswered(result.messages);
+  });
+
+  it("appends no empty turn for a refusal with no text, and keeps a refusal's words (B2)", async () => {
+    const empty = await runToolLoop({ client: setup([{ stopReason: "refusal" }]).client, request: sampleRequest(), executors: {} });
+    expect(empty.status).toBe("refused");
+    expect(empty.messages).toEqual(sampleRequest().messages);
+
+    const worded = await runToolLoop({
+      client: setup([{ stopReason: "refusal", text: "I can't help with that." }]).client,
+      request: sampleRequest(),
+      executors: {},
+    });
+    expect(worded.messages.at(-1)).toMatchObject({ role: "assistant", text: "I can't help with that.", toolCalls: [] });
   });
 
   it("stops on a refusal with a typed result, after metering the refused turn", async () => {

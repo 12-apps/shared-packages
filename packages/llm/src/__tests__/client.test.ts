@@ -21,9 +21,9 @@ function clientFor(adapter: ReturnType<typeof scriptedAdapter>["adapter"], extra
 }
 
 describe("the factory and the registry", () => {
-  it("ships the three built-in adapters, Anthropic defaulting to Claude Haiku 5.5", () => {
+  it("ships the four built-in adapters, Anthropic defaulting to Claude Haiku 5.5", () => {
     const registry = createAdapterRegistry(builtInAdapters());
-    expect(registry.ids()).toEqual(["anthropic", "openai", "gemini"]);
+    expect(registry.ids()).toEqual(["anthropic", "openai", "gemini", "xai"]);
     expect(createModelClient({ provider: "anthropic", credentials: apiKey }).model).toBe("claude-haiku-5-5");
   });
 
@@ -131,6 +131,56 @@ describe("credentials", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledWith("unauthorized");
     expect(calls.map((call) => call.credential.secret)).toEqual(["old", "renewed"]);
+  });
+
+  it("runs ONE refresh for concurrent calls that find the token expiring (B1)", async () => {
+    const now = 1_000_000;
+    const release: { open: () => void } = { open: () => undefined };
+    const gate = new Promise<void>((resolve) => {
+      release.open = resolve;
+    });
+    const refresh = vi.fn(async () => {
+      await gate;
+      return { accessToken: "fresh", expiresAt: now + 3_600_000 };
+    });
+    const session = createCredentialSession(
+      { kind: "oauth", token: () => ({ accessToken: "stale", expiresAt: now + 30_000 }), refresh },
+      { now: () => now },
+    );
+    const pending = [session.current(), session.current(), session.current()];
+    release.open();
+    const secrets = (await Promise.all(pending)).map((credential) => credential.secret);
+    expect(secrets).toEqual(["fresh", "fresh", "fresh"]);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs ONE refresh for concurrent 401s, and a 401 on a token older than the last refresh adopts it (B1)", async () => {
+    const refresh = vi.fn(async () => ({ accessToken: `renewed-${refresh.mock.calls.length}` }));
+    const session = createCredentialSession({ kind: "oauth", token: () => ({ accessToken: "old" }), refresh });
+    const a = await session.current();
+    const b = await session.current();
+    const [first, second] = await Promise.all([session.afterUnauthorized(a), session.afterUnauthorized(b)]);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect([first?.secret, second?.secret]).toEqual(["renewed-1", "renewed-1"]);
+
+    // A call that read "old" before the refresh finished, and is refused now: no second rotation.
+    const late = await session.afterUnauthorized(a);
+    expect(late?.secret).toBe("renewed-1");
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    // The refreshed token itself refused: that IS a reason to refresh again.
+    const again = await session.afterUnauthorized(late as NonNullable<typeof late>);
+    expect(again?.secret).toBe("renewed-2");
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets the next call refresh again after a refresh failed (B1)", async () => {
+    const refresh = vi.fn().mockRejectedValueOnce(new Error("idp down")).mockResolvedValueOnce({ accessToken: "fresh" });
+    const session = createCredentialSession({ kind: "oauth", token: () => ({ accessToken: "old" }), refresh });
+    const used = await session.current();
+    await expect(session.afterUnauthorized(used)).rejects.toThrow("idp down");
+    expect((await session.afterUnauthorized(used))?.secret).toBe("fresh");
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
   it("gives up after the one refresh when the renewed token is refused too", async () => {

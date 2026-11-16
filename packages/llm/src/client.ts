@@ -83,7 +83,7 @@ async function callWithAuth(
     return await adapter.chat({ model, request, credential });
   } catch (error) {
     if (!(error instanceof AuthError) || error.status !== 401) throw error;
-    const renewed = await session.afterUnauthorized();
+    const renewed = await session.afterUnauthorized(credential);
     if (!renewed) throw error;
     return adapter.chat({ model, request, credential: renewed });
   }

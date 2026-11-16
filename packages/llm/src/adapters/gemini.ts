@@ -25,6 +25,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidRequestError, InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Effort, Message, StopReason, ToolCall, ToolChoice, Usage } from "../types";
 import { loadSdk } from "./load";
+import { sealedFetch } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 export const GEMINI_PROVIDER = "gemini";
@@ -54,11 +55,24 @@ function bearerAuthClient(token: string) {
   return { getRequestHeaders: async () => new Headers({ Authorization: `Bearer ${token}` }) };
 }
 
+/** Where the Gemini API lives; never read from the environment (B3). */
+export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/";
+
+/**
+ * `vertexai: false` and the base URL are explicit: unset, the SDK reads
+ * `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT` and
+ * `GOOGLE_GEMINI_BASE_URL`, and a store's key would be sent to the platform's
+ * Vertex project or proxy (B3). The sealed fetch sends only this credential.
+ */
 async function defaultClient(credential: ResolvedCredential, options: GeminiAdapterOptions): Promise<GeminiClientLike> {
   const sdk = await loadSdk(GEMINI_PROVIDER, "@google/genai", () => import("@google/genai"));
-  const httpOptions = { baseUrl: options.baseURL, fetch: options.fetch };
-  if (credential.kind === "apiKey") return new sdk.GoogleGenAI({ apiKey: credential.secret, httpOptions });
+  const baseUrl = options.baseURL ?? GEMINI_BASE_URL;
+  const auth: Record<string, string> =
+    credential.kind === "apiKey" ? { "x-goog-api-key": credential.secret } : { authorization: `Bearer ${credential.secret}` };
+  const httpOptions = { baseUrl, fetch: sealedFetch({ provider: GEMINI_PROVIDER, baseURL: baseUrl, auth, fetch: options.fetch }) };
+  if (credential.kind === "apiKey") return new sdk.GoogleGenAI({ vertexai: false, apiKey: credential.secret, httpOptions });
   const client = new sdk.GoogleGenAI({
+    vertexai: false,
     httpOptions,
     googleAuthOptions: { authClient: bearerAuthClient(credential.secret) as never },
   });

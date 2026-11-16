@@ -21,6 +21,7 @@ import type { ResolvedCredential } from "../credentials";
 import { InvalidRequestError, InvalidResponseError, mapProviderError } from "../errors";
 import type { ChatResult, Message, StopReason, SystemBlock, ToolCall, Usage } from "../types";
 import { loadSdk } from "./load";
+import { sealedFetch } from "./sealed-fetch";
 import { count, refusalOf } from "./util";
 
 export const ANTHROPIC_PROVIDER = "anthropic";
@@ -48,14 +49,26 @@ export interface AnthropicAdapterOptions {
   defaultModel?: string;
 }
 
+/** Where Anthropic's API lives; never read from the environment (B3). */
+export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+/**
+ * Both credential options are passed, the unused one as `null`: an option left
+ * unset is read from `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, and a
+ * store's key would go out beside the platform's token (B3). The base URL is
+ * explicit for the same reason (`ANTHROPIC_BASE_URL`), and the sealed fetch
+ * sends only this credential.
+ */
 async function defaultClient(credential: ResolvedCredential, options: AnthropicAdapterOptions): Promise<AnthropicClientLike> {
   const sdk = await loadSdk(ANTHROPIC_PROVIDER, "@anthropic-ai/sdk", () => import("@anthropic-ai/sdk"));
   const Client = sdk.default;
-  // Exactly one credential option is passed, so the SDK reads none from the environment.
-  const common = { baseURL: options.baseURL, fetch: options.fetch, maxRetries: 0 };
-  return credential.kind === "apiKey"
-    ? new Client({ ...common, apiKey: credential.secret })
-    : new Client({ ...common, authToken: credential.secret, defaultHeaders: { "anthropic-beta": OAUTH_BETA } });
+  const baseURL = options.baseURL ?? ANTHROPIC_BASE_URL;
+  const apiKey = credential.kind === "apiKey";
+  const auth: Record<string, string> = apiKey ? { "x-api-key": credential.secret } : { authorization: `Bearer ${credential.secret}` };
+  const common = { baseURL, fetch: sealedFetch({ provider: ANTHROPIC_PROVIDER, baseURL, auth, fetch: options.fetch }), maxRetries: 0 };
+  return apiKey
+    ? new Client({ ...common, apiKey: credential.secret, authToken: null })
+    : new Client({ ...common, apiKey: null, authToken: credential.secret, defaultHeaders: { "anthropic-beta": OAUTH_BETA } });
 }
 
 function cacheControl(cache: SystemBlock["cache"]): Anthropic.CacheControlEphemeral | undefined {

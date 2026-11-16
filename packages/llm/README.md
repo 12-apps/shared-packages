@@ -7,9 +7,11 @@ interface onto the provider's official SDK and maps the answer back.
 - **One interface** for a chat turn with tools, and one normalized result.
 - **An abstract factory**, `createModelClient`, that picks the adapter by
   provider id from a registry the host can extend.
-- **Built-in adapters** for Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai`)
-  and Gemini (`@google/genai`). The SDKs are optional peers: install the ones
-  you use. Each SDK is imported only when its adapter makes its first call.
+- **Built-in adapters** for Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai`),
+  Gemini (`@google/genai`) and xAI's Grok (over the `openai` SDK, since xAI
+  speaks OpenAI's Chat Completions). Swapping providers is a change of
+  `provider` and credentials, nothing else. The SDKs are optional peers:
+  install the ones you use. Each SDK is imported only when its adapter makes its first call.
 - **Credential strategies**: an API key, or an OAuth access token with a
   refresh hook, both behind one interface.
 - **A tool-use loop** that reports every turn's usage.
@@ -119,7 +121,7 @@ that prefers an exception.
 
 `createModelClient({ provider, model?, credentials, retry?, registry? })`
 looks the provider id up in `registry`. When no registry is given, it uses a
-registry of the three built-in adapters. It refuses an unknown provider or a
+registry of the four built-in adapters. It refuses an unknown provider or a
 credential kind the adapter does not declare (`UnsupportedError`). It also
 refuses a missing model when the adapter has none (`InvalidRequestError`):
 only the Anthropic adapter ships a default model.
@@ -187,14 +189,34 @@ loop. Any other adapter rebuilds the turn from `text` and `toolCalls`.
 - **OAuth refresh**: a token within `refreshSkewMs` of `expiresAt` is
   refreshed before the call. After a 401, the client refreshes **once** and
   retries **once**. A second 401 is thrown as an `AuthError`.
+- **A refresh is single-flight per client.** Concurrent calls that find the
+  token expiring, or that get a 401, share one `refresh()`: providers rotate
+  the refresh token on use, and two refreshes racing can revoke the login. A
+  401 on a token older than the last refresh takes that refresh's token
+  instead of rotating again.
 - **Which strategies a provider accepts is the adapter's declaration**:
-  Anthropic `apiKey`, `oauth`; OpenAI `apiKey`; Gemini `apiKey`, `oauth`. The
+  Anthropic `apiKey`, `oauth`; OpenAI `apiKey`; Gemini `apiKey`, `oauth`;
+  xAI `apiKey`. The
   package ships **no login UI and no login flow**, and it hard-codes no
   consumer-subscription sign-in. Obtaining a token is the host's job.
-- The built-in adapters pass the credential to the SDK explicitly, so no SDK
-  falls back to a key in the environment. Gemini is the one exception: its SDK
-  prefers `GOOGLE_API_KEY` or `GEMINI_API_KEY` over any other credential. So
-  the Gemini adapter refuses an OAuth call while either variable is set.
+- **A store's credential reaches its provider alone.** Left unset, the SDKs
+  read the process environment: `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`,
+  `OPENAI_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`,
+  `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, the `*_CUSTOM_HEADERS`
+  variables and more. On a server holding the platform's own account, a store's
+  key would then be billed to the platform's project, routed through its proxy
+  or sent beside its token. So the built-in adapters pass every such option
+  explicitly: the base URL, a `null` organisation and project, a `null` second
+  credential, and `vertexai: false`. And every request goes through a sealed
+  `fetch`, the shape of a credential gateway. It refuses any URL outside the
+  adapter's base URL, drops every auth and account header the SDK set, and
+  sets only the call's own credential. A `baseURL` the host passes is honoured.
+- Gemini's SDK prefers `GOOGLE_API_KEY` or `GEMINI_API_KEY` over an OAuth
+  token, so the Gemini adapter refuses an OAuth call while either is set.
+- **The tool loop's transcript is always a valid next request.** A turn the
+  loop ends on (`max_turns`, `max_tokens`, a refusal) keeps its text but never
+  a tool call nobody answered, and a turn with no text and no call is not
+  appended at all.
 
 ### Terms: enable a provider's OAuth only where its terms allow it
 

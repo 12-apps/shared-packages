@@ -7,6 +7,12 @@
  * happens with that turn, so a host meters cost even for a turn that ends the
  * loop. A refusal is a typed RESULT (`status: "refused"`), never an error, so
  * the host can hand the conversation to a person.
+ *
+ * The returned `messages` are always a valid request for the NEXT turn (B2):
+ * a turn the loop ends on keeps its text but never a tool call that was not
+ * run (no tool_use without its tool_result), and a turn with neither text nor
+ * a tool call — an empty refusal — is not appended at all. Either would make
+ * the provider reject the host's next request with a 400.
  */
 import type { ModelClient } from "./client";
 import { RefusalError } from "./errors";
@@ -69,6 +75,24 @@ async function runCall(call: ToolCall, turn: number, executors: ToolLoopOptions[
   }
 }
 
+/**
+ * The turn the loop ENDS on, as it goes into the transcript: its words only.
+ * Tool calls nobody will answer are dropped, and with them `raw`, which
+ * carries the same calls in the provider's own blocks; a turn with no words
+ * is left out.
+ */
+function settled(message: AssistantMessage): AssistantMessage | null {
+  if (message.toolCalls.length === 0) return message.text.length > 0 ? message : null;
+  return message.text.length > 0 ? { role: "assistant", text: message.text, toolCalls: [] } : null;
+}
+
+/** The loop's result, with the turn it ends on settled into the transcript. */
+function ended(status: ToolLoopStatus, messages: Message[], final: ChatResult, turns: number, usage: Omit<Usage, "raw">): ToolLoopResult {
+  const last = settled(final.message);
+  if (last) messages.push(last);
+  return { status, messages, final, turns, usage, refusal: status === "refused" ? final.refusal : null };
+}
+
 function statusOf(result: ChatResult): ToolLoopStatus | null {
   if (result.stopReason === "refusal") return "refused";
   if (result.stopReason === "max_tokens") return "max_tokens";
@@ -86,12 +110,9 @@ export async function runToolLoop(options: ToolLoopOptions): Promise<ToolLoopRes
     const final = await options.client.chat({ ...options.request, messages: [...messages] });
     usage = addUsage(usage, final.usage);
     await options.onUsage?.(final.usage, turn, final);
-    const assistant: AssistantMessage = final.message;
-    messages.push(assistant);
-
-    const status = statusOf(final);
-    if (status) return { status, messages, final, turns: turn, usage, refusal: final.refusal };
-    if (turn >= maxTurns) return { status: "max_turns", messages, final, turns: turn, usage, refusal: null };
+    const status = statusOf(final) ?? (turn >= maxTurns ? "max_turns" : null);
+    if (status) return ended(status, messages, final, turn, usage);
+    messages.push(final.message);
 
     const results = await Promise.all(final.toolCalls.map((call) => runCall(call, turn, options.executors)));
     messages.push({ role: "tool", results });

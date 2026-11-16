@@ -7,7 +7,11 @@
  * - `oauth`: an access token the host provides, with its expiry, plus a
  *   refresh hook. Before a call the package refreshes a token that is within
  *   `refreshSkewMs` of expiring; after a 401 it refreshes once and retries
- *   once. It never runs a login flow: obtaining the first token, storing the
+ *   once. A refresh is SINGLE-FLIGHT per session (B1): concurrent calls that
+ *   find the token expiring, or get a 401, share one `refresh()` — providers
+ *   rotate the refresh token on use, and two refreshes racing can revoke the
+ *   login. A 401 on a token older than the last refresh adopts that refresh
+ *   instead of starting another. It never runs a login flow: obtaining the first token, storing the
  *   refreshed one and choosing which provider's login is allowed at all are
  *   the host's (see the README's terms note).
  *
@@ -88,8 +92,12 @@ export interface CredentialSessionOptions {
 export interface CredentialSession {
   readonly kind: CredentialKind;
   current(): Promise<ResolvedCredential>;
-  afterUnauthorized(): Promise<ResolvedCredential | null>;
+  /** `used` is the credential the 401 answered, so a refresh made since is adopted. */
+  afterUnauthorized(used: ResolvedCredential): Promise<ResolvedCredential | null>;
 }
+
+/** Which refresh each OAuth credential came from (0: the host's token as read). */
+const generations = new WeakMap<ResolvedCredential, number>();
 
 function nonEmpty(value: unknown, what: string): string {
   if (typeof value !== "string" || value.length === 0) {
@@ -116,16 +124,41 @@ export function createCredentialSession(
     };
   }
   const skew = credentials.refreshSkewMs ?? 60_000;
-  const refresh = async (reason: RefreshReason) =>
-    new ResolvedCredential("oauth", nonEmpty((await credentials.refresh(reason)).accessToken, "OAuth refresh"));
+  const oauth = credentials;
+  let generation = 0;
+  let latest: ResolvedCredential | null = null;
+  let inFlight: Promise<ResolvedCredential> | null = null;
+  const stamped = (secret: string, of: number): ResolvedCredential => {
+    const credential = new ResolvedCredential("oauth", secret);
+    generations.set(credential, of);
+    return credential;
+  };
+  // One refresh at a time: every caller that needs one while it runs awaits the same promise.
+  const refresh = (reason: RefreshReason): Promise<ResolvedCredential> => {
+    inFlight ??= (async () => {
+      const secret = nonEmpty((await oauth.refresh(reason)).accessToken, "OAuth refresh");
+      generation += 1;
+      latest = stamped(secret, generation);
+      return latest;
+    })().finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
+  };
   return {
     kind: "oauth",
     async current() {
-      const token = await credentials.token();
+      if (inFlight) return inFlight;
+      const token = await oauth.token();
       const expiring = token.expiresAt !== undefined && token.expiresAt - now() <= skew;
       if (expiring) return refresh("expiring");
-      return new ResolvedCredential("oauth", nonEmpty(token.accessToken, "OAuth token provider"));
+      return stamped(nonEmpty(token.accessToken, "OAuth token provider"), generation);
     },
-    afterUnauthorized: () => refresh("unauthorized"),
+    afterUnauthorized(used) {
+      if (inFlight) return inFlight;
+      // A refresh finished after this call's token was read: that token is the answer, not another rotation.
+      if (latest && (generations.get(used) ?? 0) < generation) return Promise.resolve(latest);
+      return refresh("unauthorized");
+    },
   };
 }

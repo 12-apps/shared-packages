@@ -10,6 +10,8 @@ import { createAdapterRegistry } from "../adapter";
 import { anthropicAdapter } from "../adapters/anthropic";
 import { geminiAdapter } from "../adapters/gemini";
 import { openaiAdapter } from "../adapters/openai";
+import { sealedFetch } from "../adapters/sealed-fetch";
+import { xaiAdapter } from "../adapters/xai";
 import { createModelClient } from "../client";
 import { AuthError, InvalidRequestError } from "../errors";
 import anthropicEnd from "./fixtures/anthropic/end-turn-cached.response.json";
@@ -146,5 +148,123 @@ describe("default SDK clients", () => {
       registry: createAdapterRegistry([openaiAdapter({ fetch })]),
     });
     await expect(client.chat(sampleRequest())).rejects.toBeInstanceOf(AuthError);
+  });
+});
+
+/** What a platform's own environment holds: none of it may reach a store's call (B3). */
+function stubPlatformEnvironment(): void {
+  vi.stubEnv("OPENAI_API_KEY", "sk-platform-openai");
+  vi.stubEnv("OPENAI_ORG_ID", "org-platform");
+  vi.stubEnv("OPENAI_PROJECT_ID", "proj_platform");
+  vi.stubEnv("OPENAI_BASE_URL", "https://platform-proxy.example/v1");
+  vi.stubEnv("OPENAI_CUSTOM_HEADERS", "X-Platform-Tenant: platform");
+  vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-platform");
+  vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "platform-bearer");
+  vi.stubEnv("ANTHROPIC_BASE_URL", "https://platform-proxy.example");
+  vi.stubEnv("ANTHROPIC_CUSTOM_HEADERS", "X-Platform-Tenant: platform");
+  vi.stubEnv("GOOGLE_GENAI_USE_VERTEXAI", "true");
+  vi.stubEnv("GOOGLE_CLOUD_PROJECT", "platform-project");
+  vi.stubEnv("GOOGLE_CLOUD_LOCATION", "us-central1");
+  vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "https://platform-proxy.example/");
+}
+
+/** Every header value the request carries, to search for a platform value. */
+function headerValues(sent: Seen): string {
+  return [...sent.headers.entries()].map(([name, value]) => `${name}: ${value}`).join("\n");
+}
+
+describe("a store's own key reaches its provider alone (B3)", () => {
+  it("openai: no platform organisation, project, base URL, key or custom header", async () => {
+    stubPlatformEnvironment();
+    const { fetch, seen } = recordingFetch(openaiCalls);
+    const client = createModelClient({
+      provider: "openai",
+      model: "gpt-fixture-1",
+      credentials: { kind: "apiKey", apiKey: "sk-store-own" },
+      registry: createAdapterRegistry([openaiAdapter({ fetch })]),
+    });
+    await client.chat(sampleRequest());
+    const sent = only(seen);
+    expect(sent.url).toBe("https://api.openai.com/v1/chat/completions");
+    expect(sent.headers.get("authorization")).toBe("Bearer sk-store-own");
+    expect(sent.headers.get("openai-organization")).toBeNull();
+    expect(sent.headers.get("openai-project")).toBeNull();
+    expect(headerValues(sent)).not.toMatch(/platform/);
+  });
+
+  it("anthropic: an API key goes out alone, never beside the platform's bearer token", async () => {
+    stubPlatformEnvironment();
+    const { fetch, seen } = recordingFetch(anthropicEnd);
+    const client = createModelClient({
+      provider: "anthropic",
+      credentials: { kind: "apiKey", apiKey: "sk-ant-store-own" },
+      registry: createAdapterRegistry([anthropicAdapter({ fetch })]),
+    });
+    await client.chat(sampleRequest());
+    const sent = only(seen);
+    expect(sent.url).toBe("https://api.anthropic.com/v1/messages");
+    expect(sent.headers.get("x-api-key")).toBe("sk-ant-store-own");
+    expect(sent.headers.get("authorization")).toBeNull();
+    expect(headerValues(sent)).not.toMatch(/platform/);
+  });
+
+  it("anthropic: an OAuth token goes out alone, never beside the platform's API key", async () => {
+    stubPlatformEnvironment();
+    const { fetch, seen } = recordingFetch(anthropicEnd);
+    const client = createModelClient({
+      provider: "anthropic",
+      credentials: { kind: "oauth", token: () => ({ accessToken: "store-oauth" }), refresh: () => ({ accessToken: "x" }) },
+      registry: createAdapterRegistry([anthropicAdapter({ fetch })]),
+    });
+    await client.chat(sampleRequest());
+    const sent = only(seen);
+    expect(sent.headers.get("authorization")).toBe("Bearer store-oauth");
+    expect(sent.headers.get("x-api-key")).toBeNull();
+    expect(headerValues(sent)).not.toMatch(/platform/);
+  });
+
+  it("gemini: the Gemini API with the store's key, never the platform's Vertex project", async () => {
+    stubPlatformEnvironment();
+    const { fetch, seen } = recordingFetch(geminiCall);
+    const client = createModelClient({
+      provider: "gemini",
+      model: "gemini-fixture-1",
+      credentials: { kind: "apiKey", apiKey: "gemini-store-own" },
+      registry: createAdapterRegistry([geminiAdapter({ fetch })]),
+    });
+    await client.chat(sampleRequest());
+    const sent = only(seen);
+    expect(sent.url).toMatch(/^https:\/\/generativelanguage\.googleapis\.com\/.*gemini-fixture-1:generateContent/);
+    expect(sent.headers.get("x-goog-api-key")).toBe("gemini-store-own");
+    expect(headerValues(sent)).not.toMatch(/platform/);
+  });
+
+  it("xai: xAI's own API root with the store's xAI key, and nothing of the platform's OpenAI account", async () => {
+    stubPlatformEnvironment();
+    const { fetch, seen } = recordingFetch(openaiCalls);
+    const client = createModelClient({
+      provider: "xai",
+      model: "grok-fixture-1",
+      credentials: { kind: "apiKey", apiKey: "xai-store-own" },
+      registry: createAdapterRegistry([xaiAdapter({ fetch })]),
+    });
+    const result = await client.chat(sampleRequest({ cacheKey: "store-42" }));
+    const sent = only(seen);
+    expect(sent.url).toBe("https://api.x.ai/v1/chat/completions");
+    expect(sent.headers.get("authorization")).toBe("Bearer xai-store-own");
+    expect(sent.headers.get("openai-organization")).toBeNull();
+    expect(headerValues(sent)).not.toMatch(/platform/);
+    expect(sent.body).not.toHaveProperty("prompt_cache_key");
+    expect(result.provider).toBe("xai");
+  });
+
+  it("the sealed fetch refuses a request outside the adapter's base URL", async () => {
+    const { fetch, seen } = recordingFetch({});
+    const sealed = sealedFetch({ provider: "openai", baseURL: "https://api.openai.com/v1", auth: { authorization: "Bearer k" }, fetch });
+    await expect(sealed("https://platform-proxy.example/v1/chat/completions", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(
+      InvalidRequestError,
+    );
+    await expect(sealed("https://api.openai.com/v1-evil/chat", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(InvalidRequestError);
+    expect(seen).toHaveLength(0);
   });
 });
