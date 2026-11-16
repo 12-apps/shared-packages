@@ -148,6 +148,20 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/LoadingState`
 **Docs**: `src/components/data-display/LoadingState/LoadingState.md`
 
+### HeatMap
+**Purpose**: Show a grid of figures judged against one target, e.g. cost / sales by weekday × hour
+**Use Cases**: Where in the week a ratio runs over its target; any two-axis grid of one figure with a threshold. Not a chart of trends (use `Chart`), and not a table of many measures (use `Table`)
+**Features**: A real `<table>` (caption, column and row headers) so every cell is named, e.g. "54% acima da meta"; diverging tints from roles (`warning` above, `info` at or under, disabled surface for "—"), bold above, never colour alone; `table-layout: fixed`, so it never scrolls sideways; transposed below `md` (`transpose="auto"`); legend; no default copy, the host formats the numbers; pure `heatMapTone` / `heatMapGrid`
+**Location**: `src/components/data-display/HeatMap`
+**Docs**: `src/components/data-display/HeatMap/HeatMap.md`
+
+### ShareBar
+**Purpose**: Show how one whole splits into parts, e.g. sales by payment method
+**Use Cases**: A split across up to ~6 parts (payment methods, channels, categories). Not a trend (use `Chart`), not many measures per part (use `Table`)
+**Features**: One horizontal 100% bar with each part's percent inside its segment only where it fits (never clipped); the same parts as an accessible list (`aria-label`ed `<ul>`, bar `aria-hidden`) with swatch, name, whole percent and optional host-formatted figure; whole percents add to exactly 100 (largest remainder); role fills, never `primary`/`error` by default; pure `shareBarParts`
+**Location**: `src/components/data-display/ShareBar`
+**Docs**: `src/components/data-display/ShareBar/ShareBar.md`
+
 ### HoverCard
 **Purpose**: Display content on hover
 **Use Cases**: User previews, additional information, contextual help
@@ -722,7 +736,7 @@ Components for structuring and organizing page layouts.
 ### SettingsLayout
 **Purpose**: Two-pane settings shell — searchable grouped rail + central panel
 **Use Cases**: Any "Configuração"/Settings area with many sections and its own routes
-**Features**: Grouped searchable rail, host-resolved situation markers (ok/off/new/locked), `switcher` or list→detail `drilldown` on narrow widths, always-mounted section chip strip that scrolls itself to the open section, configurable rail breakpoint, empty-search state carrying its own exit
+**Features**: Grouped searchable rail, host-resolved situation markers (ok/off/new ring/attention with a visible word/locked), `switcher` or list→detail `drilldown` on narrow widths, always-mounted section chip strip that scrolls itself to the open section, configurable rail breakpoint, empty-search state carrying its own exit
 **Location**: `src/components/layout/SettingsLayout`
 **Docs**: `src/components/layout/SettingsLayout/SettingsLayout.md`
 

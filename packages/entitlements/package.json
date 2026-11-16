@@ -49,6 +49,7 @@
     "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/wiring": "workspace:*",
+    "@storybook/react-vite": "^9.1.10",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -58,6 +59,7 @@
     "jsdom": "^25.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "storybook": "^9.1.10",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },

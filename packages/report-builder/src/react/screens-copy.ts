@@ -20,6 +20,11 @@
 
 import type { BreadcrumbCopy } from "@12-apps/ui/copy";
 
+import type { ReportSystemCopy } from "./system-copy";
+import type { ReportScheduleCopy } from "./schedule-copy";
+
+export type { ReportSystemCopy };
+
 /** The relative age a card's footer opens with. */
 export interface ReportRelativeTimeCopy {
   /** Under a minute old. */
@@ -128,6 +133,8 @@ export interface ReportEditorCopy {
   discardConfirm: string;
   /** Why a save is refused. */
   needsName: string;
+  /** Automatic delivery is on and nobody is ticked (FUT-776); absent: the package's own words. */
+  needsRecipient?: string;
   needsBlock: string;
   /** The canvas: adding a block, and removing one. */
   addBlock: string;
@@ -184,17 +191,6 @@ export interface ReportRangeCopy {
   emptyBody: string;
   /** The empty state's offer to widen — "Ver 30 dias", given the period. */
   widen(rangeLabel: string): string;
-}
-
-/** The host's built-in reports and dashboards. */
-export interface ReportSystemCopy {
-  blockFailed: string;
-  dashboardMissingTitle: string;
-  dashboardMissingBody: string;
-  reportFailedTitle: string;
-  reportFailedBody: string;
-  /** The retry beside a failed system report. */
-  retry: string;
 }
 
 /**
@@ -358,14 +354,35 @@ export interface ReportSettingsCopy {
   statusCards: Readonly<Record<string, ReportChoiceCardCopy>>;
   /** The audience cards, keyed by the stored visibility. */
   visibilityCards: Readonly<Record<string, ReportChoiceCardCopy>>;
-  /** The inert scheduled-delivery row (FUT-776). */
-  scheduleLabel: string;
-  scheduleValue: string;
-  scheduleReason: string;
+  /** The delivery section (FUT-776); absent: the package's own words for the pack's locale. */
+  schedule?: ReportScheduleCopy;
+  /** @deprecated The deferred row is gone (FUT-776); ignored. */
+  scheduleLabel?: string;
+  /** @deprecated Ignored. */
+  scheduleValue?: string;
+  /** @deprecated Ignored. */
+  scheduleReason?: string;
   /** The audience field's own label, above the cards. */
   visibilityLabel: string;
   /** The dialog's dismiss, which carries no visible label. */
   close: string;
+}
+
+/**
+ * What a failed call says when the server gave no sentence of its own
+ * (FUT-4070).
+ *
+ * The default transport folds every refusal and every dropped connection into
+ * a line the screen paints, and it used to word both itself, in English:
+ * `HTTP 503`, and for a thrown `fetch` the browser's own message ("Failed to
+ * fetch"). A sentence the server sent still wins; these are only what is left
+ * when it sent none, or when nothing answered at all.
+ */
+export interface ReportTransportErrorCopy {
+  /** The server refused with no sentence in the body: name the status. */
+  status(status: number): string;
+  /** Nothing answered — the connection dropped or never opened. */
+  network: string;
 }
 
 /** Everything these screens render, in one object a host passes once. */
@@ -378,4 +395,6 @@ export interface ReportScreensCopy {
   system: ReportSystemCopy;
   builder: ReportBuilderPanelCopy;
   settings: ReportSettingsCopy;
+  /** What a failed call reads as when the server sent no sentence. */
+  errors: ReportTransportErrorCopy;
 }

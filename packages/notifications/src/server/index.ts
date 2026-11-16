@@ -50,6 +50,7 @@ export type { PushSubscriptionInput, PushSubscriptionStore } from './push-subscr
 export type {
   CommittedNotification,
   NotificationChannelPolicy,
+  NotificationEmitChannelFilter,
   NotificationCommittedListener,
   NotificationDispatchScheduler,
   NotificationRouter,

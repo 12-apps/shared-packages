@@ -224,7 +224,11 @@ export function withValidChart(
   );
   if (!current || current.disabledReason === null) return draft;
   const picked = defaultPresentation(shape);
-  return { ...draft, chartType: picked.kind === "chart" ? picked.chartType : picked.kind };
+  // The picker never offers a heat map (built-ins and MCP only), so a default
+  // that somehow named one falls back to the table it is a view of.
+  const chartType: ChartKind =
+    picked.kind === "chart" ? picked.chartType : picked.kind === "heatmap" ? "table" : picked.kind;
+  return { ...draft, chartType };
 }
 
 /**

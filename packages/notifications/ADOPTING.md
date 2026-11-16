@@ -170,6 +170,16 @@ sweep — endpoints and screens included.
    error, which are the two channels that cost money per message and the exact
    two its own gate was about to refuse.
 
+   **One event's own channels: `emitChannelFilter`.** The plan gate sees a
+   tenant and a type's `channels` sees a type; neither sees the event. When one
+   emit must skip a channel because of WHAT it is about (an order already being
+   told on another path, say), pass `emitChannelFilter(event, channels)`. It is
+   handed the event (type, recipient, payload) and the channels that survived
+   preferences, transports and the plan gate, and answers the ones this emit
+   keeps. It only narrows (its answer is intersected with its input), it runs
+   for platform emits too, and a throw degrades to the free channels exactly as
+   a failed plan gate does. The inbox record is written either way.
+
 8. **Dispatch is detached by default; hand it a queue in production.**
    `scheduleDispatch(notificationId)` puts the send on the host's worker
    (`@12-apps/jobs`, BullMQ, anything). The delivery rows are the durable

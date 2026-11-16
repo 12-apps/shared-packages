@@ -139,7 +139,8 @@ export interface GradientLook {
 }
 
 /** How many derivations are kept; a host has a handful of palettes, so this is never reached in practice. */
-const CACHE_LIMIT = 64;
+const DEFAULT_CACHE_LIMIT = 64;
+let cacheLimit = DEFAULT_CACHE_LIMIT;
 const cache = new Map<string, GradientLook>();
 let computed = 0;
 
@@ -147,6 +148,13 @@ let computed = 0;
 export const gradientDerivationCount = (): number => computed;
 /** Empty the cache (a test hook). */
 export const clearGradientCache = (): void => cache.clear();
+/**
+ * Bound the cache to `limit` entries, or back to the default with no argument (a test hook): proving
+ * the eviction then costs `limit + 1` derivations instead of the default's 65.
+ */
+export const setGradientCacheLimit = (limit: number = DEFAULT_CACHE_LIMIT): void => {
+  cacheLimit = limit;
+};
 
 /** Everything the derivation reads, as one key: the two hue ends, the basis and the model's numbers. */
 const keyOf = (basis: GradientBasis, model: GradientModel, light: string, dark: string): string =>
@@ -183,7 +191,7 @@ export function deriveGradient(basis: GradientBasis, model: GradientModel, light
   computed += 1;
   const ends = { from: stepStopForInk(light, basis, model), to: stepStopForInk(dark, basis, model) };
   const look: GradientLook = { ink: basis.ink, ...settle(ends, basis, model) };
-  if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+  if (cache.size >= cacheLimit) cache.delete(cache.keys().next().value as string);
   cache.set(key, look);
   return look;
 }

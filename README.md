@@ -151,6 +151,12 @@ loop and does only what that loop cannot: it publishes the names the registry
 does not have, and skips every package it does. Packages already on npm are
 never touched by it, and with no secret set the step is a no-op.
 
+The PR that adds the package says so before the merge: the `Trusted Publisher
+Reminder` job (`scripts/trusted-publisher-reminder.mjs`) warns on any PR that
+adds a publishable package to `release-packages.txt`, with a `::warning::`
+annotation, a step-summary section and one sticky comment carrying the steps
+below. It is a reminder only and never fails the PR.
+
 Each newly published package then needs a Trusted Publisher before its **next**
 release, which the release run names in its step summary — npmjs.com → the
 package → Settings → Trusted Publisher → GitHub Actions, repository

@@ -197,7 +197,10 @@ export function createWebReportBuilder(config: ReportBuilderConfig): {
     // discards the cache every time, so every screen refetches on any state
     // change and the surface never settles.
     const client = useMemo(() => new QueryClient(), []);
-    const resolved = useMemo(() => transport ?? httpTransport(), []);
+    const resolved = useMemo(
+      () => transport ?? httpTransport({ errors: copy.screens.errors }),
+      [],
+    );
 
     const tree = (
       <ReportBuilderProvider

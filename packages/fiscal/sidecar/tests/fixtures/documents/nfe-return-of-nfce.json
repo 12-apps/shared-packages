@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "series": 2,
+  "number": 89,
+  "keyCode": "51734086",
+  "issuedAt": "2026-11-28T10:00:00-03:00",
+  "operationNature": "DEVOLUCAO DE VENDA",
+  "purpose": "RETURN",
+  "operation": "IN",
+  "referencedDocuments": [
+    {
+      "accessKey": "35261111222333000181650010000012011482139076"
+    }
+  ],
+  "destination": "INTERNAL",
+  "presence": "IN_PERSON",
+  "finalConsumer": true,
+  "intermediary": null,
+  "issuer": {
+    "cnpj": "11222333000181",
+    "stateRegistration": "123456789012",
+    "legalName": "EXAMPLE FOODS LTDA",
+    "tradeName": null,
+    "taxRegime": "NORMAL",
+    "address": {
+      "street": "Rua das Flores",
+      "number": "100",
+      "complement": "Loja 2",
+      "district": "Centro",
+      "municipalityIbge": "3550308",
+      "municipalityName": "Sao Paulo",
+      "uf": "SP",
+      "postalCode": "01001000",
+      "phone": null
+    }
+  },
+  "buyer": {
+    "document": {
+      "kind": "CPF",
+      "number": "52998224725"
+    },
+    "name": "MARIA DA SILVA",
+    "stateRegistrationStatus": "NON_CONTRIBUTOR",
+    "stateRegistration": null,
+    "email": null,
+    "address": {
+      "street": "Rua Augusta",
+      "number": "500",
+      "complement": null,
+      "district": "Consolacao",
+      "municipalityIbge": "3550308",
+      "municipalityName": "Sao Paulo",
+      "uf": "SP",
+      "postalCode": "01305000",
+      "phone": null
+    }
+  },
+  "lines": [
+    {
+      "id": "line-1",
+      "code": "BOX-12",
+      "gtin": "7891000100103",
+      "description": "Box of twelve bottles",
+      "ncm": "22021000",
+      "cest": "0300700",
+      "cfop": "1202",
+      "unit": "CX",
+      "quantity": 3.5,
+      "valueCents": 35000,
+      "discountCents": 0,
+      "approximateTaxCents": null,
+      "additionalInfo": null,
+      "icms": {
+        "regime": "NORMAL",
+        "origin": 0,
+        "cst": "00",
+        "baseCents": 35000,
+        "rateBp": 1800,
+        "amountCents": 6300
+      },
+      "pis": {
+        "cst": "01",
+        "baseCents": 35000,
+        "rateBp": 165,
+        "amountCents": 578
+      },
+      "cofins": {
+        "cst": "01",
+        "baseCents": 35000,
+        "rateBp": 760,
+        "amountCents": 2660
+      },
+      "ibsCbs": {
+        "cst": "000",
+        "classCode": "000001",
+        "figures": {
+          "baseCents": 35000,
+          "reductionBp": 0,
+          "cbsRateBp": 90,
+          "cbsCents": 315,
+          "ibsUfRateBp": 10,
+          "ibsUfCents": 35,
+          "ibsMunRateBp": 0,
+          "ibsMunCents": 0
+        }
+      }
+    }
+  ],
+  "freight": "NONE",
+  "payments": [
+    {
+      "method": "NO_PAYMENT",
+      "amountCents": 0,
+      "card": null,
+      "description": null
+    }
+  ],
+  "changeCents": 0,
+  "additionalInfo": {
+    "forTaxpayer": null,
+    "forTaxAuthority": null
+  },
+  "technicalResponsible": null
+}

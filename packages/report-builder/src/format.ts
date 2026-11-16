@@ -42,9 +42,53 @@ export function formatDurationSeconds(seconds: number): string {
   return `${sign}${rest}s`;
 }
 
+const PRECISE = new Map<string, Intl.NumberFormat>();
+
+/** A cached pt-BR formatter for one style at exactly `decimals` fraction digits. */
+function precise(style: 'currency' | 'percent' | 'decimal' | 'compact', decimals: number): Intl.NumberFormat {
+  const key = `${style}:${decimals}`;
+  let formatter = PRECISE.get(key);
+  if (!formatter) {
+    const digits = { maximumFractionDigits: decimals };
+    formatter = new Intl.NumberFormat(
+      'pt-BR',
+      style === 'currency'
+        ? { style, currency: 'BRL', minimumFractionDigits: decimals, ...digits }
+        : style === 'compact'
+          ? { notation: 'compact', ...digits }
+          : { style, ...digits },
+    );
+    PRECISE.set(key, formatter);
+  }
+  return formatter;
+}
+
+/**
+ * A number at a measure's declared precision (FUT-4063). A `duration` declared
+ * with decimals is read in HOURS ("62 h"): a staff-hours total is a magnitude,
+ * and "62h 30m" is precision the reader did not ask for.
+ */
+function formatPrecise(value: number, format: ReportValueFormat | 'compact', decimals: number): string {
+  switch (format) {
+    case 'brl':
+      return precise('currency', decimals).format(value / 100);
+    case 'percent':
+      return precise('percent', decimals).format(value);
+    case 'duration':
+      return `${precise('decimal', decimals).format(value / SECONDS_PER_HOUR)} h`;
+    case 'compact':
+      return precise('compact', decimals).format(value);
+    case 'integer':
+      return INTEGER.format(value);
+    default:
+      return precise('decimal', decimals).format(value);
+  }
+}
+
 /** A finite number rendered with one of the value formats. */
-function formatNumber(value: number, format: ReportValueFormat | 'compact'): string {
+function formatNumber(value: number, format: ReportValueFormat | 'compact', decimals?: number): string {
   if (!Number.isFinite(value)) return SUPPRESSED_PLACEHOLDER;
+  if (decimals !== undefined) return formatPrecise(value, format, decimals);
   switch (format) {
     case 'brl':
       // Repo-wide money convention: integer centavos on the wire.
@@ -67,15 +111,17 @@ export function formatReportValue(
   value: ReportCellValue | undefined,
   format: ReportValueFormat,
   copy: ValueFormatCopy,
+  /** The measure's declared fraction digits (FUT-4063); absent = the format's default. */
+  decimals?: number,
 ): string {
   if (value === null || value === undefined || isSuppressed(value)) return SUPPRESSED_PLACEHOLDER;
   if (typeof value === 'boolean') return value ? copy.booleanTrue : copy.booleanFalse;
-  if (typeof value === 'number') return formatNumber(value, format);
+  if (typeof value === 'number') return formatNumber(value, format, decimals);
   return value;
 }
 
 /** Format a KPI tile's figure; `null` (including a suppressed one) is the em-dash. */
-export function formatKpiFigure(value: number | null, format: ReportKpiFormat): string {
+export function formatKpiFigure(value: number | null, format: ReportKpiFormat, decimals?: number): string {
   if (value === null) return SUPPRESSED_PLACEHOLDER;
-  return formatNumber(value, format);
+  return formatNumber(value, format, decimals);
 }

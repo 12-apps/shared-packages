@@ -99,8 +99,10 @@ describe("the build emits one module per component", () => {
     // 153 → 154 adds `feedback/UsableModal` (FUT-4394); 154 → 155 adds
     // `data-display/StepCardList` (FUT-4476); 155 → 157 adds
     // `form/FormHold` and `feedback/UploadProgress` (FUT-4574); 157 → 158
-    // adds `data-display/DataViews/wire`, the saved-view schema (FUT-4867).
-    expect(Object.keys(entries).length - internal.length).toBe(158);
+    // adds `data-display/DataViews/wire`, the saved-view schema (FUT-4867);
+    // 158 → 159 adds `data-display/HeatMap` (FUT-4063); 159 → 160 adds
+    // `data-display/ShareBar` (FUT-145).
+    expect(Object.keys(entries).length - internal.length).toBe(160);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {

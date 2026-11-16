@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import { dashboardSpecSchema, reportDocumentSchema, reportSpecSchema } from '../spec';
-
 import { REPORT_DEFAULT_RANGES, REPORT_MAX_RANGE_DAYS, REPORT_RANGE_PRESETS } from './range';
+import { scheduleBodyFields, scheduleViewFields } from './schedule';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
 import { reportWorkingCopySchema } from './working-copy';
 
@@ -87,13 +87,22 @@ export const saveReportBody = z.strictObject({
    * this body is written by MCP authors too.
    */
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullish(),
-});
+}).extend(scheduleBodyFields);
 
 /** One row of a report result, keyed by output-column alias. */
 const reportRowSchema = z.record(
   z.string(),
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
 );
+
+/** One part of a phone card line (FUT-4063): the measure, its words, and what joins it to the last. */
+const cardPartWireSchema = z.object({
+  measure: z.string(),
+  suffix: z.string().optional(),
+  suffixOne: z.string().optional(),
+  joiner: z.string().optional(),
+  emptyText: z.string().optional(),
+});
 
 const reportTableColumnSchema = z.object({
   key: z.string(),
@@ -103,6 +112,12 @@ const reportTableColumnSchema = z.object({
    * `percent` = a 0-1 ratio (FUT-454).
    */
   format: z.enum(['brl', 'integer', 'decimal', 'text', 'duration', 'percent']),
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals: z.number().int().optional(),
+  /** A dimension's labelled closed set, the host format key and grain (FUT-4063). */
+  valueLabels: z.record(z.string(), z.string()).optional(),
+  bucketFormat: z.string().optional(),
+  grain: z.enum(['day', 'week', 'month']).optional(),
 });
 
 /** Serializable ChartSpec consumed by @12-apps/ui SpecChart. */
@@ -128,6 +143,38 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('table'),
     columns: z.array(reportTableColumnSchema),
+    rows: z.array(reportRowSchema),
+    /** The rows the presentation's flag marks (FUT-4063): the judged column, its words, row indices. */
+    flag: z
+      .object({ column: z.string(), label: z.string(), rows: z.array(z.number().int().min(0)) })
+      .optional(),
+    /** The opt-in phone cards (FUT-4063), as the spec states them. */
+    phone: z
+      .object({
+        layout: z.literal('cards'),
+        below: z.union([z.literal('md'), z.literal('always'), z.number()]).optional(),
+        title: z.string().optional(),
+        figure: z.string().optional(),
+        figureCaption: cardPartWireSchema.optional(),
+        subtitle: z.array(cardPartWireSchema).optional(),
+      })
+      .optional(),
+  }),
+  /** A grid of one measure over two dimensions, judged against a target (FUT-4063). */
+  z.object({
+    kind: z.literal('heatmap'),
+    rowAxis: z.array(z.object({ key: z.string(), label: z.string() })),
+    columnAxis: z.array(z.object({ key: z.string(), label: z.string() })),
+    cells: z.array(z.object({ row: z.string(), column: z.string(), value: z.number().nullable(), reason: z.literal('unmeasured').optional() })),
+    scale: z.object({
+      target: z.number(),
+      strongAbove: z.number().optional(),
+      strongBelow: z.number().optional(),
+    }),
+    labels: z.object({ above: z.string(), below: z.string(), empty: z.string(), unmeasured: z.string().optional() }),
+    valueFormat: reportTableColumnSchema.shape.format,
+    valueDecimals: z.number().int().optional(),
+    tableColumns: z.array(reportTableColumnSchema),
     rows: z.array(reportRowSchema),
   }),
   z.object({
@@ -159,6 +206,9 @@ export const reportRenderSchema = z.discriminatedUnion('kind', [
           value: z.number().nullable(),
           suppressed: z.boolean(),
           format: kpiFormatSchema,
+          decimals: z.number().int().optional(),
+          /** Present when the target flag marks this figure (FUT-4063). */
+          flag: z.object({ label: z.string() }).optional(),
         }),
       )
       .optional(),
@@ -179,6 +229,18 @@ export const systemReportSummarySchema = z.object({
   description: z.string(),
   presentation: z.enum(['chart', 'table']),
   supportsGrain: z.boolean(),
+  /** The grains the toggle offers (FUT-4063); absent means all three. */
+  grains: z.array(z.enum(REPORT_GRAINS)).optional(),
+});
+
+/** One thing a built-in says about its own data (FUT-4063) — see `ReportNote`. */
+const reportNoteSchema = z.object({
+  key: z.string(),
+  text: z.string(),
+  items: z.array(z.string()).optional(),
+  figure: z.number().int().min(0).optional(),
+  action: z.object({ label: z.string(), href: z.string() }).optional(),
+  phone: z.literal('below').optional(),
 });
 
 export const systemReportResultSchema = z.object({
@@ -186,9 +248,12 @@ export const systemReportResultSchema = z.object({
   title: z.string(),
   description: z.string(),
   supportsGrain: z.boolean(),
+  grains: z.array(z.enum(REPORT_GRAINS)).optional(),
   range: reportRangeViewSchema,
   grain: z.enum(REPORT_GRAINS),
   render: reportRenderSchema,
+  /** Optional only for a payload produced before FUT-4063. */
+  notes: z.array(reportNoteSchema).optional(),
 });
 
 export const savedReportSummarySchema = z.object({
@@ -259,6 +324,7 @@ const savedLifecycleFields = {
   visibilityRoles: z.array(z.string()),
   /** The period the report opens on; null when it has no preference. */
   defaultRange: z.enum(REPORT_DEFAULT_RANGES).nullable(),
+  ...scheduleViewFields,
   /**
    * The author's parked edit, echoed ONLY to a caller who may author (FUT-755).
    * The rest of the payload is always the PUBLISHED document — a reader opening

@@ -1,5 +1,9 @@
 import type { ReportSpecInput, TimeGrain } from '../index';
 
+import type { ReportWindow } from './adapter-shared';
+import type { ReportActor } from './context';
+import type { ReportRangePreset } from './range';
+
 /**
  * BUILT-IN ("system") REPORTS — the SHAPE, which is this package's, over
  * CONTENT, which is never this package's.
@@ -41,9 +45,93 @@ export interface SystemReportDef {
   section: string;
   /** Whether the date-grain toggle (day/week/month) applies. */
   supportsGrain: boolean;
+  /**
+   * The grains the toggle offers, in order (FUT-4063). Absent: all three. A
+   * report whose rows are days and weeks says `['day', 'week']`, and the
+   * toggle draws two options rather than a third that means nothing there.
+   */
+  grains?: readonly TimeGrain[];
+  /** The grain toggle's name (FUT-4063), e.g. "Agrupar por"; absent = the surface's own word. */
+  grainLabel?: string;
+  /**
+   * The periods the control offers, in order (FUT-4063), e.g. `['week', '7d',
+   * 'month', '30d']`. Absent: the rolling four. The first is the default when
+   * `30d` is not among them. Never `custom`.
+   */
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
   /** Presentation kind surfaced on the hub card. */
   presentation: 'chart' | 'table';
-  build: (options: { grain: TimeGrain }) => ReportSpecInput;
+  /**
+   * What this run needs from the host beyond the catalog (FUT-4063), resolved
+   * ONCE per run, on the server, before `build`:
+   *
+   *  - `params`: per-tenant numbers the spec is built with — a store's own
+   *    target, which a flag's `above` and a heat map's `target` then carry as
+   *    literals. The spec stays plain data.
+   *  - `notes`: what the report says ABOUT its data that is not a row of it — a
+   *    shift the system closed, a person with no rate. From the host's own
+   *    reads, so nothing per person has to become a catalog dimension.
+   *
+   * Absent: no params, no notes.
+   */
+  derive?: (context: SystemReportRunContext) => Promise<SystemReportDerived>;
+  /**
+   * The spec for one run. `params` is what `derive` returned, or `{}` — which
+   * is also what assembly validation passes, so a build must default a missing
+   * param rather than assume it.
+   */
+  build: (options: SystemReportBuildOptions) => ReportSpecInput;
+}
+
+/** What `build` is handed. */
+export interface SystemReportBuildOptions {
+  grain: TimeGrain;
+  params: SystemReportParams;
+  /** The reader's language (BCP-47), when the host negotiated one (FUT-4063). */
+  locale?: string;
+}
+
+/** Per-tenant numbers a built-in's spec is built with (FUT-4063). */
+export type SystemReportParams = Readonly<Record<string, number>>;
+
+/** What `derive` is handed: who asks, over which window, at which grain. */
+export interface SystemReportRunContext {
+  actor: ReportActor;
+  window: ReportWindow;
+  grain: TimeGrain;
+  /** The reader's language (BCP-47), so notes and labels follow it (FUT-4063). */
+  locale?: string;
+}
+
+/** What `derive` answers. */
+export interface SystemReportDerived {
+  params?: SystemReportParams;
+  notes?: readonly ReportNote[];
+}
+
+/**
+ * One thing a report says about its own data (FUT-4063), in the host's words.
+ *
+ * `text` may hold `{items}`, which the surface replaces with the first three
+ * `items` and then "e mais N" — a list never grows the screen past three
+ * names. A note whose `items` is EMPTY is not drawn: "nothing to say" hides,
+ * it does not print a sentence about zero things.
+ *
+ * `figure` makes the note the HINT of that KPI figure (its index) instead of a
+ * line under the block — "meta 30% · 2 dias acima" under "Custo / vendas".
+ *
+ * `action` is the one thing the note asks for, drawn as an outline button
+ * under it; `href` is relative to the tenant root, the same rule as a
+ * section's back-link path.
+ */
+export interface ReportNote {
+  key: string;
+  text: string;
+  items?: readonly string[];
+  figure?: number;
+  action?: { label: string; href: string };
+  /** On the phone, draw the note BELOW its block's card rather than inside it (FUT-4063). */
+  phone?: 'below';
 }
 
 /**
@@ -75,6 +163,11 @@ export interface SystemDashboardBlockDef {
   reportKey: string;
   /** Width on the 12-column canvas; at or above the presentation's floor. */
   span: number;
+  /**
+   * `false` draws the block BARE (FUT-4063): no titled card and no tools — a
+   * row of KPI tiles that are cards of their own. Default `true`.
+   */
+  frame?: boolean;
 }
 
 export interface SystemDashboardDef {
@@ -88,6 +181,9 @@ export interface SystemDashboardDef {
    */
   permission: string;
   section: string;
+  /** As on {@link SystemReportDef}: the grain toggle's name and the periods offered (FUT-4063). */
+  grainLabel?: string;
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
   /**
    * Canvas-level disclosures rendered above the blocks: the facts a reader
    * needs in order to read ANY figure on the page — what is excluded from the
@@ -111,6 +207,10 @@ export interface SystemReportNavEntry {
    * before any of them has loaded.
    */
   supportsGrain: boolean;
+  /** The grains it offers (FUT-4063); absent means all three. */
+  grains?: readonly TimeGrain[];
+  grainLabel?: string;
+  ranges?: readonly Exclude<ReportRangePreset, 'custom'>[];
 }
 
 /**
@@ -130,6 +230,9 @@ export function systemReportNav(
     permission: report.permission,
     section: report.section,
     supportsGrain: report.supportsGrain,
+    ...(report.grains ? { grains: report.grains } : {}),
+    ...(report.grainLabel ? { grainLabel: report.grainLabel } : {}),
+    ...(report.ranges ? { ranges: report.ranges } : {}),
   }));
 }
 

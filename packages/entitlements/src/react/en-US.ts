@@ -1,4 +1,4 @@
-import type { EntitlementsWebCopy } from './copy';
+import type { ResolvedEntitlementsWebCopy } from './copy';
 
 /**
  * The en-US pack — the same plan screens for an English-reading audience. The
@@ -12,7 +12,7 @@ import type { EntitlementsWebCopy } from './copy';
  * into the generic "not included" would send someone to buy a tier that changes
  * nothing — their own switch is off, and no plan fixes that.
  */
-export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
+export const EN_US_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
   requestFailed: ({ status }) => `Request failed (${status}).`,
   planPage: {
     title: 'Plans',
@@ -54,6 +54,15 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     featureColumn: 'Feature',
     included: 'Included',
     excluded: 'Not included',
+  },
+  planCompare: {
+    title: 'Compare the plans',
+    currentBadge: 'Your plan',
+    offeredBadge: 'Recommended',
+    empty: 'To see everything each plan includes, open See every plan.',
+    alreadyIncluded: 'Your plan already includes all of these features.',
+    retry: 'Try again',
+    closeLabel: 'Close',
   },
   upsell: {
     reasons: {

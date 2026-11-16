@@ -7,19 +7,20 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { useTransport } from "./transport-context";
-
 import { isRunnableRange, rangeQuery, rangeQueryKey, rangeSelection } from "./reports-api";
-
 import type { ReportWorkingCopyWire } from "./custom-reports-write";
-
+import type { ReportScheduleViewField } from "./lib/schedule-draft";
 import type { Result } from "./lib/rest-result";
 import type { ReportBuilderTransport } from "./transport";
 import type {
   ReportGrain,
+  ReportHeatmapPresentationWire,
+  ReportPhoneCardsWire,
   ReportRange,
   ReportRangeSelection,
   ReportRender,
   ReportRollingRange,
+  ReportRowFlagWire,
 } from "./reports-api";
 
 /** A period as any caller may hold it — a bare rolling preset, or the object. */
@@ -88,6 +89,7 @@ export interface ReportSpecWire {
     minSample?: number;
     /** Overrides the render format derived from the field. */
     format?: string;
+    decimals?: number;
   }>;
   filters: Array<{
     field: string;
@@ -104,9 +106,10 @@ export interface ReportSpecWire {
   sort: Array<{ by: string; direction: "asc" | "desc" }>;
   limit?: number;
   presentation:
-    | { kind: "table" }
+    | { kind: "table"; flag?: ReportRowFlagWire; phone?: ReportPhoneCardsWire }
     | { kind: "chart"; chartType: "line" | "bar" | "area" | "pie" | "donut"; stacked?: boolean }
-    | { kind: "kpi"; label?: string; numberFormat?: string };
+    | { kind: "kpi"; label?: string; numberFormat?: string; flag?: ReportRowFlagWire }
+    | ReportHeatmapPresentationWire;
 }
 
 /** One dashboard block: a regular spec plus layout metadata (FUT-306). */
@@ -172,7 +175,7 @@ export interface SavedReportSummary {
 }
 
 
-interface SavedReportViewBase {
+interface SavedReportViewBase extends ReportScheduleViewField {
   id: string;
   name: string;
   description: string | null;

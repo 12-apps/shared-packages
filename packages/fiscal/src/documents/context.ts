@@ -15,7 +15,7 @@ import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { SigningIdentities } from "./signing";
 import { type FiscalDocument, type FiscalDocumentModel, OWED_VOIDS, type SeriesKind } from "./types";
 
-export { computeAccessKey, draftOf, drawKeyCode, issuerOf, localIso, totalsOf, xmlKeys } from "./helpers";
+export { assertDraftFits, computeAccessKey, draftOf, drawKeyCode, isValidAccessKey, issuerOf, localIso, totalsOf, xmlKeys } from "./helpers";
 
 /** Twin of `@12-apps/wiring/ports`' `NotifyPort`: never throws. */
 export interface FiscalNotifyPort {

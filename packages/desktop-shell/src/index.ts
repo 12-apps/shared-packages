@@ -39,6 +39,8 @@
  * rule the rest of these packages follow, and it matters more here: the reader
  * is a shop owner, not a developer, and the words are most of the product.
  */
+export { isWindowsStoreApp, type StoreProcess } from "./store-mode";
+
 export {
   deriveShellStatus,
   INITIAL_SHELL_STATE,

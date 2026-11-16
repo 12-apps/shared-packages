@@ -13,7 +13,6 @@ import type { JSX } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@12-apps/ui/form/Button";
-import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -28,9 +27,15 @@ import {
   type ReportGrain,
   type ReportRange,
 } from "../reports-api";
+import { OneLineChoice } from "./one-line-choice";
 import { NO_PRINT_CLASS, PrintExportButton } from "./print-export";
 import type { ReportBuilderPanelCopy, ReportRangeCopy } from "../screens-copy";
-import { useReportCopy } from "../transport-context";
+import {
+  useReportCopy,
+  useReportSurface,
+  type ReportBuilderSurface,
+  type ReportPeriodSurface,
+} from "../transport-context";
 
 /**
  * ROLLING presets only — no `Personalizado…` on a built-in surface (FUT-755).
@@ -41,15 +46,94 @@ import { useReportCopy } from "../transport-context";
  * pill would send `preset=custom` with nothing to resolve — a 400 from a
  * control that looked fine. `Este mês` needs no dates, so it IS offered here.
  */
-function rangeOptions(copy: ReportRangeCopy): Array<{ value: ReportRange; label: string }> {
-  return REPORT_ROLLING_RANGES.map((range) => ({
-    value: range,
-    label: reportRangeLabel(range, copy),
-  }));
+function rangeOptions(
+  copy: ReportRangeCopy,
+  offered: readonly ReportRange[] = REPORT_ROLLING_RANGES,
+): Array<{ value: ReportRange; label: string }> {
+  return offered.map((range) => ({ value: range, label: reportRangeLabel(range, copy) }));
 }
 
-function grainOptions(copy: ReportRangeCopy): Array<{ value: ReportGrain; label: string }> {
-  return REPORT_GRAINS.map((grain) => ({
+/**
+ * The period a built-in OPENS on (FUT-4063): the FIRST it offers — the host
+ * orders its list with the default first ("Esta semana", then the rest). A
+ * built-in that offers no list opens on `30d`, as every built-in always has.
+ */
+export function initialRange(offered: readonly ReportRange[] | undefined): ReportRange {
+  return offered?.[0] ?? "30d";
+}
+
+/**
+ * The grain a built-in OPENS on (FUT-4063): `day` where it is offered, else
+ * the first grain the report offers — never one its toggle does not show.
+ */
+export function initialGrain(offered: readonly ReportGrain[] | undefined): ReportGrain {
+  if (!offered || offered.length === 0 || offered.includes("day")) return "day";
+  return offered[0] ?? "day";
+}
+
+/**
+ * The host's whole label for every period this surface offers, or `undefined`
+ * when the host labels none of them HERE (FUT-4063): `periodLabel` answering
+ * `undefined` for a surface keeps that surface on the toggle, so a host can
+ * give one built-in "Esta semana · 09–15/11" and leave the rest as they were.
+ * A host label for only SOME periods is completed from the package's own words.
+ */
+function hostPeriodLabels(
+  ranges: readonly ReportRange[],
+  periodLabel: ReportBuilderSurface["periodLabel"],
+  surface: ReportPeriodSurface,
+  fallback: (range: ReportRange) => string,
+): Map<ReportRange, string> | undefined {
+  if (!periodLabel) return undefined;
+  const labels = new Map<ReportRange, string>();
+  for (const range of ranges) {
+    const label = periodLabel(range, surface);
+    if (label !== undefined) labels.set(range, label);
+  }
+  if (labels.size === 0) return undefined;
+  for (const range of ranges) if (!labels.has(range)) labels.set(range, fallback(range));
+  return labels;
+}
+
+/**
+ * The period control: the preset toggle, or — when the host formats a label
+ * per period for THIS surface (`surface.periodLabel`, FUT-4063) — a select
+ * whose trigger reads the current period whole, "Esta semana · 03–09/11". The
+ * toggle itself becomes a select on a row too narrow for its labels on one line.
+ */
+function PeriodControl({
+  range,
+  onRangeChange,
+  offered,
+  surface,
+}: Pick<ReportControlsProps, "range" | "onRangeChange" | "surface"> & { offered?: readonly ReportRange[] }): JSX.Element {
+  const ranges = useReportCopy().screens.ranges;
+  const copy = useReportCopy().screens.builder;
+  const { periodLabel } = useReportSurface();
+  const options = rangeOptions(ranges, offered);
+  const hostLabels = hostPeriodLabels(
+    options.map((option) => option.value),
+    periodLabel,
+    surface,
+    (range) => reportRangeLabel(range, ranges),
+  );
+  return (
+    <OneLineChoice
+      options={hostLabels ? options.map((option) => ({ ...option, label: hostLabels.get(option.value) ?? option.label })) : options}
+      value={range}
+      onChange={onRangeChange}
+      label={copy.period}
+      dataTestId="report-range"
+      select={hostLabels !== undefined}
+    />
+  );
+}
+
+function grainOptions(
+  copy: ReportRangeCopy,
+  grains: readonly ReportGrain[] = REPORT_GRAINS,
+): Array<{ value: ReportGrain; label: string }> {
+  return REPORT_GRAINS.filter((grain) => grains.includes(grain)).map((grain) => ({
     value: grain,
     label: reportGrainLabel(grain, copy),
   }));
@@ -61,6 +145,14 @@ interface ReportControlsProps {
   grain: ReportGrain;
   onGrainChange: (grain: ReportGrain) => void;
   showGrain: boolean;
+  /** The grains the toggle offers (FUT-4063); absent means all three. */
+  grains?: readonly ReportGrain[];
+  /** The grain toggle's name (FUT-4063), e.g. "Agrupar por"; absent = the builder's word. */
+  grainLabel?: string;
+  /** The periods offered (FUT-4063); absent = the rolling four. */
+  ranges?: readonly ReportRange[];
+  /** The surface this row controls, passed to the host's `periodLabel` (FUT-4063). */
+  surface: ReportPeriodSurface;
   printTitle: string;
   /**
    * CSV of the whole surface. A dashboard has one file per block instead, so
@@ -76,6 +168,10 @@ export function ReportControls({
   grain,
   onGrainChange,
   showGrain,
+  grains,
+  grainLabel,
+  ranges: offered,
+  surface,
   printTitle,
   onExport,
 }: ReportControlsProps): JSX.Element {
@@ -88,27 +184,13 @@ export function ReportControls({
       sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}
       className={NO_PRINT_CLASS}
     >
-      <ToggleGroup
-        variant="exclusive"
-        size="sm"
-        options={rangeOptions(ranges)}
-        value={range}
-        onChange={(_event, next) => {
-          if (typeof next === "string") onRangeChange(next as ReportRange);
-        }}
-        aria-label={copy.period}
-        dataTestId="report-range"
-      />
+      <PeriodControl range={range} onRangeChange={onRangeChange} offered={offered} surface={surface} />
       {showGrain ? (
-        <ToggleGroup
-          variant="exclusive"
-          size="sm"
-          options={grainOptions(ranges)}
+        <OneLineChoice
+          options={grainOptions(ranges, grains)}
           value={grain}
-          onChange={(_event, next) => {
-            if (typeof next === "string") onGrainChange(next as ReportGrain);
-          }}
-          aria-label={copy.grouping}
+          onChange={onGrainChange}
+          label={grainLabel ?? copy.grouping}
           dataTestId="report-grain"
         />
       ) : null}

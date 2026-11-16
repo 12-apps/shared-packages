@@ -18,6 +18,159 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Scheduled e-mail delivery of a saved report (FUT-776, minor)
+
+This package keeps the schedule and draws the control; **the host sends the e-mail**. The change is not
+breaking: a host that does nothing except run the migration keeps compiling. The old "Em breve" row is gone and
+the control stays hidden until the host passes `surface.schedule`. The new copy keys (`screens.settings.schedule`,
+`screens.editor.needsRecipient`) are OPTIONAL: a pack without them gets the package's own words, Portuguese when
+its engine pack's `spec.locale` starts with `pt`, English otherwise. Pass them to word the section yourself. The
+three old keys (`scheduleLabel`, `scheduleValue`, `scheduleReason`) are still accepted, deprecated and ignored.
+
+| Piece | What it is |
+|---|---|
+| Column | `saved_reports.schedule` (nullable `jsonb`, migration `20261116120000_add_report_schedule`). Run `prisma:sync` and let the host's migration sync pick it up; run the migration BEFORE the rollout, the new code selects the column. |
+| Wire | `schedule` on the save body, on the working copy, and echoed on a saved view **to authors only** (it names people). Omitted: nothing is written (a stored schedule is never erased by an unrelated save); `null` removes it. The server stamps `timeZone` (from `config.timeZone`) and `startsOn`; a client cannot send either. |
+| Shape | `{ enabled, cadence: 'daily' \| 'weekly' \| 'biweekly' \| 'monthly', weekday? (0 Sunday), dayOfMonth?, time: 'HH:MM', timeZone, recipients: string[] (host user ids, at most 50), startsOn }`. An enabled schedule needs a recipient. |
+| Reading it | `readSchedule(record.schedule)` from `/server` answers a `ReportSchedule` or `null` for anything a job could not fully understand. A job treats `null` as "do not send". Read `schedule.timeZone` from the row, not the store's current zone: a store that changes zone keeps its schedule on the old clock until its author saves it again. |
+| Next run | `nextOccurrences(schedule, after, count)` from the root export. Pure. Wall clock in the schedule's zone; a skipped hour fires once, shifted forward by the length of the gap (02:30 on a night that jumps 02:00 to 03:00 fires at 03:30); a repeated hour fires once at the first. Mensal on the 29th to 31st fires on the last day of a shorter month. |
+| Quinzenal | Every other week from the FIRST send: `startsOn` is set to the date of the next matching weekday at the chosen time (saved on Monday before the time: today; after it: in 7 days), then every 14 days. It is kept while the same fortnight continues (still on, same weekday) and set again when the schedule is switched back on after being off. |
+| Idempotency | `occurrenceKey(schedule, occurrence)` (`YYYY-MM-DDTHH:MM`) names a firing by the wall clock the person chose. Combine it with the report id. Editing the time on the same day yields a second key for that day: the job should compare against what it already sent for that report and date. |
+| Control | Pass `surface.schedule = { recipients({ tenantSlug, entities }), lockedReason?, timeZoneLabel? }`. Each person is `{ id, name, detail?, canReceive, reason?, preselected? }`. The HOST decides `canReceive` from the entities the report reads; the package renders a refused person disabled with the reason. `lockedReason` shows the control locked. `timeZoneLabel` is the whole phrase for the store's clock; absent, the platform's name for the zone is used, never the IANA id. |
+
+What the package does **not** do, and the host must:
+
+- **Gate the plan on the server.** `lockedReason` only hides the control; the routes accept `schedule` on any plan.
+  Refuse the write in your middleware when the plan lacks the feature, and re-check the plan at send time. A locked
+  store cannot switch an existing schedule off from the dialog, so do that on the host side too.
+- **Re-check each recipient's access at send time.** A person's access can change after they were ticked; the
+  picker only unticks people the host refuses the next time the list is edited.
+- **Not forward `schedule` blindly from MCP.** `saveReportBody` is also the MCP author's body, so it now accepts
+  `schedule` (any recipient id, any plan). Apply the same plan and recipient checks to that tool.
+- Send, render a PDF, and stop the schedule when a report is archived or deleted.
+
+## Next minor — neutral choices, a period label per surface, null ratios (FUT-4063)
+
+Three changes reach EVERY host, on purpose. Check them:
+
+- **The chosen period and grain are drawn neutral.** The built-in controls and
+  the custom report's period toggle use `@12-apps/ui`'s
+  `ToggleGroup selection="quiet"`: the chosen option in the text ink on a faint
+  neutral wash, ringed in the secondary ink. Until now it was filled with the
+  theme's primary, which is red in some hosts, and red is never decoration on a
+  staff screen. Nothing to change in the host; a screenshot test of these
+  controls will see the new look.
+- **Options of one question stay on one line.** Where the period (or grain)
+  toggle's labels would break onto a second line — the phone, a narrow column
+  — the control is a `Select` with the same options and the question's name as
+  its label (`data-choice="select"` on its wrapper). It turns back into the
+  toggle once the row can hold it, and a resize that swaps one for the other
+  keeps the keyboard focus on the control. The custom report's and the
+  editor's period (`RangeToggle`) do the same: their five options no longer
+  wrap inside the frame, and in the select "Personalizado…" opens the picker —
+  and re-opens it when picked again while it is the period. A test that clicks
+  `report-range-item-<id>` at a phone width opens the select instead
+  (`report-range-option-<id>`).
+- **A ratio whose every numerator is null is null.** `aggregation: 'ratio'`
+  over a bucket where no row carried a number in the numerator (a cost nobody
+  priced) is `null`, read "—", in tables, KPIs, cards and heat maps. It was the
+  denominator's `0` over the sum of nothing, so `0%`. A bucket with at least
+  one numerator is unchanged: the nulls still count as nothing. An adapter
+  that folds with `newAccumulator`/`accumulate`/`mergeAccumulator` gets this
+  for free; one that builds a `MeasureAccumulator` by hand (without the new
+  optional `numeratorCount`) keeps the old rule.
+  **In a heat map that null is not "no sale".** A cell whose denominator is
+  there but whose every numerator is null (an hour that SOLD, staffed only by
+  unpriced people) is marked `reason: 'unmeasured'` and reads
+  `labels.unmeasured` — set it to your own words ("sem custo na hora"); absent,
+  it reads the engine copy's neutral `labels.heatmapUnmeasured` ("não medido" /
+  "not measured"), never `labels.empty`. Your `labels.empty` keeps meaning
+  "the denominator is nothing" ("sem venda na hora"), and stays true. The
+  engine marks such a row with `row[unmeasuredKey(alias)] = true`; an adapter
+  that folds by hand marks it with `isUnmeasuredRatio(measure, acc)`, or its
+  cells read as `empty`, as before.
+
+New on the host side, all optional:
+
+| where | what |
+|---|---|
+| surface | `periodLabel(range, surface)` — `surface` is `{ kind: 'report' \| 'dashboard', key }`. Answer a label to make THAT surface's period a select reading it; answer `undefined` for every period of a surface to keep its toggle. A function that ignores `surface` labels every surface, as before. |
+| phone card part | `suffixOne` (the suffix when the value is exactly 1: `' pessoa'` beside `suffix: ' pessoas'`); `joiner` (what joins a subtitle part to the previous one, default `' · '`: `{ measure: 'sales', joiner: ' de ' }` reads "R$ 1.240 de R$ 4.960"); `emptyText` (the part's whole text when its value is empty: `'sem custo'` instead of "— das vendas") |
+| `presentation: heatmap` | `trimEdges: 'rows' \| 'columns' \| 'both'` — drop the leading and trailing rows/columns where no cell shows activity: no figure and no unmeasured cell. An edge hour that sold with no cost priced is KEPT (and reads `labels.unmeasured`); an auto-closed night with cost and no sale is dropped. The axis stays contiguous between the first and the last. The long form (CSV, "Ver como tabela") keeps every row. |
+| `presentation: heatmap` | `labels.unmeasured` — what a cell with sales and no priced cost reads (default: the engine copy's `heatmapUnmeasured`) |
+| engine copy | `labels.heatmapUnmeasured?` — the neutral default above; the shipped packs carry it |
+| engine export | `trimAxisEdges(axis, activeKeys)`, `unmeasuredKey(alias)`, `isUnmeasuredRatio(measure, acc)` |
+
+**Heat map orientation.** With `trimEdges: 'columns'`, a store's hours are
+usually 12–14 columns. `transpose: 'auto'` keeps weekdays as rows while every
+figure fits whole: in a span-8 block of a ~924px canvas (1280 with the menu
+open) that is up to 14 hour columns at the regular type step, and up to 16 at
+the compact step; past that it draws hours as rows rather than clip a figure.
+
+## Heat maps, flags, phone cards, derived notes (FUT-4063, 5.22.0)
+
+Everything here is opt-in: a host that declares none of it renders as before.
+Four things can still reach a host that does not use them, so check them:
+
+- **Two widened unions.** `ReportRender` gains `{ kind: 'heatmap' }`, and a
+  table render gains the optional `flag` and `phone`. `ReportRange` gains
+  `'week'`. A host that switches exhaustively over either adds a branch; one
+  that reads only the kinds it knows is unaffected.
+- **Table columns carry more.** A dimension whose catalog field declares
+  `values` now carries `valueLabels`, and its cells (table, cards, CSV, "Ver
+  como tabela") read the label ("Cartão") rather than the stored value
+  (`CARD`). A measure that declares `decimals` or `label`, and a dimension that
+  declares `label` or `bucketFormat`, carry those too. Nothing else changes.
+- **The system run payload** always carries `notes` (`[]` without `derive`),
+  and `grains` when the report declares them.
+- **The CSV.** A flagged table adds one column holding the flag's words. Text
+  cells starting with `=`, `+`, `-` or `@` are written with a leading `'`.
+  This guard is new for every host. A built-in's notes follow the rows, every
+  name listed.
+
+New copy keys are OPTIONAL: `system.noteSeparator` and `system.noteMore(n)`,
+which join a note's names and close a list past three. A pack without them
+reads `"; "` and `" +N"`. Both shipped packs fill them (`"; "`, `" e mais N"` /
+`" and N more"`). Ranges gain the label `ranges.week` ("Esta semana" / "This
+week"). A pack without it shows the id.
+
+New on the host side, all optional:
+
+| where | what |
+|---|---|
+| spec measure | `decimals` (0-4; `duration` at decimals reads whole hours, "62 h"), `label` |
+| spec dimension | `label`, `bucketFormat` (a key the surface's `formatBucket` reads) |
+| `presentation: table` | `flag`, `phone: { layout: 'cards', below?: 'md' \| 'always' \| px, title?, figure?, figureCaption?, subtitle? }` |
+| `presentation: kpi` | `flag` (the whole-period target signal) |
+| `presentation: heatmap` | a new kind: 2 dimensions × 1 measure, `target`, `strongAbove/Below`, `labels` |
+| `SystemReportDef` | `grains`, `grainLabel`, `ranges` (first is the default), `derive(ctx)` → `{ params, notes }`; `build({ grain, params, locale })` |
+| `SystemDashboardDef` / block | `grainLabel`, `ranges`; a block's `frame: false` draws it bare |
+| `ReportNote` | `text` with `{items}`, `items`, `figure`, `action`, `phone: 'below'` |
+| server config | `weekStartsOn` (`week` preset, Monday default), `onDeriveError` (a failed `derive` draws the block without notes) |
+| surface | `periodLabel(range)` (period as a select), `formatBucket(value, { format, grain })` |
+
+## Migrating 5.20.x → 5.21.0 — a failed call reads in the host's words (FUT-4070)
+
+The default transport worded its own failures in English: a refusal with no
+sentence in its body read `HTTP 503`, a read threw `HTTP 503 for <path>`, and a
+dropped connection showed the browser's own message ("Failed to fetch"). Those
+words are now `ReportScreensCopy.errors` (`ReportTransportErrorCopy`),
+REQUIRED, and both `PT_BR_REPORT_SCREENS_COPY` and `EN_US_REPORT_SCREENS_COPY`
+fill them. `createWebReportBuilder` hands them to the default transport; a
+sentence the server sends still wins. A host passing a shipped pack changes
+nothing; a hand-written pack adds:
+
+| key | what it says | en-US | pt-BR |
+|---|---|---|---|
+| `errors.status(n)` | the server refused and sent no sentence | `` `HTTP ${n}` `` | `` `Erro ${n}` `` |
+| `errors.network` | nothing answered | `network error` | `Falha de conexão` |
+
+A host that builds the default transport by hand passes the same words:
+`httpTransport({ errors })`. With none it reads in English, as
+`@12-apps/app-shell`'s `restResult` does. The built-in reports
+(`useSystemReport`) now read through the transport in scope too, so a host's
+own transport sees that read.
+
 ## Migrating 5.18.x → 5.19.0 — seven more builder words (FUT-3860)
 
 The block builder still compiled a few labels in. They are now keys of

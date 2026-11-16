@@ -62,6 +62,13 @@ export interface MeasureAccumulator {
   /** `ratio` only: the summed denominator. */
   denominatorSum: number;
   /**
+   * `ratio` only: in-scope rows whose NUMERATOR is a number (FUT-4063). Zero
+   * means no row carried one — a cost nobody priced — and the ratio is then
+   * null ("—"), never 0%. Optional so an accumulator a host built by hand still
+   * type-checks; absent, the ratio behaves as it always did.
+   */
+  numeratorCount?: number;
+  /**
    * Rows that put this measure's group into scope — the basis `minSample`
    * compares against. Non-null inputs for a plain aggregate; rows carrying a
    * denominator for a ratio, since the denominator IS the population.
@@ -78,8 +85,18 @@ export function newAccumulator(): MeasureAccumulator {
     distinct: new Set(),
     samples: [],
     denominatorSum: 0,
+    numeratorCount: 0,
     eligible: 0,
   };
+}
+
+/**
+ * Unknown on either side (a hand-built accumulator) stays unknown, so the
+ * merged ratio falls back to the old rule rather than reading a false "none".
+ */
+function mergedNumeratorCount(into: MeasureAccumulator, from: MeasureAccumulator): number | undefined {
+  if (into.numeratorCount === undefined || from.numeratorCount === undefined) return undefined;
+  return into.numeratorCount + from.numeratorCount;
 }
 
 /**
@@ -98,6 +115,7 @@ export function mergeAccumulator(into: MeasureAccumulator, from: MeasureAccumula
   into.sum += from.sum;
   into.count += from.count;
   into.denominatorSum += from.denominatorSum;
+  into.numeratorCount = mergedNumeratorCount(into, from);
   into.eligible += from.eligible;
   if (from.min !== null && (into.min === null || compareValues(from.min, into.min) < 0)) {
     into.min = from.min;
@@ -124,7 +142,10 @@ function accumulateRatio(acc: MeasureAccumulator, measure: CompiledMeasure, row:
   acc.eligible += 1;
   acc.count += 1;
   acc.denominatorSum += denominator;
-  if (typeof numerator === 'number') acc.sum += numerator;
+  if (typeof numerator === 'number') {
+    acc.sum += numerator;
+    acc.numeratorCount = (acc.numeratorCount ?? 0) + 1;
+  }
 }
 
 /** Fold one source row into a measure's accumulator. */
@@ -154,7 +175,10 @@ function quotientAggregate(aggregation: Aggregation, acc: MeasureAccumulator): n
   if (aggregation === 'sum') return acc.count === 0 ? null : acc.sum;
   if (aggregation === 'avg') return acc.count === 0 ? null : acc.sum / acc.count;
   // Ratio-of-sums: a zero denominator is undefined, not zero. Rendering shows
-  // the same em-dash as a missing value rather than an inviting "0%".
+  // the same em-dash as a missing value rather than an inviting "0%". So is a
+  // bucket where EVERY numerator was null (FUT-4063): nothing was measured, and
+  // 0% would say the cost was nothing.
+  if (acc.numeratorCount === 0) return null;
   return acc.denominatorSum === 0 ? null : acc.sum / acc.denominatorSum;
 }
 
@@ -174,6 +198,15 @@ function aggregateValue(aggregation: Aggregation, acc: MeasureAccumulator): Repo
   if (aggregation === 'count_distinct') return acc.distinct.size;
   if (aggregation === 'min') return acc.min;
   return acc.max;
+}
+
+/**
+ * A ratio that is null only because nothing was measured (FUT-4063): the
+ * denominator is there (the hour sold) but no row carried a numerator (no cost
+ * priced). Distinct from a zero denominator, which is "no sale".
+ */
+export function isUnmeasuredRatio(measure: CompiledMeasure, acc: MeasureAccumulator): boolean {
+  return measure.aggregation === 'ratio' && acc.numeratorCount === 0 && acc.denominatorSum !== 0;
 }
 
 /**

@@ -22,7 +22,12 @@ const PACKAGE_LIST = new URL("../../release-packages.txt", import.meta.url);
 
 /** The package list as written in release-packages.txt, comments and blanks stripped. */
 export function declaredDirs(file = PACKAGE_LIST) {
-  return readFileSync(file, "utf8")
+  return parseDirs(readFileSync(file, "utf8"));
+}
+
+/** The same reading for text already in hand, e.g. the file as `git show` prints it at another ref. */
+export function parseDirs(text) {
+  return text
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "" && !line.startsWith("#"));

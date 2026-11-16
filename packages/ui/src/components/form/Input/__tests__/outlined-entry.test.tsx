@@ -39,6 +39,7 @@ const CASES: Record<string, Omit<InputProps, 'variant'>> = {
   floating: { id: 'f', label: 'CEP', floating: true },
   glow: { id: 'f', label: 'CEP', glow: true },
   pulse: { id: 'f', label: 'CEP', pulse: true },
+  'read-only': { id: 'f', label: 'CEP', readOnly: true, defaultValue: '01001-000' },
 };
 
 describe('the outlined Input entry', () => {
@@ -50,6 +51,14 @@ describe('the outlined Input entry', () => {
 
   it('renders outlined when no variant is given, as the generic Input does', () => {
     expect(html(<OutlinedInput id="f" label="CEP" />)).toBe(html(<Input id="f" label="CEP" />));
+  });
+
+  it('puts a top-level readOnly on the input, not the root', () => {
+    const { getByTestId } = render(<OutlinedInput readOnly defaultValue="x" data-testid="f" />);
+    const input = getByTestId('f') as HTMLInputElement;
+
+    expect(input.readOnly).toBe(true);
+    expect(input.closest('.MuiFormControl-root')).not.toHaveAttribute('readonly');
   });
 
   it('keeps the generic displayName', () => {

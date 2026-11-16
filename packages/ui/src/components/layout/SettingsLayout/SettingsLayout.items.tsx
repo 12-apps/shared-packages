@@ -13,7 +13,7 @@ import React from 'react';
 
 import { atLeastRail, TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
-import { SettingsStatusMarker } from './SettingsStatusMarker';
+import { SettingsStatusMarker, SettingsStatusWord, visibleStatusWord } from './SettingsStatusMarker';
 import type {
   SettingsLayoutProps,
   SettingsNavGroup,
@@ -41,6 +41,15 @@ interface RailItemProps extends RailShape {
   testIdPrefix: string;
 }
 
+/** At most two lines, then an ellipsis: a label beside a status word. */
+const LABEL_TWO_LINES_SX = {
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  overflowWrap: 'anywhere',
+} as const;
+
 /** Label, plus the situation marker when the host resolved one. */
 function RailItemContent({
   item,
@@ -51,6 +60,7 @@ function RailItemContent({
   active: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const word = visibleStatusWord(item);
   return (
     <>
       {item.icon ? (
@@ -58,12 +68,20 @@ function RailItemContent({
       ) : null}
       <ListItemText
         primary={item.label}
-        primaryTypographyProps={{ variant: 'body2', noWrap: true, fontWeight: active ? 600 : 500 }}
+        // Beside a visible word the label may take a second line rather than be
+        // cut ("Endereço e cont…"): the word is what the row asks for, and the
+        // label is what it is called. Without one it stays a single line.
+        primaryTypographyProps={{
+          variant: 'body2',
+          fontWeight: active ? 600 : 500,
+          ...(word ? { sx: LABEL_TWO_LINES_SX } : { noWrap: true }),
+        }}
       />
+      {word ? <SettingsStatusWord text={word} testId={`${testIdPrefix}-status-text-${item.id}`} /> : null}
       {item.status ? (
         <SettingsStatusMarker
           status={item.status}
-          label={item.statusLabel}
+          label={item.statusLabel ?? word}
           testId={`${testIdPrefix}-status-${item.id}`}
         />
       ) : null}

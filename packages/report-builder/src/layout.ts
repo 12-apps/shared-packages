@@ -25,7 +25,8 @@ export const BLOCK_SPAN_MAX = REPORT_GRID_COLUMNS;
 export type PresentationShape =
   | { readonly kind: 'table' }
   | { readonly kind: 'chart'; readonly chartType: 'line' | 'bar' | 'area' | 'pie' | 'donut' }
-  | { readonly kind: 'kpi' };
+  | { readonly kind: 'kpi' }
+  | { readonly kind: 'heatmap' };
 
 /**
  * The narrowest span at which a presentation still reads:
@@ -33,10 +34,11 @@ export type PresentationShape =
  *   - `pie`/`donut` — round, so they degrade gracefully; 3 columns.
  *   - other charts — need horizontal room for the category axis; 4 columns.
  *   - `table` — columns + headers; below half the canvas it truncates; 6.
+ *   - `heatmap` — a column per bucket of its second axis; half the canvas, 6.
  */
 export function minSpanForPresentation(presentation: PresentationShape): number {
   if (presentation.kind === 'kpi') return 2;
-  if (presentation.kind === 'table') return 6;
+  if (presentation.kind === 'table' || presentation.kind === 'heatmap') return 6;
   return presentation.chartType === 'pie' || presentation.chartType === 'donut' ? 3 : 4;
 }
 

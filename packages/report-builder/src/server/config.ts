@@ -76,7 +76,7 @@ function assertSystemReports(config: ReportBuilderServerConfig): void {
     // preset naming a field the host's catalog does not have fails at boot,
     // not on the reader's first click.
     try {
-      compileReport(reportSpecSchema.parse(report.build({ grain: 'day' })), config.catalog);
+      compileReport(reportSpecSchema.parse(report.build({ grain: 'day', params: {} })), config.catalog);
     } catch (error) {
       fail(
         `System report "${report.key}" does not compile against this catalog: ${

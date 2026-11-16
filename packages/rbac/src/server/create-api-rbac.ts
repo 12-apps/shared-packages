@@ -1,16 +1,9 @@
 import type { Rbac } from '../core/engine';
 
-import {
-  RbacApiError,
-  messagesOf,
-  type RbacActor,
-  type RbacRoute,
-  type RbacServerConfig,
-} from './context';
+import type { RbacRoute, RbacServerConfig } from './context';
 import { createDbEngine } from './engine';
 import { createGrantGovernance, type GrantGovernance } from './grant-governance';
 import { createRbacGuards, type RbacGuards } from './guards';
-import { platformActorOf } from './roster-policy';
 import { roleRoutes } from './routes-roles';
 import { teamRoutes } from './routes-team';
 import { inviteRoutes } from './routes-invites';
@@ -68,26 +61,9 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
   const roles = createRolesStore(config);
   const team = createTeamStore(config);
   const wire = buildWireSchemas(config.catalog.permissions);
-  const messages = messagesOf(config);
-  // Stated by the host, `null` included — never defaulted. A wrong answer here
-  // admits every shopper to the staff tier, which is why it is not guessable.
-  const { customerRole } = config;
-
-  /** Any non-customer membership, or a platform admin — the shell's tier. */
-  const requireStaffTier = async (actor: RbacActor): Promise<void> => {
-    if (platformActorOf(actor)) return;
-    if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
-    // Resolved from the membership row (the tier reader refuses a
-    // soft-disabled membership) — never from the actor object.
-    const role = await team.getMemberRole(actor.tenantId, actor.userId);
-    if (!role || role === customerRole) {
-      throw new RbacApiError(403, messages.forbidden);
-    }
-  };
-
   return {
     routes: [
-      ...roleRoutes({ config, guards, governance, roles, wire, requireStaffTier }),
+      ...roleRoutes({ config, guards, governance, roles, wire }),
       ...teamRoutes({ config, guards, governance, roles, team, wire }),
       ...inviteRoutes({ config, guards, governance, roles, team, wire }),
     ],

@@ -3,6 +3,7 @@ import { createContext, useContext, useMemo, type JSX, type ReactNode } from "re
 import type { ReportEngineCopy } from "../copy";
 
 import type { ReportBuilderCopy } from "./copy";
+import { withScheduleDefaults, type ResolvedReportBuilderCopy } from "./schedule-defaults";
 import type {
   SystemDashboardDef,
   SystemReportNavEntry,
@@ -10,7 +11,10 @@ import type {
 } from "../server/system-reports";
 
 import type { BlockTemplateGroup } from "../server/block-templates";
+import type { ReportScheduleSurface } from "./schedule-surface";
 import { httpTransport, type ReportBuilderTransport } from "./transport";
+import type { BucketFormatter } from "./lib/column-value";
+import type { ReportRange } from "./reports-api";
 
 /**
  * What every screen in this package reads from: how to reach the API, whose
@@ -30,6 +34,13 @@ import { httpTransport, type ReportBuilderTransport } from "./transport";
  * section labels and its template picker whether it wanted them or not, with no
  * config field to say otherwise.
  */
+/** Which built-in surface a period control belongs to, as `periodLabel` is told (FUT-4063). */
+export interface ReportPeriodSurface {
+  kind: "report" | "dashboard";
+  /** The built-in report's or dashboard's key. */
+  key: string;
+}
+
 export interface ReportBuilderSurface {
   /** The host's built-in reports, as nav/lookup entries. `[]` for none. */
   systemReports: readonly SystemReportNavEntry[];
@@ -41,6 +52,28 @@ export interface ReportBuilderSurface {
   blockTemplates: readonly BlockTemplateGroup[];
   /** The tenant's IANA zone — the clock the period picker calls "hoje". */
   timeZone: string;
+  /**
+   * A built-in surface's period, as its trigger reads it (FUT-4063): given a
+   * preset and the surface it is asked for, the host's whole label — "Esta
+   * semana · 03–09/11". Where it answers a label, that surface's period is a
+   * select whose trigger shows it; where it answers `undefined` for every
+   * period, that surface keeps the preset toggle. So one built-in (a dashboard,
+   * a report, by `surface.key`) can opt in alone. The host formats the dates,
+   * on its own clock. A function that ignores `surface` and always answers
+   * labels every surface, as before.
+   */
+  periodLabel?: (range: ReportRange, surface: ReportPeriodSurface) => string | undefined;
+  /**
+   * How a dimension that names a `bucketFormat` reads (FUT-4063) — the host's
+   * "Seg 03/11" for a day, "Semana de 03/11" for a week. Absent: the value as
+   * the server sent it.
+   */
+  formatBucket?: BucketFormatter;
+  /**
+   * Scheduled e-mail delivery of a saved report (FUT-776). Absent: the
+   * "Envio automático" control is not shown at all, rather than shown dead.
+   */
+  schedule?: ReportScheduleSurface;
 }
 
 /**
@@ -64,7 +97,7 @@ interface ReportBuilderContextValue {
   transport: ReportBuilderTransport;
   tenantSlug: string;
   surface: ReportBuilderSurface;
-  copy: ReportBuilderCopy;
+  copy: ResolvedReportBuilderCopy;
 }
 
 const ReportBuilderContext = createContext<ReportBuilderContextValue | null>(null);
@@ -83,7 +116,7 @@ export function ReportBuilderProvider({
   children: ReactNode;
 }): JSX.Element {
   const value = useMemo(
-    () => ({ transport, tenantSlug, surface, copy }),
+    () => ({ transport, tenantSlug, surface, copy: withScheduleDefaults(copy) }),
     [transport, tenantSlug, surface, copy],
   );
   return <ReportBuilderContext.Provider value={value}>{children}</ReportBuilderContext.Provider>;
@@ -120,7 +153,7 @@ export function useReportSurface(): ReportBuilderSurface {
  * silent. Failing at the first render names the wiring mistake; blank labels
  * would hide it.
  */
-export function useReportCopy(): ReportBuilderCopy {
+export function useReportCopy(): ResolvedReportBuilderCopy {
   const value = useContext(ReportBuilderContext);
   if (!value) {
     throw new Error(

@@ -51,6 +51,14 @@ export const reportDimensionSchema = z.strictObject({
   field: z.string().min(1),
   /** Only valid on date dimensions; buckets values by the grain. */
   timeGrain: timeGrainSchema.optional(),
+  /** The column's heading in the host's words (FUT-4063), e.g. "Dia"; absent: derived. */
+  label: z.string().min(1).max(80).optional(),
+  /**
+   * A HOST format key for this dimension's values (FUT-4063), e.g.
+   * `'weekday-day'` for "Seg 03/11". The surface's `formatBucket` reads it;
+   * a surface without one prints the value as it comes.
+   */
+  bucketFormat: z.string().min(1).max(40).optional(),
 });
 
 export const reportMeasureSchema = z.strictObject({
@@ -73,10 +81,121 @@ export const reportMeasureSchema = z.strictObject({
   minSample: z.number().int().min(1).max(MAX_MIN_SAMPLE).optional(),
   /** Overrides the render format derived from the field (duration, percent…). */
   format: valueFormatSchema.optional(),
+  /** The column's heading in the host's words (FUT-4063), e.g. "Custo / vendas"; absent: derived. */
+  label: z.string().min(1).max(80).optional(),
+  /**
+   * Fraction digits this measure renders with (FUT-4063): `0` prints whole reais
+   * ("R$ 1.240"), whole percents ("25%"), and a `duration` as whole HOURS
+   * ("62 h"). Absent: the format's own default, byte for byte.
+   */
+  decimals: z.number().int().min(0).max(4).optional(),
+});
+
+/**
+ * A table's per-row flag (FUT-4063): the row whose `measure` is above `above`
+ * is marked with `label` and an icon — never colour alone. `whenEmpty` also
+ * flags a row whose judged value is EMPTY (a ratio over a zero denominator)
+ * while that other measure is above zero: cost with no sales is over any
+ * target. Aliases name measures of the same spec (checked at compile).
+ */
+export const reportRowFlagSchema = z.strictObject({
+  measure: z.string().min(1),
+  /** In the measure's own units: a `percent` measure is a 0-1 ratio. */
+  above: z.number(),
+  /** The flag's words, e.g. "acima da meta" — the host's, in its language. */
+  label: z.string().min(1).max(40),
+  whenEmpty: z.strictObject({ measure: z.string().min(1) }).optional(),
+});
+
+/** The heat map's words (FUT-4063), the host's: its two sides and what a no-figure cell means. */
+const heatmapLabelsSchema = z.strictObject({
+  above: z.string().min(1).max(60),
+  below: z.string().min(1).max(60),
+  /** A cell with no figure because its denominator is nothing ("sem venda na hora"). */
+  empty: z.string().min(1).max(60),
+  /**
+   * A cell with no figure because its measure was never taken: the denominator
+   * is there, no numerator is ("sem custo na hora"). Absent: the engine copy's
+   * `labels.heatmapUnmeasured`, a neutral "not measured".
+   */
+  unmeasured: z.string().min(1).max(60).optional(),
+});
+
+/** One measure on a phone card line, with the host's words after it ("9" + " pessoas"). */
+const cardPartSchema = z.strictObject({
+  measure: z.string().min(1),
+  suffix: z.string().max(40).optional(),
+  /**
+   * The suffix when the value is exactly 1 (FUT-4063): `suffix: ' pessoas'`,
+   * `suffixOne: ' pessoa'`, so one person never reads "1 pessoas". Absent: the
+   * `suffix` for every value.
+   */
+  suffixOne: z.string().max(40).optional(),
+  /**
+   * The text between the PREVIOUS subtitle part and this one (FUT-4063), e.g.
+   * `' de '` for "R$ 1.240 de R$ 4.960". Absent: `' · '`, as always. Ignored on
+   * the first part and on `figureCaption`.
+   */
+  joiner: z.string().max(12).optional(),
+  /**
+   * The part's WHOLE text when its value is empty (FUT-4063): `'sem custo'`
+   * instead of "— das vendas". Absent: the empty mark and the suffix, as always.
+   */
+  emptyText: z.string().max(40).optional(),
+});
+
+/**
+ * A table's opt-in PHONE form (FUT-4063): below `md` each row is a stacked card.
+ * `title` is the row's name (default: the first dimension); `figure` the bold
+ * value on the right, `figureCaption` the line under it; `subtitle` the parts
+ * joined under the title. Without `subtitle`, every other column is a
+ * label/value line. Aliases name this spec's dimensions or measures.
+ */
+export const reportPhoneCardsSchema = z.strictObject({
+  layout: z.literal('cards'),
+  /**
+   * When the cards replace the table: `'md'` (default) below the viewport's
+   * `md`; `'always'`; or a number — below that many px of the BLOCK's own
+   * width, so a narrow block on a wide screen (Por área at a third of the
+   * canvas) reads as cards too.
+   */
+  below: z.union([z.literal('md'), z.literal('always'), z.number().int().min(120).max(4000)]).optional(),
+  title: z.string().min(1).optional(),
+  figure: z.string().min(1).optional(),
+  figureCaption: cardPartSchema.optional(),
+  subtitle: z.array(cardPartSchema).min(1).max(4).optional(),
 });
 
 export const reportPresentationSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('table') }),
+  z.strictObject({
+    kind: z.literal('table'),
+    flag: reportRowFlagSchema.optional(),
+    phone: reportPhoneCardsSchema.optional(),
+  }),
+  /**
+   * A grid of ONE measure over TWO dimensions — rows by the first, columns by
+   * the second — tinted by which side of `target` each cell sits on
+   * (FUT-4063). Not offered by the builder's picker: built-ins and MCP specs.
+   */
+  z.strictObject({
+    kind: z.literal('heatmap'),
+    /** In the measure's own units (a `percent` measure: a 0-1 ratio). */
+    target: z.number(),
+    /** Above this, the deeper attention tint. */
+    strongAbove: z.number().optional(),
+    /** Below this, the deeper calm tint. */
+    strongBelow: z.number().optional(),
+    labels: heatmapLabelsSchema,
+    /**
+     * Drop the leading and trailing rows and/or columns with no activity in any
+     * cell (FUT-4063): no figure, and no unmeasured cell either (an hour that
+     * sold with no cost priced is activity). An hour axis then starts at the
+     * first such hour and ends at the last, and stays contiguous between them.
+     * Absent: every present value is drawn, as always. Axes are in the data's
+     * orientation (rows = the first dimension), whichever way the grid is drawn.
+     */
+    trimEdges: z.enum(['rows', 'columns', 'both']).optional(),
+  }),
   z.strictObject({
     kind: z.literal('chart'),
     chartType: z.enum(['line', 'bar', 'area', 'pie', 'donut']),
@@ -96,6 +215,12 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
     numberFormat: z
       .enum(['brl', 'percent', 'compact', 'integer', 'decimal', 'duration'])
       .optional(),
+    /**
+     * The whole-period target signal (FUT-4063): the figure of `measure` above
+     * `above` is drawn amber with an icon, and `label` is its spoken word. Off
+     * unless declared.
+     */
+    flag: reportRowFlagSchema.optional(),
   }),
 ]);
 
@@ -130,6 +255,8 @@ export type ReportFilter = z.infer<typeof reportFilterSchema>;
 export type ReportDimension = z.infer<typeof reportDimensionSchema>;
 export type ReportMeasure = z.infer<typeof reportMeasureSchema>;
 export type ReportPresentation = z.infer<typeof reportPresentationSchema>;
+export type ReportRowFlag = z.infer<typeof reportRowFlagSchema>;
+export type ReportPhoneCards = z.infer<typeof reportPhoneCardsSchema>;
 export type ReportSpec = z.infer<typeof reportSpecSchema>;
 export type ReportSpecInput = z.input<typeof reportSpecSchema>;
 

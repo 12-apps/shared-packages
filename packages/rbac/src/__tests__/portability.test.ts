@@ -304,7 +304,8 @@ describe('toy second host — composing this package beside its own domain', () 
 // Everything above this line is the engine, the governance validator and the
 // composition — halves a suite can exercise without ever constructing a
 // server config. That is why this file used to prove less about PORTABILITY
-// than its name claims: `ownerRoles`, `customerRole` and `adminRoles` live
+// than its name claims: `ownerRoles` and `customerRole` (and, until FUT-3661,
+// `adminRoles`) live
 // only on the server config, so a suite that never calls `createApiRbac`
 // cannot reach them, and every one of them shipped a default in the extracted
 // application's vocabulary. A blog whose owner is `SITE_OWNER` is precisely
@@ -327,9 +328,8 @@ function mountBlog() {
     db: async () => db,
     catalog: blogCatalog(),
     // `ownerRoles` is deliberately ABSENT: it derives from the catalog's own
-    // `['SITE_OWNER']`. The other two have no catalog answer, so the blog
-    // states them — in words the package has never heard of.
-    adminRoles: ['SITE_OWNER', 'STAFF_ADMIN', 'SUPERADMIN'],
+    // `['SITE_OWNER']`. `customerRole` has no catalog answer, so the blog
+    // states it — in a word the package has never heard of.
     customerRole: 'SUBSCRIBER',
     // Copy is required config too — nothing here asserts a sentence, so the
     // blog reuses the named pack; what matters is that the choice is a line
@@ -457,7 +457,7 @@ describe('toy second host — the SERVER half, in the blog\'s vocabulary', () =>
     expect(allowed.status).toBe(200);
   });
 
-  it('gates the roster on the blog\'s OWN admin tier', async () => {
+  it('gates the roster on the blog\'s own team:read, not a role name', async () => {
     const blog = mountBlog();
     await blog.api.seedTenantRoles(blogSite);
     enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');

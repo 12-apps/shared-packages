@@ -51,6 +51,7 @@ export {
 export {
   accumulate,
   finalize,
+  isUnmeasuredRatio,
   newAccumulator,
   percentileOf,
   type MeasureAccumulator,
@@ -94,6 +95,14 @@ export {
 export { createMemoryDataSource, executeCompiledQuery } from './memory';
 export { renderReport, type ReportRenderModel, type ReportTableColumn } from './render';
 export type { ReportKpiFigure } from './render-kpi';
+export { isRowFlagged, type ReportTableFlag } from './render-flag';
+export {
+  heatmapAxis,
+  trimAxisEdges,
+  type ReportHeatmapAxisItem,
+  type ReportHeatmapCell,
+  type ReportHeatmapModel,
+} from './render-heatmap';
 export {
   parseReportDocument,
   parseReportSpec,
@@ -129,6 +138,7 @@ export {
   type ReportFilter,
   type ReportMeasure,
   type ReportPresentation,
+  type ReportRowFlag,
   type ReportSpec,
   type ReportSpecInput,
 } from './spec';
@@ -163,4 +173,15 @@ export {
   REPORT_VALUE_FORMATS,
   SUPPRESSED,
   TIME_GRAINS,
+  unmeasuredKey,
 } from './types';
+export {
+  SCHEDULE_CADENCES,
+  SCHEDULE_MAX_RECIPIENTS,
+  civilDateOf,
+  isRunnable as isRunnableSchedule,
+  nextOccurrences,
+  occurrenceKey,
+  type ReportSchedule,
+  type ScheduleCadence,
+} from './schedule';

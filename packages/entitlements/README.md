@@ -279,6 +279,13 @@ stop this being reusable.
 `useQuota(feature, used)` takes usage from the caller because live counts are
 not in the snapshot; the component rendering the list already knows.
 
+The surface factory (`createWebEntitlements`, ADOPTING.md §10) also ships
+`PlanCompare` / `openPlanCompare`: a popup comparing one screen's own rows
+(picked by `ComparisonLine.key`) across the tiers on sale, ending on the same
+`plan:request`-gated ask as the upsell prompt. Story:
+`src/react/plan-compare.stories.tsx` (Entitlements/PlanCompareDialog in the
+ui Storybook).
+
 > **Boundary:** `/react` may import types and pure helpers only — never a port,
 > adapter or the engine. Enforced by `src/react/__tests__/boundary.test.ts`.
 

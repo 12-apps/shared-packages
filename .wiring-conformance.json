@@ -119,6 +119,10 @@
     "kind": "exempt",
     "why": "no packaged screens: the card-on-file UI is host code and the payment flows are @12-apps/payments-frontend's — this package is deliberately the API half only"
   },
+  "@12-apps/card-terminal": {
+    "kind": "exempt",
+    "why": "moved out of payments as it stood (FUT-4996), and payments' terminal subpaths declared no wiring either: the capture table is the host's own model behind a duck-typed store, the refund sweep is a dep-free job blueprint the host installs, and every act answers what the host writes instead of mounting anything. A manifest is a follow-up once a host adopts the package, not something to invent so a gate can tick."
+  },
   "@12-apps/chat :: areas": {
     "kind": "exempt",
     "why": "a thread is never a page of its own: it sits inside whichever screen shows the thing the conversation is about, which only the host knows, so there is no route or nav row to suggest"
@@ -450,6 +454,38 @@
   "@12-apps/mcp :: surface": {
     "kind": "exempt",
     "why": "./react ships AI-connect components a host renders where its settings live — no createWeb* factory exists, so there is nothing a web binder could build once and memoise"
+  },
+  "@12-apps/messaging :: areas": {
+    "kind": "exempt",
+    "why": "suggests no nav rows: it ships no web surface to place, and where a conversation list sits in a back office is the host's layout"
+  },
+  "@12-apps/messaging :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: the pipeline is driven through its unit suites with recorded channel payloads and on real Postgres, and the screens a journey would cross are the host's"
+  },
+  "@12-apps/messaging :: email": {
+    "kind": "exempt",
+    "why": "sends no mail: the connector speaks on the channels its adapters serve, and telling a person that a message arrived is the host's call through onInboundMessage"
+  },
+  "@12-apps/messaging :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env: the app secret, the verify token, the Graph base URL and version, the retention window and every port arrive as config at mount"
+  },
+  "@12-apps/messaging :: mcp": {
+    "kind": "exempt",
+    "why": "conversations and contacts' addresses (phone numbers) are off the agent surface by design: a bearer tool could read a stranger's messages or write to them on the tenant's number, so no tool set is shipped"
+  },
+  "@12-apps/messaging :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as manifest data: who hears that a contact wrote, or that a conversation needs a person, is host vocabulary, told through the onInboundMessage hook"
+  },
+  "@12-apps/messaging :: permissions": {
+    "kind": "exempt",
+    "why": "ships no authenticated route yet, only the channel webhooks, which a channel calls without a session; the ids that gate connecting an account and replying arrive with the routes that need them"
+  },
+  "@12-apps/messaging :: surface": {
+    "kind": "exempt",
+    "why": "ships no web surface: the connect flow, the conversation list and the composer are the host's, drawn over the engine's reads"
   },
   "@12-apps/notifications :: areas": {
     "kind": "exempt",

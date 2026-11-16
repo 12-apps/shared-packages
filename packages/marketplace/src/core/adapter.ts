@@ -1,4 +1,5 @@
 import type { MarketplaceCatalogue } from "./catalogue-port";
+import type { CatalogueReader } from "./catalogue-read-port";
 import type { MarketplaceAvailability } from "./pause-port";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
@@ -184,6 +185,12 @@ export interface MarketplaceAdapter {
    * marketplace cannot be published to, and the host says so.
    */
   readonly catalogue?: MarketplaceCatalogue;
+  /**
+   * OPTIONAL. Reading the menu the store already keeps on this marketplace,
+   * through its own connection, for the host to import (FUT-951). Absent: the
+   * menu cannot be read through an API, and the host says so.
+   */
+  readonly catalogueReader?: CatalogueReader;
   /**
    * OPTIONAL. Closing the store on this marketplace for a while, and opening
    * it again (FUT-4851). Absent: the marketplace cannot be paused through an

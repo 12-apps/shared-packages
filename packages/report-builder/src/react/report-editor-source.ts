@@ -1,3 +1,4 @@
+import { draftFromWire, type ScheduleDraft } from "./lib/schedule-draft";
 import { defaultPublishDraft, type PublishDraft } from "./lib/publish-section";
 import type { ReportWorkingCopyWire, SavedReportView } from "./custom-reports-api";
 import { draftFromDocument, emptyReportDraft, type ReportDraft } from "./report-model";
@@ -20,6 +21,8 @@ export interface PersistedEditorState {
   draft: ReportDraft;
   publish: PublishDraft;
   defaultRange: ReportRollingRange;
+  /** The e-mail delivery schedule; null when the report has none (FUT-776). */
+  schedule: ScheduleDraft | null;
 }
 
 /** What the editor opens on, and what "discard" goes back to. */
@@ -63,6 +66,8 @@ function fromWorkingCopy(
       visibilityRoles: copy.visibilityRoles ?? published.publish.visibilityRoles,
     },
     defaultRange: copy.defaultRange ?? published.defaultRange,
+    // `undefined` is a parked edit that never touched it; `null` removed it.
+    schedule: copy.schedule === undefined ? published.schedule : draftFromWire(copy.schedule),
   };
 }
 
@@ -81,6 +86,7 @@ export function editorSource(saved: SavedReportView | undefined): EditorSource {
       : emptyReportDraft(),
     publish: initialPublishDraft(saved),
     defaultRange: saved?.defaultRange ?? "30d",
+    schedule: draftFromWire(saved?.schedule),
   };
   const parked = saved?.workingCopy ?? null;
   return {

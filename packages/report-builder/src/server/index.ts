@@ -33,6 +33,14 @@ export {
   type ReportRangeView,
   type ResolvedReportRange,
 } from './range';
+/** Scheduled e-mail delivery of a saved report (FUT-776): wire shapes and the stored-JSON reader. */
+export {
+  readSchedule,
+  reportScheduleDraftInput,
+  reportScheduleInput,
+  resolveSchedule,
+  type ReportScheduleInput,
+} from './schedule';
 /** Compile-only validation of a document, the way the save routes do it. */
 export { compileDocument } from './compile-document';
 export { toSummary, type SavedReportSummary } from './summary';
@@ -80,9 +88,14 @@ export {
   findSystemReport,
   systemReportNav,
   type SystemDashboardBlockDef,
+  type ReportNote,
   type SystemDashboardDef,
+  type SystemReportBuildOptions,
   type SystemReportDef,
+  type SystemReportDerived,
   type SystemReportNavEntry,
+  type SystemReportParams,
+  type SystemReportRunContext,
   type SystemReportSection,
 } from './system-reports';
 export { REPORT_RUN_MAX_ROWS } from './policy';

@@ -16,6 +16,9 @@ import {
   DEFAULT_SWEEP_TAKE,
   type NotificationDispatchDeps,
 } from './dispatch';
+import { applyEmitFilter, type NotificationEmitChannelFilter } from './emit-filter';
+
+export type { NotificationEmitChannelFilter } from './emit-filter';
 import type { NotificationPreferenceStore } from './preferences';
 
 /**
@@ -125,6 +128,7 @@ interface NotificationRouterDeps extends NotificationDispatchDeps {
   generators: NotificationGeneratorRegistry;
   preferences: NotificationPreferenceStore;
   channelPolicy?: NotificationChannelPolicy;
+  emitChannelFilter?: NotificationEmitChannelFilter;
   scheduleDispatch?: NotificationDispatchScheduler;
   onCommitted?: NotificationCommittedListener;
   sideOf?: NotificationSideResolver;
@@ -209,7 +213,8 @@ function announce(deps: NotificationRouterDeps, notification: CommittedNotificat
 
 /**
  * The channels one emit will actually enqueue:
- * preference ∩ transport ∩ plan ∩ the TYPE's own availability.
+ * preference ∩ transport ∩ plan ∩ the emit's own hook ∩ the TYPE's own
+ * availability.
  *
  * Availability is applied LAST rather than left to the preference store,
  * because {@link NotificationChannelPolicy} is a HOST function returning an
@@ -247,7 +252,10 @@ async function resolveChannels(
   // tenant's plan covers, so a revoked transport DEGRADES to the remaining ones
   // rather than dropping the notification silently.
   const permitted = await applyPolicy(deps, event.recipient.clientId, supported);
-  return capToAvailable(permitted, generator.channels);
+  // The host's per-emit hook: what THIS event may use, beyond its tenant and
+  // its type (an order already told on another path skips a channel).
+  const kept = await applyEmitFilter(deps.emitChannelFilter, deps.logger, event, permitted, policyFallback);
+  return capToAvailable(kept, generator.channels);
 }
 
 /** Commit the inbox record and its delivery rows together, in one transaction. */

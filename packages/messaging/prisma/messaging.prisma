@@ -1,0 +1,140 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/messaging — a host's multi-file schema folder holds only a
+// COPY of this file. Conversations with people on a messaging channel live
+// here, in the package, never in the application.
+//
+// Self-contained on purpose: `tenant_id` and `staff_user_id` are by-value
+// String columns with NO foreign key into any host table, so the models work
+// in every repo without schema coupling. What a conversation leads to (a cart,
+// a customer record, an attributed sale) is the host's business, kept in the
+// host's own tables keyed by the conversation id.
+//
+// Vocabulary columns (`channel`, `status`, `state`, `direction`, `kind`,
+// `author_kind`, `delivery_status`) are Strings guarded by CHECKs in the
+// migration, not Prisma enums: a new channel adapter is a new value, never a
+// type the host's client has to regenerate around.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One account on a channel that a tenant connected: a WhatsApp phone number,
+// later a mailbox or a workspace. `external_account_id` is the channel's own id
+// for it (WhatsApp's phone_number_id), UNIQUE across tenants: an inbound
+// delivery names the account, and the account names exactly one tenant.
+model MessagingConnection {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  channel           String
+  externalAccountId String    @map("external_account_id")
+  // The channel's parent account when it has one (WhatsApp's WABA id).
+  externalParentId  String?   @map("external_parent_id")
+  // What a person reads as the address (a display phone number).
+  displayAddress    String    @map("display_address")
+  status            String    @default("CONNECTED")
+  // The channel credential, SEALED by the host's encryption port. The package
+  // never holds the key, never returns this column and never logs it.
+  // NULL once revoked: disconnecting removes the token.
+  credentialSealed  String?   @map("credential_sealed")
+  statusReason      String?   @map("status_reason")
+  connectedAt       DateTime  @default(now()) @map("connected_at")
+  revokedAt         DateTime? @map("revoked_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  conversations     MessagingConversation[]
+
+  @@unique([channel, externalAccountId])
+  @@index([tenantId, channel])
+  @@map("messaging_connections")
+}
+
+// One raw delivery, exactly as the channel posted it, stored BEFORE the
+// acknowledgement. A channel that carries no per-delivery id (WhatsApp) is
+// deduplicated on the hash of the raw body: a redelivery is the same bytes.
+// The raw body is the channel's whole payload (message text, phone number,
+// profile name), so the retention sweep DELETES the row past the retention
+// window once it is PROCESSED or out of attempts; message-level dedupe lives on
+// `messaging_messages (channel, external_id)`.
+model MessagingInboxDelivery {
+  id          String    @id @default(uuid())
+  channel     String
+  bodyHash    String    @map("body_hash")
+  rawBody     String    @map("raw_body")
+  state       String    @default("PENDING")
+  attempts    Int       @default(0)
+  error       String?
+  receivedAt  DateTime  @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([channel, bodyHash])
+  // The reconciliation sweep: unprocessed deliveries, oldest first.
+  @@index([state, receivedAt])
+  @@map("messaging_inbox_deliveries")
+}
+
+// One conversation between a tenant and one contact on one channel. The text
+// of its messages is deleted after the retention window; this row, its state
+// and its structured summary stay.
+model MessagingConversation {
+  id                String             @id @default(uuid())
+  tenantId          String             @map("tenant_id")
+  channel           String
+  // The contact's address on the channel (WhatsApp: the wa_id, E.164 digits).
+  contactId         String             @map("contact_id")
+  contactName       String?            @map("contact_name")
+  // The connection the contact last wrote to: where a reply is sent from.
+  connectionId      String             @map("connection_id")
+  state             String             @default("AGENT")
+  lastInboundAt     DateTime?          @map("last_inbound_at")
+  lastMessageAt     DateTime?          @map("last_message_at")
+  // When the contact last opted out, by the message's own time: a message
+  // sent before it never re-opens the conversation, whatever order the
+  // deliveries are processed in.
+  optedOutAt        DateTime?          @map("opted_out_at")
+  // Whether any message still carries text: the retention sweep's index.
+  hasText           Boolean            @default(false) @map("has_text")
+  // Structured, never free text (items discussed, a mode, an area), written by
+  // the host. Outlives the text.
+  summary           Json?
+  summaryUpdatedAt  DateTime?          @map("summary_updated_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  messages          MessagingMessage[]
+  connection        MessagingConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, channel, contactId])
+  @@index([tenantId, lastMessageAt])
+  // The retention sweep: conversations still holding text, by last message.
+  @@index([hasText, lastMessageAt])
+  @@map("messaging_conversations")
+}
+
+// One message, either way. `body` and `transcript` are the text the retention
+// sweep deletes; `options` is an interactive message's choices as JSON text,
+// deleted with it. `external_id` is the channel's id (WhatsApp's wamid),
+// UNIQUE per channel: a redelivered inbound message is a no-op.
+model MessagingMessage {
+  id             String                @id @default(uuid())
+  conversationId String                @map("conversation_id")
+  tenantId       String                @map("tenant_id")
+  channel        String
+  direction      String
+  kind           String
+  body           String?
+  options        String?
+  transcript     String?
+  // An attachment's id on the channel (WhatsApp's media id), never its bytes.
+  attachmentRef  String?               @map("attachment_ref")
+  externalId     String?               @map("external_id")
+  deliveryStatus String                @map("delivery_status")
+  authorKind     String                @map("author_kind")
+  staffUserId    String?               @map("staff_user_id")
+  error          String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  sentAt         DateTime?             @map("sent_at")
+  deliveredAt    DateTime?             @map("delivered_at")
+  readAt         DateTime?             @map("read_at")
+  failedAt       DateTime?             @map("failed_at")
+  conversation   MessagingConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, externalId])
+  @@index([conversationId, createdAt])
+  @@map("messaging_messages")
+}

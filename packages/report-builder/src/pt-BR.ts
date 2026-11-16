@@ -90,6 +90,7 @@ export const PT_BR_REPORT_ENGINE_COPY: ReportEngineCopy = {
     othersBucket: 'Outros',
     emptySplit: '(sem valor)',
     emptyTable: 'Nenhum dado para este período.',
+    heatmapUnmeasured: 'não medido',
   },
   presentation: {
     needsGrouping:

@@ -9,12 +9,18 @@ import type { ElementType, ReactNode } from 'react';
  *
  * - `ok` — set up and working.
  * - `off` — exists, switched off.
- * - `new` — never opened.
+ * - `new` — never opened. Drawn as a hollow ring in the primary colour: not
+ *   visiting a section yet is not a fault, so it is not red.
+ * - `attention` — needs the viewer to act, and is neither late, failed nor money
+ *   owed. Drawn in `warning.main` (amber), and the one status that carries a
+ *   VISIBLE word beside its marker ({@link SettingsNavItem.statusText}), so a
+ *   reader who cannot tell amber from the other dots still finds the row. The
+ *   row stays where it is: the rail never reorders for a status.
  * - `locked` — the plan does not include it, so it has no configuration state at
  *   all. Rendered as a padlock rather than a coloured dot for exactly that
  *   reason: a locked row is not "off", and colouring it grey would say it is.
  */
-export type SettingsNavStatus = 'ok' | 'off' | 'new' | 'locked';
+export type SettingsNavStatus = 'ok' | 'off' | 'new' | 'attention' | 'locked';
 
 /**
  * A single navigable configuration entry inside a {@link SettingsNavGroup}. The
@@ -41,6 +47,17 @@ export interface SettingsNavItem {
    * `status`: a marker nobody can name is decoration.
    */
   statusLabel?: string;
+  /**
+   * A short VISIBLE word beside the marker, in the host's language — "Pending".
+   *
+   * Drawn for `attention` only, and ignored for every other status: those are
+   * background a rail repeats on most rows, and a word on each would bury the
+   * one that needs action. Keep it to a word or two; the full sentence belongs
+   * in `statusLabel`, which a screen reader hears instead of this (the word is
+   * hidden from it, so nothing is read twice). Without a `statusLabel`, the word
+   * becomes the hidden label too.
+   */
+  statusText?: string;
   /**
    * Render the entry as inert text rather than a control.
    *

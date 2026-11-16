@@ -199,6 +199,10 @@ only check that still fires when the release workflow cannot run at all.
 > file it trusts. Publishing moved from `ci.yml` to `cd.yml`, so each package's
 > Trusted Publisher must name **`cd.yml`** or the publish is refused — there is
 > no token fallback except a package's first publish.
+>
+> A PR that adds a package to `release-packages.txt` gets a reminder of this
+> before the merge (`Trusted Publisher Reminder` job, never a failing check);
+> see README, "The first publish of a new package".
 
 A footer is anchored to the start of a line, which is what
 conventional-commits-parser tests. A sentence that merely *mentions* a breaking

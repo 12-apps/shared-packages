@@ -2,7 +2,7 @@ import { EN_US_REPORT_SERVER_MESSAGES } from '../en-US';
 import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
 import { EN_US_REPORT_ENGINE_COPY } from '../../en-US';
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { defineCatalog } from '../../catalog';
 import { createMemoryDataSource } from '../../memory';
@@ -340,6 +340,114 @@ describe('the built-in reports', () => {
 
     expect(response.status).toBe(200);
     expect(data<{ reports: unknown[] }>(response).reports).toEqual([]);
+  });
+});
+
+describe('a built-in that derives what it needs (FUT-4063)', () => {
+  const derived: SystemReportDef = {
+    key: 'meta',
+    title: 'Meta',
+    description: 'Receita por forma, marcada acima do alvo da loja.',
+    permission: 'sales:read',
+    section: 'orders',
+    supportsGrain: true,
+    grains: ['day', 'week'],
+    presentation: 'table',
+    derive: ({ actor: who, window, grain }) =>
+      Promise.resolve({
+        params: { target: who.clientId === 'tenant-1' ? 100 : 0 },
+        notes: [
+          { key: 'grain', text: `${grain} desde ${window.from.toISOString().slice(0, 10)}` },
+          { key: 'names', text: 'Sem custo: {items}', items: ['A', 'B'] },
+        ],
+      }),
+    build: ({ params }) =>
+      ({
+        ...ORDERS_SPEC,
+        measures: [{ field: 'totalCents', alias: 'revenue' }],
+        presentation: {
+          kind: 'table',
+          flag: { measure: 'revenue', above: params.target ?? 1_000_000, label: 'acima' },
+        },
+      }) as never,
+  };
+
+  it('builds the spec with the params it derived, and returns its notes', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const response = await call('GET', '/reports/system/:key', {
+      params: { key: 'meta' },
+      query: { preset: 'today', grain: 'week' },
+    });
+
+    expect(response.status).toBe(200);
+    const result = data<{
+      grains: string[];
+      render: { kind: string; flag?: { label: string; rows: number[] } };
+      notes: Array<{ key: string; text: string }>;
+    }>(response);
+    expect(result.grains).toEqual(['day', 'week']);
+    // The tenant's target (100 centavos) reached the flag, so rows are marked.
+    expect(result.render.flag?.label).toBe('acima');
+    expect(result.render.flag?.rows.length).toBeGreaterThan(0);
+    expect(result.notes.map((note) => note.key)).toEqual(['grain', 'names']);
+    expect(result.notes[0]?.text).toBe('week desde 2026-07-14');
+  });
+
+  it('lists its grains on the hub, and an empty notes list for a report without derive', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const list = data<{ reports: Array<{ key: string; grains?: string[] }> }>(
+      await call('GET', '/reports/system', {}),
+    );
+    expect(list.reports.find((report) => report.key === 'meta')?.grains).toEqual(['day', 'week']);
+    expect(list.reports.find((report) => report.key === 'vendas')).not.toHaveProperty('grains');
+
+    const plain = data<{ notes: unknown[] }>(
+      await call('GET', '/reports/system/:key', { params: { key: 'vendas' }, query: { preset: 'today' } }),
+    );
+    expect(plain.notes).toEqual([]);
+  });
+
+  it('is validated at assembly with no params, so a build must default them', () => {
+    expect(() => setup({ systemReports: [derived] })).not.toThrow();
+  });
+
+  it("draws the block without notes when the host's derive fails, and says so", async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing: SystemReportDef = { ...derived, key: 'falha', derive: () => Promise.reject(new Error('shifts down')) };
+    const { call } = setup({ systemReports: [...SYSTEM, failing] });
+
+    const response = await call('GET', '/reports/system/:key', { params: { key: 'falha' }, query: { preset: 'today' } });
+
+    expect(response.status).toBe(200);
+    expect(data<{ notes: unknown[] }>(response).notes).toEqual([]);
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it("hands derive and build the reader's locale", async () => {
+    const deriveSpy = vi.fn(() => Promise.resolve({}));
+    const buildSpy = vi.fn(() => ORDERS_SPEC as never);
+    const localed: SystemReportDef = { ...derived, key: 'idioma', derive: deriveSpy, build: buildSpy };
+    const { call } = setup({ systemReports: [...SYSTEM, localed] });
+
+    await call('GET', '/reports/system/:key', { params: { key: 'idioma' }, query: { preset: 'today' }, locale: 'en-US' });
+
+    expect(deriveSpy).toHaveBeenCalledWith(expect.objectContaining({ locale: 'en-US' }));
+    // The first build is assembly's own check, which has no reader.
+    expect(buildSpy).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'en-US' }));
+  });
+
+  it('runs a grain the report does not offer as its first offered grain', async () => {
+    const { call } = setup({ systemReports: [...SYSTEM, derived] });
+
+    const response = await call('GET', '/reports/system/:key', {
+      params: { key: 'meta' },
+      query: { preset: 'today', grain: 'month' },
+    });
+
+    expect(data<{ grain: string }>(response).grain).toBe('day');
   });
 });
 
@@ -855,3 +963,137 @@ describe('the ENGINE\'s words follow the reader too', () => {
   });
 });
 
+
+describe('the e-mail delivery schedule (FUT-776)', () => {
+  const body = {
+    name: 'Semanal',
+    spec: ORDERS_SPEC,
+    schedule: { enabled: true, cadence: 'weekly', weekday: 1, time: '08:00', recipients: ['user-2'] },
+  };
+  const scheduleOf = (response: ReportResponse): unknown =>
+    (response.body as { data: { schedule?: unknown } }).data.schedule;
+
+  it('is stamped with the store zone and persisted on create', async () => {
+    const harness = setup({ seed: [] });
+    const created = await harness.call('POST', '/reports/custom', { body });
+    expect(created.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual({
+      ...body.schedule,
+      timeZone: 'America/Sao_Paulo',
+      startsOn: '2026-07-14',
+    });
+  });
+
+  it('is echoed to an author and hidden from a reader, since it names people', async () => {
+    const harness = setup({ seed: [] });
+    await harness.call('POST', '/reports/custom', { body });
+    const id = harness.stored()[0]?.id ?? '';
+    const asAuthor = await harness.call('GET', '/reports/custom/:id', { params: { id } });
+    const asReader = await harness.call('GET', '/reports/custom/:id', {
+      params: { id },
+      actor: actor({ permissions: ['sales:read'] }),
+    });
+    expect(scheduleOf(asAuthor)).toMatchObject({ cadence: 'weekly', recipients: ['user-2'] });
+    expect(scheduleOf(asReader)).toBeNull();
+  });
+
+  it('is kept when an update omits it and removed by an explicit null', async () => {
+    const harness = setup({ seed: [] });
+    await harness.call('POST', '/reports/custom', { body });
+    const id = harness.stored()[0]?.id ?? '';
+    const withoutSchedule = { name: body.name, spec: body.spec };
+    await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: withoutSchedule });
+    expect(harness.stored()[0]?.schedule).toMatchObject({ enabled: true });
+    await harness.call('PUT', '/reports/custom/:id', { params: { id }, body: { ...withoutSchedule, schedule: null } });
+    expect(harness.stored()[0]?.schedule).toBeNull();
+  });
+
+  it('refuses an enabled schedule with no recipient', async () => {
+    const harness = setup({ seed: [] });
+    const refused = await harness.call('POST', '/reports/custom', {
+      body: { ...body, schedule: { ...body.schedule, recipients: [] } },
+    });
+    expect(refused.status).toBe(422);
+  });
+});
+
+describe('the schedule through a parked edit and its publish (FUT-776)', () => {
+  const parked = (schedule: unknown): Record<string, unknown> => ({
+    name: 'Publicado',
+    spec: ORDERS_SPEC,
+    schedule,
+  });
+  const weekly = { enabled: true, cadence: 'weekly', weekday: 1, time: '08:00', recipients: ['user-2'] };
+  const PARK = '/reports/custom/:id/working-copy' as const;
+  const PUBLISH = '/reports/custom/:id/working-copy/publish' as const;
+  const stamped = {
+    ...weekly,
+    timeZone: 'America/Sao_Paulo',
+    startsOn: '2026-07-01',
+  };
+
+  it('accepts parking an enabled schedule with nobody ticked yet', async () => {
+    const harness = setup();
+    const response = await harness.call('PUT', PARK, {
+      params: { id: 'r1' },
+      body: parked({ ...weekly, recipients: [] }),
+    });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.workingCopy).toMatchObject({ schedule: { recipients: [] } });
+  });
+
+  it('refuses publishing that schedule (422) and writes nothing', async () => {
+    const harness = setup();
+    const before = harness.stored()[0];
+    const response = await harness.call('POST', PUBLISH, {
+      params: { id: 'r1' },
+      body: parked({ ...weekly, recipients: [] }),
+    });
+    expect(response.status).toBe(422);
+    expect(harness.stored()[0]).toEqual(before);
+  });
+
+  it('publishes a schedule stamped with the store zone and the first-send date, and clears the park', async () => {
+    const harness = setup({ seed: [record({ workingCopy: { name: 'x', spec: ORDERS_SPEC } })] });
+    const response = await harness.call('POST', PUBLISH, { params: { id: 'r1' }, body: parked(weekly) });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual({ ...stamped, startsOn: '2026-07-14' });
+    expect(harness.stored()[0]?.workingCopy).toBeNull();
+  });
+
+  it('keeps the stored schedule when the publish body does not mention it', async () => {
+    const harness = setup({ seed: [record({ schedule: stamped })] });
+    const response = await harness.call('POST', PUBLISH, {
+      params: { id: 'r1' },
+      body: { name: 'Publicado', spec: ORDERS_SPEC },
+    });
+    expect(response.status).toBe(200);
+    expect(harness.stored()[0]?.schedule).toEqual(stamped);
+  });
+
+  it('removes it on an explicit null', async () => {
+    const harness = setup({ seed: [record({ schedule: stamped })] });
+    await harness.call('POST', PUBLISH, { params: { id: 'r1' }, body: parked(null) });
+    expect(harness.stored()[0]?.schedule).toBeNull();
+  });
+
+  it('refuses a zone or anchor the client names, on the park', async () => {
+    const harness = setup();
+    for (const extra of [{ timeZone: 'UTC' }, { startsOn: '2026-01-01' }]) {
+      const response = await harness.call('PUT', PARK, {
+        params: { id: 'r1' },
+        body: parked({ ...weekly, ...extra }),
+      });
+      expect(response.status).toBe(422);
+    }
+  });
+
+  it('never erases a stored schedule on an update that omits it', async () => {
+    const harness = setup({ seed: [record({ schedule: { unreadable: 'shape from a newer release' } })] });
+    await harness.call('PUT', '/reports/custom/:id', {
+      params: { id: 'r1' },
+      body: { name: 'Renomeado', spec: ORDERS_SPEC },
+    });
+    expect(harness.stored()[0]?.schedule).toEqual({ unreadable: 'shape from a newer release' });
+  });
+});

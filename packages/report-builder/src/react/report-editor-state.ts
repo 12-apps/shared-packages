@@ -11,6 +11,7 @@ import {
 import { useAutosave, type AutosaveState } from "./lib/use-autosave";
 import { useUnsavedChanges } from "./lib/use-unsaved-changes";
 import type { PublishDraft } from "./lib/publish-section";
+import type { ScheduleDraft } from "./lib/schedule-draft";
 import type { EditorSource, PersistedEditorState } from "./report-editor-source";
 import type { ReportDraft } from "./report-model";
 import { documentGuardError, sendSave } from "./report-editor-writes";
@@ -101,6 +102,8 @@ interface ReportEditorState {
   /** The period the SAVED report will open on — persisted, unlike `range`. */
   defaultRange: ReportRollingRange;
   setDefaultRange: (next: ReportRollingRange) => void;
+  schedule: ScheduleDraft | null;
+  setSchedule: (next: ScheduleDraft | null) => void;
   error: string | null;
   saving: boolean;
   dirty: boolean;
@@ -118,6 +121,8 @@ interface DocumentState {
   setRange: (next: ReportRange) => void;
   defaultRange: ReportRollingRange;
   setDefaultRange: (next: ReportRollingRange) => void;
+  schedule: ScheduleDraft | null;
+  setSchedule: (next: ScheduleDraft | null) => void;
   /** Put a whole state back on screen — what discarding an edit lands on. */
   reset: (state: PersistedEditorState) => void;
 }
@@ -126,6 +131,7 @@ function useDocumentState(initial: PersistedEditorState): DocumentState {
   const [draft, setDraft] = useState<ReportDraft>(initial.draft);
   const [publish, setPublish] = useState<PublishDraft>(initial.publish);
   const [defaultRange, setDefaultRange] = useState<ReportRollingRange>(initial.defaultRange);
+  const [schedule, setSchedule] = useState<ScheduleDraft | null>(initial.schedule);
   // The preview STARTS on the report's own default: the editor should open on
   // the period the reader will (FUT-755). It is then free to differ — moving
   // the toggle previews another window without changing what is stored.
@@ -140,10 +146,13 @@ function useDocumentState(initial: PersistedEditorState): DocumentState {
     setRange,
     defaultRange,
     setDefaultRange,
+    schedule,
+    setSchedule,
     reset: (state) => {
       setDraft(state.draft);
       setPublish(state.publish);
       setDefaultRange(state.defaultRange);
+      setSchedule(state.schedule);
     },
   };
 }
@@ -244,6 +253,7 @@ export function useEditorState(
     draft: document.draft,
     publish: document.publish,
     defaultRange: document.defaultRange,
+    schedule: document.schedule,
   };
   const { dirty, markSaved } = useUnsavedChanges({
     current: persisted,

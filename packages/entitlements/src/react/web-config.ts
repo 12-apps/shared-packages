@@ -4,7 +4,7 @@
  */
 import type { ComponentType, ReactNode } from 'react';
 
-import type { EntitlementsWebCopy } from './copy';
+import type { EntitlementsWebCopy, ResolvedEntitlementsWebCopy } from './copy';
 
 /** Where the tenant's own switch for a feature lives, as the HOST routes it. */
 export interface TenantSwitchLocation {
@@ -75,7 +75,7 @@ export interface ResolvedWebConfig {
   apiBase: string;
   fetchImpl: typeof fetch;
   canRequestPlanChange: boolean;
-  copy: EntitlementsWebCopy;
+  copy: ResolvedEntitlementsWebCopy;
   switchLocation: (feature: string) => TenantSwitchLocation | null;
   plansPath: string | null;
   featuresPath: string | null;

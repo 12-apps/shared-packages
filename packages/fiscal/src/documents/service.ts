@@ -13,7 +13,7 @@
 import type { IssuerFailure } from "../issuer/port";
 import { FISCAL_ISSUE } from "../manifest/permissions";
 import type { LookedUpDocument } from "../sidecar/types";
-import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertReason, issuerOf, totalsOf, xmlKeys } from "./context";
+import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertDraftFits, assertReason, issuerOf, totalsOf, xmlKeys } from "./context";
 import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
@@ -80,6 +80,7 @@ async function issue(deps: Deps, input: IssueInput): Promise<FiscalDocument> {
   if (existing !== null) return existing;
   const signing = await deps.ctx.material(profile);
   const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: input.subjectId, model: input.model });
+  assertDraftFits(draft, input.model);
   const numbered = await numberOrExisting(deps, input, () =>
     deps.ctx.createNumbered({ profile, point, subjectId: input.subjectId, model: input.model, seriesKind: "ONLINE", draft }),
   );
@@ -94,6 +95,7 @@ async function issueOffline(deps: Deps, input: Omit<IssueInput, "model">): Promi
   if (existing !== null) return existing;
   const signing = await deps.ctx.material(profile);
   const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: input.subjectId, model: "NFCE" });
+  assertDraftFits(draft, "NFCE");
   const numbered = await numberOrExisting(deps, target, () =>
     deps.ctx.createNumbered({ profile, point, subjectId: input.subjectId, model: "NFCE", seriesKind: "CONTINGENCY", draft }),
   );
@@ -127,6 +129,7 @@ async function resendContingency(deps: Deps, input: { ownerId: string; documentI
   }
   const profile = await deps.ctx.requireProfile(input.ownerId);
   const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: document.subjectId, model: document.model });
+  assertDraftFits(draft, document.model);
   const totals = totalsOf(draft);
   const buyerTaxId = draft.buyer?.document.number ?? null;
   if (printedFieldsChange(document, totals, buyerTaxId)) {

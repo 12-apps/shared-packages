@@ -976,3 +976,30 @@ export const SelectedKeepsItsFill: Story = {
     await waitFor(() => expect(alphaOf(getComputedStyle(day).backgroundColor)).toBe(1));
   },
 };
+
+/** FUT-4063: the chosen option drawn neutral, whatever the brand colour. */
+export const QuietSelection: Story = {
+  args: {
+    variant: 'exclusive',
+    selection: 'quiet',
+    size: 'sm',
+    options: [
+      { value: 'day', label: 'Dia' },
+      { value: 'week', label: 'Semana' },
+    ],
+    value: 'week',
+    dataTestId: 'quiet-grain',
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step('The chosen option is pressed and ringed in the text ink, not filled', async () => {
+      const week = canvas.getByTestId('quiet-grain-item-week');
+      await expect(week).toHaveAttribute('aria-pressed', 'true');
+      const style = getComputedStyle(week);
+      await expect(style.boxShadow).toContain('inset');
+      // Neutral: the ink's channels are equal (a grey), never a hue.
+      const [r = 0, g = 0, b = 0] = (style.color.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+      await expect(r === g && g === b).toBe(true);
+    });
+  },
+};

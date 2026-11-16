@@ -23,7 +23,11 @@
  * against its own `/api/admin/...` endpoints. See ADOPTING.md.
  */
 export { createWebReportBuilder, type ReportBuilderConfig } from './create-report-builder';
-export { httpTransport, type ReportBuilderTransport } from './transport';
+export {
+  httpTransport,
+  type HttpTransportOptions,
+  type ReportBuilderTransport,
+} from './transport';
 
 /**
  * The vocabulary a host declares, and the types it declares it in.
@@ -35,8 +39,10 @@ export { httpTransport, type ReportBuilderTransport } from './transport';
  * is the shape they are declared in; the entries themselves are the host's, and
  * travel INTO the surface rather than out of it.
  */
-export type { ReportBuilderSurface } from './transport-context';
+export type { ReportBuilderSurface, ReportPeriodSurface } from './transport-context';
+export type { ReportScheduleSurface, ScheduleRecipient } from "./schedule-surface";
 export type {
+  ReportNote,
   SystemDashboardDef,
   SystemReportDef,
   SystemReportNavEntry,
@@ -86,4 +92,5 @@ export type {
   ReportBuilderPanelCopy,
   ReportSettingsCopy,
   ReportChoiceCardCopy,
+  ReportTransportErrorCopy,
 } from './screens-copy';

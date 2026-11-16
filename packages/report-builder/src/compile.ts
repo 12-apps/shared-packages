@@ -1,5 +1,10 @@
 import { invalidSpecError, unknownEntityError, unknownFieldError } from './errors';
-import { assertChartShape, assertKpiShape } from './presentation-shape';
+import {
+  assertChartShape,
+  assertHeatmapShape,
+  assertKpiShape,
+  assertRowFlagShape,
+} from './presentation-shape';
 import type { ReportDimension, ReportFilter, ReportMeasure, ReportSpec } from './spec';
 import { isValidTimeZone } from './time';
 import { PERCENTILE_AGGREGATIONS } from './types';
@@ -137,6 +142,8 @@ function compileDimension(entity: string, def: EntityDef, dim: ReportDimension):
     field: dim.field,
     timeGrain: grain,
     alias: grain ? `${dim.field}_${grain}` : dim.field,
+    ...(dim.label !== undefined ? { label: dim.label } : {}),
+    ...(dim.bucketFormat !== undefined ? { bucketFormat: dim.bucketFormat } : {}),
   };
 }
 
@@ -189,6 +196,8 @@ function compileMeasure(entity: string, def: EntityDef, measure: ReportMeasure):
     ...(denominatorField ? { denominatorField } : {}),
     ...(minSample !== undefined ? { minSample } : {}),
     format: resolveFormat(field, aggregation, measure.format),
+    ...(measure.decimals !== undefined ? { decimals: measure.decimals } : {}),
+    ...(measure.label !== undefined ? { label: measure.label } : {}),
   };
 }
 
@@ -341,6 +350,8 @@ export function compileReport(
   assertUniqueAliases(dimensions, measures);
   assertChartShape(spec, dimensions);
   assertKpiShape(spec, dimensions);
+  assertHeatmapShape(spec, dimensions);
+  assertRowFlagShape(spec, dimensions, measures);
   const filters = spec.filters.map((filter) => compileFilter(spec.entity, entityDef, filter));
   assertIdentitySuppression(
     entityDef,

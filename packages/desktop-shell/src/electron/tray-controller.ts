@@ -1,8 +1,9 @@
-import { Menu, Tray } from "electron";
+import { Menu, shell, Tray } from "electron";
 
 import type { Autostart } from "../autostart";
 import type { ShellStatus } from "../status";
 
+import { createAutostartToggle } from "./autostart-toggle";
 import { buildTrayMenu, type TrayActions, type TrayCopy } from "./tray-menu";
 
 /**
@@ -42,18 +43,13 @@ export async function createTrayController(
   const tray = new Tray(options.icons.starting);
   const view = { autostartEnabled: await options.autostart.isEnabled() };
 
-  /**
-   * Flip autostart and read the answer BACK.
-   *
-   * Every platform can refuse silently — a policy, a read-only home, a sandbox
-   * — and a checkbox that ticks itself on a change that did not happen is
-   * worse than one that refuses to move.
-   */
-  async function toggleAutostart(): Promise<void> {
-    await options.autostart.set(!view.autostartEnabled);
-    await refreshAutostart();
-    await options.onAutostartToggled?.();
-  }
+  const toggleAutostart = createAutostartToggle({
+    autostart: options.autostart,
+    openExternal: (url) => shell.openExternal(url),
+    refresh: () => refreshAutostart(),
+    enabled: () => view.autostartEnabled,
+    ...(options.onAutostartToggled === undefined ? {} : { onToggled: options.onAutostartToggled }),
+  });
 
   async function refreshAutostart(): Promise<void> {
     view.autostartEnabled = await options.autostart.isEnabled();
@@ -69,6 +65,7 @@ export async function createTrayController(
           status,
           copy: options.copy,
           autostartEnabled: view.autostartEnabled,
+          autostartManagedBySystem: options.autostart.managedBySystem === true,
           actions: { ...options.actions, toggleAutostart: () => void toggleAutostart() },
         }),
       ),

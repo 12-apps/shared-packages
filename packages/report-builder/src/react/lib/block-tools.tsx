@@ -23,11 +23,12 @@
 import { useCallback, useEffect, useState, type JSX } from "react";
 
 import { exportColumnsFor } from "../report-render";
-import type { ReportRender } from "../reports-api";
+import type { ReportNoteView, ReportRender } from "../reports-api";
 import { exportRows } from "./export-rows";
+import { noteCsvLines } from "./report-notes";
 import { Glyph } from "./glyph";
 import { OverflowToolCluster, type BlockTool } from "./tool-cluster";
-import { useReportCopy, useReportEngineCopy } from "../transport-context";
+import { useReportCopy, useReportEngineCopy, useReportSurface } from "../transport-context";
 
 /** Grid — "show me the numbers this was drawn from". */
 function TableGlyph(): JSX.Element {
@@ -153,7 +154,7 @@ export function BlockToolCluster({
   renderTestId: string;
   menuTestId: string;
   /** Omitted where the page exports from its own toolbar instead. */
-  csv?: { filename: string; dataTestId: string };
+  csv?: { filename: string; dataTestId: string; notes?: readonly ReportNoteView[] };
   /**
    * Offer "expand" while a table is on screen — set where the block BOUNDS its
    * table (a dashboard), never on a report's own page, which draws it whole.
@@ -161,7 +162,8 @@ export function BlockToolCluster({
   expandable?: boolean;
 }): JSX.Element | null {
   const copy = useReportEngineCopy();
-  const words = useReportCopy().screens.builder;
+  const { builder: words, system: systemWords } = useReportCopy().screens;
+  const { formatBucket } = useReportSurface();
   const { render } = view;
   const tools: BlockTool[] = [];
   if (view.canToggle) {
@@ -189,7 +191,13 @@ export function BlockToolCluster({
       label: words.downloadCsv,
       icon: <DownloadGlyph />,
       onSelect: () => {
-        exportRows("csv", render.rows, exportColumnsFor(render, copy.values), csv.filename);
+        exportRows(
+          "csv",
+          render.rows,
+          exportColumnsFor(render, copy.values, formatBucket),
+          csv.filename,
+          noteCsvLines(csv.notes, systemWords),
+        );
       },
       dataTestId: csv.dataTestId,
     });

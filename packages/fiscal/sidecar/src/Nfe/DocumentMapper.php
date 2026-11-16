@@ -21,6 +21,8 @@ use Throwable;
 final class DocumentMapper
 {
     private const PURPOSE = ['NORMAL' => 1, 'COMPLEMENTARY' => 2, 'ADJUSTMENT' => 3, 'RETURN' => 4];
+    /** `tpNF`. An absent `operation` is `OUT`: a document built before the field existed is unchanged. */
+    private const OPERATION = ['IN' => 0, 'OUT' => 1];
     private const DESTINATION = ['INTERNAL' => 1, 'INTERSTATE' => 2, 'FOREIGN' => 3];
     private const PRESENCE = [
         'IN_PERSON' => 1,
@@ -77,6 +79,15 @@ final class DocumentMapper
     public const LAYOUT_LIMIT = '2027-01-01';
     public const LAYOUT_LIMIT_CODE = 'NT_2026_008_NOT_SUPPORTED';
 
+    /** A return (`finNFe` 4) quotes the document it returns (`NFref`); one without a reference is refused. */
+    public const RETURN_NEEDS_REFERENCE_CODE = 'RETURN_NEEDS_REFERENCE';
+
+    /**
+     * An NFC-e has no return purpose: a buyer's goods come back on an NF-e
+     * (model 55) of entry that references the NFC-e's key.
+     */
+    public const RETURN_ON_NFCE_CODE = 'RETURN_ON_NFCE';
+
     /**
      * @param array<string, mixed> $document
      * @param array{since: string, reason: string}|null $contingency an NFC-e signed offline (`tpEmis = 9`)
@@ -86,6 +97,7 @@ final class DocumentMapper
     public function build(array $document, Model $model, int $environment, ?array $contingency = null): array
     {
         self::refuseWhatThisLayoutCannotSay($document);
+        self::refuseAReturnItCannotBe($document, $model);
         $make = new Make(NfeModule::SCHEMES);
         $make->setOnlyAscii(false);
         $make->setCheckGtin(true);
@@ -135,6 +147,36 @@ final class DocumentMapper
         }
     }
 
+    /**
+     * @param array<string, mixed> $document
+     * @throws ServiceError INVALID, coded, when the purpose and the model or the references disagree
+     */
+    private static function refuseAReturnItCannotBe(array $document, Model $model): void
+    {
+        $isReturn = $document['purpose'] === 'RETURN';
+        if ($model === Model::NFCE && $isReturn) {
+            throw new ServiceError(
+                \Fiscal\Sidecar\ErrorClass::INVALID,
+                'An NFC-e has no return purpose: a return is an NF-e (model 55) of entry referencing the NFC-e.',
+                self::RETURN_ON_NFCE_CODE,
+            );
+        }
+        if ($model === Model::NFCE && ($document['operation'] ?? 'OUT') === 'IN') {
+            throw ServiceError::invalid('An NFC-e is an outgoing document.', ['operation: an NFC-e takes "OUT" (tpNF 1)']);
+        }
+        if ($model === Model::NFCE && ($document['referencedDocuments'] ?? []) !== []) {
+            // SEFAZ rejects NFref on a model 65 with 708, after the number is spent.
+            throw ServiceError::invalid('An NFC-e references no document.', ['referencedDocuments: an NFC-e takes none (708)']);
+        }
+        if ($isReturn && ($document['referencedDocuments'] ?? []) === []) {
+            throw new ServiceError(
+                \Fiscal\Sidecar\ErrorClass::INVALID,
+                'A return must reference the document it returns (referencedDocuments).',
+                self::RETURN_NEEDS_REFERENCE_CODE,
+            );
+        }
+    }
+
     /** @param array<string, mixed> $d */
     private function header(Make $make, array $d, Model $model, int $environment, ?array $contingency): void
     {
@@ -149,7 +191,7 @@ final class DocumentMapper
             'nNF' => $d['number'],
             'dhEmi' => $d['issuedAt'],
             'dhSaiEnt' => null,
-            'tpNF' => 1,
+            'tpNF' => self::OPERATION[$d['operation'] ?? 'OUT'],
             'idDest' => self::DESTINATION[$d['destination']],
             'cMunFG' => $d['issuer']['address']['municipalityIbge'],
             'tpImp' => $model === Model::NFCE ? 4 : 1,
@@ -167,6 +209,9 @@ final class DocumentMapper
             'dhCont' => $contingency['since'] ?? null,
             'xJust' => $contingency['reason'] ?? null,
         ]);
+        foreach ($d['referencedDocuments'] ?? [] as $referenced) {
+            $make->tagrefNFe((object) ['refNFe' => $referenced['accessKey']]);
+        }
     }
 
     /** @param array<string, mixed> $d */

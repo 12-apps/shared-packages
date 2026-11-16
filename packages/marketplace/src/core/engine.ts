@@ -32,6 +32,8 @@ import {
 } from "./catalogue";
 import { runCatalogue, type CatalogueJobPayload, type CatalogueOutcome } from "./catalogue-job";
 import type { CatalogueMenuOptions } from "./catalogue-port";
+import { readMarketplaceCatalogue } from "./catalogue-read";
+import type { CatalogueReadResult } from "./catalogue-read-port";
 import type { CataloguePublicationView } from "./catalogue-store";
 import {
   runFetchOrder,
@@ -218,6 +220,12 @@ export interface MarketplaceEngine {
     provider: MarketplaceProvider;
     options: CatalogueMenuOptions;
   }): Promise<CatalogueDocumentResult>;
+  /**
+   * Read the menu the store keeps on a marketplace, through its own
+   * connection (FUT-951): the snapshot, a final refusal, or a `retry` (429,
+   * 5xx, a timeout). Calls the marketplace at once; nothing is queued.
+   */
+  readCatalogue(input: { clientId: string; provider: MarketplaceProvider; now?: Date }): Promise<CatalogueReadResult>;
   /** Run one queued publish or withdraw (the `marketplace.catalogue` job's body). */
   runCatalogue(payload: CatalogueJobPayload, attempt: OutboundAttempt): Promise<CatalogueOutcome>;
 
@@ -310,6 +318,7 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     catalogueState: (input) => readCatalogueState(ctx, input),
     catalogueDocument: (input) => readCatalogueDocument(ctx, input),
     runCatalogue: (payload, attempt) => runCatalogue(ctx, payload, attempt),
+    readCatalogue: (input) => readMarketplaceCatalogue(ctx, input),
 
     pauseStore: (input) => pauseStore(ctx, input),
     resumeStore: (input) => resumeStore(ctx, input),

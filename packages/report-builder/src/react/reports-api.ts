@@ -6,9 +6,9 @@
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { apiFetch } from "./lib/api";
 import type { ChartSpec } from "@12-apps/ui/charts";
 import type { ReportRangeCopy } from "./screens-copy";
+import { useTransport } from "./transport-context";
 
 /**
  * The presets that resolve against the CLOCK, narrow → wide-ish.
@@ -35,7 +35,13 @@ export type ReportRollingRange = (typeof REPORT_ROLLING_RANGES)[number];
  * a 400 from a control that looked fine.
  */
 export const REPORT_RANGES = [...REPORT_ROLLING_RANGES, "custom"] as const;
-export type ReportRange = (typeof REPORT_RANGES)[number];
+/**
+ * A period a screen may hold. `week` ("Esta semana", FUT-4063) is a rolling
+ * preset a BUILT-IN may offer through its `ranges`; it is kept out of
+ * {@link REPORT_ROLLING_RANGES} because a saved report's stored default is
+ * CHECK-constrained to those four.
+ */
+export type ReportRange = (typeof REPORT_RANGES)[number] | "week";
 
 /**
  * The period labels, from the host's own words.
@@ -121,6 +127,10 @@ export interface SystemReportSummary {
   description: string;
   presentation: "chart" | "table";
   supportsGrain: boolean;
+  /** The grains its toggle offers (FUT-4063); absent means all three. */
+  grains?: ReportGrain[];
+  grainLabel?: string;
+  ranges?: ReportRange[];
 }
 
 type ReportRowValue = string | number | boolean | null;
@@ -134,11 +144,103 @@ export interface ReportTableColumn {
    * values are seconds and `percent` values a 0-1 ratio (FUT-454).
    */
   format: "brl" | "integer" | "decimal" | "text" | "duration" | "percent";
+  /** The measure's declared fraction digits (FUT-4063); absent unless declared. */
+  decimals?: number;
+  /** A dimension's closed set, labelled (FUT-4063): cells read the label, not the stored value. */
+  valueLabels?: Record<string, string>;
+  /** The spec's host format key for the values, and the bucket's grain (FUT-4063). */
+  bucketFormat?: string;
+  grain?: ReportGrain;
+}
+
+/** One measure on a phone card line, with the host's words after it (FUT-4063). */
+export interface ReportCardPart {
+  measure: string;
+  suffix?: string;
+  /** The suffix when the value is exactly 1 (FUT-4063): " pessoa" beside " pessoas". */
+  suffixOne?: string;
+  /** What joins this part to the previous subtitle part (FUT-4063); default " · ". */
+  joiner?: string;
+  /** The part's whole text when its value is empty (FUT-4063), e.g. "sem custo". */
+  emptyText?: string;
+}
+
+/** A table's opt-in phone form (FUT-4063): each row a stacked card below `md`. */
+export interface ReportPhoneCards {
+  layout: "cards";
+  /** When the cards replace the table: below `md` (default), always, or below this block width in px. */
+  below?: "md" | "always" | number;
+  title?: string;
+  figure?: string;
+  figureCaption?: ReportCardPart;
+  subtitle?: ReportCardPart[];
 }
 
 /** Rendered report: a table model or a `@12-apps/ui` chart spec, plus rows. */
+/** A table presentation's row flag, as a spec carries it (FUT-4063). */
+export interface ReportRowFlagWire {
+  measure: string;
+  above: number;
+  label: string;
+  whenEmpty?: { measure: string };
+}
+
+/** The heat map presentation, as a spec carries it (FUT-4063). */
+/** A table presentation's phone cards, as a spec carries them (FUT-4063). */
+export type ReportPhoneCardsWire = ReportPhoneCards;
+
+export interface ReportHeatmapPresentationWire {
+  kind: "heatmap";
+  target: number;
+  strongAbove?: number;
+  strongBelow?: number;
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
+  /** Drop the empty leading/trailing rows and/or columns (FUT-4063). */
+  trimEdges?: "rows" | "columns" | "both";
+}
+
+/** A table's flagged rows (FUT-4063): the judged column, the flag's words, row indices. */
+export interface ReportTableFlag {
+  column: string;
+  label: string;
+  rows: number[];
+}
+
+/** The heat map's render model (FUT-4063), as the server ships it. */
+export interface ReportHeatmapRender {
+  kind: "heatmap";
+  rowAxis: Array<{ key: string; label: string }>;
+  columnAxis: Array<{ key: string; label: string }>;
+  cells: Array<{ row: string; column: string; value: number | null; reason?: "unmeasured" }>;
+  scale: { target: number; strongAbove?: number; strongBelow?: number };
+  labels: { above: string; below: string; empty: string; unmeasured?: string };
+  valueFormat: ReportTableColumn["format"];
+  valueDecimals?: number;
+  /** The long form — the dimensions, then the measure — for CSV and the table view. */
+  tableColumns: ReportTableColumn[];
+  rows: ReportRow[];
+}
+
+/** One thing a built-in says about its own data (FUT-4063); see the server's `ReportNote`. */
+export interface ReportNoteView {
+  key: string;
+  text: string;
+  items?: string[];
+  figure?: number;
+  action?: { label: string; href: string };
+  /** On the phone, the note sits below its block's card (FUT-4063). */
+  phone?: "below";
+}
+
 export type ReportRender =
-  | { kind: "table"; columns: ReportTableColumn[]; rows: ReportRow[] }
+  | {
+      kind: "table";
+      columns: ReportTableColumn[];
+      rows: ReportRow[];
+      flag?: ReportTableFlag;
+      phone?: ReportPhoneCards;
+    }
+  | ReportHeatmapRender
   | {
       kind: "chart";
       chartSpec: ChartSpec;
@@ -172,6 +274,9 @@ export type ReportRender =
         value: number | null;
         suppressed?: boolean;
         format: "brl" | "percent" | "compact" | "integer" | "decimal" | "duration";
+        decimals?: number;
+        /** Present when the presentation's target flag marks this figure (FUT-4063). */
+        flag?: { label: string };
       }>;
       rows: ReportRow[];
     };
@@ -182,28 +287,26 @@ interface SystemReportResult {
   title: string;
   description: string;
   supportsGrain: boolean;
+  grains?: ReportGrain[];
   range: { preset: string; from: string; toExclusive: string };
   grain: ReportGrain;
   render: ReportRender;
-}
-
-/** Success envelope shared by the whole `/api/admin/**` surface. */
-interface ApiEnvelope<T> {
-  data: T;
+  /** What the report says about its data (FUT-4063); absent before that. */
+  notes?: ReportNoteView[];
 }
 
 function adminPath(tenantSlug: string, path: string): string {
   return `/api/admin/${encodeURIComponent(tenantSlug)}${path}`;
 }
 
-async function adminFetch<T>(path: string): Promise<T> {
-  const { data } = await apiFetch<ApiEnvelope<T>>(path);
-  return data;
-}
-
 /**
  * Run one built-in report. Range and grain are part of the query key, so
  * switching either re-queries while previously loaded frames stay cached.
+ *
+ * Read through the transport in scope, like every other call this surface
+ * makes, so a failure reads in the host's words (FUT-4070) and a host's own
+ * transport sees this read too. It used to call a private `fetch` that threw
+ * `HTTP <status> for <path>` in English.
  */
 export function useSystemReport(
   tenantSlug: string,
@@ -211,10 +314,11 @@ export function useSystemReport(
   range: ReportRange,
   grain: ReportGrain,
 ): UseQueryResult<SystemReportResult> {
+  const transport = useTransport();
   return useQuery({
     queryKey: ["admin", tenantSlug, "reports", "system", reportKey, range, grain],
     queryFn: () =>
-      adminFetch<SystemReportResult>(
+      transport.get<SystemReportResult>(
         adminPath(
           tenantSlug,
           `/reports/system/${encodeURIComponent(reportKey)}?preset=${range}&grain=${grain}`,

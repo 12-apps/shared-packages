@@ -118,6 +118,32 @@ export interface ComparisonTableCopy {
   excluded: string;
 }
 
+/**
+ * The per-screen plan comparison (`PlanCompareDialog`): a screen's own rows,
+ * side by side across the tiers on sale. Its marks and column heading are
+ * {@link ComparisonTableCopy}'s, and its ask is {@link UpsellHostCopy}'s, so
+ * the two sale surfaces cannot word the same act two ways.
+ */
+export interface PlanCompareCopy {
+  /** The dialog's title. */
+  title: string;
+  /** Over the tenant's own tier column. */
+  currentBadge: string;
+  /** Over the tier the dialog offers — so the table points at the ask below it. */
+  offeredBadge: string;
+  /**
+   * When none of the screen's rows is in the payload — said, never blank, and
+   * pointing at the next step (the all-plans link), not at the host's wiring.
+   */
+  empty: string;
+  /** When the tenant's own tier already includes every compared row: no sale. */
+  alreadyIncluded: string;
+  /** The retry on the load-failed state. */
+  retry: string;
+  /** The close button's accessible name. */
+  closeLabel: string;
+}
+
 export interface UpsellHostCopy {
   /**
    * The dialog's title/body per reason. Total over {@link UpsellReason} so a
@@ -169,6 +195,17 @@ export interface EntitlementsWebCopy {
   planPage: PlanPageCopy;
   tierCards: TierCardsCopy;
   comparisonTable: ComparisonTableCopy;
+  /**
+   * Optional so a host's hand-written copy object from before FUT-5062 keeps
+   * compiling. The package has no notion of the active locale (the host picks
+   * a pack by hand), so a missing block falls back to the en-US pack's —
+   * `createWebEntitlements` fills it. A pt-BR host passing its own object
+   * should add it; the named packs already carry it.
+   */
+  planCompare?: PlanCompareCopy;
   upsell: UpsellHostCopy;
   pageLock: PageLockCopy;
 }
+
+/** The copy as the screens read it: every optional block resolved. */
+export type ResolvedEntitlementsWebCopy = EntitlementsWebCopy & { planCompare: PlanCompareCopy };

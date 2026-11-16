@@ -97,6 +97,7 @@ export const EN_US_REPORT_ENGINE_COPY: ReportEngineCopy = {
     othersBucket: 'Other',
     emptySplit: '(no value)',
     emptyTable: 'No data for this period.',
+    heatmapUnmeasured: 'not measured',
   },
   // Each of these says what is WRONG and what to do about it — either change
   // the field or pick a different presentation. A translation that kept only

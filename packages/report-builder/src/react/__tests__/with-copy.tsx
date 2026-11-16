@@ -19,7 +19,7 @@ import { ReportBuilderProvider } from "../transport-context";
 function CopyWrapper({ children }: { children: ReactNode }): JSX.Element {
   return (
     <ReportBuilderProvider
-      transport={httpTransport()}
+      transport={httpTransport({ errors: PT_BR_REPORT_SCREENS_COPY.errors })}
       tenantSlug="acme"
       surface={{
         systemReports: [],

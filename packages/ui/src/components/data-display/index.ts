@@ -13,6 +13,8 @@ export * from './DayRuler';
 export * from './DescriptionItem';
 export * from './EmptyState/EmptyState';
 export * from './ErrorState';
+export * from './HeatMap';
+export * from './ShareBar';
 export * from './HoverCard';
 export * from './InteractiveTooltip';
 export * from './LazyImage';

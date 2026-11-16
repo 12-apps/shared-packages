@@ -20,6 +20,7 @@ import {
   gradientLook,
   gradientWorstContrast,
   holdsInEveryState,
+  setGradientCacheLimit,
   stepStopForInk,
   sweepHolds,
   type GradientBasis,
@@ -138,14 +139,28 @@ describe('Given the derivation is memoised', () => {
   });
 
   it('keeps the cache bounded', () => {
+    // A derivation is a few thousand contrast evaluations (~6 ms), so the bound is lowered to 4 and
+    // eviction costs 5 of them; filling the default 64 took 100 and timed out on a loaded runner.
+    const limit = 4;
     clearGradientCache();
-    const theme = themeOf('light');
-    const before = gradientDerivationCount();
-    for (let i = 0; i < 100; i += 1) gradientLook(theme, { main: '#336699', light: `#33${(i + 16).toString(16)}99`, dark: '#112233' });
-    expect(gradientDerivationCount() - before).toBe(100);
-    // The oldest entries were dropped, so asking again recomputes rather than growing without end.
-    gradientLook(theme, { main: '#336699', light: '#331099', dark: '#112233' });
-    expect(gradientDerivationCount() - before).toBe(101);
+    setGradientCacheLimit(limit);
+    try {
+      const theme = themeOf('light');
+      const palette = (i: number) => ({ main: '#336699', light: `#33${(i + 16).toString(16)}99`, dark: '#112233' });
+      const before = gradientDerivationCount();
+      for (let i = 0; i < limit; i += 1) gradientLook(theme, palette(i));
+      expect(gradientDerivationCount() - before).toBe(limit);
+      // Within the bound nothing is dropped: asking for the oldest again is a hit.
+      gradientLook(theme, palette(0));
+      expect(gradientDerivationCount() - before).toBe(limit);
+      // One past the bound drops the oldest entry, so asking for it again recomputes rather than growing without end.
+      gradientLook(theme, palette(limit));
+      gradientLook(theme, palette(0));
+      expect(gradientDerivationCount() - before).toBe(limit + 2);
+    } finally {
+      setGradientCacheLimit();
+      clearGradientCache();
+    }
   });
 
   it('renders a gradient Alert 50 times with one derivation', () => {

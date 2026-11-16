@@ -180,6 +180,17 @@ Nothing here decides what a payment *means* to your domain. Orders, stock,
 subscription cycles and the copy a buyer reads stay in the host, on its own
 vocabulary.
 
+## Webhook wire schemas
+
+`@12-apps/payments-backend/webhook-wire` exports each provider's strict wire
+schema for the payload it posts (PagBank Order and legacy notification, Stone,
+Stripe, InfinitePay, Itaú Pix) and `webhookWireSchema(provider, payload)`, which
+picks one by provider key (PagBank by payload shape). A host that reports or
+refuses undeclared keys walks these definitions instead of keeping its own
+copies. Walk them; do not `parse` a delivery with them: every documented key is
+required at parse time, and a real delivery may omit one. It needs `zod` (>=4)
+as a peer.
+
 ## Server-only
 
 This package reads credentials and calls provider APIs. It is never imported

@@ -115,6 +115,147 @@ final class DocumentMapperTest extends TestCase
         self::assertSame($contingency['reason'], $x('//n:ide/n:xJust'));
     }
 
+    public function testAReturnIsAnNfeOfEntryThatQuotesTheNfceItReturns(): void
+    {
+        $xml = $this->signed('nfe-return-of-nfce', Model::NFE);
+        $x = self::xpath($xml);
+
+        self::assertXsdValid($xml);
+        self::assertSame('55', $x('//n:ide/n:mod'));
+        self::assertSame('0', $x('//n:ide/n:tpNF'), 'an entry');
+        self::assertSame('4', $x('//n:ide/n:finNFe'), 'a return');
+        self::assertSame('35261111222333000181650010000012011482139076', $x('//n:ide/n:NFref/n:refNFe'));
+        self::assertSame('1202', $x('//n:det[@nItem="1"]/n:prod/n:CFOP'));
+        self::assertSame('90', $x('//n:detPag/n:tPag'));
+    }
+
+    public function testEveryReferencedDocumentIsWrittenInOrder(): void
+    {
+        $document = Fixtures::document('nfe-return-of-nfce');
+        $document['referencedDocuments'][] = ['accessKey' => '35261111222333000181650010000012029482139079'];
+
+        $xml = (new DocumentMapper())->build($document, Model::NFE, 2)['xml'];
+        $x = self::xpath($xml);
+
+        self::assertSame('35261111222333000181650010000012011482139076', $x('//n:ide/n:NFref[1]/n:refNFe'));
+        self::assertSame('35261111222333000181650010000012029482139079', $x('//n:ide/n:NFref[2]/n:refNFe'));
+    }
+
+    /**
+     * The goldens were written by the mapper BEFORE `operation` and
+     * `referencedDocuments` existed (FUT-2238): a document that omits them, or
+     * states their defaults, still builds the very same bytes.
+     *
+     * @return iterable<string, array{string, Model, array{since: string, reason: string}|null, string}>
+     */
+    public static function documentsBuiltBeforeTheReturn(): iterable
+    {
+        yield 'NFC-e' => ['nfce-simples', Model::NFCE, null, 'nfce-simples'];
+        yield 'NF-e' => ['nfe-normal-company-buyer', Model::NFE, null, 'nfe-normal-company-buyer'];
+        $contingency = ['since' => '2026-11-20T12:00:00-03:00', 'reason' => 'SEFAZ fora do ar ha mais de dez minutos'];
+        yield 'offline NFC-e' => ['nfce-simples', Model::NFCE, $contingency, 'nfce-simples-contingency'];
+    }
+
+    /** @param array{since: string, reason: string}|null $contingency */
+    #[\PHPUnit\Framework\Attributes\DataProvider('documentsBuiltBeforeTheReturn')]
+    public function testADocumentWithoutTheReturnFieldsIsUnchangedByteForByte(
+        string $fixture,
+        Model $model,
+        ?array $contingency,
+        string $golden,
+    ): void {
+        $expected = (string) file_get_contents(__DIR__ . "/../fixtures/golden/$golden.xml");
+        $document = Fixtures::document($fixture);
+        $stated = ['operation' => 'OUT', 'referencedDocuments' => []] + $document;
+
+        self::assertArrayNotHasKey('operation', $document);
+        self::assertSame($expected, (new DocumentMapper())->build($document, $model, 2, $contingency)['xml']);
+        self::assertSame($expected, (new DocumentMapper())->build($stated, $model, 2, $contingency)['xml']);
+    }
+
+    public function testAReturnWithoutAReferenceIsRefusedWithItsCode(): void
+    {
+        $document = Fixtures::document('nfe-return-of-nfce');
+        unset($document['referencedDocuments']);
+
+        $error = self::refusal($document, Model::NFE);
+
+        self::assertSame('INVALID', $error->class->value);
+        self::assertSame(DocumentMapper::RETURN_NEEDS_REFERENCE_CODE, $error->sefazCode);
+        $document['referencedDocuments'] = [];
+        self::assertSame(DocumentMapper::RETURN_NEEDS_REFERENCE_CODE, self::refusal($document, Model::NFE)->sefazCode);
+    }
+
+    public function testAReturnOnAnNfceIsRefusedWithItsCode(): void
+    {
+        $document = Fixtures::document('nfce-simples');
+        $document['purpose'] = 'RETURN';
+        $document['referencedDocuments'] = [['accessKey' => '35261111222333000181650010000012011482139076']];
+
+        $error = self::refusal($document, Model::NFCE);
+
+        self::assertSame('INVALID', $error->class->value);
+        self::assertSame(DocumentMapper::RETURN_ON_NFCE_CODE, $error->sefazCode);
+    }
+
+    public function testAnNfceIsNeverAnEntry(): void
+    {
+        $document = ['operation' => 'IN'] + Fixtures::document('nfce-simples');
+
+        $error = self::refusal($document, Model::NFCE);
+
+        self::assertSame('INVALID', $error->class->value);
+        self::assertSame(['operation: an NFC-e takes "OUT" (tpNF 1)'], $error->details);
+    }
+
+    public function testAnNfceQuotesNoDocumentButAnEmptyListPasses(): void
+    {
+        $document = Fixtures::document('nfce-simples');
+        $document['referencedDocuments'] = [['accessKey' => '35261111222333000181650010000012011482139076']];
+
+        $error = self::refusal($document, Model::NFCE);
+
+        self::assertSame('INVALID', $error->class->value);
+        self::assertSame(['referencedDocuments: an NFC-e takes none (708)'], $error->details);
+        $document['referencedDocuments'] = [];
+        self::assertSame(
+            (string) file_get_contents(__DIR__ . '/../fixtures/golden/nfce-simples.xml'),
+            (new DocumentMapper())->build($document, Model::NFCE, 2)['xml'],
+        );
+    }
+
+    public function testTheCodedRefusalTravelsToTheCallerAndNothingIsSent(): void
+    {
+        $transport = new RecordedTransport();
+        [$kernel] = Fixtures::kernel($transport);
+        $body = Fixtures::issueBody('nfce-simples', self::$certificate, true);
+        $body['document']['purpose'] = 'RETURN';
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/issue', $body);
+
+        self::assertSame(400, $response->status);
+        self::assertSame(['INVALID', DocumentMapper::RETURN_ON_NFCE_CODE], [
+            $response->body['error']['class'],
+            $response->body['error']['code'],
+        ]);
+        self::assertSame([], $transport->sent);
+    }
+
+    public function testTheSchemaRefusesAReferenceThatIsNotAnAccessKey(): void
+    {
+        $transport = new RecordedTransport();
+        [$kernel] = Fixtures::kernel($transport);
+        $body = Fixtures::issueBody('nfe-return-of-nfce', self::$certificate, false);
+        $body['document']['referencedDocuments'] = [['accessKey' => '3526111122233300018165001000001201148213907']];
+
+        $response = Fixtures::call($kernel, 'POST', '/nfe/issue', $body);
+
+        self::assertSame(400, $response->status);
+        self::assertSame('INVALID', $response->body['error']['class']);
+        self::assertStringContainsString('referencedDocuments', implode(' ', $response->body['error']['details']));
+        self::assertSame([], $transport->sent);
+    }
+
     public function testTheSameDocumentAlwaysYieldsTheSameAccessKey(): void
     {
         $document = Fixtures::document('nfce-simples');
@@ -154,6 +295,17 @@ final class DocumentMapperTest extends TestCase
     {
         $this->expectException(ServiceError::class);
         (new DocumentMapper())->build(['lines' => []] + Fixtures::document('nfce-simples'), Model::NFCE, 2);
+    }
+
+    /** @param array<string, mixed> $document */
+    private static function refusal(array $document, Model $model): ServiceError
+    {
+        try {
+            (new DocumentMapper())->build($document, $model, 2);
+        } catch (ServiceError $error) {
+            return $error;
+        }
+        self::fail('the mapper built a document it should have refused');
     }
 
     /** @param array{since: string, reason: string}|null $contingency */

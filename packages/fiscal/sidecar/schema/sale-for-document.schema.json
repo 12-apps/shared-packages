@@ -41,6 +41,27 @@
     },
     "operationNature": { "type": "string", "minLength": 1, "maxLength": 60 },
     "purpose": { "enum": ["NORMAL", "COMPLEMENTARY", "ADJUSTMENT", "RETURN"] },
+    "operation": {
+      "description": "tpNF: OUT (1) for a sale or any outgoing document, IN (0) for an entry, such as a buyer's goods coming back. Optional: absent is OUT, so a document written before the field existed is unchanged. An NFC-e is always OUT.",
+      "enum": ["OUT", "IN"]
+    },
+    "referencedDocuments": {
+      "description": "NFref/refNFe: the earlier NF-e or NFC-e this document refers to, by access key. Optional: absent is none. A RETURN needs at least one.",
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accessKey"],
+        "properties": {
+          "accessKey": {
+            "description": "44 characters: cUF, AAMM, the issuer's CNPJ (alphanumeric from July 2026), model, series, number, tpEmis, cNF and the modulo-11 check digit.",
+            "type": "string",
+            "pattern": "^[0-9]{6}[0-9A-Z]{12}[0-9]{26}$"
+          }
+        }
+      }
+    },
     "destination": { "enum": ["INTERNAL", "INTERSTATE", "FOREIGN"] },
     "presence": {
       "enum": ["IN_PERSON", "INTERNET", "TELEPHONE", "HOME_DELIVERY", "IN_PERSON_OFF_PREMISES", "OTHER"]

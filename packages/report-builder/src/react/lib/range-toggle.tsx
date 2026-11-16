@@ -13,7 +13,6 @@
  */
 import { useState, type JSX } from "react";
 
-import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
 import { fieldBorder } from "@12-apps/ui/tokens";
 
 import {
@@ -23,6 +22,7 @@ import {
   type ReportRange,
 } from "../reports-api";
 import { CustomRangeDialog, type CustomRangeWindow } from "./custom-range-dialog";
+import { OneLineChoice } from "./one-line-choice";
 import { CONTROL_HEIGHT, CONTROL_RADIUS_PX } from "./report-surface";
 import type { ReportRangeCopy } from "../screens-copy";
 import { useReportCopy } from "../transport-context";
@@ -78,9 +78,9 @@ const SEGMENT_SX = {
   border: fieldBorder,
   borderRadius: `${CONTROL_RADIUS_PX}px`,
   bgcolor: "background.paper",
-  // Five pills do not fit a phone in one line; wrapping keeps them all
-  // reachable instead of pushing "Personalizado…" past the edge.
-  flexWrap: "wrap",
+  // Five pills do not fit a phone in one line. They never wrap (FUT-4063: a
+  // second line would sit outside this frame); `OneLineChoice` swaps them for
+  // a select instead.
   "& .MuiToggleButtonGroup-grouped": {
     m: 0,
     height: "100%",
@@ -124,37 +124,33 @@ export function RangeToggle({
 
   return (
     <>
-      <ToggleGroup
-        variant="exclusive"
-        size="sm"
+      <OneLineChoice<ReportRange>
         options={(custom ? REPORT_RANGES : REPORT_ROLLING_RANGES).map(option(ranges))}
         value={value}
-        onChange={(_event, next) => {
-          // An exclusive `ToggleButtonGroup` reports `null` when the pill that
-          // is ALREADY selected is clicked. For a rolling preset that has to be
-          // a no-op — a report is always running over some period, and there is
-          // no "no period" to fall back to. For `custom` it is the ONLY way
-          // back into the picker once its pill is active, so re-opening is what
-          // clicking it has to mean; without this the window could be set once
-          // and never adjusted again without first leaving for another preset.
-          if (next === null) {
-            if (value === "custom") setPicking(true);
-            return;
-          }
-          if (typeof next !== "string") return;
+        // Picking the ACTIVE option again: for a rolling preset a no-op — a
+        // report is always running over some period, and there is no "no
+        // period" to fall back to. For `custom` it is the ONLY way back into
+        // the picker once it is active, so re-opening is what it has to mean;
+        // without this the window could be set once and never adjusted again
+        // without first leaving for another preset. The toggle reports it as a
+        // `null` click, the select (on the phone) as a re-picked option.
+        onReselect={(current) => {
+          if (current === "custom") setPicking(true);
+        }}
+        onChange={(next) => {
           // `Personalizado…` opens the picker instead of applying anything: on
           // its own the word names no window, and reporting the preset here
           // would send a request the server can only refuse. The period changes
-          // when the picker is CONFIRMED, which is also what leaves the pill
-          // showing as selected afterwards.
+          // when the picker is CONFIRMED, which is also what leaves the option
+          // showing as chosen afterwards.
           if (next === "custom") {
             setPicking(true);
             return;
           }
-          onChange(next as ReportRange);
+          onChange(next);
         }}
-        aria-label={copy.period}
-        sx={SEGMENT_SX}
+        label={copy.period}
+        toggleSx={SEGMENT_SX}
         dataTestId={dataTestId}
       />
       {custom ? (

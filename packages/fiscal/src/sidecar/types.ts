@@ -216,7 +216,9 @@ export interface SidecarErrorBody {
      * The SEFAZ `cStat` when SEFAZ answered (always for `REJECTED`); for
      * `INVALID`, a named code where one applies (`NT_2026_008_NOT_SUPPORTED`:
      * a document issued on or after 2027-01-01, which needs NT 2026.008's
-     * `vProdLiq`); `null` otherwise.
+     * `vProdLiq`; `RETURN_ON_NFCE`: a return asked of an NFC-e, which has no
+     * return purpose; `RETURN_NEEDS_REFERENCE`: a return quoting no
+     * `referencedDocuments`); `null` otherwise.
      */
     readonly code: string | null;
     readonly message: string;

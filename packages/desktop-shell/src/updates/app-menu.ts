@@ -82,6 +82,12 @@ export interface AppMenuInput {
   actions: AppMenuActions;
   platform: NodeJS.Platform;
   /**
+   * Who updates the app, when it is not us: `"store"` is a Microsoft Store
+   * install. The menu then offers no check, no install and no updater status
+   * line, only the version.
+   */
+  updatesManagedBy?: "store";
+  /**
    * The host's own File entries (its settings window, say), placed FIRST,
    * before a separator and Quit.
    */
@@ -150,6 +156,9 @@ function editMenu(copy: MenuCopy): AppMenuItem {
  */
 function helpMenu(input: AppMenuInput): AppMenuItem[] {
   const { copy, updates, actions } = input;
+  if (input.updatesManagedBy === "store") {
+    return [{ label: copy.version(input.version), enabled: false }];
+  }
   const items: AppMenuItem[] = [];
   if (updates.kind !== "unsupported") {
     items.push({ label: copy.checkUpdates, click: actions.checkUpdates });

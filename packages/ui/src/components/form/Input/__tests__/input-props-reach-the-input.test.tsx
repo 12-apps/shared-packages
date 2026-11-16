@@ -45,4 +45,28 @@ describe('Input: inputProps land on the <input>', () => {
 
     expect(screen.getByTestId('por-dentro').tagName).toBe('INPUT');
   });
+
+  it('puts a top-level readOnly on the input, not the root', () => {
+    render(<Input readOnly value="x" onChange={() => undefined} data-testid="f" />);
+    const input = screen.getByTestId('f') as HTMLInputElement;
+
+    expect(input.tagName).toBe('INPUT');
+    expect(input.readOnly).toBe(true);
+    expect(input).toHaveAttribute('readonly');
+    expect(rootOf(input)).not.toHaveAttribute('readonly');
+  });
+
+  it("lets a caller's inputProps.readOnly win over the top-level one", () => {
+    render(<Input readOnly inputProps={{ readOnly: false }} value="x" onChange={() => undefined} data-testid="f" />);
+    const input = screen.getByTestId('f') as HTMLInputElement;
+
+    expect(input.readOnly).toBe(false);
+    expect(rootOf(input)).not.toHaveAttribute('readonly');
+  });
+
+  it('leaves the input editable when readOnly is not given', () => {
+    render(<Input defaultValue="x" data-testid="f" />);
+
+    expect((screen.getByTestId('f') as HTMLInputElement).readOnly).toBe(false);
+  });
 });

@@ -65,5 +65,7 @@ export const TOUCH_TARGET = 44;
 export const STATUS_COLOR: Record<Exclude<SettingsNavStatus, 'locked'>, string> = {
   ok: 'success.main',
   off: 'text.disabled',
-  new: 'error.main',
+  // The ring's colour, not a fill: `new` is drawn hollow, in the host's brand.
+  new: 'primary.main',
+  attention: 'warning.main',
 };
