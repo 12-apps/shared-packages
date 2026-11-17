@@ -9,8 +9,8 @@ import {
   purchaseReference,
   type OneOffPurchase,
   type OneOffPurchaseDeps,
-  type PayablePurchase,
   type PurchaseCardOptions,
+  type PurchaseRow,
   type PurchaseStore,
 } from "./purchase-ports";
 import { createPurchaseSettlement } from "./purchase-settle";
@@ -102,7 +102,7 @@ export function createOneOffPurchase(deps: OneOffPurchaseDeps): OneOffPurchase {
     result: CollectionResult,
   ): Promise<void> {
     const snapshot = result.snapshot;
-    if (!snapshot || typeof row === "string") return;
+    if (!snapshot || row === "unknown" || row.state !== "payable") return;
     if (snapshot.status === "DECLINED") {
       const declined = snapshot.declineReason ? { declineReason: snapshot.declineReason } : {};
       await store.markFailed(purchaseId, {
@@ -114,16 +114,19 @@ export function createOneOffPurchase(deps: OneOffPurchaseDeps): OneOffPurchase {
       return;
     }
     if (snapshot.status === "PAID") {
+      // Never throws for a failed delivery: the card is paid, and the sweep
+      // delivers what `onSettled` could not.
       await settlement.settle({
         reference,
         amountCents: snapshot.amount.amountCents,
+        currency: snapshot.amount.currency,
         providerChargeId: snapshot.providerChargeId,
       });
     }
   }
 }
 
-type Row = PayablePurchase | "unknown" | "settled";
+type Row = PurchaseRow | "unknown";
 
 /** An id the attempt convention cannot carry: empty, or holding its separator. */
 function refusable(purchaseId: string): boolean {
@@ -136,12 +139,13 @@ function refusable(purchaseId: string): boolean {
  * is back, so the host is told the code's expiry along with the charge.
  */
 function cycleView(store: PurchaseStore, purchaseId: string, row: Row) {
-  const attempt = typeof row === "string" ? 0 : row.attempt;
+  const attempt = row !== "unknown" && row.state === "payable" ? row.attempt : 0;
   const reference = purchaseReference(purchaseId, attempt);
   let raised: RaisedCharge | null = null;
   const view: CycleStore = {
     async read() {
-      if (typeof row === "string") return row;
+      if (row === "unknown") return row;
+      if (row.state === "settled") return "settled";
       const { groupId, amount, customer } = row.purchase;
       return { cycle: { id: reference, groupId, amount, customer }, providerChargeId: row.providerChargeId };
     },

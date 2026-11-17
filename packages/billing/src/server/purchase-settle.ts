@@ -1,15 +1,13 @@
-import { chargeDeadlinePassed, type ChargeSnapshot } from "@12-apps/payments-backend";
-
+import { deliverPurchase, voidOtherAttempt } from "./purchase-deliver";
 import {
   purchaseIdOf,
-  purchaseReference,
   type OneOffPurchaseDeps,
+  type PayablePurchase,
   type PlatformChargeInput,
-  type PurchaseReconcilePass,
   type PurchaseSettleOutcome,
-  type PurchaseStore,
-  type UnansweredPurchaseCharge,
+  type SettledPurchase,
 } from "./purchase-ports";
+import { createPurchaseReconcile } from "./purchase-reconcile";
 
 /**
  * Settling a purchase (FUT-5094): the webhook's path and the sweep's, one
@@ -20,17 +18,21 @@ import {
  *
  * 1. **Not a purchase reference → `"not-mine"`**, before any read: the host's
  *    cycle settle takes it, exactly as before this existed.
- * 2. **A shortfall is refused BEFORE the claim.** A partial transfer must not
- *    move the row to paid, or the purchase is delivered for less than it
- *    costs; it stays payable and is logged for a person.
- * 3. **The claim is the exactly-once point.** Only the caller whose
- *    conditional `claimSettled` moved the row delivers; a replay, a racing
- *    sweep or a second payment loses it and delivers nothing.
- * 4. **An overpayment settles**, delivers the purchase — never more — and is
- *    reported (`excessCents`, and a warning) for the host to return or keep.
+ * 2. **Already settled:** by THIS charge, a replay (`"already-settled"`); by
+ *    ANOTHER, the customer paid twice (`"duplicate-payment"`, logged, handed
+ *    to `onDuplicatePayment`) — nothing is delivered either way.
+ * 3. **A shortfall or another currency is refused BEFORE the claim.** A
+ *    partial transfer must not move the row to paid; it stays payable and is
+ *    logged for a person, once per charge.
+ * 4. **The claim is the exactly-once point for the SETTLEMENT.** Only the
+ *    caller whose conditional `claimSettled` moved the row delivers, voids
+ *    the attempt still open at the provider, and reports an excess. Delivery
+ *    itself is at-least-once: a throw is logged and the sweep delivers again.
  */
 export function createPurchaseSettlement(deps: OneOffPurchaseDeps) {
   const now = deps.now ?? (() => new Date());
+  /** Refusals already logged at error level, so a sweep does not repeat them every pass. */
+  const refusalsLogged = new Set<string>();
 
   async function settle(input: PlatformChargeInput): Promise<PurchaseSettleOutcome> {
     const purchaseId = purchaseIdOf(input.reference);
@@ -41,104 +43,65 @@ export function createPurchaseSettlement(deps: OneOffPurchaseDeps) {
       deps.logger.error(`purchase ${purchaseId}: charge ${input.providerChargeId} paid, but no such purchase`);
       return "unknown";
     }
-    if (row === "settled") return alreadySettled(deps, purchaseId, input);
-    const owed = row.purchase.amount.amountCents;
-    if (input.amountCents < owed) {
-      deps.logger.error(
-        `purchase ${purchaseId}: charge ${input.providerChargeId} captured ${input.amountCents}, short of ${owed}; not settled`,
-      );
-      return "shortfall";
+    if (row.state === "settled") return settledAlready(deps, row, input);
+    const refusal = await refusalOf(row, input);
+    if (refusal) return refusal;
+
+    const { currency } = row.purchase.amount;
+    const settlement = { amountCents: input.amountCents, currency, providerChargeId: input.providerChargeId, paidAt: now() };
+    if (!(await store.claimSettled(purchaseId, settlement))) {
+      const again = await store.read(purchaseId);
+      return again !== "unknown" && again.state === "settled" ? settledAlready(deps, again, input) : "already-settled";
     }
-    const settlement = { amountCents: input.amountCents, providerChargeId: input.providerChargeId, paidAt: now() };
-    if (!(await store.claimSettled(purchaseId, settlement))) return alreadySettled(deps, purchaseId, input);
-    const excessCents = input.amountCents - owed;
+    const excessCents = input.amountCents - row.purchase.amount.amountCents;
     if (excessCents > 0) {
       deps.logger.warn(`purchase ${purchaseId}: charge ${input.providerChargeId} paid ${excessCents} past what was owed`);
     }
-    try {
-      await deps.onSettled(row.purchase, { ...settlement, excessCents });
-    } catch (error) {
-      deps.logger.error(`purchase ${purchaseId}: settled by ${input.providerChargeId}, but delivering it threw`);
-      throw error;
-    }
-    return "granted";
+    await voidOtherAttempt(deps, row, input.providerChargeId);
+    const settled: SettledPurchase = { state: "settled", purchase: row.purchase, settlement, delivered: false };
+    return (await deliverPurchase(deps, store, settled)) ? "granted" : "delivery-pending";
   }
 
-  async function reconcileDue(at: Date = now()): Promise<PurchaseReconcilePass> {
-    const pass: PurchaseReconcilePass = { settled: 0, failed: 0, stillPending: 0, unreadable: 0 };
-    if (!(await deps.enabled())) return pass;
-    const store = await deps.purchases();
-    const { gateway } = await deps.payments();
-    for (const open of await store.unanswered()) {
-      let snapshot: ChargeSnapshot;
-      try {
-        snapshot = await gateway.refreshCharge(deps.merchant, open.provider, open.providerChargeId);
-      } catch {
-        pass.unreadable += 1;
-        continue;
-      }
-      pass[await answer(store, open, snapshot, at)] += 1;
+  /** A shortfall or a foreign currency, logged at error once per charge. */
+  async function refusalOf(row: PayablePurchase, input: PlatformChargeInput): Promise<PurchaseSettleOutcome | null> {
+    const owed = row.purchase.amount;
+    const paidIn = input.currency ?? (await storedCurrency(input));
+    let refusal: { outcome: PurchaseSettleOutcome; why: string } | null = null;
+    if (paidIn !== null && paidIn !== owed.currency) {
+      refusal = { outcome: "currency-mismatch", why: `paid in ${paidIn}, owed in ${owed.currency}` };
+    } else if (input.amountCents < owed.amountCents) {
+      refusal = { outcome: "shortfall", why: `captured ${input.amountCents}, short of ${owed.amountCents}` };
     }
-    return pass;
+    if (!refusal) return null;
+    const key = `${row.purchase.id}:${input.providerChargeId}`;
+    const line = `purchase ${row.purchase.id}: charge ${input.providerChargeId} ${refusal.why}; not settled`;
+    if (refusalsLogged.has(key)) deps.logger.warn(line);
+    else deps.logger.error(line);
+    refusalsLogged.add(key);
+    return refusal.outcome;
   }
 
-  /** What the provider's word on one unanswered charge does. */
-  async function answer(
-    store: PurchaseStore,
-    open: UnansweredPurchaseCharge,
-    snapshot: ChargeSnapshot,
-    at: Date,
-  ): Promise<"settled" | "failed" | "stillPending"> {
-    if (snapshot.status === "PAID") {
-      const outcome = await settle({
-        reference: purchaseReference(open.purchaseId, open.attempt),
-        amountCents: snapshot.amount.amountCents,
-        providerChargeId: open.providerChargeId,
-      });
-      return outcome === "granted" || outcome === "already-settled" ? "settled" : "stillPending";
-    }
-    const reason = failureOf(snapshot, open, at);
-    if (!reason) return "stillPending";
-    const failure = { attempt: open.attempt, providerChargeId: open.providerChargeId, reason };
-    const declined = snapshot.declineReason ? { declineReason: snapshot.declineReason } : {};
-    await store.markFailed(open.purchaseId, { ...failure, ...declined });
-    return "failed";
+  /** The stored charge's currency — a purchase charge's idempotency key IS its reference. */
+  async function storedCurrency(input: PlatformChargeInput): Promise<string | null> {
+    const stored = await deps.charges.findByIdempotencyKey(deps.merchant, input.reference);
+    if (stored) return stored.snapshot.amount.currency;
+    deps.logger.warn(`purchase charge ${input.providerChargeId}: no stored charge for ${input.reference}; currency unchecked`);
+    return null;
   }
 
-  return { settle, reconcileDue };
+  return { settle, reconcileDue: createPurchaseReconcile(deps, settle, now) };
 }
 
-function alreadySettled(deps: OneOffPurchaseDeps, purchaseId: string, input: PlatformChargeInput): PurchaseSettleOutcome {
-  // A replay of the settling charge reads the same as a second payment here;
-  // the host's claim knows which charge settled it, and says.
-  deps.logger.warn(`purchase ${purchaseId}: already settled; charge ${input.providerChargeId} delivered nothing`);
-  return "already-settled";
-}
-
-/**
- * The provider's refusal or lapse, or null while the charge can still be paid.
- * A pending push code fails only once its deadline has passed — the
- * provider's own deadline first, the one recorded at the raise otherwise.
- */
-function failureOf(
-  snapshot: ChargeSnapshot,
-  open: UnansweredPurchaseCharge,
-  at: Date,
-): "DECLINED" | "EXPIRED" | "CANCELED" | null {
-  switch (snapshot.status) {
-    case "DECLINED":
-      return "DECLINED";
-    case "CANCELED":
-      return "CANCELED";
-    case "EXPIRED":
-      return "EXPIRED";
-    case "PENDING":
-    case "AUTHORIZED": {
-      const deadline = snapshot.pix?.expiresAt ?? open.expiresAt?.toISOString();
-      return chargeDeadlinePassed(deadline, at.getTime()) ? "EXPIRED" : null;
-    }
-    default:
-      // REFUNDED / PARTIALLY_REFUNDED: money moved and came back; a person's.
-      return null;
-  }
+/** A confirmation for a purchase already settled: a replay, or a second payment. */
+async function settledAlready(
+  deps: OneOffPurchaseDeps,
+  row: SettledPurchase,
+  input: PlatformChargeInput,
+): Promise<PurchaseSettleOutcome> {
+  if (row.settlement.providerChargeId === input.providerChargeId) return "already-settled";
+  deps.logger.error(
+    `purchase ${row.purchase.id}: settled by ${row.settlement.providerChargeId}, PAID AGAIN by ${input.providerChargeId} (${input.amountCents}); nothing delivered`,
+  );
+  await deps.onDuplicatePayment?.(row.purchase, { amountCents: input.amountCents, providerChargeId: input.providerChargeId });
+  return "duplicate-payment";
 }

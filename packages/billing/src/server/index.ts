@@ -34,12 +34,14 @@ export {
   type PurchaseLog,
   type PurchasePayments,
   type PurchaseReconcilePass,
+  type PurchaseRow,
   type PurchaseSettled,
   type PurchaseSettlement,
   type PurchaseSettleOutcome,
   type PurchaseStore,
   type PurchaseStoreFactory,
   type RaisedPurchaseCharge,
+  type SettledPurchase,
   type UnansweredPurchaseCharge,
 } from "./purchase-ports";
 export { createSubscriptionRefund } from "./refund";

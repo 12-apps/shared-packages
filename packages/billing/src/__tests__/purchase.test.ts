@@ -18,7 +18,6 @@ import { createWebhookReactor, type ChargeSnapshot, type NormalizedWebhookEvent 
 
 import {
   PURCHASE_REFERENCE_PREFIX,
-  createOneOffPurchase,
   purchaseIdOf,
   purchaseReference,
   type OneOffPurchase,
@@ -61,6 +60,11 @@ describe("the purchase reference", () => {
     expect(purchaseIdOf("purchase:pur-1--2")).toBe("pur-1");
   });
 
+  it("round-trips an id that itself contains a colon", () => {
+    expect(purchaseIdOf(purchaseReference("tenant:42:pack", 0))).toBe("tenant:42:pack");
+    expect(purchaseIdOf(purchaseReference("tenant:42:pack", 3))).toBe("tenant:42:pack");
+  });
+
   it("names no purchase for a cycle's bare id", () => {
     expect(purchaseIdOf("cycle-1")).toBeNull();
     expect(purchaseIdOf("c1a2b3purchase:x")).toBeNull();
@@ -96,6 +100,7 @@ describe("raising a purchase charge", () => {
     expect((await purchaseWorld({ exists: false }).purchases.startByPush(PURCHASE.id)).skipped).toBe("unknown-payment");
     const w = purchaseWorld();
     w.held.status = "paid";
+    w.held.settlement = { amountCents: 4_990, currency: "BRL", providerChargeId: "chg-x", paidAt: T0 };
     expect((await w.purchases.startByCard(PURCHASE.id)).skipped).toBe("already-paid");
     expect(w.gateway.charge).not.toHaveBeenCalled();
   });
@@ -132,7 +137,7 @@ describe("exactly once", () => {
     await reactor(event, stored, MERCHANT);
 
     expect(w.granted).toHaveLength(1);
-    expect(w.granted[0]?.settled).toEqual({ amountCents: 4_990, providerChargeId: "chg-purchase:pur-1", paidAt: T0, excessCents: 0 });
+    expect(w.granted[0]?.settled).toEqual({ amountCents: 4_990, currency: "BRL", providerChargeId: "chg-purchase:pur-1", paidAt: T0, excessCents: 0 });
     expect(w.store.claimSettled).toHaveBeenCalledTimes(1);
     expect(settleCycle).not.toHaveBeenCalled();
   });
@@ -182,10 +187,10 @@ describe("a failed attempt", () => {
     await w.purchases.startByPush(PURCHASE.id);
 
     const before = await w.purchases.reconcileDue(new Date(T0.getTime() + 29 * MINUTE));
-    expect(before).toEqual({ settled: 0, failed: 0, stillPending: 1, unreadable: 0 });
+    expect(before).toEqual({ settled: 0, failed: 0, stillPending: 1, unreadable: 0, delivered: 0, undelivered: 0 });
 
     const after = await w.purchases.reconcileDue(new Date(T0.getTime() + 31 * MINUTE));
-    expect(after).toEqual({ settled: 0, failed: 1, stillPending: 0, unreadable: 0 });
+    expect(after).toEqual({ settled: 0, failed: 1, stillPending: 0, unreadable: 0, delivered: 0, undelivered: 0 });
     expect(w.held.failures).toEqual([{ attempt: 0, providerChargeId: "chg-purchase:pur-1", reason: "EXPIRED" }]);
     expect(w.granted).toEqual([]);
 
@@ -197,6 +202,23 @@ describe("a failed attempt", () => {
     const { event, stored } = paidEvent("purchase:pur-1--1");
     await reactor(event, stored, MERCHANT);
     expect(w.granted).toHaveLength(1);
+  });
+
+  it("a refunded charge on an unsettled purchase fails the attempt as CANCELED, logged once, and a retry raises anew", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.provider.refresh = { status: "PARTIALLY_REFUNDED" };
+
+    expect((await w.purchases.reconcileDue(T0)).failed).toBe(1);
+    expect(w.held.failures).toEqual([{ attempt: 0, providerChargeId: "chg-purchase:pur-1", reason: "CANCELED" }]);
+    expect(w.logger.error).toHaveBeenCalledTimes(1);
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("PARTIALLY_REFUNDED"));
+    expect((await w.purchases.reconcileDue(T0)).failed).toBe(0);
+    expect(w.logger.error).toHaveBeenCalledTimes(1);
+
+    expect((await w.purchases.startByPush(PURCHASE.id)).skipped).toBeNull();
+    expect(w.held.providerChargeId).toBe("chg-purchase:pur-1--1");
+    expect(w.granted).toEqual([]);
   });
 
   it("a lapsed code paid late still settles when nothing else has", async () => {
@@ -267,27 +289,6 @@ describe("dispatch from the platform settle", () => {
     expect(w.logger.error).toHaveBeenCalled();
   });
 
-  it("keeps the claim and rethrows when delivering throws", async () => {
-    const w = purchaseWorld();
-    const failing = vi.fn(async () => {
-      throw new Error("grant failed");
-    });
-    const purchases = createOneOffPurchase({
-      payments: async () => ({ gateway: w.gateway, credentials: { defaultProvider: async () => "acquirer-a" } }) as never,
-      merchant: MERCHANT,
-      enabled: async () => true,
-      instruments: async () => ({ instrument: null, hasAny: false }),
-      purchases: async () => w.store,
-      onSettled: failing,
-      logger: w.logger,
-    });
-    const input = { reference: "purchase:pur-1", amountCents: 4_990, providerChargeId: "chg-1" };
-
-    await expect(purchases.settlePlatformCharge(input)).rejects.toThrow("grant failed");
-    expect(w.held.status).toBe("paid");
-    expect(await purchases.settlePlatformCharge(input)).toBe("already-settled");
-    expect(failing).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("reconcileDue", () => {
@@ -298,7 +299,7 @@ describe("reconcileDue", () => {
 
     const pass = await w.purchases.reconcileDue(T0);
 
-    expect(pass).toEqual({ settled: 1, failed: 0, stillPending: 0, unreadable: 0 });
+    expect(pass).toEqual({ settled: 1, failed: 0, stillPending: 0, unreadable: 0, delivered: 0, undelivered: 0 });
     expect(w.gateway.refreshCharge).toHaveBeenCalledWith(MERCHANT, "acquirer-a", "chg-purchase:pur-1");
     expect(w.granted).toHaveLength(1);
   });
@@ -307,10 +308,10 @@ describe("reconcileDue", () => {
     const w = purchaseWorld();
     await w.purchases.startByPush(PURCHASE.id);
     w.gateway.refreshCharge.mockRejectedValueOnce(new Error("timeout"));
-    expect(await w.purchases.reconcileDue(T0)).toEqual({ settled: 0, failed: 0, stillPending: 0, unreadable: 1 });
+    expect(await w.purchases.reconcileDue(T0)).toEqual({ settled: 0, failed: 0, stillPending: 0, unreadable: 1, delivered: 0, undelivered: 0 });
 
     w.provider.refresh = { status: "CANCELED" };
-    expect(await w.purchases.reconcileDue(T0)).toEqual({ settled: 0, failed: 1, stillPending: 0, unreadable: 0 });
+    expect(await w.purchases.reconcileDue(T0)).toEqual({ settled: 0, failed: 1, stillPending: 0, unreadable: 0, delivered: 0, undelivered: 0 });
     expect(w.held.failures[0]?.reason).toBe("CANCELED");
   });
 
@@ -319,5 +320,168 @@ describe("reconcileDue", () => {
     await w.purchases.startByPush(PURCHASE.id);
     w.provider.refresh = { status: "PENDING", pix: { qrText: "x", expiresAt: new Date(T0.getTime() + 60 * MINUTE).toISOString() } };
     expect((await w.purchases.reconcileDue(new Date(T0.getTime() + 45 * MINUTE))).stillPending).toBe(1);
+  });
+});
+
+describe("paid twice", () => {
+  it("an older attempt paid late after a newer one settled is a duplicate payment: logged, handed to the hook, nothing delivered again", async () => {
+    const w = purchaseWorld();
+    w.provider.answer = () => ({ status: "DECLINED" } as Partial<ChargeSnapshot>);
+    await w.purchases.startByCard(PURCHASE.id);
+    w.provider.answer = () => ({ status: "PAID" });
+    await w.purchases.startByCard(PURCHASE.id);
+    expect(w.held.settledBy).toEqual(["chg-purchase:pur-1--1"]);
+
+    const { reactor } = hostReactor(w.purchases);
+    const late = paidEvent("purchase:pur-1", 4_990, "evt-late");
+    await reactor(late.event, late.stored, MERCHANT);
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      providerChargeId: "chg-purchase:pur-1",
+    });
+
+    expect(outcome).toBe("duplicate-payment");
+    expect(w.granted).toHaveLength(1);
+    expect(w.hooks.onDuplicatePayment).toHaveBeenCalledWith(PURCHASE, { amountCents: 4_990, providerChargeId: "chg-purchase:pur-1" });
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("PAID AGAIN"));
+  });
+
+  it("a replay of the settling charge stays already-settled, with no hook", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByCard(PURCHASE.id);
+    const again = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      providerChargeId: "chg-purchase:pur-1",
+    });
+    expect(again).toBe("already-settled");
+    expect(w.hooks.onDuplicatePayment).not.toHaveBeenCalled();
+  });
+
+  it("settling by one attempt's charge voids the other attempt still open at the provider, best-effort", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.held.attempt = 1; // a newer attempt is current, its code still open
+    w.held.providerChargeId = "chg-open";
+    w.held.provider = "acquirer-a";
+    w.gateway.cancelCharge.mockRejectedValueOnce(new Error("provider cannot void"));
+
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      providerChargeId: "chg-purchase:pur-1",
+    });
+
+    expect(outcome).toBe("granted");
+    expect(w.gateway.cancelCharge).toHaveBeenCalledWith(MERCHANT, "acquirer-a", "chg-open");
+    expect(w.logger.warn).toHaveBeenCalledWith(expect.stringContaining("could not void open charge chg-open: provider cannot void"));
+  });
+});
+
+describe("delivery is at-least-once", () => {
+  it("an onSettled that throws once is delivered by the sweep, once", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    const deliver = w.hooks.onSettled;
+    w.hooks.onSettled = vi.fn().mockRejectedValueOnce(new Error("grant failed")).mockImplementation(deliver);
+
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      providerChargeId: "chg-purchase:pur-1",
+    });
+    expect(outcome).toBe("delivery-pending");
+    expect(w.held.status).toBe("paid");
+    expect(w.granted).toEqual([]);
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("delivery threw: grant failed"));
+
+    expect((await w.purchases.reconcileDue(T0)).delivered).toBe(1);
+    expect((await w.purchases.reconcileDue(T0)).delivered).toBe(0);
+    expect(w.granted).toHaveLength(1);
+    expect(w.held.delivered).toBe(true);
+  });
+
+  it("a card paid at the screen whose delivery throws does not throw; the sweep delivers it", async () => {
+    const w = purchaseWorld();
+    const deliver = w.hooks.onSettled;
+    w.hooks.onSettled = vi.fn().mockRejectedValueOnce(new Error("grant failed")).mockImplementation(deliver);
+
+    const result = await w.purchases.startByCard(PURCHASE.id);
+    expect(result.snapshot?.status).toBe("PAID");
+    expect(w.granted).toEqual([]);
+
+    const pass = await w.purchases.reconcileDue(T0);
+    expect(pass).toEqual({ settled: 0, failed: 0, stillPending: 0, unreadable: 0, delivered: 1, undelivered: 0 });
+    expect(w.granted).toHaveLength(1);
+  });
+
+  it("keeps retrying while delivery keeps throwing", async () => {
+    const w = purchaseWorld();
+    w.hooks.onSettled = vi.fn().mockRejectedValue(new Error("down"));
+    await w.purchases.startByCard(PURCHASE.id);
+    expect((await w.purchases.reconcileDue(T0)).undelivered).toBe(1);
+    expect((await w.purchases.reconcileDue(T0)).undelivered).toBe(1);
+    expect(w.held.delivered).toBe(false);
+  });
+});
+
+describe("currency", () => {
+  it("refuses a payment in another currency than owed, like a shortfall", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      currency: "USD",
+      providerChargeId: "chg-purchase:pur-1",
+    });
+    expect(outcome).toBe("currency-mismatch");
+    expect(w.store.claimSettled).not.toHaveBeenCalled();
+    expect(w.granted).toEqual([]);
+  });
+
+  it("reads the currency off the stored charge when the webhook input carries none", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    const stored = w.charges.get("purchase:pur-1");
+    if (!stored) throw new Error("no stored charge");
+    w.charges.set("purchase:pur-1", { ...stored, snapshot: { ...stored.snapshot, amount: { amountCents: 4_990, currency: "USD" } } });
+
+    const { reactor } = hostReactor(w.purchases);
+    const { event, stored: row } = paidEvent("purchase:pur-1");
+    await reactor(event, row, MERCHANT);
+
+    expect(w.chargeStore.findByIdempotencyKey).toHaveBeenCalledWith(MERCHANT, "purchase:pur-1");
+    expect(w.held.status).toBe("pending");
+    expect(w.granted).toEqual([]);
+  });
+
+  it("refuses a sweep-read payment in another currency", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.provider.refresh = { status: "PAID", amount: { amountCents: 4_990, currency: "USD" } };
+    expect((await w.purchases.reconcileDue(T0)).stillPending).toBe(1);
+    expect(w.granted).toEqual([]);
+  });
+});
+
+describe("log noise", () => {
+  it("logs a PAID shortfall at error once per charge, then at warn on later passes", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.provider.refresh = { status: "PAID", amount: { amountCents: 100, currency: "BRL" } };
+    await w.purchases.reconcileDue(T0);
+    await w.purchases.reconcileDue(T0);
+    expect(w.logger.error).toHaveBeenCalledTimes(1);
+    expect(w.logger.warn).toHaveBeenCalledWith(expect.stringContaining("short of 4990"));
+  });
+
+  it("logs the provider's error message when a charge cannot be read", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.gateway.refreshCharge.mockRejectedValueOnce(new Error("upstream 503"));
+    await w.purchases.reconcileDue(T0);
+    expect(w.logger.warn).toHaveBeenCalledWith(expect.stringContaining("unreadable: upstream 503"));
   });
 });

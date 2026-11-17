@@ -7,6 +7,7 @@ import type {
   Purchase,
   PurchaseFailure,
   PurchaseSettled,
+  PurchaseSettlement,
   PurchaseStore,
   RaisedPurchaseCharge,
 } from "../server/purchase-ports";
@@ -43,6 +44,9 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
     status: "pending" as "pending" | "failed" | "paid",
     attempt: 0,
     providerChargeId: null as string | null,
+    provider: null as string | null,
+    settlement: null as PurchaseSettlement | null,
+    delivered: false,
     expiresAt: null as Date | null,
     settledBy: [] as string[],
     failures: [] as PurchaseFailure[],
@@ -51,19 +55,29 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
   const store: PurchaseStore = {
     read: vi.fn(async () => {
       if (!held.exists) return "unknown" as const;
-      if (held.status === "paid") return "settled" as const;
-      return { purchase: PURCHASE, providerChargeId: held.providerChargeId, attempt: held.attempt };
+      if (held.status === "paid" && held.settlement) {
+        return { state: "settled" as const, purchase: PURCHASE, settlement: held.settlement, delivered: held.delivered };
+      }
+      return {
+        state: "payable" as const,
+        purchase: PURCHASE,
+        providerChargeId: held.providerChargeId,
+        provider: held.provider,
+        attempt: held.attempt,
+      };
     }),
     recordRaised: vi.fn(async (_id: string, charge: RaisedPurchaseCharge) => {
       held.raised.push(charge);
       if (held.status === "paid" || charge.attempt !== held.attempt) return;
       held.providerChargeId = charge.providerChargeId;
+      held.provider = charge.provider;
       held.expiresAt = charge.expiresAt;
       held.status = "pending";
     }),
     claimSettled: vi.fn(async (_id: string, settlement) => {
       if (held.status === "paid") return false;
       held.status = "paid";
+      held.settlement = settlement;
       held.settledBy.push(settlement.providerChargeId);
       return true;
     }),
@@ -73,6 +87,7 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
       held.status = "failed";
       held.attempt += 1;
       held.providerChargeId = null;
+      held.provider = null;
       held.expiresAt = null;
       return true;
     }),
@@ -87,6 +102,14 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
               expiresAt: held.expiresAt,
             },
           ]
+        : [],
+    ),
+    markDelivered: vi.fn(async () => {
+      held.delivered = true;
+    }),
+    undelivered: vi.fn(async () =>
+      held.status === "paid" && held.settlement && !held.delivered
+        ? [{ state: "settled" as const, purchase: PURCHASE, settlement: held.settlement, delivered: false }]
         : [],
     ),
   };
@@ -117,11 +140,21 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
       method: "PIX",
       ...provider.refresh,
     }) as ChargeSnapshot),
+    cancelCharge: vi.fn(async (_merchant: unknown, _provider: string, chargeId: string) => ({ providerChargeId: chargeId, status: "CANCELED" }) as ChargeSnapshot),
+  };
+  const chargeStore = {
+    findByIdempotencyKey: vi.fn(async (_merchant: unknown, key: string) => charges.get(key) ?? null),
   };
   const credentials = { defaultProvider: vi.fn(async () => "acquirer-a") };
 
   const granted: Array<{ purchase: Purchase; settled: PurchaseSettled }> = [];
   const logger = { warn: vi.fn(), error: vi.fn() };
+  const hooks = {
+    onSettled: async (purchase: Purchase, settled: PurchaseSettled) => {
+      granted.push({ purchase, settled });
+    },
+    onDuplicatePayment: vi.fn(async () => undefined),
+  };
   const purchases = createOneOffPurchase({
     payments: async () => ({ gateway, credentials }) as never,
     merchant: MERCHANT,
@@ -131,14 +164,14 @@ export function purchaseWorld(options: { exists?: boolean } = {}) {
       hasAny: true,
     }),
     purchases: async () => store,
-    onSettled: async (purchase, settled) => {
-      granted.push({ purchase, settled });
-    },
+    onSettled: (purchase, settled) => hooks.onSettled(purchase, settled),
+    onDuplicatePayment: hooks.onDuplicatePayment,
+    charges: chargeStore,
     logger,
     now: () => T0,
   });
 
-  return { held, store, gateway, provider, charges, granted, logger, purchases };
+  return { held, store, gateway, provider, charges, chargeStore, granted, hooks, logger, purchases };
 }
 
 /** A stored platform charge, as the gateway's charge store hands it to the webhook reactor. */

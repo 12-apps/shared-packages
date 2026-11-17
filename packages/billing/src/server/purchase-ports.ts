@@ -2,6 +2,7 @@ import {
   attemptReference,
   baseReference,
   type CardCollectionOptions,
+  type ChargeStore,
   type CollectionResult,
   type CredentialStore,
   type CustomerInfo,
@@ -68,15 +69,31 @@ export interface Purchase {
 
 /** A purchase that can still be paid, as `read` answers it. */
 export interface PayablePurchase {
+  state: "payable";
   purchase: Purchase;
   /** The charge outstanding for the CURRENT attempt, or null when none is. */
   providerChargeId: string | null;
+  /** Who holds that charge — what a settle by ANOTHER attempt's charge voids. */
+  provider: ProviderName | null;
   /**
    * The current attempt's ordinal, from 0. The host persists it and advances
    * it by one in `markFailed`, never anywhere else.
    */
   attempt: number;
 }
+
+/** A purchase already paid, as `read` and `undelivered` answer it. */
+export interface SettledPurchase {
+  state: "settled";
+  purchase: Purchase;
+  /** What `claimSettled` recorded — above all WHICH charge settled it. */
+  settlement: PurchaseSettlement;
+  /** Whether `markDelivered` has been written since. */
+  delivered: boolean;
+}
+
+/** One purchase row, as `read` answers it. */
+export type PurchaseRow = PayablePurchase | SettledPurchase;
 
 /** What `recordRaised` is told: the charge now outstanding for one attempt. */
 export interface RaisedPurchaseCharge {
@@ -94,6 +111,8 @@ export interface RaisedPurchaseCharge {
 export interface PurchaseSettlement {
   /** What the provider says it CAPTURED — never below the amount owed. */
   amountCents: number;
+  /** The purchase's own currency, which the payment was checked against. */
+  currency: string;
   providerChargeId: string;
   paidAt: Date;
 }
@@ -123,8 +142,8 @@ export interface UnansweredPurchaseCharge {
  * exactly-once argument: a webhook, its replay and the sweep race routinely.
  */
 export interface PurchaseStore {
-  /** `'unknown'`: no such purchase. `'settled'`: already paid. */
-  read(purchaseId: string): Promise<PayablePurchase | "unknown" | "settled">;
+  /** `'unknown'`: no such purchase. */
+  read(purchaseId: string): Promise<PurchaseRow | "unknown">;
   /** Stamp the charge outstanding for an attempt. Without it the next start raises a second. */
   recordRaised(purchaseId: string, charge: RaisedPurchaseCharge): Promise<void>;
   /**
@@ -141,6 +160,10 @@ export interface PurchaseStore {
   markFailed(purchaseId: string, failure: PurchaseFailure): Promise<boolean>;
   /** Every unpaid purchase whose current attempt has a charge outstanding. */
   unanswered(): Promise<readonly UnansweredPurchaseCharge[]>;
+  /** Record that `onSettled` returned for this purchase. Idempotent. */
+  markDelivered(purchaseId: string): Promise<void>;
+  /** Every settled purchase not yet `markDelivered` — what the sweep delivers again. */
+  undelivered(): Promise<readonly SettledPurchase[]>;
 }
 
 /** The host's purchase rows, built per call over its own database client. */
@@ -148,13 +171,13 @@ export type PurchaseStoreFactory = () => Promise<PurchaseStore>;
 
 /** What the purchase flow needs from the host's already-built payments gateway. */
 export interface PurchasePayments {
-  gateway: Pick<PaymentsGateway, "charge" | "refreshCharge">;
+  gateway: Pick<PaymentsGateway, "charge" | "refreshCharge" | "cancelCharge">;
   credentials: Pick<CredentialStore, "defaultProvider">;
 }
 
 /**
- * Where a payment that needs a person is reported: a shortfall, an excess, a
- * purchase paid twice, a grant that threw. REQUIRED — a host that wants no
+ * Where a payment that needs a person is reported: a shortfall, a currency
+ * mismatch, an excess, a purchase paid twice, a delivery that threw. REQUIRED — a host that wants no
  * output passes no-ops and has said so.
  */
 export interface PurchaseLog {
@@ -179,12 +202,28 @@ export interface OneOffPurchaseDeps {
   instruments: InstrumentLookup;
   purchases: PurchaseStoreFactory;
   /**
-   * Deliver what was bought. Called ONCE per purchase, only by the caller
-   * whose `claimSettled` won. A throw is logged and rethrown, and the claim
-   * stands — a host whose grant must be atomic with the claim grants inside
-   * `claimSettled` and passes a no-op here.
+   * Deliver what was bought. ⚠️ MUST BE IDEMPOTENT BY PURCHASE ID: delivery is
+   * AT-LEAST-ONCE. It runs first for the caller whose `claimSettled` won; a
+   * throw is logged, never rethrown, and `reconcileDue` calls it again for
+   * every `undelivered()` row until it returns (and `markDelivered` lands) —
+   * so it can run again after a success whose `markDelivered` failed, or
+   * while a slow first call is still in flight.
    */
   onSettled(purchase: Purchase, settled: PurchaseSettled): Promise<void>;
+  /**
+   * A purchase already settled by one charge was paid AGAIN by another (an
+   * older attempt's code paid late, say). Nothing is delivered for it; this
+   * is where the host refunds or alerts. Called on every confirmation of that
+   * charge, so it must be idempotent by `providerChargeId`. Optional: absent,
+   * the error log is the only trace.
+   */
+  onDuplicatePayment?(purchase: Purchase, payment: { amountCents: number; providerChargeId: string }): Promise<void>;
+  /**
+   * The gateway's charge rows, read by idempotency key (a purchase charge's
+   * key IS its reference) for the currency a webhook settlement does not
+   * carry. The same store the host built its gateway over.
+   */
+  charges: Pick<ChargeStore, "findByIdempotencyKey">;
   logger: PurchaseLog;
   /** The clock, for `paidAt`. Default: `new Date()`. */
   now?: () => Date;
@@ -195,6 +234,8 @@ export interface PlatformChargeInput {
   reference: string;
   amountCents: number;
   providerChargeId: string;
+  /** Absent from the reactor's input; then read from the stored charge (`charges`). */
+  currency?: string;
 }
 
 /**
@@ -203,12 +244,18 @@ export interface PlatformChargeInput {
  */
 export type PurchaseSettleOutcome =
   | "not-mine"
-  /** This call won the claim and `onSettled` ran. */
+  /** This call won the claim and `onSettled` returned. */
   | "granted"
-  /** Already paid — a replay, a race lost, or a second payment (logged). */
+  /** This call won the claim; `onSettled` threw (logged) and the sweep delivers. */
+  | "delivery-pending"
+  /** Already paid by THIS charge — a replay, or a race lost. */
   | "already-settled"
+  /** Already paid by ANOTHER charge: logged, `onDuplicatePayment`, nothing delivered. */
+  | "duplicate-payment"
   /** Paid less than owed: refused before claiming, logged, still payable. */
   | "shortfall"
+  /** Paid in another currency than owed: refused like a shortfall. */
+  | "currency-mismatch"
   /** The reference names a purchase the host has no row for (logged). */
   | "unknown";
 
@@ -219,6 +266,10 @@ export interface PurchaseReconcilePass {
   stillPending: number;
   /** The provider could not be asked; the charge is read again next pass. */
   unreadable: number;
+  /** Settled purchases whose `onSettled` returned on this pass. */
+  delivered: number;
+  /** Settled purchases whose `onSettled` threw again; retried next pass. */
+  undelivered: number;
 }
 
 /** How `startByCard` charges: the cardholder may be present; one payment, never split. */
@@ -231,6 +282,6 @@ export interface OneOffPurchase {
   startByCard(purchaseId: string, options?: PurchaseCardOptions): Promise<CollectionResult>;
   /** The host's `settlePlatformPayment` calls this FIRST; `"not-mine"` falls through. */
   settlePlatformCharge(input: PlatformChargeInput): Promise<PurchaseSettleOutcome>;
-  /** Ask the provider about every unanswered charge: settle paid, fail lapsed or refused. */
+  /** Ask the provider about every unanswered charge (settle paid, fail lapsed, refused or refunded), then deliver every undelivered purchase. */
   reconcileDue(now?: Date): Promise<PurchaseReconcilePass>;
 }
