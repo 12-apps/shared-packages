@@ -128,6 +128,22 @@ describe('orderSnapshot — a paid order names its transaction', () => {
     expect(snapshot.transaction).toEqual({ pspCnpjBase: PAGBANK_CNPJ_BASE });
   });
 
+  it.each([
+    ['2023-02-08T18:15:12Z', '2023-02-08T18:15:12.000Z'],
+    ['2023-02-08T18:15:12.500Z', '2023-02-08T18:15:12.500Z'],
+    ['2023-02-08T15:15:12+0000', '2023-02-08T15:15:12.000Z'],
+  ])('reads paid-at %s as the instant %s', (paidAt, expected) => {
+    const order = structuredClone(PAID_PIX_ORDER);
+    order.charges[0]!.paid_at = paidAt;
+    expect(orderSnapshot(order, 'fallback').transaction?.settledAt).toBe(expected);
+  });
+
+  it('drops a paid-at with no offset, which would name a different instant per server zone', () => {
+    const order = structuredClone(PAID_PIX_ORDER);
+    order.charges[0]!.paid_at = '2023-02-08T15:15:12';
+    expect(orderSnapshot(order, 'fallback').transaction).not.toHaveProperty('settledAt');
+  });
+
   it('drops a paid-at it cannot read rather than passing it on verbatim', () => {
     const order = structuredClone(PAID_PIX_ORDER);
     (order.charges[0] as { paid_at: unknown }).paid_at = 'not a date';

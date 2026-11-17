@@ -65,7 +65,20 @@ export function mergeRefreshedSnapshot(
     ...(stored.settlementHints || refreshed.settlementHints
       ? { settlementHints: { ...stored.settlementHints, ...refreshed.settlementHints } }
       : {}),
+    ...accumulatedTransaction(stored, refreshed),
   };
+}
+
+/**
+ * The transaction's ids ACCUMULATE too (FUT-2239), key by key: an approval's
+ * NSU and authorisation code are recorded facts, and a later re-read that does
+ * not repeat them — a refund or void reads the charge as CANCELED, and the
+ * adapter names no trace for an unapproved charge — must not erase them. A
+ * field the refresh DOES report wins.
+ */
+function accumulatedTransaction(stored: ChargeSnapshot, refreshed: ChargeSnapshot): Partial<ChargeSnapshot> {
+  if (!stored.transaction && !refreshed.transaction) return {};
+  return { transaction: { ...stored.transaction, ...refreshed.transaction } };
 }
 
 /** The fields a silent refresh inherits from the row it is refreshing. */

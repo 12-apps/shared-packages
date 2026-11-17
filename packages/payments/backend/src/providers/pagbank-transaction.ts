@@ -46,10 +46,17 @@ function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
-/** PagBank's local-offset timestamp as UTC ISO-8601, or nothing when unreadable. */
+/** A timestamp that names its own offset — `Z` or `±hh:mm` — and so one instant on any server. */
+const WITH_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/;
+
+/**
+ * PagBank's offset timestamp as UTC ISO-8601, or nothing when unreadable. One
+ * with no offset is dropped: `Date.parse` would read it in the SERVER's zone,
+ * and the same payload would name different instants on different machines.
+ */
 function instant(value: unknown): string | undefined {
   const raw = text(value);
-  if (raw === undefined) return undefined;
+  if (raw === undefined || !WITH_OFFSET.test(raw)) return undefined;
   const ms = Date.parse(raw);
   return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
 }
