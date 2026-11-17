@@ -5,6 +5,7 @@ import type { JSX, ReactNode } from "react";
 import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
 
 import { CheckCircleOutlineIcon, ErrorOutlineIcon, ScheduleIcon } from "./icons";
+import { useCheckoutCopy } from "./copy-context";
 import { Fact } from "./payment-status-parts";
 import type { ShortPaymentCopy } from "./short-copy";
 import { useCheckoutComponents } from "./ui";
@@ -150,6 +151,8 @@ interface ShortOutcomeProps {
   onRequestRefund?: () => void;
   /** An act is in flight: both actions stand down, the one running shows it. */
   busy?: "pay" | "refund" | null;
+  /** Why the last refund was not taken: shown under the actions, which stay for a retry. */
+  error?: string | null;
   /** The way out once the short is resolved, worded by the host. */
   backAction: string;
   onBackToMenu: () => void;
@@ -232,8 +235,16 @@ export function ShortOutcome(props: ShortOutcomeProps): JSX.Element {
           </Button>
         ) : null}
       </ActionRow>
+      {props.error != null ? <RefundRefusal message={props.error} /> : null}
     </Box>
   );
+}
+
+/** A refund not taken, presented as the checkout presents a refused order: the server's sentence under the heading. */
+function RefundRefusal({ message }: { message: string }): JSX.Element {
+  const { Alert } = useCheckoutComponents();
+  const title = useCheckoutCopy().screens.error.cannotContinue;
+  return <Alert variant="danger" title={title} description={message || undefined} showIcon data-testid="payment-short-refund-error" />;
 }
 
 /**

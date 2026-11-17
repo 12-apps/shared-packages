@@ -142,6 +142,8 @@ interface PaymentStatusProps {
   onRequestRefund?: () => void;
   /** One of those two acts is in flight. */
   shortBusy?: "pay" | "refund" | null;
+  /** Why the last refund was not taken ("" when no sentence came); the acts stay offered for a retry. */
+  shortError?: string | null;
 }
 
 /**
@@ -248,6 +250,7 @@ function MoneyFactStatus({ props, fact }: { props: PaymentStatusProps; fact: Mon
           onPayDifference={props.onPayDifference}
           onRequestRefund={props.onRequestRefund}
           busy={props.shortBusy ?? null}
+          error={props.shortError ?? null}
           backAction={props.copy.backAction}
           onBackToMenu={props.onBackToMenu}
         />

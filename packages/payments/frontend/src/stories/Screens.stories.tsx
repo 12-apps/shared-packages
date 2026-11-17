@@ -143,7 +143,7 @@ export const StatusPaidWithHostHero: StoryObj = screen(
 /** The contract's figures: a 2070 pedido, 690 arrived by Pix. */
 const SHORT = { totalCents: 2070, paidCents: 690, dueCents: 1380, paidMethod: "PIX", resolution: null } as const;
 
-type ShortFacts = Pick<PaymentStatusScreenProps, "shortfall" | "stockGone">;
+type ShortFacts = Pick<PaymentStatusScreenProps, "shortfall" | "stockGone" | "shortError">;
 
 const factStory = (status: OrderStatus, facts: ShortFacts): StoryObj =>
   screen({}, (flows) => (
@@ -165,6 +165,11 @@ export const StatusShortRefunded: StoryObj = factStory("FAILED", { shortfall: { 
 /** A refund on its way, or waiting for the store ("Estorno pendente"). */
 export const StatusShortRefundPending: StoryObj = factStory("FAILED", {
   shortfall: { ...SHORT, resolution: "REFUND_PENDING" },
+});
+/** A refund the server refused: its sentence under the two acts, which stay for a retry. */
+export const StatusShortRefundRefused: StoryObj = factStory("FAILED", {
+  shortfall: SHORT,
+  shortError: "Não foi possível devolver agora. Tente de novo em instantes.",
 });
 /** The store collected the difference itself and confirmed. */
 export const StatusShortSettled: StoryObj = factStory("PAID", { shortfall: { ...SHORT, resolution: "SETTLED" } });

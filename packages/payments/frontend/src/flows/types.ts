@@ -284,6 +284,8 @@ export interface PaymentStatusScreenProps {
   onPayDifference?(): void;
   onRequestRefund?(): void;
   shortBusy?: "pay" | "refund" | null;
+  /** Why the last refund was not taken; the two acts stay offered for a retry. */
+  shortError?: string | null;
 }
 
 /** The screens a host may nest itself. Every one works standalone. */

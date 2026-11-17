@@ -164,3 +164,48 @@ describe("option C with no host port: the client's own wire", () => {
     expect(client.requestShortRefund).toHaveBeenCalledWith("o-short");
   });
 });
+
+describe("the refund act's answer on the open face (review round 1)", () => {
+  it("sends ONE request for two taps dispatched before the re-render", async () => {
+    const client = wiredClient();
+    // Still in flight when the second tap lands.
+    client.requestShortRefund.mockReturnValue(new Promise(() => undefined) as never);
+    renderList({ config: onPageStore(), client: client as never, createOrder: async (input) => pixOrder(input) });
+
+    await payByPix();
+    const button = await screen.findByTestId("payment-short-refund");
+    // Both inside ONE act: React re-renders (and disables the button) only after it.
+    act(() => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+
+    expect(client.requestShortRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the server's sentence under the actions, and keeps them for a retry", async () => {
+    const client = wiredClient();
+    client.requestShortRefund.mockResolvedValue({ ok: false, error: "Este pedido não pode mais ser cancelado." } as never);
+    renderList({ config: onPageStore(), client: client as never, createOrder: async (input) => pixOrder(input) });
+
+    await payByPix();
+    fireEvent.click(await screen.findByTestId("payment-short-refund"));
+
+    const refusal = await screen.findByTestId("payment-short-refund-error");
+    expect(normalized(refusal)).toContain("Este pedido não pode mais ser cancelado.");
+    expect(screen.getByTestId("payment-short-open")).toBeTruthy();
+    await waitFor(() => expect((screen.getByTestId("payment-short-refund") as HTMLButtonElement).disabled).toBe(false));
+    expect((screen.getByTestId("payment-short-pay") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows the wire's offline sentence when the request never reached the server", async () => {
+    const offline = createCheckoutClient({ copy, fetchImpl: async () => Promise.reject(new TypeError("Failed to fetch")) });
+    const client = { ...wiredClient(), requestShortRefund: vi.fn(offline.requestShortRefund!) };
+    renderList({ config: onPageStore(), client: client as never, createOrder: async (input) => pixOrder(input) });
+
+    await payByPix();
+    fireEvent.click(await screen.findByTestId("payment-short-refund"));
+
+    expect(normalized(await screen.findByTestId("payment-short-refund-error"))).toContain(copy.offline);
+  });
+});

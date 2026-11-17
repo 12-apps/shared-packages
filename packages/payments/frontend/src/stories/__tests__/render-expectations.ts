@@ -174,6 +174,10 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     absentText: ["A loja devolveu", "mesmo meio de pagamento"],
     absentTestIds: ["payment-short-pay", "payment-short-refund"],
   },
+  "Screens/StatusShortRefundRefused": {
+    testIds: ["payment-short-open", "payment-short-pay", "payment-short-refund", "payment-short-refund-error"],
+    text: ["Faltam R$ 13,80 para fechar o pedido", "Não foi possível devolver agora. Tente de novo em instantes."],
+  },
   "Screens/StatusShortRefundPending": {
     testIds: ["payment-short-refund-pending"],
     text: ["A devolução de R$ 6,90 está em andamento", "Você recebe um aviso quando o valor voltar."],

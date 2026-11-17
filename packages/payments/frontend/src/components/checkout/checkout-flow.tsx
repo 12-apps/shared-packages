@@ -240,6 +240,7 @@ interface ShortStatusProps {
   onPayDifference?: () => void;
   onRequestRefund?: () => void;
   shortBusy: "refund" | null;
+  shortError: string | null;
 }
 
 /**
@@ -258,6 +259,7 @@ function shortStatusProps(
     shortfall,
     stockGone,
     shortBusy: short.busy,
+    shortError: short.refundError,
     ...shortActs(c, short, { orderId, dueCents: shortfall ? shortfall.dueCents : 0 }),
   };
 }

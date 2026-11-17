@@ -48,6 +48,10 @@ export function useShortPayment(
 ) {
   const [facts, setFacts] = useState<KnownStatusFacts | null>(null);
   const [busy, setBusy] = useState<"refund" | null>(null);
+  // Why the last refund was not taken: the server's sentence, or the wire's own when offline.
+  const [refundError, setRefundError] = useState<string | null>(null);
+  // Set before the request, so a second tap dispatched before the re-render sends nothing.
+  const refunding = useRef(false);
   // The difference being paid, in cents, from the press of "Pagar R$ X" on.
   const [payingCents, setPayingCents] = useState<number | null>(null);
   const paying = useRef(false);
@@ -76,11 +80,18 @@ export function useShortPayment(
 
   const refund = useCallback(
     async (orderId: string) => {
-      if (!requestShortRefund) return;
+      if (!requestShortRefund || refunding.current) return;
+      refunding.current = true;
       setBusy("refund");
-      const answered = await requestShortRefund(orderId);
-      setBusy(null);
-      if (answered.ok) report(orderId, answered.data);
+      setRefundError(null);
+      try {
+        const answered = await requestShortRefund(orderId);
+        if (answered.ok) report(orderId, answered.data);
+        else setRefundError(answered.error);
+      } finally {
+        refunding.current = false;
+        setBusy(null);
+      }
     },
     [requestShortRefund, report],
   );
@@ -89,6 +100,7 @@ export function useShortPayment(
     facts,
     report,
     busy,
+    refundError,
     payingCents,
     routedCreateOrder,
     startDifference,

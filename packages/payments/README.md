@@ -146,6 +146,10 @@ When a capture arrives short of the total, `/status` answers the host's token wi
 
 The host only says where its routes are, as whole paths with `:ref` for the order. It sets `shortPaymentRoutes: { payDifference, refund }` on `CheckoutTransport`, or passes `<CheckoutFlow shortPaymentRoutes>` when it mounts the flow by hand. Both routes default to `<baseUrl>/orders/:ref/pay-difference` and `<baseUrl>/orders/:ref/short-refund`. A `payDifference` or `requestShortRefund` port passed to the flow still wins. A decline sends no fact, so it keeps today's screen.
 
+**Sending a `shortfall` means mounting both routes, or passing both ports.** The checkout client always carries the two calls. Once `/status` states a shortfall, the flow offers "pay the difference" and "cancel and refund", and a host that mounted neither leaves those buttons answering 404.
+
+A refused or offline refund is shown under the two actions, which stay usable for a retry. The refusal shows the server's `error`, or the transport's own `offline` sentence when the request never reached the server.
+
 `resolution` says where the short stands:
 
 - `null` while the buyer can still act.
