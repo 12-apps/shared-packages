@@ -3,11 +3,7 @@
  * of rows (`buildMatrix`), and cut down to a screen's own rows by stable key
  * (`selectComparisonRows`). `comparison-matrix.tsx` draws what this builds.
  */
-import type {
-  ComparisonLine,
-  ComparisonRowRequest,
-  ComparisonTier,
-} from "../plan-wire";
+import type { ComparisonLine, ComparisonRowRequest, ComparisonTier } from '../plan-wire';
 
 /** One row: the label, and what each tier makes of it (by tier key). */
 export interface MatrixRow {
@@ -55,9 +51,7 @@ function flatCells(tiers: ComparisonTier[]): FlatCell[] {
  */
 function rowId(sectionTitle: string, line: ComparisonLine): string {
   return JSON.stringify(
-    line.key === undefined
-      ? [sectionTitle, "label", line.label]
-      : [sectionTitle, "key", line.key],
+    line.key === undefined ? [sectionTitle, 'label', line.label] : [sectionTitle, 'key', line.key],
   );
 }
 
@@ -113,19 +107,14 @@ export function selectComparisonRows(
     sections: tier.sections
       .map((section) => ({
         ...section,
-        lines: section.lines.filter(
-          (line) => line.key !== undefined && wanted.has(line.key),
-        ),
+        lines: section.lines.filter((line) => line.key !== undefined && wanted.has(line.key)),
       }))
       .filter((section) => section.lines.length > 0),
   }));
 }
 
 /** The line a tier carries for a stable key, whichever section it sits in. */
-function lineForKey(
-  tier: ComparisonTier,
-  key: string,
-): ComparisonLine | undefined {
+function lineForKey(tier: ComparisonTier, key: string): ComparisonLine | undefined {
   for (const section of tier.sections) {
     const found = section.lines.find((line) => line.key === key);
     if (found !== undefined) return found;
@@ -164,13 +153,13 @@ export function buildRowsMatrix(
     if (cells.size === 0) return [];
     return [
       {
-        id: JSON.stringify(["row", index, request.key]),
+        id: JSON.stringify(['row', index, request.key]),
         label: request.label,
         cells,
       },
     ];
   });
-  return built.length === 0 ? [] : [{ title: "", rows: built }];
+  return built.length === 0 ? [] : [{ title: '', rows: built }];
 }
 
 /** The distinct keys of a screen's rows, in first-seen order. */

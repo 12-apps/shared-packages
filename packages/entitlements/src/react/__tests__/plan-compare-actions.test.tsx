@@ -134,7 +134,7 @@ describe('with no compared row', () => {
 });
 
 describe("the screen's own words around the table", () => {
-  it('draws the subtitle and illustration above the table and the footnote under it', async () => {
+  it('draws the subtitle and illustration above the table and the footnote under the action', async () => {
     mount([FREE, MAX], {
       subtitle: 'What each plan does here.',
       footnote: 'Only plans on sale today.',
@@ -147,7 +147,19 @@ describe("the screen's own words around the table", () => {
     const footnote = screen.getByTestId('plan-compare-footnote');
     expect(footnote.textContent).toBe('Only plans on sale today.');
     expect(intro.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(table.compareDocumentPosition(footnote) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const action = screen.getByTestId('plan-compare-learn-max');
+    expect(table.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(action.compareDocumentPosition(footnote) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Pinned with the actions, not scrolled away inside the content.
+    expect(table.contains(footnote)).toBe(false);
+  });
+
+  it('puts the footnote under the one ask too, in cheapest mode', async () => {
+    mount([FREE, MAX], { offer: 'cheapest', footnote: 'Only plans on sale today.' });
+    const cta = await screen.findByTestId('upsell-cta');
+    expect(cta.compareDocumentPosition(screen.getByTestId('plan-compare-footnote'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it('draws none of them by default', async () => {
