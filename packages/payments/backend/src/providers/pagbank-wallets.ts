@@ -1,6 +1,6 @@
 import type { ApplePayActivation, ApplePayCsr, ResolvedCredentials } from '../core/types';
 
-import { pagbankRequest } from './pagbank-http';
+import { type PagBankFile, pagbankFileRequest } from './pagbank-http';
 
 /**
  * PagBank's Apple Pay certificate round-trip (FUT-472) — the enrolment a
@@ -11,8 +11,11 @@ import { pagbankRequest } from './pagbank-http';
  *      downloads a `.cer` (outside any code path);
  *   3. `POST /wallets/apple-pay/cer` here → PagBank activates the integration.
  *
- * Both calls ride `pagbankRequest` — same bearer auth, same environment
- * routing, same pre-send-only retry — and both parse DEFENSIVELY: PagBank
+ * Both calls ride `pagbankFileRequest` — same bearer auth, same environment
+ * routing, same pre-send-only retry as every PagBank call, but sent with
+ * `Accept: *\/*`: the CSR endpoint answers the FILE (`application/pkcs10`)
+ * and refuses `Accept: application/json` with 406 (FUT-5196, production
+ * 2026-11-17). Both parse DEFENSIVELY: PagBank
  * documents the endpoints but publishes NO response schema for either, so
  * nothing below assumes a field name. The CSR is recognized by its PEM
  * armour wherever it appears; activation is read off the HTTP outcome (a
@@ -46,15 +49,57 @@ function findCsr(value: unknown, depth = 0): string | null {
   return null;
 }
 
+/** The PEM armour of DER bytes, 64 base64 characters per line. */
+function derToPem(base64: string): string {
+  const lines = base64.match(/.{1,64}/g) ?? [];
+  return ['-----BEGIN CERTIFICATE REQUEST-----', ...lines, '-----END CERTIFICATE REQUEST-----'].join('\n');
+}
+
+/** A DER CSR starts with an ASN.1 SEQUENCE in long form (`0x30 0x81`/`0x82`). */
+function isDer(bytes: Uint8Array): boolean {
+  return bytes[0] === 0x30 && (bytes[1] === 0x81 || bytes[1] === 0x82);
+}
+
+function base64Of(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/**
+ * What a file answer says, as a value `findCsr` can search: the body's text,
+ * parsed when it is JSON; a DER body as the base64 it would be armoured from.
+ */
+function bodyOf(file: PagBankFile): unknown {
+  if (file.bytes.length === 0) return undefined;
+  if (isDer(file.bytes)) return base64Of(file.bytes);
+  const text = new TextDecoder().decode(file.bytes);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * The CSR in an answer: PEM wherever it is buried, else a bare base64 DER
+ * (`MII…`, what a PEM body looks like without its armour) given its armour.
+ */
+function csrOf(raw: unknown): string | null {
+  const pem = findCsr(raw);
+  if (pem) return pem;
+  if (typeof raw !== 'string') return null;
+  const bare = raw.replace(/\s+/g, '');
+  return /^MII[A-Za-z0-9+/]+={0,2}$/.test(bare) ? derToPem(bare) : null;
+}
+
 /** Step 1: mint the CSR the merchant submits to Apple. */
 export async function requestApplePayCsr(
   credentials: ResolvedCredentials,
 ): Promise<ApplePayCsr> {
   if (credentials.stub) return { csr: STUB_CSR, raw: { stub: true } };
-  const raw = await pagbankRequest<unknown>('/wallets/apple-pay/csr', credentials, {
-    method: 'POST',
-  });
-  return { csr: findCsr(raw), raw };
+  const raw = bodyOf(await pagbankFileRequest('/wallets/apple-pay/csr', credentials, { method: 'POST' }));
+  return { csr: csrOf(raw), raw };
 }
 
 /**
@@ -77,8 +122,8 @@ export async function activateApplePayCertificate(
   // field `cer` (`--form 'cer=@"arquivo.cer"'`), not a JSON body (FUT-3757).
   const form = new FormData();
   form.append('cer', new Blob([certificateBytes(certificate)]), 'apple_pay.cer');
-  const raw = await pagbankRequest<unknown>('/wallets/apple-pay/cer', credentials, { method: 'POST', form });
-  // `pagbankRequest` throws on every non-2xx, so reaching here IS activation
+  const raw = bodyOf(await pagbankFileRequest('/wallets/apple-pay/cer', credentials, { method: 'POST', form }));
+  // `pagbankFileRequest` throws on every non-2xx, so reaching here IS activation
   // as far as the wire can say.
   return { activated: true, raw };
 }

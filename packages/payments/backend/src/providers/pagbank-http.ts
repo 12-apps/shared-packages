@@ -203,13 +203,13 @@ export function pagbankIdempotencyKey(key: string): string {
  */
 function snapshotOf(
   url: string,
-  init: { method: string; body?: unknown; idempotencyKey?: string },
+  init: { method: string; body?: unknown; idempotencyKey?: string; accept?: string },
 ): ProviderRequestSnapshot {
   return {
     method: init.method,
     url,
     headers: {
-      Accept: 'application/json',
+      Accept: init.accept ?? JSON_ACCEPT,
       'Content-Type': 'application/json',
       // Never the real token. It is not captured and then hidden — it is
       // never read into the snapshot at all.
@@ -220,18 +220,41 @@ function snapshotOf(
   };
 }
 
-export async function pagbankRequest<T>(
+/** The `Accept` every JSON endpoint is sent with. */
+const JSON_ACCEPT = 'application/json';
+
+interface PagBankRequestInit {
+  method: 'GET' | 'POST';
+  body?: unknown;
+  /** Sends multipart instead of JSON — the one upload PagBank takes (Apple Pay's `.cer`). */
+  form?: FormData;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+  /**
+   * The `Accept` header, `application/json` unless named. PagBank negotiates
+   * content strictly: an endpoint that answers a FILE refuses
+   * `Accept: application/json` with 406 Not Acceptable (FUT-5196 — the Apple
+   * Pay CSR is `application/pkcs10`).
+   */
+  accept?: string;
+}
+
+/**
+ * One PagBank call up to a 2xx `Response`: auth, environment routing, the
+ * pre-send-only retry, and the typed error (with a redacted snapshot) on any
+ * other status. How the body is read is the caller's business.
+ */
+async function pagbankFetch(
   path: string,
   credentials: ResolvedCredentials,
-  /** `form` sends multipart instead of JSON — the one upload PagBank takes (Apple Pay's `.cer`). */
-  init: { method: 'GET' | 'POST'; body?: unknown; form?: FormData; idempotencyKey?: string; signal?: AbortSignal },
-): Promise<T> {
+  init: PagBankRequestInit,
+): Promise<Response> {
   const url = `${apiBaseFor(credentials)}${path}`;
   return withNetworkRetry(async () => {
     const res = await recordedFetch(url, {
       method: init.method,
       headers: {
-        Accept: 'application/json',
+        Accept: init.accept ?? JSON_ACCEPT,
         // A multipart body names its own boundary in the Content-Type fetch sets.
         ...(init.form ? {} : { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${credentials.fields['token'] ?? ''}`,
@@ -257,8 +280,41 @@ export async function pagbankRequest<T>(
         },
       );
     }
-    return (await res.json()) as T;
+    return res;
   });
+}
+
+export async function pagbankRequest<T>(
+  path: string,
+  credentials: ResolvedCredentials,
+  init: Omit<PagBankRequestInit, 'accept'>,
+): Promise<T> {
+  const res = await pagbankFetch(path, credentials, init);
+  return (await res.json()) as T;
+}
+
+/** A non-JSON answer, as it came off the wire. */
+export interface PagBankFile {
+  contentType: string | null;
+  bytes: Uint8Array;
+}
+
+/**
+ * A call to an endpoint that answers a FILE rather than JSON (Apple Pay's CSR,
+ * FUT-5196). Sent with `Accept: *\/*` — what PagBank's own curl example sends —
+ * and read as bytes, so a PEM, a JSON envelope and a DER body all survive for
+ * the caller to recognize.
+ */
+export async function pagbankFileRequest(
+  path: string,
+  credentials: ResolvedCredentials,
+  init: Omit<PagBankRequestInit, 'accept'>,
+): Promise<PagBankFile> {
+  const res = await pagbankFetch(path, credentials, { ...init, accept: '*/*' });
+  return {
+    contentType: res.headers?.get?.('content-type') ?? null,
+    bytes: new Uint8Array(await res.arrayBuffer()),
+  };
 }
 
 /** The response as PagBank meant it, falling back to the raw text. */
