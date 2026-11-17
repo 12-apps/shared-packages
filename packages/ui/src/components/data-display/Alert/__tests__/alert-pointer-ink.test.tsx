@@ -15,7 +15,7 @@
  * actually emits that step, on those two lines, at those amounts).
  */
 import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { createTheme, ThemeProvider } from '../../../../mui/styles';
 import { muiThemeOptionsFrom } from '../../../../provider/mui-bridge';
@@ -155,43 +155,54 @@ describe('Given the rule the sheet emits', () => {
   const VARIANTS = ['info', 'success', 'warning', 'danger', 'glass', 'gradient'] as const;
   const titled = (mode: Mode) =>
     createTheme({ ...muiThemeOptionsFrom(createUiTheme({ mode })), uiAlert: { iconPlacement: 'title' } });
-  const emitted = (): string => {
-    for (const mode of MODES) {
-      for (const variant of VARIANTS) {
-        render(
-          <ThemeProvider theme={createTheme(muiThemeOptionsFrom(createUiTheme({ mode })))}>
-            <Alert variant={variant} title="Atenção" description="mensagem" closable closeLabel="Fechar" data-testid="surface" />
-            <Alert variant={variant}>Só o texto, como filho.</Alert>
-          </ThemeProvider>,
-        );
-        render(
-          <ThemeProvider theme={titled(mode)}>
-            <Alert variant={variant} title="Atenção" description="mensagem" />
-          </ThemeProvider>,
-        );
-      }
-    }
-    return Array.from(document.querySelectorAll('style'))
+  /**
+   * Every rule the sheet emits for the variants, both modes and both icon
+   * placements. Rendered ONCE for the block, in one tree, and unmounted: the
+   * cases only read the CSS string. Each case used to render the 24-root matrix
+   * itself — the first one twice, 48 roots left mounted — which took 5.5 s on a
+   * loaded runner against a 5 s timeout (FUT-4811). Emotion keeps a style it
+   * inserted, so a second pass emitted nothing the first had not.
+   */
+  let css = '';
+  beforeAll(() => {
+    const { unmount } = render(
+      <>
+        {MODES.flatMap((mode) =>
+          VARIANTS.map((variant) => (
+            <div key={`${mode}-${variant}`}>
+              <ThemeProvider theme={createTheme(muiThemeOptionsFrom(createUiTheme({ mode })))}>
+                <Alert variant={variant} title="Atenção" description="mensagem" closable closeLabel="Fechar" />
+                <Alert variant={variant}>Só o texto, como filho.</Alert>
+              </ThemeProvider>
+              <ThemeProvider theme={titled(mode)}>
+                <Alert variant={variant} title="Atenção" description="mensagem" />
+              </ThemeProvider>
+            </div>
+          )),
+        )}
+      </>,
+    );
+    css = Array.from(document.querySelectorAll('style'))
       .map((el) => el.textContent ?? '')
       .join('\n');
-  };
+    unmount();
+  });
   const percent = (step: number): string => `${Math.round((1 - step) * 100)}%`;
   const steppedParts = (css: string): string[] =>
     css
       .split('}')
       .filter((chunk) => chunk.includes('color-mix(in srgb, currentColor'))
       .flatMap((chunk) => selectorParts(chunk.slice(0, chunk.indexOf('{'))));
-  const steppedTargets = (): string[] => [...new Set(steppedParts(emitted()).map(targetOf))];
+  const steppedTargets = (): string[] => [...new Set(steppedParts(css).map(targetOf))];
 
   it('steps the title, the description and the children, and nothing else, while hovered or pressed', () => {
-    const parts = steppedParts(emitted());
+    const parts = steppedParts(css);
     expect(parts.length).toBeGreaterThan(0);
     for (const part of parts) expect(part).toMatch(/:(hover|active)/);
     expect(steppedTargets().sort()).toEqual(['.MuiAlertTitle-root', '.alert-children', '.alert-description']);
   });
 
   it('steps by the hover and the press amounts, toward the side', () => {
-    const css = emitted();
     const hovered = blocksFor(css, ':hover').join('\n');
     const pressed = blocksFor(css, ':active').join('\n');
     expect(hovered).toContain(`color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.hover.black)}, #000)`);
