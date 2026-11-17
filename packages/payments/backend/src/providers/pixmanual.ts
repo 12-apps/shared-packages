@@ -98,6 +98,9 @@ function createCharge(input: ChargeInput, credentials: ResolvedCredentials, now:
     amount: input.amount,
     method: 'PIX',
     pix: { qrText, expiresAt: new Date(now() + settings.windowMinutes * 60_000).toISOString() },
+    // The txid tag 62/05 carries — what the payer's bank echoes back (FUT-2239).
+    // No PSP: that is the store's own bank, which this adapter cannot know.
+    transaction: { txid: sanitizeTxId(input.reference) },
   };
 }
 

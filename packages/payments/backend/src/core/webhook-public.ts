@@ -6,6 +6,7 @@
  * that starts hiding capabilities to stay small. Every name is re-exported from
  * the root unchanged, so nothing an adopter imports moves.
  */
+export type { ChargeTransaction } from './charge-transaction';
 export { classifyReversalEvent } from './reversal';
 export type { DisputeFacts, RefundFacts, ReversalFacts } from './reversal';
 export {
