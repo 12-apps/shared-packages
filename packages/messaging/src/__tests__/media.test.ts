@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChannelAdapter } from "../core/channel";
+import { ChannelMediaFailure, type ChannelAdapter } from "../core/channel";
+import { createMemoryMessagingStore } from "../core/memory-store";
+import type { MessagingStore } from "../core/store";
 import { DEFAULT_MEDIA_MAX_BYTES } from "../core/media";
 import { textMessage, voiceNote } from "./fixtures";
 import { OTHER_TENANT, TENANT, TOKEN, createHarness, type RecordedCall } from "./harness";
@@ -37,6 +39,7 @@ async function refusal(promise: Promise<unknown>) {
   } catch (error) {
     const text = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
     expect(text).not.toContain(TOKEN);
+    if (error instanceof Error && error.cause !== undefined) expect(String(error.cause)).not.toContain(TOKEN);
     return error as Error & { code: string };
   }
   throw new Error("expected a refusal");
@@ -125,5 +128,42 @@ describe("downloading a voice note's media", () => {
     expect(error).toMatchObject({ code: "CHANNEL_FAILED" });
     expect(error.message).toContain("MEDIA_HOST_REFUSED");
     expect(h.calls.map((call) => call.url)).toEqual([`https://graph.example.test/v23.0/${MEDIA_ID}`]);
+  });
+
+  it("refuses a cap or a deadline that would not bound the download, before reading anything", async () => {
+    const { h, message } = await withVoiceNote();
+    for (const options of [{ maxBytes: NaN }, { maxBytes: Infinity }, { maxBytes: 0 }, { maxBytes: -5 }, { timeoutMs: Infinity }, { timeoutMs: 0.5 }]) {
+      expect(await refusal(h.engine.downloadMedia(TENANT, message.id, options))).toMatchObject({ name: "MessagingMediaError", code: "BAD_OPTIONS" });
+    }
+    expect(h.calls).toHaveLength(0);
+  });
+
+  it("reports an adapter's deadline as TIMEOUT, and hands the adapter the deadline asked for", async () => {
+    const seen: (number | undefined)[] = [];
+    const timingOut = (adapter: ChannelAdapter): ChannelAdapter => ({
+      ...adapter,
+      fetchMedia: async (input) => {
+        seen.push(input.timeoutMs);
+        throw new ChannelMediaFailure("TIMEOUT", "the media download did not finish within 7 ms");
+      },
+    });
+    const { h, message } = await withVoiceNote({ adapter: timingOut });
+
+    expect(await refusal(h.engine.downloadMedia(TENANT, message.id, { timeoutMs: 7 }))).toMatchObject({ code: "TIMEOUT" });
+    expect(await refusal(h.engine.downloadMedia(TENANT, message.id))).toMatchObject({ code: "TIMEOUT" });
+    expect(seen).toEqual([7, 30_000]);
+  });
+
+  it("refuses a download on a store that cannot read a message by id", async () => {
+    const store: MessagingStore = { ...createMemoryMessagingStore() };
+    delete store.getMessage;
+    const h = createHarness({ store, answer: mediaAnswer() });
+    await h.connect();
+    await h.deliver(voiceNote());
+    const conversation = (await h.store.findConversation(TENANT, "whatsapp", "5511987654321"))!;
+    const [message] = await h.store.listMessages(TENANT, conversation.id);
+
+    expect(await refusal(h.engine.downloadMedia(TENANT, message!.id))).toMatchObject({ code: "UNSUPPORTED" });
+    expect(h.calls).toHaveLength(0);
   });
 });

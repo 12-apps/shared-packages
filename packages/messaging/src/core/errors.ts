@@ -54,12 +54,16 @@ export type MessagingMediaErrorCode =
   | "NO_MEDIA"
   /** No adapter for the message's channel is mounted. */
   | "UNKNOWN_CHANNEL"
-  /** The channel's adapter has no media download. */
+  /** The channel's adapter has no media download, or the store cannot read a message by id. */
   | "UNSUPPORTED"
   /** The message's connection is not connected (revoked, in error, gone, or holds no credential). */
   | "NOT_CONNECTED"
+  /** `maxBytes` or `timeoutMs` is not a positive safe integer. */
+  | "BAD_OPTIONS"
   /** The media is larger than the cap, as declared or as read. */
   | "TOO_LARGE"
+  /** The download did not finish before its deadline. */
+  | "TIMEOUT"
   /** The channel was called and refused or failed. */
   | "CHANNEL_FAILED";
 

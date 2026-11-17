@@ -1,4 +1,10 @@
-import { ChannelMediaFailure, ChannelSendFailure, type ChannelMedia } from "./channel";
+import {
+  ChannelMediaFailure,
+  ChannelSendFailure,
+  DEFAULT_MEDIA_TIMEOUT_MS,
+  isPositiveSafeInteger,
+  type ChannelMedia,
+} from "./channel";
 import type { EngineContext } from "./context";
 import { errorText, MessagingMediaError } from "./errors";
 import type { MessageView } from "./types";
@@ -9,7 +15,12 @@ export const DEFAULT_MEDIA_MAX_BYTES = 16 * 1024 * 1024;
 export interface DownloadMediaOptions {
   /** The most bytes accepted; larger media is refused (`TOO_LARGE`). Default {@link DEFAULT_MEDIA_MAX_BYTES}. */
   maxBytes?: number;
+  /** The deadline for the whole download; past it the download fails `TIMEOUT`. Default {@link DEFAULT_MEDIA_TIMEOUT_MS}. */
+  timeoutMs?: number;
 }
+
+/** The codes an adapter's failure keeps as the engine's own; every other is `CHANNEL_FAILED`. */
+const KEPT_CODES = new Set<string>(["TOO_LARGE", "TIMEOUT", "BAD_OPTIONS"]);
 
 /** The media id of a message that has downloadable media: an inbound audio. */
 function mediaIdOf(message: MessageView): string {
@@ -39,8 +50,8 @@ function mediaFailureOf(error: unknown, credential: string): MessagingMediaError
   const coded = error instanceof ChannelMediaFailure || error instanceof ChannelSendFailure;
   const raw = coded ? `${error.code}: ${error.message}` : errorText(error);
   const text = (credential ? raw.split(credential).join("[credential]") : raw).slice(0, 500);
-  const code = error instanceof ChannelMediaFailure && error.code === "TOO_LARGE" ? "TOO_LARGE" : "CHANNEL_FAILED";
-  return new MessagingMediaError(code, text);
+  const kept = error instanceof ChannelMediaFailure && KEPT_CODES.has(error.code);
+  return new MessagingMediaError(kept ? (error.code as "TOO_LARGE" | "TIMEOUT" | "BAD_OPTIONS") : "CHANNEL_FAILED", text);
 }
 
 /**
@@ -54,12 +65,19 @@ export async function downloadMedia(
   messageId: string,
   options: DownloadMediaOptions = {},
 ): Promise<ChannelMedia> {
-  const message = await ctx.config.store.getMessage(tenantId, messageId);
+  const maxBytes = options.maxBytes ?? DEFAULT_MEDIA_MAX_BYTES;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_MEDIA_TIMEOUT_MS;
+  if (!isPositiveSafeInteger(maxBytes) || !isPositiveSafeInteger(timeoutMs)) {
+    throw new MessagingMediaError("BAD_OPTIONS", "maxBytes and timeoutMs must be positive safe integers");
+  }
+  const { store } = ctx.config;
+  if (!store.getMessage) throw new MessagingMediaError("UNSUPPORTED", "the store cannot read a message by id (getMessage)");
+  const message = await store.getMessage(tenantId, messageId);
   if (!message) throw new MessagingMediaError("NOT_FOUND", `no message ${messageId}`);
   const mediaId = mediaIdOf(message);
   const { fetchMedia, credential, accountId } = await admitDownload(ctx, tenantId, message);
   try {
-    return await fetchMedia({ credential, accountId, mediaId, maxBytes: options.maxBytes ?? DEFAULT_MEDIA_MAX_BYTES });
+    return await fetchMedia({ credential, accountId, mediaId, maxBytes, timeoutMs });
   } catch (error) {
     throw mediaFailureOf(error, credential);
   }

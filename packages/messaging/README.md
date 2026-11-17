@@ -142,24 +142,30 @@ An inbound voice note is stored with the channel's media id only, never its
 bytes. A host that needs them (to transcribe the note) asks the engine:
 
 ```ts
-const { bytes, mimeType, size } = await engine.downloadMedia(tenantId, messageId, { maxBytes });
+const { bytes, mimeType, size } = await engine.downloadMedia(tenantId, messageId, { maxBytes, timeoutMs });
 ```
 
 The message must be the tenant's, an inbound `AUDIO` with a media id, and its
 connection `CONNECTED`; the sealed credential is opened exactly as a send opens
 it and handed only to the adapter's optional `fetchMedia`. Every refusal is a
-`MessagingMediaError` with a code: `NOT_FOUND`, `NO_MEDIA`, `UNKNOWN_CHANNEL`,
-`UNSUPPORTED` (the adapter has no `fetchMedia`), `NOT_CONNECTED`, `TOO_LARGE`,
-`CHANNEL_FAILED`. None carries the credential: the engine scrubs it even from a
+`MessagingMediaError` with a code: `BAD_OPTIONS` (a `maxBytes` or `timeoutMs`
+that is not a positive safe integer), `NOT_FOUND`, `NO_MEDIA`,
+`UNKNOWN_CHANNEL`, `UNSUPPORTED` (the adapter has no `fetchMedia`, or the store
+no `getMessage`), `NOT_CONNECTED`, `TOO_LARGE`, `TIMEOUT`, `CHANNEL_FAILED`.
+`MessagingStore.getMessage(tenantId, id)` is optional, so a host's own store
+keeps compiling; both shipped stores implement it. None carries the credential: the engine scrubs it even from a
 channel error that echoes it.
 
 The WhatsApp adapter looks the media id up on the Graph API, then downloads the
 URL Meta returns, with the token in the Authorization header and nowhere else.
-That URL must be https on a Meta media host (`graph.mediaHosts`, default
+That URL must be https, with no explicit port, on a Meta media host (`graph.mediaHosts`, default
 `DEFAULT_META_MEDIA_HOSTS`: `lookaside.fbsbx.com`, `*.fbcdn.net`,
 `*.whatsapp.net`), a redirect is refused rather than followed, and the cap
 (`maxBytes`, default 16 MiB) is checked against the declared `file_size` before
-the download and against the bytes actually read during it.
+the download and against the bytes actually read during it. The whole download
+has a deadline (`timeoutMs`, default 30 s, `DEFAULT_MEDIA_TIMEOUT_MS`): both
+calls get an abort signal, and a body still streaming at the deadline is
+cancelled.
 
 **The bytes live only in the returned memory.** The package stores none of
 them, and the host decides retention: none. Transcribe, store the transcript

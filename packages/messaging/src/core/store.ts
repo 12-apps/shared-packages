@@ -84,8 +84,12 @@ export interface MessagingStore {
   /** Insert one; a duplicate `(channel, externalId)` is `created: false` and the existing row. */
   insertMessage(input: NewMessage): Promise<{ created: boolean; message: MessageView }>;
   updateMessage(tenantId: string, id: string, patch: MessagePatch): Promise<MessageView | null>;
-  /** The tenant's message by id; null for another tenant's or none. */
-  getMessage(tenantId: string, id: string): Promise<MessageView | null>;
+  /**
+   * The tenant's message by id; null for another tenant's or none. Optional so
+   * a host's own store keeps compiling; both shipped stores implement it, and
+   * `downloadMedia` is refused (`UNSUPPORTED`) on a store without it.
+   */
+  getMessage?(tenantId: string, id: string): Promise<MessageView | null>;
   listMessages(tenantId: string, conversationId: string): Promise<MessageView[]>;
   /**
    * Stamp a receipt on the tenant's outbound message: the receipt's timestamp

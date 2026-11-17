@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { APP_SECRET, PHONE_NUMBER_ID, VERIFY_TOKEN } from "../../__tests__/fixtures";
-import { createWhatsAppAdapter, type FetchInit, type FetchPort, type FetchResponse, type GraphConfig } from "..";
+import { createWhatsAppAdapter, downloadWhatsAppMedia, type FetchInit, type FetchPort, type FetchResponse, type GraphConfig } from "..";
 
 /**
  * The WhatsApp media download: a Graph lookup of the media id, then a GET of
@@ -33,7 +33,8 @@ function recordingGraph(answers: { lookup?: Answer; download?: Answer }, overrid
   };
   const graph: GraphConfig = { fetch, baseUrl: "https://graph.example.test", apiVersion: "v23.0", ...overrides };
   const adapter = createWhatsAppAdapter({ appSecret: APP_SECRET, verifyToken: VERIFY_TOKEN, graph });
-  const download = (maxBytes = 1024) => adapter.fetchMedia!({ credential: TOKEN, accountId: PHONE_NUMBER_ID, mediaId: MEDIA_ID, maxBytes });
+  const download = (maxBytes = 1024, timeoutMs?: number) =>
+    adapter.fetchMedia!({ credential: TOKEN, accountId: PHONE_NUMBER_ID, mediaId: MEDIA_ID, maxBytes, ...(timeoutMs ? { timeoutMs } : {}) });
   return { calls: recorded, download };
 }
 
@@ -49,6 +50,8 @@ function expectNoToken(calls: Call[], ...rest: unknown[]) {
   for (const value of rest) {
     const text = value instanceof Error ? `${value.message}\n${value.stack ?? ""}` : JSON.stringify(value);
     expect(text).not.toContain(TOKEN);
+    const cause = value instanceof Error ? value.cause : undefined;
+    if (cause !== undefined) expect(cause instanceof Error ? `${cause.message}\n${cause.stack ?? ""}` : JSON.stringify(cause)).not.toContain(TOKEN);
   }
 }
 
@@ -74,6 +77,7 @@ describe("a WhatsApp media download", () => {
     for (const call of calls) {
       expect(call.init.headers.authorization).toBe(`Bearer ${TOKEN}`);
       expect(call.init.redirect).toBe("manual");
+      expect(call.init.signal).toBeInstanceOf(AbortSignal);
       expect(call.init.body).toBeUndefined();
     }
     expectNoToken(calls, media);
@@ -196,6 +200,90 @@ describe("a WhatsApp media download", () => {
   it("refuses a body the fetch port cannot read as binary", async () => {
     const { download } = recordingGraph({ lookup: lookup(), download: { status: 200 } });
     await expect(download()).rejects.toMatchObject({ code: "NO_BINARY_BODY" });
+  });
+});
+
+describe("the media host check", () => {
+  it.each([
+    ["https://x.fbcdn.net/a.ogg", "accepted"],
+    ["https://LOOKASIDE.FBSBX.COM/whatsapp_business/attachments/?mid=1", "accepted"],
+    ["https://fbcdn.net/a.ogg", "MEDIA_HOST_REFUSED"],
+    ["https://lookaside.fbsbx.com./whatsapp_business/attachments/?mid=1", "MEDIA_HOST_REFUSED"],
+    ["https://lookaside.fbsbx.com:8443/whatsapp_business/attachments/?mid=1", "MEDIA_URL_REFUSED"],
+    ["https://evilfbcdn.net/a.ogg", "MEDIA_HOST_REFUSED"],
+    ["https://fbcdn.net.evil.test/a.ogg", "MEDIA_HOST_REFUSED"],
+  ])("%s is %s", async (url, verdict) => {
+    const { calls, download } = recordingGraph({ lookup: lookup({ url }), download: bytes() });
+    if (verdict === "accepted") {
+      await expect(download()).resolves.toMatchObject({ size: AUDIO.length });
+      expect(calls).toHaveLength(2);
+    } else {
+      const error = await failure(download());
+      expect(error).toMatchObject({ code: verdict });
+      // Refused before the token reached it.
+      expect(calls).toHaveLength(1);
+      expectNoToken(calls, error);
+    }
+  });
+});
+
+describe("the media download's limits", () => {
+  it.each([NaN, Infinity, -Infinity, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 2])("refuses maxBytes %s before any call", async (maxBytes) => {
+    const { calls, download } = recordingGraph({ lookup: lookup(), download: bytes() });
+    await expect(download(maxBytes)).rejects.toMatchObject({ name: "ChannelMediaFailure", code: "BAD_OPTIONS" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses a timeoutMs that would not bound the download, called directly too", async () => {
+    const { calls, download } = recordingGraph({ lookup: lookup(), download: bytes() });
+    await expect(download(1024, Infinity)).rejects.toMatchObject({ code: "BAD_OPTIONS" });
+    const graph: GraphConfig = { fetch: async () => ({ status: 200, text: async () => "{}" }), baseUrl: "https://graph.example.test", apiVersion: "v23.0" };
+    await expect(downloadWhatsAppMedia(graph, { token: TOKEN, mediaId: MEDIA_ID, maxBytes: NaN })).rejects.toMatchObject({ code: "BAD_OPTIONS" });
+    await expect(downloadWhatsAppMedia(graph, { token: TOKEN, mediaId: MEDIA_ID, maxBytes: 10, timeoutMs: -1 })).rejects.toMatchObject({ code: "BAD_OPTIONS" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("cancels a body that never ends at the deadline, and fails TIMEOUT", async () => {
+    const read = vi.fn(() => new Promise<{ done: boolean; value?: Uint8Array }>(() => undefined));
+    const cancel = vi.fn(async () => undefined);
+    const { calls, download } = recordingGraph({ lookup: lookup(), download: { status: 200, body: { getReader: () => ({ read, cancel }) } } });
+    const error = await failure(download(1024, 5));
+
+    expect(error).toMatchObject({ name: "ChannelMediaFailure", code: "TIMEOUT" });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(calls[1]!.init.signal!.aborted).toBe(true);
+    expectNoToken(calls, error);
+  });
+
+  it("aborts a call that does not answer by the deadline, through its signal", async () => {
+    const signals: AbortSignal[] = [];
+    const fetch: FetchPort = (_url, init) => {
+      signals.push(init.signal!);
+      // Answers only by rejecting when aborted, as the global fetch does.
+      return new Promise((_resolve, reject) => init.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+    };
+    const graph: GraphConfig = { fetch, baseUrl: "https://graph.example.test", apiVersion: "v23.0" };
+    const error = await failure(downloadWhatsAppMedia(graph, { token: TOKEN, mediaId: MEDIA_ID, maxBytes: 1024, timeoutMs: 5 }));
+
+    expect(error).toMatchObject({ code: "TIMEOUT" });
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.aborted).toBe(true);
+    expectNoToken([], error);
+  });
+
+  it("discards the body of a refused answer, even when cancelling it throws", async () => {
+    for (const status of [302, 500]) {
+      const cancel = vi.fn(async () => undefined);
+      const answered = recordingGraph({ lookup: lookup(), download: { status, body: { getReader: () => ({ read: vi.fn(), cancel: vi.fn() }), cancel } } });
+      await expect(answered.download()).rejects.toMatchObject({ code: status === 302 ? "REDIRECT_REFUSED" : "HTTP_500" });
+      expect(cancel).toHaveBeenCalledTimes(1);
+    }
+    const throwing = vi.fn(() => {
+      throw new Error("locked");
+    });
+    const locked = recordingGraph({ lookup: lookup(), download: { status: 302, body: { getReader: () => ({ read: vi.fn(), cancel: vi.fn() }), cancel: throwing } } });
+    await expect(locked.download()).rejects.toMatchObject({ code: "REDIRECT_REFUSED" });
+    expect(throwing).toHaveBeenCalledTimes(1);
   });
 });
 

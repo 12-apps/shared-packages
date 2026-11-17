@@ -10,6 +10,7 @@ export { createMessagingEngine, type MessagingEngine } from "./core/engine";
 export {
   ChannelMediaFailure,
   ChannelSendFailure,
+  DEFAULT_MEDIA_TIMEOUT_MS,
   isWindowOpen,
   OPEN_SEND_POLICY,
   serviceWindowPolicy,

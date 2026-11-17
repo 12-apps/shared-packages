@@ -19,6 +19,8 @@ export interface FetchInit {
   body?: string;
   /** `manual` for a media download: a redirect is answered, never followed. */
   redirect?: "manual" | "follow" | "error";
+  /** Aborts the call at a media download's deadline. */
+  signal?: AbortSignal;
 }
 
 export interface FetchResponse {
@@ -26,7 +28,7 @@ export interface FetchResponse {
   text(): Promise<string>;
   arrayBuffer?(): Promise<ArrayBuffer>;
   /** The body as a stream; read chunk by chunk so an oversized one is cut off early. */
-  body?: { getReader(): FetchBodyReader } | null;
+  body?: { getReader(): FetchBodyReader; cancel?(reason?: unknown): Promise<void> } | null;
   headers?: { get(name: string): string | null };
 }
 
@@ -76,6 +78,7 @@ interface GraphCall {
   query?: Record<string, string>;
   body?: unknown;
   redirect?: FetchInit["redirect"];
+  signal?: AbortSignal;
 }
 
 /** Drops trailing "/" characters in one linear pass (a regex here backtracks quadratically on library input). */
@@ -99,6 +102,7 @@ function requestOf(graph: GraphConfig, call: GraphCall) {
       headers,
       ...(call.body !== undefined ? { body: JSON.stringify(call.body) } : {}),
       ...(call.redirect ? { redirect: call.redirect } : {}),
+      ...(call.signal ? { signal: call.signal } : {}),
     } satisfies FetchInit,
   };
 }

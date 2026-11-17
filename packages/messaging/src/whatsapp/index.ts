@@ -47,8 +47,8 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       }),
     send: ({ credential, accountId, to, content }) =>
       sendWhatsAppMessage(config.graph, { token: credential, phoneNumberId: accountId, to, content }),
-    fetchMedia: ({ credential, mediaId, maxBytes }) =>
-      downloadWhatsAppMedia(config.graph, { token: credential, mediaId, maxBytes }),
+    fetchMedia: ({ credential, mediaId, maxBytes, timeoutMs }) =>
+      downloadWhatsAppMedia(config.graph, { token: credential, mediaId, maxBytes, ...(timeoutMs !== undefined ? { timeoutMs } : {}) }),
     policy: serviceWindowPolicy(WHATSAPP_SERVICE_WINDOW_MS),
   };
 }

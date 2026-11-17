@@ -49,7 +49,7 @@ export interface ChannelAdapter {
    * id, into memory. OPTIONAL: a channel with no media leaves it out, and the
    * engine refuses a download through it (`UNSUPPORTED`). Throws
    * {@link ChannelMediaFailure} when the channel refuses, or when the media is
-   * larger than `maxBytes` — declared OR actual. The same rule as `send`: the
+   * larger than `maxBytes` — declared OR actual — or past its deadline (`TIMEOUT`). The same rule as `send`: the
    * opened credential is never logged, put in an error, or returned.
    */
   fetchMedia?(input: ChannelMediaInput): Promise<ChannelMedia>;
@@ -79,6 +79,20 @@ export interface ChannelMediaInput {
   mediaId: string;
   /** The most bytes the caller accepts. Larger media is refused, never truncated. */
   maxBytes: number;
+  /**
+   * The deadline for the whole download, lookup and body included; past it the
+   * calls are aborted and the download fails `TIMEOUT`. Default
+   * {@link DEFAULT_MEDIA_TIMEOUT_MS}.
+   */
+  timeoutMs?: number;
+}
+
+/** The default deadline of one media download: 30 s. */
+export const DEFAULT_MEDIA_TIMEOUT_MS = 30_000;
+
+/** Is `value` a usable byte cap or deadline: a positive safe integer (never NaN, Infinity or 0). */
+export function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 /** Downloaded media: in memory only. The package never stores it. */
