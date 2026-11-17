@@ -18,6 +18,8 @@ import type { CheckoutPaymentList } from "./list/types";
 import { PaymentPhase } from "./payment-phase";
 import { StatusFactsReporterProvider } from "./status-facts-context";
 import { useFactsOnSettle, useShortPayment, type ShortPayment, type ShortPaymentPorts } from "./use-short-payment";
+import { ShortPaymentRoutesContext } from "./client-context";
+import type { ShortPaymentRoutes } from "./short-payment-wire";
 
 
 /** What the flow reads off the host's cart — display facts, never money math. */
@@ -65,6 +67,12 @@ export interface CheckoutCartView {
  * pixels render through the slot contract (`components`, see `ui.tsx`).
  */
 export interface CheckoutFlowProps extends CheckoutHostPorts, ShortPaymentPorts {
+  /**
+   * Where a short-paid order's two acts go when this flow is mounted by hand
+   * with no bound client (FUT-612) — see `CheckoutTransport.shortPaymentRoutes`.
+   * A port passed beside it wins.
+   */
+  shortPaymentRoutes?: ShortPaymentRoutes;
   /**
    * Every sentence the flow's own chrome renders — the consent line, the
    * empty cart, the confirmation screen. REQUIRED, with no default:
@@ -232,6 +240,7 @@ interface ShortStatusProps {
   onPayDifference?: () => void;
   onRequestRefund?: () => void;
   shortBusy: "refund" | null;
+  shortError: string | null;
 }
 
 /**
@@ -240,7 +249,6 @@ interface ShortStatusProps {
  * raises the balance order; an act whose port the host did not bind is absent.
  */
 function shortStatusProps(
-  props: Pick<CheckoutFlowProps, "payDifference" | "requestShortRefund">,
   c: ReturnType<typeof useCheckoutController>,
   short: ShortPayment,
 ): ShortStatusProps {
@@ -251,7 +259,8 @@ function shortStatusProps(
     shortfall,
     stockGone,
     shortBusy: short.busy,
-    ...shortActs(props, c, short, { orderId, dueCents: shortfall ? shortfall.dueCents : 0 }),
+    shortError: short.refundError,
+    ...shortActs(c, short, { orderId, dueCents: shortfall ? shortfall.dueCents : 0 }),
   };
 }
 
@@ -260,23 +269,22 @@ function factsOf(orderId: string | null, short: ShortPayment): ShortPayment["fac
   return orderId !== null && short.facts?.orderId === orderId ? short.facts : null;
 }
 
-/** The two acts, each only when the host bound its port. */
+/** The two acts, each only when a port or the client's own wire answers it. */
 function shortActs(
-  props: Pick<CheckoutFlowProps, "payDifference" | "requestShortRefund">,
   c: ReturnType<typeof useCheckoutController>,
   short: ShortPayment,
   target: { orderId: string | null; dueCents: number },
 ): Pick<ShortStatusProps, "onPayDifference" | "onRequestRefund"> {
   const { orderId, dueCents } = target;
   const acts: Pick<ShortStatusProps, "onPayDifference" | "onRequestRefund"> = {};
-  if (props.payDifference) {
+  if (short.canPayDifference) {
     acts.onPayDifference = () => {
-      short.startDifference(dueCents);
+      short.startDifference(dueCents, orderId);
       c.dropOrder();
       c.setStep("payment");
     };
   }
-  if (props.requestShortRefund && orderId !== null) acts.onRequestRefund = () => void short.refund(orderId);
+  if (short.canRequestRefund && orderId !== null) acts.onRequestRefund = () => void short.refund(orderId);
   return acts;
 }
 
@@ -354,7 +362,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
           confirmationHero={confirmationHero}
           confirmationFooter={confirmationFooter}
           backActionEmphasis={backActionEmphasis}
-          short={shortStatusProps(props, c, short)}
+          short={shortStatusProps(c, short)}
         />
       ) : null}
     </CheckoutFrame>
@@ -373,12 +381,14 @@ function differenceLabel(copy: CheckoutViewCopy, payingCents: number | null): st
  * `<CheckoutFlow cart={...} createOrder={...} onExitToMenu={...} />` is a
  * complete buyer checkout; everything else is optional.
  */
-export function CheckoutFlow({ components, parkHostedOrders = true, ...props }: CheckoutFlowProps): JSX.Element {
+export function CheckoutFlow({ components, parkHostedOrders = true, shortPaymentRoutes, ...props }: CheckoutFlowProps): JSX.Element {
   return (
     <CheckoutComponentsProvider components={components}>
       <CheckoutCopyProvider copy={props.copy.screens}>
         <HostedParkingContext.Provider value={parkHostedOrders}>
-          <CheckoutFlowBody {...props} />
+          <ShortPaymentRoutesContext.Provider value={shortPaymentRoutes}>
+            <CheckoutFlowBody {...props} />
+          </ShortPaymentRoutesContext.Provider>
         </HostedParkingContext.Provider>
       </CheckoutCopyProvider>
     </CheckoutComponentsProvider>

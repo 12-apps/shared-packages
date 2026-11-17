@@ -34,13 +34,19 @@ import {
 } from "./client";
 import { useCheckoutCopy } from "./copy-context";
 import type { CheckoutTransportCopy } from "./screens-copy";
+import type { ShortPaymentRoutes } from "./short-payment-wire";
 import { createCheckoutClient, type CheckoutClient } from "./transport";
 
 /** The unbound client: `/api/checkout` on the ambient `fetch`. */
-function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
+function unboundClient(copy: CheckoutTransportCopy, shortPaymentRoutes: ShortPaymentRoutes | undefined): CheckoutClient {
+  // Option C's two acts (FUT-612), at the routes a hand-mounted flow was given.
+  const short = () => createCheckoutClient({ copy, ...(shortPaymentRoutes ? { shortPaymentRoutes } : {}) });
   return {
     getConfig: (tenantSlug) => fetchCheckoutConfig(tenantSlug, copy),
     getStatus: (ref) => pollOrderStatus(ref, copy),
+    // The money facts beside the token (FUT-612): a hand-mounted `<CheckoutFlow>`
+    // reads them from this client, the same `/status` request as `getStatus`.
+    getStatusDetail: (ref) => createCheckoutClient({ copy }).getStatusDetail!(ref),
     charge: (input) => chargeCard(input, copy),
     chargeWallet: (input) => chargeWallet(input, copy),
     listInstruments: (tenantSlug) => listSavedCards(copy, tenantSlug),
@@ -54,10 +60,15 @@ function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
     completeVault: (input) => createCheckoutClient({ copy }).completeVault(input),
     refreshBrowserKey: (input) => refreshCardPublicKey(input, copy),
     threeDSecureSession: (input) => createCheckoutClient({ copy }).threeDSecureSession!(input),
+    payDifference: (input) => short().payDifference!(input),
+    requestShortRefund: (ref) => short().requestShortRefund!(ref),
   };
 }
 
 const CheckoutClientContext = createContext<CheckoutClient | null>(null);
+
+/** The short-payment routes a hand-mounted `<CheckoutFlow>` was given (FUT-612), for the unbound client. */
+export const ShortPaymentRoutesContext = createContext<ShortPaymentRoutes | undefined>(undefined);
 
 /** Point everything below at one bound {@link CheckoutClient}. */
 export function CheckoutClientProvider({
@@ -76,5 +87,6 @@ export function CheckoutClientProvider({
 export function useCheckoutClientApi(): CheckoutClient {
   const provided = useContext(CheckoutClientContext);
   const copy = useCheckoutCopy().screens.transport;
-  return useMemo(() => provided ?? unboundClient(copy), [provided, copy]);
+  const shortPaymentRoutes = useContext(ShortPaymentRoutesContext);
+  return useMemo(() => provided ?? unboundClient(copy, shortPaymentRoutes), [provided, copy, shortPaymentRoutes]);
 }

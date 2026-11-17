@@ -111,6 +111,7 @@ export const CHECKOUT_PROP_ROUTES = {
   requestShortRefund: "usePorts",
   components: "mount",
   parkHostedOrders: "mount",
+  shortPaymentRoutes: "mount",
 } as const satisfies { readonly [K in keyof Required<CheckoutFlowProps>]: PropRoute };
 
 /** Bind the factory over `<CheckoutFlow>`'s props. */
@@ -160,8 +161,8 @@ export function createCheckoutPropsBinding(base: CheckoutPropsBindingBase): Chec
     config,
     mount(flows) {
       return function BoundCheckout(props: CheckoutFlowProps): JSX.Element {
-        const { settlement, parkHostedOrders, components } = props;
-        return createElement(Props.Provider, { value: props }, createElement(flows.Checkout, { settlement, parkHostedOrders, components }));
+        const { settlement, parkHostedOrders, components, shortPaymentRoutes } = props;
+        return createElement(Props.Provider, { value: props }, createElement(flows.Checkout, { settlement, parkHostedOrders, components, shortPaymentRoutes }));
       };
     },
   };
