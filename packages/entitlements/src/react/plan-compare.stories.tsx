@@ -127,6 +127,82 @@ function Demo({
   );
 }
 
+/**
+ * A screen's OWN title and rows (FUT-3921): the first caller words six rows
+ * from three entitlements (a key repeats), and asks for one "Conhecer o
+ * <plano>" per plan on sale. The tiers carry no copy of the screen's.
+ */
+const OWN_ROWS = [
+  { key: 'reports.list', label: 'Lista exportada (envio manual)' },
+  { key: 'reports.email', label: 'Resumo por e-mail' },
+  { key: 'reports.email', label: 'Anexo em PDF no e-mail' },
+  { key: 'reports.email', label: 'Enviar para todos com um toque' },
+  { key: 'reports.auto', label: 'Envio automático todo dia' },
+  { key: 'reports.auto', label: 'Teto de envios por mês' },
+];
+
+function ownTier(
+  key: string,
+  name: string,
+  included: [boolean, boolean, boolean],
+  over: Partial<ComparisonTier> = {},
+): ComparisonTier {
+  const [list, email, auto] = included;
+  return {
+    ...tier(key, name, [false, false, false], over),
+    sections: [
+      {
+        title: 'Relatórios',
+        lines: [
+          { key: 'reports.list', label: 'Lista exportada', included: list, detail: null },
+          { key: 'reports.email', label: 'Resumo por e-mail', included: email, detail: null },
+          { key: 'reports.auto', label: 'Envio automático', included: auto, detail: null },
+        ],
+      },
+    ],
+  };
+}
+
+const OWN_FREE = ownTier('free', 'Grátis', [true, false, false], { current: true, upgrade: false });
+const OWN_PRO = ownTier('pro', 'Pro', [true, true, false]);
+const OWN_MAX = ownTier('max', 'Max', [true, true, true], { recommended: true });
+
+function OwnRowsDemo({
+  tiers,
+  subtitle,
+  footnote,
+}: {
+  tiers: ComparisonTier[];
+  subtitle?: string;
+  footnote?: string;
+}): JSX.Element {
+  const [{ PlanCompare }] = useState(() =>
+    createWebEntitlements({
+      apiBase: '/api/demo',
+      fetchImpl: fakeFetch(tiers),
+      canRequestPlanChange: true,
+      copy: PT_BR_ENTITLEMENTS_WEB_COPY,
+      plansPath: '#plans',
+    }),
+  );
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Open</Button>
+      <PlanCompare
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Relatórios"
+        rows={OWN_ROWS}
+        offer="each"
+        subtitle={subtitle}
+        footnote={footnote}
+        feature="reports.email"
+      />
+    </>
+  );
+}
+
 const meta: Meta = { title: 'Entitlements/PlanCompareDialog' };
 export default meta;
 
@@ -149,3 +225,24 @@ export const NoMatchingRows: StoryObj = { render: () => <Demo keys={['unknown.ke
 
 /** The English pack. */
 export const EnglishCopy: StoryObj = { render: () => <Demo copy={EN_US_ENTITLEMENTS_WEB_COPY} /> };
+
+/** The screen's title and rows, the only plan on sale (Max) offered alone. */
+export const OwnRowsOnePlanOnSale: StoryObj = {
+  render: () => <OwnRowsDemo tiers={[OWN_FREE, OWN_MAX]} />,
+};
+
+/** Two plans on sale: two actions on ONE line at every width, Max solid. */
+export const OwnRowsEachPlan: StoryObj = {
+  render: () => <OwnRowsDemo tiers={[OWN_FREE, OWN_PRO, OWN_MAX]} />,
+};
+
+/** The optional sentence under the title and the note under the table. */
+export const OwnRowsWithSubtitleAndFootnote: StoryObj = {
+  render: () => (
+    <OwnRowsDemo
+      tiers={[OWN_FREE, OWN_MAX]}
+      subtitle="Veja o que cada plano faz nesta tela."
+      footnote="Só aparecem os planos à venda hoje."
+    />
+  ),
+};

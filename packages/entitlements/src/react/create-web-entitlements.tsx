@@ -25,10 +25,10 @@ import { UpsellPromptHost } from './upsell-host';
 import { UpgradeButton, type UpgradeButtonProps } from './upgrade-button';
 import { createWithEntitlement, type EntitlementGate } from './with-entitlement';
 
-/** The default link: a plain anchor. Pass the router's Link to replace it. */
-function PlainAnchor({ to, onClick, children, ...rest }: EntitlementsLinkProps): JSX.Element {
+/** The default link: a plain anchor that keeps every prop it is given. */
+function PlainAnchor({ to, children, ...rest }: EntitlementsLinkProps): JSX.Element {
   return (
-    <a href={to} onClick={onClick} data-testid={rest['data-testid']}>
+    <a href={to} {...rest}>
       {children}
     </a>
   );
@@ -109,7 +109,15 @@ function assertWebConfig(config: WebEntitlementsConfig): void {
  * host chooses a pack by hand), so the fallback is the en-US pack's block.
  */
 function resolveCopy(copy: EntitlementsWebCopy): ResolvedEntitlementsWebCopy {
-  return { ...copy, planCompare: copy.planCompare ?? EN_US_ENTITLEMENTS_WEB_COPY.planCompare };
+  return {
+    ...copy,
+    planCompare: {
+      ...EN_US_ENTITLEMENTS_WEB_COPY.planCompare,
+      ...copy.planCompare,
+      // An explicit `undefined` must not erase the fallback the spread laid down.
+      learnPlan: copy.planCompare?.learnPlan ?? EN_US_ENTITLEMENTS_WEB_COPY.planCompare.learnPlan,
+    },
+  };
 }
 
 export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitlements {

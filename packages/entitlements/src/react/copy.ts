@@ -142,6 +142,15 @@ export interface PlanCompareCopy {
   retry: string;
   /** The close button's accessible name. */
   closeLabel: string;
+  /**
+   * One plan's action when the screen asks for every plan on sale
+   * (`offer: 'each'`): "Conhecer o Max". `planName` is the tier's commercial
+   * name — a pack words the article and the verb, this package only slots
+   * the name. Optional so a host copy object written before it existed still
+   * compiles; the en-US pack's wording fills it in, like the rest of the
+   * block (`resolveCopy`).
+   */
+  learnPlan?: (context: { planName: string }) => string;
 }
 
 export interface UpsellHostCopy {

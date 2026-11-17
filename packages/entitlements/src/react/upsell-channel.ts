@@ -7,9 +7,19 @@
  * A module-level emitter rather than context because 402 interception
  * typically lives on an HTTP client constructed outside the React tree.
  */
-import type { UpsellPrompt } from '../plan-wire';
+import type { ReactNode } from 'react';
 
-export type { UpsellPrompt, UpsellReason } from '../plan-wire';
+import type { UpsellPrompt as WireUpsellPrompt } from '../plan-wire';
+
+export type { UpsellReason } from '../plan-wire';
+
+/**
+ * What a raise carries. The wire prompt plus the one thing that is never wire
+ * data: a node a screen hands the comparison to draw above its table
+ * (`PlanCompareRequest.illustration`). The channel is an in-memory emitter, so
+ * nothing here is serialised.
+ */
+export type UpsellPrompt = WireUpsellPrompt & { compareIllustration?: ReactNode };
 export { upsellPromptFromPaymentRequired } from '../plan-wire';
 
 type UpsellListener = (prompt: UpsellPrompt) => void;

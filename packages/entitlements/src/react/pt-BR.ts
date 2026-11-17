@@ -53,6 +53,7 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: ResolvedEntitlementsWebCopy = {
     alreadyIncluded: 'Seu plano já inclui todos estes recursos.',
     retry: 'Tentar de novo',
     closeLabel: 'Fechar',
+    learnPlan: ({ planName }) => `Conhecer o ${planName}`,
   },
   upsell: {
     reasons: {

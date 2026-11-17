@@ -50,26 +50,65 @@ export interface CompareOffer {
   covered: boolean;
 }
 
+/** Whether a tier marks every row of the matrix as included. */
+function coversEveryRow(tier: ComparisonTier, sections: MatrixSection[]): boolean {
+  return sections.every((section) =>
+    section.rows.every((row) => row.cells.get(tier.key)?.included === true),
+  );
+}
+
 /**
  * What the footer offers, from the already-filtered tiers. `rowCount` is how
  * many rows the matrix shows: a tier that leaves one out does not include
  * "every compared row", however its listed lines read.
+ *
+ * `sections` is given when the screen worded its OWN rows (`rows`): one
+ * entitlement can then fill several rows, so the tier's lines no longer
+ * count the rows and coverage is read off the matrix itself.
  */
 export function compareOffer(
   tiers: ComparisonTier[],
   rowCount: number,
   plan: string | null | undefined,
+  sections?: MatrixSection[],
 ): CompareOffer {
+  const covers = (tier: ComparisonTier): boolean =>
+    sections === undefined ? coversAll(tier, rowCount) : coversEveryRow(tier, sections);
   if (plan !== undefined && plan !== null) {
     return { tier: tiers.find((tier) => tier.key === plan && tier.upgrade) ?? null, covered: false };
   }
   if (rowCount === 0) return { tier: null, covered: false };
   const current = tiers.find((tier) => tier.current);
-  if (current !== undefined && coversAll(current, rowCount)) return { tier: null, covered: true };
-  return {
-    tier: tiers.find((tier) => tier.upgrade && coversAll(tier, rowCount)) ?? null,
-    covered: false,
-  };
+  if (current !== undefined && covers(current)) return { tier: null, covered: true };
+  return { tier: tiers.find((tier) => tier.upgrade && covers(tier)) ?? null, covered: false };
+}
+
+export interface CompareOffers {
+  /** Every upgrade tier in the payload, cheapest first: the ones on sale. */
+  tiers: ComparisonTier[];
+  /** The tenant's own tier already includes every compared row. */
+  covered: boolean;
+}
+
+/**
+ * The `offer: 'each'` reading: not the ONE tier that covers every row but
+ * every upgrade tier the payload carries. The payload is already the tiers
+ * on sale plus the tenant's own (the host's `comparison` builder), so "an
+ * upgrade tier" is "a plan on sale that costs more": a plan off sale never
+ * reaches here to be offered. Nothing is offered when the tenant's own tier
+ * already includes every row.
+ */
+export function compareOffers(
+  tiers: ComparisonTier[],
+  rowCount: number,
+  sections: MatrixSection[],
+): CompareOffers {
+  const current = tiers.find((tier) => tier.current);
+  const covered = rowCount > 0 && current !== undefined && coversEveryRow(current, sections);
+  // No rows: nothing was compared, so there is nothing to look at a plan FOR.
+  // Said by the empty sentence and the all-plans link, as `'cheapest'` does.
+  const offered = covered || rowCount === 0 ? [] : tiers.filter((tier) => tier.upgrade);
+  return { tiers: offered, covered };
 }
 
 type CompareLayout = 'table' | 'stacked';

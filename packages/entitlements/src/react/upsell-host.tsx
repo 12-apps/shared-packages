@@ -11,7 +11,7 @@
  * the host's `switchLocation` map) and never mentions money. `requiredPlan`
  * can be null even on a real plan gap — the pitch line renders only when
  * there is a plan to name, never "Disponível no plano " with a dangling
- * blank. A plan-gap prompt that carries `compareKeys` opens the per-screen
+ * blank. A plan-gap prompt that carries `compareKeys` or `compareRows` opens the per-screen
  * comparison (`PlanCompareDialog`) instead.
  *
  * PRICING copy stays out: the prompt names the tier and files the lead; what
@@ -24,16 +24,21 @@ import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { UpsellPrompt, UpsellReason } from '../plan-wire';
+import type { UpsellReason } from '../plan-wire';
 import { PlanCompareDialog } from './plan-compare-dialog';
 import { createPlanApi, useRead } from './plan-api';
 import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
-import { subscribeToUpsell } from './upsell-channel';
+import { subscribeToUpsell, type UpsellPrompt } from './upsell-channel';
 import type { ResolvedWebConfig } from './web-config';
 
 /** The two reasons an upgrade honestly fixes. */
 function isUpgradeable(reason: UpsellReason): boolean {
   return reason === 'not-entitled' || reason === 'quota-exceeded';
+}
+
+/** A screen asked for its own comparison, by keys or by worded rows. */
+function isComparison(prompt: UpsellPrompt): boolean {
+  return prompt.compareKeys !== undefined || prompt.compareRows !== undefined;
 }
 
 /** The non-sale destination: their own config switch, named per feature. */
@@ -146,16 +151,28 @@ export function UpsellPromptHost({ config }: { config: ResolvedWebConfig }): JSX
   // side by side. Only a SALE gets the comparison: a restricted, suspended or
   // switched-off feature keeps the plain prompt, whose copy says why no plan
   // fixes it.
-  if (prompt.compareKeys !== undefined && isUpgradeable(prompt.reason)) {
+  if (isComparison(prompt) && isUpgradeable(prompt.reason)) {
+    const decor = {
+      title: prompt.compareTitle,
+      subtitle: prompt.compareSubtitle,
+      footnote: prompt.compareFootnote,
+      illustration: prompt.compareIllustration,
+      offer: prompt.compareOffer,
+    };
+    const rows =
+      prompt.compareRows === undefined
+        ? { keys: prompt.compareKeys ?? [] }
+        : { rows: prompt.compareRows };
     return (
       <PlanCompareDialog
         key={id}
         open
         onClose={close}
-        keys={prompt.compareKeys}
         feature={prompt.feature}
         plan={prompt.requiredPlan}
         config={config}
+        {...decor}
+        {...rows}
       />
     );
   }

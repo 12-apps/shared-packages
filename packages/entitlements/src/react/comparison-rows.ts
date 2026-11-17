@@ -3,7 +3,7 @@
  * of rows (`buildMatrix`), and cut down to a screen's own rows by stable key
  * (`selectComparisonRows`). `comparison-matrix.tsx` draws what this builds.
  */
-import type { ComparisonLine, ComparisonTier } from '../plan-wire';
+import type { ComparisonLine, ComparisonRowRequest, ComparisonTier } from '../plan-wire';
 
 /** One row: the label, and what each tier makes of it (by tier key). */
 export interface MatrixRow {
@@ -111,4 +111,74 @@ export function selectComparisonRows(
       }))
       .filter((section) => section.lines.length > 0),
   }));
+}
+
+/** The line a tier carries for a stable key, whichever section it sits in. */
+function lineForKey(tier: ComparisonTier, key: string): ComparisonLine | undefined {
+  for (const section of tier.sections) {
+    const found = section.lines.find((line) => line.key === key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * The matrix for a screen's OWN rows: one row per request, in the screen's
+ * order, labelled with the screen's words and marked from each tier's line
+ * that carries the request's key.
+ *
+ * The screen words its rows because what a feature means HERE is the
+ * screen's to say ("Export to PDF" rather than the catalogue's "Reports"), not the plan
+ * page's catalogue sentence. So the same key may open several rows: one
+ * entitlement can gate several things the screen lists apart, and each gets a
+ * row of its own (the row's identity is its position, never its key). A key
+ * no tier carries drops its row, as an unknown key does for `keys`: a host
+ * that has not shipped the line yet must not paint a column of crosses
+ * claiming no plan includes the thing. A tier that lacks a line others
+ * carry reads as not including it, like every matrix here.
+ *
+ * One untitled section: the screen's rows are one list, and the matrix
+ * draws no heading for a single section.
+ */
+export function buildRowsMatrix(
+  tiers: ComparisonTier[],
+  rows: readonly ComparisonRowRequest[],
+): MatrixSection[] {
+  const built = rows.flatMap((request, index): MatrixRow[] => {
+    const cells = new Map<string, ComparisonLine>();
+    for (const tier of tiers) {
+      const line = lineForKey(tier, request.key);
+      if (line !== undefined) cells.set(tier.key, line);
+    }
+    if (cells.size === 0) return [];
+    return [
+      {
+        id: JSON.stringify(['row', index, request.key]),
+        label: request.label,
+        cells,
+      },
+    ];
+  });
+  return built.length === 0 ? [] : [{ title: '', rows: built }];
+}
+
+/** The distinct keys of a screen's rows, in first-seen order. */
+export function keysOfRows(rows: readonly ComparisonRowRequest[]): string[] {
+  return [...new Set(rows.map((row) => row.key))];
+}
+
+/** The matrix rows: the screen's own, or the payload's lines it named by key. */
+export function matrixForRequest(
+  tiers: ComparisonTier[],
+  request: {
+    keys?: readonly string[] | undefined;
+    rows?: readonly ComparisonRowRequest[] | undefined;
+  },
+): { selected: ComparisonTier[]; sections: MatrixSection[] } {
+  if (request.rows !== undefined) {
+    const selected = selectComparisonRows(tiers, keysOfRows(request.rows));
+    return { selected, sections: buildRowsMatrix(selected, request.rows) };
+  }
+  const selected = selectComparisonRows(tiers, request.keys ?? []);
+  return { selected, sections: buildMatrix(selected) };
 }
