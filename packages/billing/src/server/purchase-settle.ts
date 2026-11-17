@@ -8,6 +8,7 @@ import {
   type SettledPurchase,
 } from "./purchase-ports";
 import { createPurchaseReconcile } from "./purchase-reconcile";
+import { messageOf } from "./purchase-verdict";
 
 /**
  * Settling a purchase (FUT-5094): the webhook's path and the sweep's, one
@@ -21,7 +22,8 @@ import { createPurchaseReconcile } from "./purchase-reconcile";
  * 2. **Already settled:** by THIS charge, a replay (`"already-settled"`); by
  *    ANOTHER, the customer paid twice (`"duplicate-payment"`, logged, handed
  *    to `onDuplicatePayment`) — nothing is delivered either way.
- * 3. **A shortfall or another currency is refused BEFORE the claim.** A
+ * 3. **A shortfall, another currency, or a currency that cannot be checked
+ *    (no stored charge, no input currency) is refused BEFORE the claim.** A
  *    partial transfer must not move the row to paid; it stays payable and is
  *    logged for a person, once per charge.
  * 4. **The claim is the exactly-once point for the SETTLEMENT.** Only the
@@ -62,12 +64,16 @@ export function createPurchaseSettlement(deps: OneOffPurchaseDeps) {
     return (await deliverPurchase(deps, store, settled)) ? "granted" : "delivery-pending";
   }
 
-  /** A shortfall or a foreign currency, logged at error once per charge. */
+  /** A shortfall, a foreign or uncheckable currency — logged at error once per charge. */
   async function refusalOf(row: PayablePurchase, input: PlatformChargeInput): Promise<PurchaseSettleOutcome | null> {
     const owed = row.purchase.amount;
     const paidIn = input.currency ?? (await storedCurrency(input));
     let refusal: { outcome: PurchaseSettleOutcome; why: string } | null = null;
-    if (paidIn !== null && paidIn !== owed.currency) {
+    if (paidIn === null) {
+      // Fail CLOSED: a charge we hold no row for cannot have its currency
+      // checked here. The sweep reads the provider's own word and decides.
+      refusal = { outcome: "unrecognised-charge", why: `has no stored charge under ${input.reference}; left to the sweep` };
+    } else if (paidIn !== owed.currency) {
       refusal = { outcome: "currency-mismatch", why: `paid in ${paidIn}, owed in ${owed.currency}` };
     } else if (input.amountCents < owed.amountCents) {
       refusal = { outcome: "shortfall", why: `captured ${input.amountCents}, short of ${owed.amountCents}` };
@@ -84,9 +90,7 @@ export function createPurchaseSettlement(deps: OneOffPurchaseDeps) {
   /** The stored charge's currency — a purchase charge's idempotency key IS its reference. */
   async function storedCurrency(input: PlatformChargeInput): Promise<string | null> {
     const stored = await deps.charges.findByIdempotencyKey(deps.merchant, input.reference);
-    if (stored) return stored.snapshot.amount.currency;
-    deps.logger.warn(`purchase charge ${input.providerChargeId}: no stored charge for ${input.reference}; currency unchecked`);
-    return null;
+    return stored ? stored.snapshot.amount.currency : null;
   }
 
   return { settle, reconcileDue: createPurchaseReconcile(deps, settle, now) };
@@ -102,6 +106,11 @@ async function settledAlready(
   deps.logger.error(
     `purchase ${row.purchase.id}: settled by ${row.settlement.providerChargeId}, PAID AGAIN by ${input.providerChargeId} (${input.amountCents}); nothing delivered`,
   );
-  await deps.onDuplicatePayment?.(row.purchase, { amountCents: input.amountCents, providerChargeId: input.providerChargeId });
+  try {
+    await deps.onDuplicatePayment?.(row.purchase, { amountCents: input.amountCents, providerChargeId: input.providerChargeId });
+  } catch (error) {
+    // The outcome stands: a webhook handler that threw would only be replayed into the same answer.
+    deps.logger.error(`purchase ${row.purchase.id}: onDuplicatePayment threw for ${input.providerChargeId}: ${messageOf(error)}`);
+  }
   return "duplicate-payment";
 }

@@ -24,7 +24,13 @@ export async function deliverPurchase(
     deps.logger.error(`purchase ${purchase.id}: settled by ${settlement.providerChargeId}, delivery threw: ${messageOf(error)}`);
     return false;
   }
-  await store.markDelivered(purchase.id);
+  try {
+    await store.markDelivered(purchase.id);
+  } catch (error) {
+    // Delivered, but not recorded: the sweep delivers again, which an idempotent `onSettled` absorbs.
+    deps.logger.error(`purchase ${purchase.id}: delivered, but markDelivered threw: ${messageOf(error)}`);
+    return false;
+  }
   return true;
 }
 

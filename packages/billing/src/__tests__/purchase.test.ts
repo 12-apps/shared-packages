@@ -485,3 +485,61 @@ describe("log noise", () => {
     expect(w.logger.warn).toHaveBeenCalledWith(expect.stringContaining("unreadable: upstream 503"));
   });
 });
+
+describe("failing closed", () => {
+  it("a webhook for a purchase charge with no stored charge does not settle; the sweep settles it with the provider's currency", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    w.charges.clear();
+
+    const { reactor } = hostReactor(w.purchases);
+    const { event, stored } = paidEvent("purchase:pur-1");
+    await reactor(event, stored, MERCHANT);
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1",
+      amountCents: 4_990,
+      providerChargeId: "chg-purchase:pur-1",
+    });
+
+    expect(outcome).toBe("unrecognised-charge");
+    expect(w.store.claimSettled).not.toHaveBeenCalled();
+    expect(w.held.status).toBe("pending");
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("no stored charge under purchase:pur-1"));
+
+    w.provider.refresh = { status: "PAID", amount: { amountCents: 4_990, currency: "BRL" } };
+    expect((await w.purchases.reconcileDue(T0)).settled).toBe(1);
+    expect(w.granted).toHaveLength(1);
+  });
+
+  it("a markDelivered that throws after a delivery is logged, never thrown, and the sweep delivers again", async () => {
+    const w = purchaseWorld();
+    vi.mocked(w.store.markDelivered).mockRejectedValueOnce(new Error("db down"));
+
+    const result = await w.purchases.startByCard(PURCHASE.id);
+
+    expect(result.snapshot?.status).toBe("PAID");
+    expect(w.granted).toHaveLength(1);
+    expect(w.held.delivered).toBe(false);
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("markDelivered threw: db down"));
+
+    expect((await w.purchases.reconcileDue(T0)).delivered).toBe(1);
+    expect(w.granted).toHaveLength(2); // at-least-once: the host's onSettled is idempotent by purchase id
+    expect(w.held.delivered).toBe(true);
+  });
+
+  it("an onDuplicatePayment that throws is logged and the outcome is still duplicate-payment", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByCard(PURCHASE.id);
+    w.hooks.onDuplicatePayment.mockRejectedValueOnce(new Error("alert service down"));
+
+    const outcome = await w.purchases.settlePlatformCharge({
+      reference: "purchase:pur-1--7",
+      amountCents: 4_990,
+      providerChargeId: "chg-other",
+    });
+
+    expect(outcome).toBe("duplicate-payment");
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("onDuplicatePayment threw for chg-other: alert service down"));
+    expect(w.granted).toHaveLength(1);
+  });
+});

@@ -231,7 +231,8 @@ second copy.
 > AT-LEAST-ONCE: it runs for the caller that won the settlement, and
 > `reconcileDue` runs it again for every `undelivered()` row until it returns
 > and `markDelivered` lands — after a throw, after a success whose
-> `markDelivered` failed, or alongside a slow first call.
+> `markDelivered` threw (logged, never thrown on), or alongside a slow first
+> call.
 
 ```ts
 const purchases = createOneOffPurchase({
@@ -276,7 +277,8 @@ The rules it holds:
   `"duplicate-payment"`, is logged at error level and is handed to the
   optional `onDuplicatePayment(purchase, { amountCents, providerChargeId })`
   for the host to refund or alert; it delivers nothing. The hook runs on every
-  confirmation of that charge, so it is idempotent by `providerChargeId`. To
+  confirmation of that charge, so it is idempotent by `providerChargeId`; a
+  throw from it is logged and the outcome stands. To
   narrow the window, the settling caller voids the other attempt's charge
   still open at the provider (`cancelCharge`, best-effort, a failure logged);
   a provider that cannot void leaves that code payable until it lapses.
@@ -285,7 +287,9 @@ The rules it holds:
   delivered, and it is logged at error once per charge (a warning on later
   sweeps). The currency is the input's when given (the sweep's and the card
   path's), else the stored charge's, read from `charges` by the reference —
-  a purchase charge's idempotency key.
+  a purchase charge's idempotency key. **It fails closed:** a purchase charge
+  with neither is refused (`"unrecognised-charge"`, logged at error) and left
+  to `reconcileDue`, which reads the provider's own currency.
 - **An overpayment settles**, delivers the purchase and never more, and is
   reported — `excessCents` on `onSettled`, and a warning — for the host to
   return or keep.

@@ -206,7 +206,7 @@ export interface OneOffPurchaseDeps {
    * AT-LEAST-ONCE. It runs first for the caller whose `claimSettled` won; a
    * throw is logged, never rethrown, and `reconcileDue` calls it again for
    * every `undelivered()` row until it returns (and `markDelivered` lands) —
-   * so it can run again after a success whose `markDelivered` failed, or
+   * so it can run again after a success whose `markDelivered` threw, or
    * while a slow first call is still in flight.
    */
   onSettled(purchase: Purchase, settled: PurchaseSettled): Promise<void>;
@@ -214,8 +214,8 @@ export interface OneOffPurchaseDeps {
    * A purchase already settled by one charge was paid AGAIN by another (an
    * older attempt's code paid late, say). Nothing is delivered for it; this
    * is where the host refunds or alerts. Called on every confirmation of that
-   * charge, so it must be idempotent by `providerChargeId`. Optional: absent,
-   * the error log is the only trace.
+   * charge, so it must be idempotent by `providerChargeId`; a throw is logged
+   * and the outcome stands. Optional: absent, the error log is the only trace.
    */
   onDuplicatePayment?(purchase: Purchase, payment: { amountCents: number; providerChargeId: string }): Promise<void>;
   /**
@@ -234,7 +234,7 @@ export interface PlatformChargeInput {
   reference: string;
   amountCents: number;
   providerChargeId: string;
-  /** Absent from the reactor's input; then read from the stored charge (`charges`). */
+  /** Absent from the reactor's input; then read from the stored charge (`charges`), and with none the charge is refused. */
   currency?: string;
 }
 
@@ -256,6 +256,12 @@ export type PurchaseSettleOutcome =
   | "shortfall"
   /** Paid in another currency than owed: refused like a shortfall. */
   | "currency-mismatch"
+  /**
+   * A purchase charge with no input currency and no stored charge under its
+   * reference: its currency cannot be checked, so it is refused (logged at
+   * error) and left to `reconcileDue`, which reads the provider's currency.
+   */
+  | "unrecognised-charge"
   /** The reference names a purchase the host has no row for (logged). */
   | "unknown";
 
