@@ -136,6 +136,10 @@ describe.each(STORES)("the %s store", (_name, makeStore) => {
     expect(await h.store.getConversation("tenant-b", conversation.id)).toBeNull();
     expect(await h.store.updateConversation("tenant-b", conversation.id, { state: "CLOSED" })).toBeNull();
     expect(await h.store.listMessages("tenant-b", conversation.id)).toEqual([]);
+    const [message] = await h.store.listMessages(TENANT, conversation.id);
+    expect(await h.store.getMessage(TENANT, message!.id)).toEqual(message);
+    expect(await h.store.getMessage("tenant-b", message!.id)).toBeNull();
+    expect(await h.store.getMessage(TENANT, "00000000-0000-0000-0000-000000000000")).toBeNull();
     expect(await h.engine.setSummary("tenant-b", conversation.id, { stolen: true })).toBeNull();
   });
 });

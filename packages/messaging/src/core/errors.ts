@@ -46,6 +46,33 @@ export class MessagingConnectError extends Error {
   }
 }
 
+/** Why a media download was refused or failed. */
+export type MessagingMediaErrorCode =
+  /** No such message in this tenant. */
+  | "NOT_FOUND"
+  /** The message carries no downloadable media (not an inbound audio, or no media id). */
+  | "NO_MEDIA"
+  /** No adapter for the message's channel is mounted. */
+  | "UNKNOWN_CHANNEL"
+  /** The channel's adapter has no media download. */
+  | "UNSUPPORTED"
+  /** The message's connection is not connected (revoked, in error, gone, or holds no credential). */
+  | "NOT_CONNECTED"
+  /** The media is larger than the cap, as declared or as read. */
+  | "TOO_LARGE"
+  /** The channel was called and refused or failed. */
+  | "CHANNEL_FAILED";
+
+/** A media download refused. Its message never carries the credential. */
+export class MessagingMediaError extends Error {
+  readonly code: MessagingMediaErrorCode;
+  constructor(code: MessagingMediaErrorCode, message: string) {
+    super(message);
+    this.name = "MessagingMediaError";
+    this.code = code;
+  }
+}
+
 /** The error text a row keeps: bounded, because a channel's error body can be a page. */
 export function errorText(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);

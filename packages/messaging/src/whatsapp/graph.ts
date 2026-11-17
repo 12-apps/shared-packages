@@ -4,11 +4,43 @@ import type { OutboundContent } from "../core/types";
 /**
  * The only way the adapter reaches Meta: an injected fetch. The global
  * `fetch` satisfies it; a test answers it with a recording fake.
+ *
+ * A JSON call reads `text()` only. A media download also asks for
+ * `redirect: "manual"` (a 3xx comes back as itself, never followed) and reads
+ * the binary body through `body` (a stream, read up to the size cap) or, when
+ * there is none, `arrayBuffer()`. All three are optional so a text-only fake
+ * still satisfies the port.
  */
-export type FetchPort = (
-  url: string,
-  init: { method: string; headers: Record<string, string>; body?: string },
-) => Promise<{ status: number; text(): Promise<string> }>;
+export type FetchPort = (url: string, init: FetchInit) => Promise<FetchResponse>;
+
+export interface FetchInit {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  /** `manual` for a media download: a redirect is answered, never followed. */
+  redirect?: "manual" | "follow" | "error";
+}
+
+export interface FetchResponse {
+  status: number;
+  text(): Promise<string>;
+  arrayBuffer?(): Promise<ArrayBuffer>;
+  /** The body as a stream; read chunk by chunk so an oversized one is cut off early. */
+  body?: { getReader(): FetchBodyReader } | null;
+  headers?: { get(name: string): string | null };
+}
+
+export interface FetchBodyReader {
+  read(): Promise<{ done: boolean; value?: Uint8Array }>;
+  cancel(reason?: unknown): Promise<void>;
+}
+
+/**
+ * The hosts Meta serves WhatsApp media from: the URL a media lookup returns is
+ * `https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=…`, and the
+ * CDN families behind it. `*.` matches any subdomain (not the bare domain).
+ */
+export const DEFAULT_META_MEDIA_HOSTS: readonly string[] = ["lookaside.fbsbx.com", "*.fbcdn.net", "*.whatsapp.net"];
 
 /** Where the Graph API is, and through what. Both numbers are config, never constants in the adapter. */
 export interface GraphConfig {
@@ -17,6 +49,12 @@ export interface GraphConfig {
   baseUrl: string;
   /** `v23.0` — the Graph API version every call is pinned to. */
   apiVersion: string;
+  /**
+   * The hosts a media URL may point at; any other is refused before the token
+   * is sent to it. Exact names, or `*.domain` for its subdomains. Default
+   * {@link DEFAULT_META_MEDIA_HOSTS}.
+   */
+  mediaHosts?: readonly string[];
 }
 
 /** A Graph call that did not answer 2xx. Carries Meta's error code; never the token. */
@@ -37,6 +75,7 @@ interface GraphCall {
   token?: string;
   query?: Record<string, string>;
   body?: unknown;
+  redirect?: FetchInit["redirect"];
 }
 
 /** Drops trailing "/" characters in one linear pass (a regex here backtracks quadratically on library input). */
@@ -55,7 +94,12 @@ function requestOf(graph: GraphConfig, call: GraphCall) {
   if (call.body !== undefined) headers["content-type"] = "application/json";
   return {
     url: `${base}/${graph.apiVersion}/${call.path}${query}`,
-    init: { method: call.method, headers, ...(call.body !== undefined ? { body: JSON.stringify(call.body) } : {}) },
+    init: {
+      method: call.method,
+      headers,
+      ...(call.body !== undefined ? { body: JSON.stringify(call.body) } : {}),
+      ...(call.redirect ? { redirect: call.redirect } : {}),
+    } satisfies FetchInit,
   };
 }
 

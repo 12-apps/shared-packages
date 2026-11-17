@@ -8,11 +8,14 @@
 
 export { createMessagingEngine, type MessagingEngine } from "./core/engine";
 export {
+  ChannelMediaFailure,
   ChannelSendFailure,
   isWindowOpen,
   OPEN_SEND_POLICY,
   serviceWindowPolicy,
   type ChannelAdapter,
+  type ChannelMedia,
+  type ChannelMediaInput,
   type ChannelSendInput,
   type HandshakeAnswer,
   type SendPolicy,
@@ -31,13 +34,16 @@ export {
 } from "./core/ports";
 export {
   MessagingConnectError,
+  MessagingMediaError,
   MessagingSendError,
   type MessagingConnectErrorCode,
+  type MessagingMediaErrorCode,
   type MessagingSendErrorCode,
 } from "./core/errors";
 export { PROCESS_DELIVERY_JOB, type DeliveryOutcome } from "./core/inbox";
 export type { EventOutcome } from "./core/inbound";
 export type { SendAuthor, SendInput } from "./core/sender";
+export { DEFAULT_MEDIA_MAX_BYTES, type DownloadMediaOptions } from "./core/media";
 export type { ConnectInput } from "./core/connections";
 export type {
   ConversationPatch,
