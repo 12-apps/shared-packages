@@ -14,7 +14,7 @@ config**. The package owns the mechanism and none of the policy — see
 | entry | contains | dependencies |
 |---|---|---|
 | `@12-apps/billing` | periods, the lifecycle vocabulary and its ageing, the entitlement seam, usage pricing and its breakdown check | **none** |
-| `@12-apps/billing/server` | the retry policy, the cycle collection binding, the subscription refund, the card vault, the HTTP surface | `@12-apps/payments-backend` (peer) |
+| `@12-apps/billing/server` | the retry policy, the cycle collection binding, one-off purchases, the subscription refund, the card vault, the HTTP surface | `@12-apps/payments-backend` (peer) |
 
 A browser that needs to say "this account is past due" imports the root entry
 and pays nothing for the money path. The split is not taste: the payments
@@ -216,6 +216,73 @@ await refunds.refundUpdated(update);                       // the provider's wor
 await http.handleWebhook(request, { merchant, onWebhookEvent: refunds.onWebhookEvent }, provider);
 await refunds.markNotReturned(paymentId, { by, reason });  // a person, past the deadline
 ```
+
+### One-off purchases
+
+`createOneOffPurchase` sells a customer something ONCE, paid in advance (a
+prepaid pack, say), by a push code or the card on file, and calls the host's
+`onSettled` exactly once when the payment is CONFIRMED. It raises through the
+same `createCycleCollector` a cycle does — platform merchant, deployment
+guard, instrument lookup, idempotent raise, a declined card recording nothing
+— so nothing about the provider path is a second copy.
+
+```ts
+const purchases = createOneOffPurchase({
+  payments, merchant, enabled, instruments,  // the same ones the collection takes
+  purchases: () => purchaseStore(db),        // PurchaseStore, built per call
+  onSettled: async (purchase, settled) => deliver(purchase.id),
+  logger,                                    // { warn, error }; required
+});
+await purchases.startByPush(purchaseId);                               // CollectionResult
+await purchases.startByCard(purchaseId, { cardholderPresent: true });  // a PAID answer settles at once
+await purchases.reconcileDue();                                        // the host's sweep
+```
+
+**The reference says whose charge it is.** Every purchase charge is raised
+under `purchase:<id>` (`PURCHASE_REFERENCE_PREFIX`), and from the second
+attempt on `purchase:<id>--<n>`. The webhook reactor hands every PLATFORM
+payment to the host's one `settlePlatformPayment`, which must ask the
+purchases first and settle a cycle only on `"not-mine"`:
+
+```ts
+createWebhookReactor({
+  // …
+  async settlePlatformPayment(input) {
+    if ((await purchases.settlePlatformCharge(input)) !== "not-mine") return;
+    await settleCycle(input); // unchanged
+  },
+});
+```
+
+A purchase id must not contain `--`; a host cycle id must not start with
+`purchase:` (no uuid or cuid does).
+
+The rules it holds:
+
+- **Exactly once.** Only the caller whose conditional `claimSettled` moved
+  the row to paid calls `onSettled`. A replayed webhook, a racing sweep or a
+  second payment answers `"already-settled"` and delivers nothing.
+- **A shortfall is refused before the claim** (`"shortfall"`, logged): the row
+  stays payable and nothing is delivered for a partial transfer.
+- **An overpayment settles**, delivers the purchase and never more, and is
+  reported — `excessCents` on `onSettled`, and a warning — for the host to
+  return or keep.
+- **A failed attempt can be retried.** A refused card (at `startByCard`) or a
+  lapsed, refused or voided charge (at `reconcileDue`) calls `markFailed`,
+  which advances the row's `attempt`; the retry is raised under the next
+  reference, a FRESH charge rather than the provider's answer to the old key.
+  A lapsed code paid late still settles while nothing else has.
+- **`reconcileDue`** asks the provider about every `unanswered()` charge:
+  paid settles, refused or lapsed fails (a push code by the provider's
+  deadline, else the one recorded at the raise), unreadable is read again next
+  pass. A refunded charge is left for a person.
+- **`onSettled` throwing** is logged and rethrown, and the claim stands. A host
+  whose delivery must be atomic with the claim delivers inside `claimSettled`
+  and passes a no-op `onSettled`.
+
+What stays the host's: the purchase row and its status vocabulary, what is
+delivered, and what an excess or a second payment becomes. The provider's
+charge description is the reference; the receipt copy is the host's.
 
 Nothing here has a parameter a card could travel in. The number goes from the
 cardholder's keyboard to the provider's SDK to the provider; what crosses these
