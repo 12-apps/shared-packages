@@ -135,6 +135,11 @@ describe("the card entry for an existing payable", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     pay();
     await waitFor(() => expect(screen.getByTestId("card-processing")).toBeTruthy());
+    // The spinner is on screen a beat before the effect that starts the wait
+    // runs, and that effect is what arms the 90 s deadline (FUT-5108). Advancing
+    // before it, the fake clock jumped past a deadline not yet set, and one set
+    // after `useRealTimers` never fired. The first ask proves the wait is armed.
+    await waitFor(() => expect(client.pollOrderStatus).toHaveBeenCalled());
     await act(async () => {
       await vi.advanceTimersByTimeAsync(91_000);
     });
