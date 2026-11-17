@@ -161,3 +161,42 @@ describe('mergeRefreshedSnapshot — everything the refresh does report wins', (
     expect(merged.amount).toEqual({ amountCents: 1290, currency: 'BRL' });
   });
 });
+
+describe('mergeRefreshedSnapshot — the transaction ids (FUT-2239)', () => {
+  const APPROVED: ChargeSnapshot = {
+    provider: 'pagbank',
+    providerChargeId: 'CHAR_K',
+    status: 'PAID',
+    amount: { amountCents: 1000, currency: 'BRL' },
+    method: 'CARD',
+    transaction: { nsu: '032416400102', authorizationCode: '145803' },
+  };
+
+  it('keeps an approval trace a refund re-read does not repeat', () => {
+    // A refunded card re-reads as CANCELED, and the adapter names no trace for
+    // an unapproved charge: silence, never a retraction of the recorded fact.
+    const refunded: ChargeSnapshot = {
+      ...APPROVED,
+      status: 'REFUNDED',
+      transaction: { pspCnpjBase: '08561701', settledAt: '2023-02-08T21:29:05.000Z' },
+    };
+
+    expect(mergeRefreshedSnapshot(APPROVED, refunded).transaction).toEqual({
+      nsu: '032416400102',
+      authorizationCode: '145803',
+      pspCnpjBase: '08561701',
+      settledAt: '2023-02-08T21:29:05.000Z',
+    });
+  });
+
+  it('lets a field the refresh reports win', () => {
+    const refreshed: ChargeSnapshot = { ...APPROVED, transaction: { nsu: '999' } };
+    expect(mergeRefreshedSnapshot(APPROVED, refreshed).transaction).toEqual({ nsu: '999', authorizationCode: '145803' });
+  });
+
+  it('keeps the stored ids when the refresh names none, and adds none when neither does', () => {
+    const silent: ChargeSnapshot = { ...APPROVED, transaction: undefined };
+    expect(mergeRefreshedSnapshot(APPROVED, silent).transaction).toEqual(APPROVED.transaction);
+    expect(mergeRefreshedSnapshot(CREATED, UNPAID_REREAD)).not.toHaveProperty('transaction');
+  });
+});

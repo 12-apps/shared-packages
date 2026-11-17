@@ -120,8 +120,7 @@ export { gateIssuesOf, nothingWasAttempted } from './core/walk-failure';
 export type { WalkFailure, WalkFailureKind } from './core/walk-failure';
 // Every provider failure, reported to the host (FUT-4074) — `core/provider-failure.ts`.
 export { describeProviderFailure, redactProviderText } from './core/provider-failure';
-export type { ProviderFailureReport, ProviderFailureReporter, ProviderFailurePath } from './core/provider-failure';
-export type { ProviderFailureSeverity, ProviderFailureSilence } from './core/provider-failure';
+export type { ProviderFailurePath, ProviderFailureReport, ProviderFailureReporter, ProviderFailureSeverity, ProviderFailureSilence } from './core/provider-failure';
 export {
   AdapterContractError,
   AmbiguousChargeError,
@@ -187,6 +186,7 @@ export type {
   ChargeInput,
   ChargeSnapshot,
   ChargeStatus,
+  ChargeTransaction,
   ClientTokenization,
   CredentialFieldSpec,
   CustomerFieldIssue,

@@ -19,8 +19,9 @@ import { ProviderRequestError } from '../core/errors';
 import type { CardFunding } from '../core/card-funding';
 import type { ChargeInput, ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
-import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
+import { pagbankDecline } from './pagbank-declines';
 import { NAME } from './pagbank-http';
+import { pagbankTransaction, type PagBankTraceRawData } from './pagbank-transaction';
 import { capturedAmountCents } from './shared';
 
 /**
@@ -42,9 +43,12 @@ export interface PagBankPixResponse {
 export interface PagBankCardCharge {
   id?: string;
   status?: string;
+  /** When PagBank captured it (FUT-2239). */
+  paid_at?: string;
   /** The ABECS outcome — `code` is the refusal, `raw_data` says which of its
-   *  issuer reasons, the only thing telling an expired card from a typo. */
-  payment_response?: { code?: string; message?: string; raw_data?: PagBankPaymentRawData };
+   *  issuer reasons, the only thing telling an expired card from a typo; on an
+   *  approval, `reference` and `raw_data` carry the NSU and authorisation code. */
+  payment_response?: { code?: string; message?: string; reference?: string; raw_data?: PagBankTraceRawData };
   payment_method?: { type?: string; card?: { id?: string; brand?: string; last_digits?: string } };
 }
 
@@ -65,7 +69,10 @@ export interface PagBankOrderCharge {
   id?: unknown;
   status?: unknown;
   amount?: { value?: unknown; summary?: { refunded?: unknown } };
-  payment_method?: { type?: unknown; pix?: { expiration_date?: unknown } };
+  /** When PagBank captured it, and the trace an approval carries (FUT-2239). */
+  paid_at?: unknown;
+  payment_response?: { code?: unknown; message?: unknown; reference?: unknown; raw_data?: PagBankTraceRawData };
+  payment_method?: { type?: unknown; pix?: { expiration_date?: unknown; end_to_end_id?: unknown } };
 }
 
 export interface PagBankOrderResponse {
@@ -217,6 +224,7 @@ export function orderSnapshot(
     amount: { amountCents: capturedAmountCents(NAME, settled, captured), currency: 'BRL' },
     method: methodOfCharge(paid),
     ...(typeof res.id === 'string' ? { settlementHints: { orderId: res.id } } : {}),
+    transaction: pagbankTransaction(paid),
     raw: res,
   };
 }
@@ -263,6 +271,8 @@ export function mapPix(
     method: 'PIX',
     pix: { qrText, expiresAt: pixExpiry(res) ?? expiresAt },
     settlementHints: { orderId: providerOrderId },
+    // A raised QR: PagBank names no txid for it, so only the PSP (FUT-2239).
+    transaction: pagbankTransaction(undefined),
     raw: res,
   };
 }
@@ -290,13 +300,31 @@ function cardOutcome(
   };
 }
 
+/**
+ * The card as the snapshot names it. `vaultToken` is the id PagBank mints when
+ * it agreed to STORE the card — normalized here so no host has to read this
+ * vendor payload itself; `authorizationCode` is the approval's (FUT-2239).
+ */
+function cardOf(charge: PagBankCardCharge, authorizationCode: string | undefined): ChargeSnapshot['card'] {
+  const card = charge.payment_method?.card;
+  return {
+    brand: card?.brand,
+    last4: card?.last_digits,
+    vaultToken: card?.id,
+    ...(authorizationCode ? { authorizationCode } : {}),
+    // DEBIT_CARD / CREDIT_CARD, as PagBank charged it (FUT-3754): a receipt
+    // or a reconciliation must not call a debit card credit.
+    ...fundingOfMethod(charge.payment_method?.type),
+  };
+}
+
 export function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSnapshot {
   if (!res.id) throw new ProviderRequestError(NAME, 'PagBank card response missing order id.');
   const charge = res.charges?.[0];
   if (!charge?.id) {
     throw new ProviderRequestError(NAME, 'PagBank card response missing charge id.');
   }
-  const card = charge.payment_method?.card;
+  const transaction = pagbankTransaction(charge);
   return {
     provider: NAME,
     providerChargeId: charge.id,
@@ -306,19 +334,11 @@ export function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSna
     ...cardOutcome(charge),
     amount: input.amount,
     method: 'CARD',
-    // `vaultToken` is the id PagBank mints when it agreed to STORE the card —
-    // normalized here so no host has to read this vendor payload itself.
-    card: {
-      brand: card?.brand,
-      last4: card?.last_digits,
-      vaultToken: card?.id,
-      // DEBIT_CARD / CREDIT_CARD, as PagBank charged it (FUT-3754): a receipt
-      // or a reconciliation must not call a debit card credit.
-      ...fundingOfMethod(charge.payment_method?.type),
-    },
+    card: cardOf(charge, transaction.authorizationCode),
     // The container the charge lives under — what `getCharge` polls, since
     // PagBank's read API is keyed by order, not by charge (FUT-681).
     settlementHints: { orderId: res.id },
+    transaction,
     raw: res,
   };
 }

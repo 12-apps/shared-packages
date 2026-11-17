@@ -1,6 +1,6 @@
 import { baseReference } from './reference';
 import { classifyReversalEvent } from './reversal';
-import type { MerchantRef } from './types';
+import type { ChargeTransaction, MerchantRef } from './types';
 import type { NormalizedWebhookEvent } from './webhook-event-types';
 import type { StoredCharge, WebhookEventHandler } from './ports';
 
@@ -55,12 +55,18 @@ export interface WebhookReactorPorts {
    * the real figure through here. So a host COMPARES it against what it is
    * owed rather than assuming coverage — settle iff it covers the payable, and
    * park the shortfall — which is what makes reporting the truth safe.
+   *
+   * `transaction` is the snapshot's own ids (FUT-2239) — the Pix end-to-end id,
+   * the card's NSU and authorisation code, the PSP, the provider's paid-at —
+   * present only when the provider named any, so a host records them without
+   * re-reading the stored snapshot.
    */
   settlePayable(input: {
     reference: string;
     providerChargeId: string;
     method: 'PIX' | 'CARD';
     amountCents: number;
+    transaction?: ChargeTransaction;
   }): Promise<void>;
   /**
    * Is this reference a payable this merchant can still settle? Answering
@@ -303,5 +309,6 @@ function settle(
     providerChargeId: paid.providerChargeId,
     method: paid.method === 'CARD' ? 'CARD' : 'PIX',
     amountCents: paid.amount.amountCents,
+    ...(paid.transaction ? { transaction: paid.transaction } : {}),
   });
 }

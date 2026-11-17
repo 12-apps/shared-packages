@@ -1,3 +1,4 @@
+import type { ChargeTransaction } from './charge-transaction';
 import type { CardDetails } from './card-details';
 import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
@@ -222,12 +223,15 @@ export interface ChargeSnapshot {
    * reads the reason.
    */
   declineRetriable?: boolean;
+  /** The transaction's own identifiers, when the provider names them ({@link ChargeTransaction}). */
+  transaction?: ChargeTransaction;
   /** Set by this package when a newer charge replaced this unvoided one (FUT-4072). */
   superseded?: ChargeSupersession;
   /** Verbatim provider payload, for audit/debugging. Never branch on it. */
   raw?: unknown;
 }
 
+export type { ChargeTransaction } from './charge-transaction';
 export type { RefundInput } from './refund-input';
 
 export interface RefundSnapshot {
