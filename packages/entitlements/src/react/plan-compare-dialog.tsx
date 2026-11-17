@@ -27,38 +27,37 @@
  * sits in the dialog's actions slot, pinned under the scrolling rows, so the
  * one action is on screen at 320 px without a scroll.
  */
-import type { JSX, ReactNode } from 'react';
+import type { JSX, ReactNode } from "react";
 
-import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
-import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
-import { Dialog, DialogActions, DialogContent } from '@12-apps/ui/feedback/Dialog';
-import { Box } from '@12-apps/ui/mui/Box';
-import { Stack } from '@12-apps/ui/mui/Stack';
-import { useTheme } from '@12-apps/ui/mui/styles';
-import { useMediaQuery } from '@12-apps/ui/mui/useMediaQuery';
-import { Text } from '@12-apps/ui/typography/Text';
-
-import type { CompareOfferMode, ComparisonRowRequest, ComparisonTier } from '../plan-wire';
+import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
+import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import {
-  buildMatrix,
-  buildRowsMatrix,
-  keysOfRows,
-  selectComparisonRows,
-  type MatrixSection,
-} from './comparison-rows';
-import { createPlanApi, useRead } from './plan-api';
-import { EachPlanActions } from './plan-compare-each';
+  Dialog,
+  DialogActions,
+  DialogContent,
+} from "@12-apps/ui/feedback/Dialog";
+import { Box } from "@12-apps/ui/mui/Box";
+import { useTheme } from "@12-apps/ui/mui/styles";
+import { useMediaQuery } from "@12-apps/ui/mui/useMediaQuery";
+import { Text } from "@12-apps/ui/typography/Text";
+
+import type {
+  CompareOfferMode,
+  ComparisonRowRequest,
+  ComparisonTier,
+} from "../plan-wire";
+import { keysOfRows, matrixForRequest } from "./comparison-rows";
+import { createPlanApi, useRead } from "./plan-api";
+import { CompareFooter } from "./plan-compare-footer";
+import { CompareFootnote, CompareIntro } from "./plan-compare-intro";
 import {
   compareOffer,
   compareOffers,
   CompareMatrixView,
   useMeasuredWidth,
-  type CompareOffer,
-  type CompareOffers,
-} from './plan-compare-layout';
-import { PlanPitchLine, UpgradeCta } from './upgrade-cta';
-import { raiseUpsell } from './upsell-channel';
-import type { ResolvedWebConfig } from './web-config';
+} from "./plan-compare-layout";
+import { raiseUpsell } from "./upsell-channel";
+import type { ResolvedWebConfig } from "./web-config";
 
 /** What every request carries, whichever way it names its rows. */
 interface PlanCompareBaseRequest {
@@ -134,131 +133,7 @@ export interface PlanCompareProps extends PlanCompareBaseRequest {
 }
 
 /** What the dialog reads: either way of naming rows, neither required here. */
-type PlanCompareRead = Omit<PlanCompareProps, 'open' | 'onClose'>;
-
-/** The all-plans link, with a 40 px hit area (a 16 px line of text is not a target). */
-function AllPlansLink({
-  config,
-  onClose,
-}: {
-  config: ResolvedWebConfig;
-  onClose: () => void;
-}): JSX.Element | null {
-  if (config.plansPath === null) return null;
-  const Link = config.LinkComponent;
-  return (
-    <Box
-      sx={{ '& a': { display: 'inline-flex', alignItems: 'center', minHeight: 40 } }}
-      data-testid="plan-compare-all-plans-target"
-    >
-      <Text as="span" size="sm">
-        <Link to={config.plansPath} onClick={onClose} data-testid="plan-compare-all-plans">
-          {config.copy.upsell.allPlansLink}
-        </Link>
-      </Text>
-    </Box>
-  );
-}
-
-/** The one ask: for the offered tier, then the all-plans link. */
-function SingleAskFooter({
-  offer,
-  feature,
-  config,
-  onClose,
-}: {
-  offer: CompareOffer;
-  feature: string | undefined;
-  config: ResolvedWebConfig;
-  onClose: () => void;
-}): JSX.Element {
-  const offered = offer.tier;
-  const requiredPlan = offered?.key ?? null;
-  const target = feature === undefined ? { requiredPlan } : { requiredPlan, feature };
-  return (
-    <Stack spacing={1} sx={{ width: '100%' }} data-testid="plan-compare-footer">
-      {offer.covered ? (
-        <Text as="div" data-testid="plan-compare-already-included">
-          {config.copy.planCompare.alreadyIncluded}
-        </Text>
-      ) : null}
-      <PlanPitchLine planName={offered?.name ?? null} config={config} />
-      <UpgradeCta target={target} planName={offered?.name ?? null} config={config} />
-      <AllPlansLink config={config} onClose={onClose} />
-    </Stack>
-  );
-}
-
-function CompareFooter({
-  offer,
-  each,
-  feature,
-  config,
-  onClose,
-}: {
-  offer: CompareOffer;
-  each: CompareOffers | null;
-  feature: string | undefined;
-  config: ResolvedWebConfig;
-  onClose: () => void;
-}): JSX.Element {
-  if (each !== null && config.plansPath !== null && each.tiers.length > 0) {
-    return (
-      <EachPlanActions
-        offers={each}
-        plansPath={config.plansPath}
-        config={config}
-        onClose={onClose}
-      />
-    );
-  }
-  return <SingleAskFooter offer={offer} feature={feature} config={config} onClose={onClose} />;
-}
-
-/** The picture and the sentence above the table, when the screen gave either. */
-function CompareIntro({
-  subtitle,
-  illustration,
-  gap,
-}: {
-  subtitle: string | undefined;
-  illustration: ReactNode;
-  gap: number;
-}): JSX.Element | null {
-  const hasText = subtitle !== undefined && subtitle !== '';
-  const hasPicture = illustration !== undefined && illustration !== null && illustration !== false;
-  if (!hasText && !hasPicture) return null;
-  return (
-    <Box
-      sx={{ display: 'flex', alignItems: 'center', columnGap: 2, mb: gap }}
-      data-testid="plan-compare-intro"
-    >
-      {hasPicture ? (
-        <Box sx={{ flexShrink: 0 }} data-testid="plan-compare-illustration">
-          {illustration}
-        </Box>
-      ) : null}
-      {hasText ? (
-        <Text as="div" color="secondary" data-testid="plan-compare-subtitle">
-          {subtitle}
-        </Text>
-      ) : null}
-    </Box>
-  );
-}
-
-/** The matrix rows: the screen's own, or the payload's lines it named by key. */
-function matrixFor(
-  tiers: ComparisonTier[],
-  request: PlanCompareRead,
-): { selected: ComparisonTier[]; sections: MatrixSection[] } {
-  if (request.rows !== undefined) {
-    const selected = selectComparisonRows(tiers, keysOfRows(request.rows));
-    return { selected, sections: buildRowsMatrix(selected, request.rows) };
-  }
-  const selected = selectComparisonRows(tiers, request.keys ?? []);
-  return { selected, sections: buildMatrix(selected) };
-}
+type PlanCompareRead = Omit<PlanCompareProps, "open" | "onClose">;
 
 /**
  * The loaded body, as the dialog's two slots: the rows (or their empty
@@ -278,20 +153,29 @@ function PlanCompareBody({
   onClose: () => void;
 }): JSX.Element {
   const [measureRef, width] = useMeasuredWidth();
-  const { selected, sections } = matrixFor(tiers, request);
-  const rowCount = sections.reduce((sum, section) => sum + section.rows.length, 0);
+  const { selected, sections } = matrixForRequest(tiers, request);
+  const rowCount = sections.reduce(
+    (sum, section) => sum + section.rows.length,
+    0,
+  );
   const offer = compareOffer(
     selected,
     rowCount,
     request.plan,
     request.rows === undefined ? undefined : sections,
   );
-  const each = request.offer === 'each' ? compareOffers(selected, rowCount, sections) : null;
+  const each =
+    request.offer === "each"
+      ? compareOffers(selected, rowCount, sections)
+      : null;
   const copy = config.copy;
   // Under `each` no tier is THE recommendation: the actions below name them all.
   const badges = {
     currentLabel: copy.planCompare.currentBadge,
-    offeredKey: each !== null && config.plansPath !== null ? null : offer.tier?.key ?? null,
+    offeredKey:
+      each !== null && config.plansPath !== null
+        ? null
+        : (offer.tier?.key ?? null),
     offeredLabel: copy.planCompare.offeredBadge,
   };
   return (
@@ -317,13 +201,7 @@ function PlanCompareBody({
             />
           )}
         </Box>
-        {request.footnote === undefined || request.footnote === '' ? null : (
-          <Box sx={{ mt: 1.5 }}>
-            <Text as="div" size="sm" color="secondary" data-testid="plan-compare-footnote">
-              {request.footnote}
-            </Text>
-          </Box>
-        )}
+        <CompareFootnote footnote={request.footnote} />
       </DialogContent>
       <DialogActions alignment="left">
         <CompareFooter
@@ -350,7 +228,11 @@ function PlanCompareLoader({
   onClose: () => void;
 }): JSX.Element {
   const planRead = useRead(() =>
-    createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed).getPlan(),
+    createPlanApi(
+      config.apiBase,
+      config.fetchImpl,
+      config.copy.requestFailed,
+    ).getPlan(),
   );
   if (planRead.pending) {
     return (
@@ -364,7 +246,7 @@ function PlanCompareLoader({
       <DialogContent dense={dense}>
         <ErrorState
           title={config.copy.planPage.loadFailedTitle}
-          message={planRead.error?.message ?? ''}
+          message={planRead.error?.message ?? ""}
           onRetry={planRead.reload}
           retryLabel={config.copy.planCompare.retry}
           dataTestId="plan-compare-error"
@@ -399,7 +281,9 @@ function requestKey(request: PlanCompareRead): string {
 
 /** The screen's title, or the pack's when none (or only blanks) was given. */
 function titleOf(requested: string | undefined, fallback: string): string {
-  return requested !== undefined && requested.trim() !== '' ? requested : fallback;
+  return requested !== undefined && requested.trim() !== ""
+    ? requested
+    : fallback;
 }
 
 /**
@@ -413,13 +297,13 @@ export function PlanCompareDialog({
   ...request
 }: PlanCompareProps & { config: ResolvedWebConfig }): JSX.Element | null {
   const theme = useTheme();
-  const phone = useMediaQuery(theme.breakpoints.down('sm'));
+  const phone = useMediaQuery(theme.breakpoints.down("sm"));
   if (!open) return null;
   return (
     <Dialog
       open
       size="sm"
-      variant={phone ? 'bottom-sheet' : 'default'}
+      variant={phone ? "bottom-sheet" : "default"}
       title={titleOf(request.title, config.copy.planCompare.title)}
       closeLabel={config.copy.planCompare.closeLabel}
       onClose={onClose}
@@ -441,17 +325,28 @@ export function PlanCompareDialog({
  * through the upsell channel. The prompt host mounted in the layout renders
  * it. No-op until a host subscribes.
  */
-export function openPlanCompare(request: PlanCompareRequest & { feature: string }): void {
+export function openPlanCompare(
+  request: PlanCompareRequest & { feature: string },
+): void {
   raiseUpsell({
     feature: request.feature,
     requiredPlan: request.plan ?? null,
-    reason: 'not-entitled',
-    compareKeys: request.rows === undefined ? (request.keys ?? []) : keysOfRows(request.rows),
+    reason: "not-entitled",
+    compareKeys:
+      request.rows === undefined
+        ? (request.keys ?? [])
+        : keysOfRows(request.rows),
     ...(request.title === undefined ? {} : { compareTitle: request.title }),
     ...(request.rows === undefined ? {} : { compareRows: request.rows }),
     ...(request.offer === undefined ? {} : { compareOffer: request.offer }),
-    ...(request.subtitle === undefined ? {} : { compareSubtitle: request.subtitle }),
-    ...(request.footnote === undefined ? {} : { compareFootnote: request.footnote }),
-    ...(request.illustration === undefined ? {} : { compareIllustration: request.illustration }),
+    ...(request.subtitle === undefined
+      ? {}
+      : { compareSubtitle: request.subtitle }),
+    ...(request.footnote === undefined
+      ? {}
+      : { compareFootnote: request.footnote }),
+    ...(request.illustration === undefined
+      ? {}
+      : { compareIllustration: request.illustration }),
   });
 }

@@ -3,7 +3,11 @@
  * of rows (`buildMatrix`), and cut down to a screen's own rows by stable key
  * (`selectComparisonRows`). `comparison-matrix.tsx` draws what this builds.
  */
-import type { ComparisonLine, ComparisonRowRequest, ComparisonTier } from '../plan-wire';
+import type {
+  ComparisonLine,
+  ComparisonRowRequest,
+  ComparisonTier,
+} from "../plan-wire";
 
 /** One row: the label, and what each tier makes of it (by tier key). */
 export interface MatrixRow {
@@ -51,7 +55,9 @@ function flatCells(tiers: ComparisonTier[]): FlatCell[] {
  */
 function rowId(sectionTitle: string, line: ComparisonLine): string {
   return JSON.stringify(
-    line.key === undefined ? [sectionTitle, 'label', line.label] : [sectionTitle, 'key', line.key],
+    line.key === undefined
+      ? [sectionTitle, "label", line.label]
+      : [sectionTitle, "key", line.key],
   );
 }
 
@@ -107,14 +113,19 @@ export function selectComparisonRows(
     sections: tier.sections
       .map((section) => ({
         ...section,
-        lines: section.lines.filter((line) => line.key !== undefined && wanted.has(line.key)),
+        lines: section.lines.filter(
+          (line) => line.key !== undefined && wanted.has(line.key),
+        ),
       }))
       .filter((section) => section.lines.length > 0),
   }));
 }
 
 /** The line a tier carries for a stable key, whichever section it sits in. */
-function lineForKey(tier: ComparisonTier, key: string): ComparisonLine | undefined {
+function lineForKey(
+  tier: ComparisonTier,
+  key: string,
+): ComparisonLine | undefined {
   for (const section of tier.sections) {
     const found = section.lines.find((line) => line.key === key);
     if (found !== undefined) return found;
@@ -151,12 +162,34 @@ export function buildRowsMatrix(
       if (line !== undefined) cells.set(tier.key, line);
     }
     if (cells.size === 0) return [];
-    return [{ id: JSON.stringify(['row', index, request.key]), label: request.label, cells }];
+    return [
+      {
+        id: JSON.stringify(["row", index, request.key]),
+        label: request.label,
+        cells,
+      },
+    ];
   });
-  return built.length === 0 ? [] : [{ title: '', rows: built }];
+  return built.length === 0 ? [] : [{ title: "", rows: built }];
 }
 
 /** The distinct keys of a screen's rows, in first-seen order. */
 export function keysOfRows(rows: readonly ComparisonRowRequest[]): string[] {
   return [...new Set(rows.map((row) => row.key))];
+}
+
+/** The matrix rows: the screen's own, or the payload's lines it named by key. */
+export function matrixForRequest(
+  tiers: ComparisonTier[],
+  request: {
+    keys?: readonly string[] | undefined;
+    rows?: readonly ComparisonRowRequest[] | undefined;
+  },
+): { selected: ComparisonTier[]; sections: MatrixSection[] } {
+  if (request.rows !== undefined) {
+    const selected = selectComparisonRows(tiers, keysOfRows(request.rows));
+    return { selected, sections: buildRowsMatrix(selected, request.rows) };
+  }
+  const selected = selectComparisonRows(tiers, request.keys ?? []);
+  return { selected, sections: buildMatrix(selected) };
 }

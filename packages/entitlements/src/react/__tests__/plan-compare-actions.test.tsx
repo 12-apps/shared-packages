@@ -90,17 +90,16 @@ describe('the link adapter contract', () => {
     mount([FREE, MAX], {}, over);
     const link = await screen.findByTestId('plan-compare-learn-max');
     fireEvent.keyDown(document, { key: 'Tab' });
-    await waitFor(() => {
-      act(() => link.focus());
-      expect(link.className).toContain('Mui-focusVisible');
-    });
+    // The keyboard moves real focus; `fireEvent.focus` would not set :focus-visible.
+    act(() => HTMLElement.prototype.focus.call(link));
+    await waitFor(() => expect(link.className).toContain('Mui-focusVisible'));
   });
 
   it('the default anchor keeps the button class, so it is painted as one', async () => {
     mount([FREE, MAX]);
-    const link = await screen.findByTestId('plan-compare-learn-max');
-    expect(link.className).toContain('MuiButton');
-    expect(link.getAttribute('aria-label')).toBe('Conhecer o Max');
+    const anchor = await screen.findByTestId('plan-compare-learn-max');
+    expect(anchor.className).toContain('MuiButton');
+    expect(anchor.getAttribute('aria-label')).toBe('Conhecer o Max');
   });
 });
 
