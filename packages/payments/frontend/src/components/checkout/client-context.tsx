@@ -41,6 +41,9 @@ function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
   return {
     getConfig: (tenantSlug) => fetchCheckoutConfig(tenantSlug, copy),
     getStatus: (ref) => pollOrderStatus(ref, copy),
+    // The money facts beside the token (FUT-612): a hand-mounted `<CheckoutFlow>`
+    // reads them from this client, the same `/status` request as `getStatus`.
+    getStatusDetail: (ref) => createCheckoutClient({ copy }).getStatusDetail!(ref),
     charge: (input) => chargeCard(input, copy),
     chargeWallet: (input) => chargeWallet(input, copy),
     listInstruments: (tenantSlug) => listSavedCards(copy, tenantSlug),
