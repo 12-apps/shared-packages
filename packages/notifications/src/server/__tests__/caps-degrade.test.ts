@@ -1,7 +1,7 @@
 /* eslint-disable test-flakiness/no-global-state-mutation --
    `sends`, `emails` and `logged` RECORD what crossed the doubles; the db double's
    counter delegate is replaced per case to fail the way a real one can. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ApiNotifications } from '../create-api-notifications';
 
@@ -13,7 +13,8 @@ import { createMemoryDb, type MemoryDb } from './memory-db';
  * event. A counter statement that throws, or a seam without the
  * `notificationSendCounter` delegate, degrades to the free channels exactly as a
  * throwing cap resolver does: the INBOX row is always written (invariant 5), and
- * the missing delegate is reported at mount.
+ * the missing delegate is reported once, on the first use of the caps gate —
+ * never at mount, which touches no database.
  */
 
 interface Harness {
@@ -56,14 +57,35 @@ describe('a send counter that fails', () => {
     expect(h.sends).toEqual([]);
   });
 
-  it('a seam without the delegate: reported at mount, and every emit still writes its inbox row', async () => {
+  it('a seam without the delegate: reported once on the first caps use, and every emit still writes its inbox row', async () => {
     const h = await mountWithCaps((db) => {
       delete (db as { notificationSendCounter?: unknown }).notificationSendCounter;
     });
-    expect(h.logged.some((line) => line.includes('notificationSendCounter'))).toBe(true);
+    const missing = () => h.logged.filter((line) => line.includes('until it is there')).length;
+    expect(missing()).toBe(0);
     const result = await emit(h.api);
     expect(result.channels).toEqual(['EMAIL']);
     expect(h.db.rows.notifications).toHaveLength(1);
     expect(h.sends).toEqual([]);
+    expect(missing()).toBe(1);
+    await emit(h.api);
+    expect(h.db.rows.notifications).toHaveLength(2);
+    expect(missing()).toBe(1);
+  });
+});
+
+describe('mounting with caps', () => {
+  it('touches no database: the db provider is not called at mount', async () => {
+    const db = createMemoryDb();
+    const asked: string[] = [];
+    const provider = vi.fn(() => {
+      asked.push('db');
+      return Promise.resolve(db);
+    });
+    mountContract(db, { caps: { timeZone: 'America/Sao_Paulo' }, db: provider });
+    // A mount-time seam check would be queued as a microtask: drain a few.
+    for (let turn = 0; turn < 5; turn += 1) await Promise.resolve();
+    expect(provider).toHaveBeenCalledTimes(0);
+    expect(asked).toEqual([]);
   });
 });

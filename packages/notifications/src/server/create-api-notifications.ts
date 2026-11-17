@@ -18,7 +18,7 @@ import {
 } from './by-permission';
 import type { NotificationsRoute } from './context';
 import type { NotificationContactDirectory, NotificationsDbProvider } from './db';
-import { checkCountersSeam, createCapsGate, type CapsGate, type NotificationCapsConfig } from './caps';
+import { createCapsGate, type CapsGate, type NotificationCapsConfig } from './caps';
 import {
   createConsentEngine,
   resolveConsentConfig,
@@ -343,7 +343,6 @@ function paidPolicy(
   const requireConsent = config.requireConsent ?? [];
   const consentConfig = resolveConsentConfig(config.consent, requireConsent);
   const caps = config.caps ? createCapsGate(config.db, config.caps, logger) : null;
-  if (config.caps) checkCountersSeam(config.db, logger);
   if (!consentConfig) return caps ? { caps } : {};
   const consent = createConsentEngine(
     { db: config.db, contacts: config.contacts, transports, config: consentConfig, caps, logger },
