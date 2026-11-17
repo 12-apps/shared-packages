@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
 
@@ -24,7 +24,10 @@ import type { CreateOrderRequest, CreateOrderResult, OrderStatus } from "./types
  *  - `requestShortRefund` asks for the capture back and answers the status
  *    detail after it, which the screen then shows (refunded, or on its way).
  *
- * Either one absent, its action is not offered.
+ * Either one absent, the checkout client's own wire answers it (FUT-612:
+ * the package wires, the host binds), at the routes the host configured —
+ * `CheckoutTransport.shortPaymentRoutes`, or `<CheckoutFlow shortPaymentRoutes>`
+ * when mounted by hand. A client with neither does not offer the action.
  */
 export interface ShortPaymentPorts {
   /** Raise the balance order of a short-paid pedido; answered like `createOrder`. */
@@ -48,7 +51,12 @@ export function useShortPayment(
   // The difference being paid, in cents, from the press of "Pagar R$ X" on.
   const [payingCents, setPayingCents] = useState<number | null>(null);
   const paying = useRef(false);
-  const { createOrder, payDifference, requestShortRefund } = ports;
+  // The order whose difference is being paid, from the press of "Pagar R$ X" on.
+  const differenceOf = useRef<string | null>(null);
+  const client = useCheckoutClientApi();
+  const { createOrder } = ports;
+  const payDifference = useMemo(() => ports.payDifference ?? wiredPayDifference(client, differenceOf), [ports.payDifference, client]);
+  const requestShortRefund = ports.requestShortRefund ?? client.requestShortRefund;
 
   const report: StatusFactsReporter = useCallback((orderId, detail) => {
     setFacts({ orderId, ...(detail.shortfall ? { shortfall: detail.shortfall } : {}), ...(detail.stockGone ? { stockGone: detail.stockGone } : {}) });
@@ -60,7 +68,8 @@ export function useShortPayment(
     [createOrder, payDifference],
   );
 
-  const startDifference = useCallback((dueCents: number) => {
+  const startDifference = useCallback((dueCents: number, orderId: string | null = null) => {
+    differenceOf.current = orderId;
     paying.current = true;
     setPayingCents(dueCents);
   }, []);
@@ -76,7 +85,37 @@ export function useShortPayment(
     [requestShortRefund, report],
   );
 
-  return { facts, report, busy, payingCents, routedCreateOrder, startDifference, refund };
+  return {
+    facts,
+    report,
+    busy,
+    payingCents,
+    routedCreateOrder,
+    startDifference,
+    refund,
+    canPayDifference: payDifference !== undefined,
+    canRequestRefund: requestShortRefund !== undefined,
+  };
+}
+
+/**
+ * The client's own balance-order call as a `payDifference` port: the order is
+ * the one whose "Pagar R$ X" was pressed, and a refusal keeps the server's
+ * sentence and code, as `createOrder`'s does.
+ */
+function wiredPayDifference(
+  client: ReturnType<typeof useCheckoutClientApi>,
+  differenceOf: { current: string | null },
+): ShortPaymentPorts["payDifference"] {
+  const raise = client.payDifference;
+  if (!raise) return undefined;
+  return async (input: CreateOrderRequest): Promise<CreateOrderResult> => {
+    const orderId = differenceOf.current;
+    if (orderId === null) return { ok: false, error: { message: "", code: "ORDER_NOT_FOUND", field: null } };
+    const answered = await raise({ orderId, method: input.method, ...(input.buyer.taxId ? { taxId: input.buyer.taxId } : {}) });
+    if (answered.ok) return answered;
+    return { ok: false, error: { message: answered.error, code: answered.code ?? "UNKNOWN", field: null } };
+  };
 }
 
 export type ShortPayment = ReturnType<typeof useShortPayment>;

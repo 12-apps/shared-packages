@@ -142,7 +142,9 @@ server composes. See `src/tender-split/math.ts`.
 
 ### A short capture: option C (FUT-612)
 
-When a capture arrives short of the total, `/status` answers the host's token with a `shortfall` beside it (`checkoutStatusBody`, `{ totalCents, paidCents, dueCents, paidMethod, resolution }`). When the whole amount arrived but an item ran out, it answers a `stockGone` instead. `<CheckoutFlow>` reads both from the same poll and shows them on its confirmation step. The host binds two ports: `payDifference` raises the balance order, and `requestShortRefund` returns the capture through `refundCaptureOnRequest`. A decline sends no fact, so it keeps today's screen.
+When a capture arrives short of the total, `/status` answers the host's token with a `shortfall` beside it (`checkoutStatusBody`, `{ totalCents, paidCents, dueCents, paidMethod, resolution }`). When the whole amount arrived but an item ran out, it answers a `stockGone` instead. `<CheckoutFlow>` reads both from the same poll and shows them on its confirmation step. The package wires the buyer's two acts itself. `payDifference` raises the balance order with `POST { method, taxId? }`, answered `{ data: <order> }`. `requestShortRefund` asks for the capture back with `POST` and is answered like `/status`. On the server, the host returns it through `refundCaptureOnRequest`.
+
+The host only says where its routes are, as whole paths with `:ref` for the order. It sets `shortPaymentRoutes: { payDifference, refund }` on `CheckoutTransport`, or passes `<CheckoutFlow shortPaymentRoutes>` when it mounts the flow by hand. Both routes default to `<baseUrl>/orders/:ref/pay-difference` and `<baseUrl>/orders/:ref/short-refund`. A `payDifference` or `requestShortRefund` port passed to the flow still wins. A decline sends no fact, so it keeps today's screen.
 
 `resolution` says where the short stands:
 

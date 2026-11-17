@@ -22,6 +22,7 @@
 import type { PaymentShortfall, PaymentStockGone } from "@12-apps/payments-backend";
 
 import type { CheckoutPaymentList } from "../components/checkout/list/types";
+import type { ShortPaymentRoutes } from "../components/checkout/short-payment-wire";
 import type { CheckoutStatusDetail } from "../components/checkout/status-detail";
 import type { BackActionEmphasis } from "../components/checkout/payment-status-parts";
 import type { ComponentType, ReactNode } from "react";
@@ -324,6 +325,8 @@ export interface PaymentFlows {
     parkHostedOrders?: boolean;
     /** Slots for THIS mount, layered over the config's `components`. */
     components?: Partial<CheckoutComponents>;
+    /** `CheckoutFlowProps.shortPaymentRoutes`; the bound client's `transport.shortPaymentRoutes` wins (FUT-612). */
+    shortPaymentRoutes?: ShortPaymentRoutes;
   }>;
   /** Slots + transport + scope + the fetched config, for a nesting host. */
   Provider: ComponentType<{ children: ReactNode; config?: CheckoutProviderConfig | null }>;

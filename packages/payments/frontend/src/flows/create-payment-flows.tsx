@@ -128,7 +128,7 @@ function buildCheckout(
 
   const refuses = runtime.config.refusesUnchargeableStore ?? true;
 
-  function CheckoutBody({ settlement, parkHostedOrders, components }: CheckoutMountProps): JSX.Element {
+  function CheckoutBody({ settlement, parkHostedOrders, components, shortPaymentRoutes }: CheckoutMountProps): JSX.Element {
     const cart = runtime.config.useCart();
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
     const hostSettlement = runtime.config.useSettlement?.() ?? null;
@@ -168,6 +168,7 @@ function buildCheckout(
         paymentList={paymentList}
         parkHostedOrders={parkHostedOrders}
         components={components}
+        shortPaymentRoutes={shortPaymentRoutes}
       />
     );
   }

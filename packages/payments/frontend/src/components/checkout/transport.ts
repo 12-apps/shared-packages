@@ -22,12 +22,14 @@ import { err, ok, type Result } from "../../result";
 
 import type { ThreeDSecureSessionView } from "./debit-types";
 import type { CheckoutTransportCopy } from "./screens-copy";
+import { shortPaymentCalls, type PayDifferenceInput, type ShortPaymentRoutes } from "./short-payment-wire";
 import { statusDetailOf, type CheckoutStatusDetail } from "./status-detail";
 
 import type {
   ChargeCardInput,
   ChargeOutcome,
   ChargeWalletInput,
+  CheckoutOrder,
   CheckoutProviderConfig,
   OrderStatus,
 } from "./types";
@@ -85,6 +87,12 @@ export interface CheckoutTransport {
   fetchImpl?: typeof fetch;
   /** Extra headers per request (a bearer token, a tenant header). */
   headers?: () => HeadersInit | Promise<HeadersInit>;
+  /**
+   * Where a short-paid order's two acts go (FUT-612). Whole paths, NOT under
+   * `baseUrl`, with `:ref` standing for the order ref. Each defaults under
+   * `baseUrl` — see `ShortPaymentRoutes`.
+   */
+  shortPaymentRoutes?: ShortPaymentRoutes;
 }
 
 /**
@@ -141,6 +149,10 @@ export interface CheckoutClient {
    * authenticated on. Optional — a host without the row offers no debit.
    */
   threeDSecureSession?(input: { orderId: string }): Promise<Result<ThreeDSecureSessionView>>;
+  /** A short-paid order's balance (FUT-612), answered like a first order; see `shortPaymentRoutes`. */
+  payDifference?(input: PayDifferenceInput): Promise<Result<CheckoutOrder>>;
+  /** Cancel and have a short capture returned; answers `/status`'s detail after it (FUT-612). */
+  requestShortRefund?(ref: string): Promise<Result<CheckoutStatusDetail>>;
 }
 
 /** Envelope the API routes return: `{ data }` on success, `{ error }` on failure. */
@@ -272,7 +284,7 @@ async function extraHeaders(transport: CheckoutTransport): Promise<HeadersInit |
 }
 
 /** A success envelope: `data`, and anything the route stated beside it. */
-type Envelope<T> = ApiEnvelope<T> & { data: T } & Record<string, unknown>;
+export type Envelope<T> = ApiEnvelope<T> & { data: T } & Record<string, unknown>;
 
 /**
  * Call a checkout route and keep the WHOLE envelope — `data` and whatever the
@@ -283,12 +295,21 @@ async function requestEnvelope<T>(
   route: string,
   init?: RequestInit,
 ): Promise<Result<Envelope<T>>> {
+  return requestAt<T>(transport, `${transport.baseUrl ?? DEFAULT_CHECKOUT_BASE_URL}${route}`, init);
+}
+
+/** {@link requestEnvelope} at a WHOLE path: the short-payment acts (FUT-612) live where the host mounts them. */
+async function requestAt<T>(
+  transport: CheckoutTransport,
+  url: string,
+  init?: RequestInit,
+): Promise<Result<Envelope<T>>> {
   const copy = transport.copy;
   // Resolved here, not captured at build time: a suite (or a story) that
   // replaces the global afterwards must still be the one that answers.
   const doFetch = transport.fetchImpl ?? ambientFetch;
   try {
-    const res = await doFetch(`${transport.baseUrl ?? DEFAULT_CHECKOUT_BASE_URL}${route}`, {
+    const res = await doFetch(url, {
       ...init,
       headers: { "Content-Type": "application/json", ...(await extraHeaders(transport)), ...init?.headers },
     });
@@ -369,5 +390,7 @@ export function createCheckoutClient(transport: CheckoutTransport): CheckoutClie
     refreshBrowserKey: (input) => call<{ publicKey: string | null }>("/refresh-key", orderBody(input)),
 
     threeDSecureSession: (input) => call<ThreeDSecureSessionView>("/3ds-session", orderBody(input)),
+
+    ...shortPaymentCalls(transport, requestAt),
   };
 }

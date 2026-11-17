@@ -100,6 +100,7 @@ function everyProp(): { [K in keyof Required<CheckoutFlowProps>]: CheckoutFlowPr
     components: sentinel("components"),
     // Not the flow's own default (`true`).
     parkHostedOrders: false,
+    shortPaymentRoutes: sentinel("shortPaymentRoutes"),
   };
 }
 
