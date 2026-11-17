@@ -527,19 +527,43 @@ describe("failing closed", () => {
     expect(w.held.delivered).toBe(true);
   });
 
-  it("an onDuplicatePayment that throws is logged and the outcome is still duplicate-payment", async () => {
+  it("an onDuplicatePayment that throws is logged and rethrown, so a replay calls the hook again; nothing is delivered", async () => {
     const w = purchaseWorld();
     await w.purchases.startByCard(PURCHASE.id);
     w.hooks.onDuplicatePayment.mockRejectedValueOnce(new Error("alert service down"));
+    const { reactor } = hostReactor(w.purchases);
+    const late = paidEvent("purchase:pur-1--7", 4_990, "evt-dup");
+
+    await expect(reactor(late.event, late.stored, MERCHANT)).rejects.toThrow("alert service down");
+    expect(w.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("onDuplicatePayment threw for chg-purchase:pur-1--7: alert service down"),
+    );
+
+    await reactor(late.event, late.stored, MERCHANT);
+    expect(w.hooks.onDuplicatePayment).toHaveBeenCalledTimes(2);
+    expect(w.granted).toHaveLength(1);
+  });
+
+  it("a late payment of an OLDER failed attempt with no stored charge is refused, logged for a person, and never swept", async () => {
+    const w = purchaseWorld();
+    await w.purchases.startByPush(PURCHASE.id);
+    await w.purchases.reconcileDue(new Date(T0.getTime() + 31 * MINUTE)); // attempt 0 lapses
+    await w.purchases.startByPush(PURCHASE.id); // attempt 1 is current
+    w.charges.delete("purchase:pur-1");
 
     const outcome = await w.purchases.settlePlatformCharge({
-      reference: "purchase:pur-1--7",
+      reference: "purchase:pur-1",
       amountCents: 4_990,
-      providerChargeId: "chg-other",
+      providerChargeId: "chg-purchase:pur-1",
     });
+    expect(outcome).toBe("unrecognised-charge");
+    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("chg-purchase:pur-1 has no stored charge under purchase:pur-1;"));
 
-    expect(outcome).toBe("duplicate-payment");
-    expect(w.logger.error).toHaveBeenCalledWith(expect.stringContaining("onDuplicatePayment threw for chg-other: alert service down"));
-    expect(w.granted).toHaveLength(1);
+    w.gateway.refreshCharge.mockClear();
+    await w.purchases.reconcileDue(T0);
+    expect(w.gateway.refreshCharge).toHaveBeenCalledTimes(1);
+    expect(w.gateway.refreshCharge).toHaveBeenCalledWith(MERCHANT, "acquirer-a", "chg-purchase:pur-1--1");
+    expect(w.held.status).toBe("pending");
+    expect(w.granted).toEqual([]);
   });
 });

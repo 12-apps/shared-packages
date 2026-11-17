@@ -278,7 +278,8 @@ The rules it holds:
   optional `onDuplicatePayment(purchase, { amountCents, providerChargeId })`
   for the host to refund or alert; it delivers nothing. The hook runs on every
   confirmation of that charge, so it is idempotent by `providerChargeId`; a
-  throw from it is logged and the outcome stands. To
+  throw from it is logged and rethrown, so the provider replays the webhook
+  into the hook again. To
   narrow the window, the settling caller voids the other attempt's charge
   still open at the provider (`cancelCharge`, best-effort, a failure logged);
   a provider that cannot void leaves that code payable until it lapses.
@@ -289,7 +290,11 @@ The rules it holds:
   path's), else the stored charge's, read from `charges` by the reference —
   a purchase charge's idempotency key. **It fails closed:** a purchase charge
   with neither is refused (`"unrecognised-charge"`, logged at error) and left
-  to `reconcileDue`, which reads the provider's own currency.
+  to `reconcileDue`, which reads the provider's own currency. The sweep reads
+  only the CURRENT attempt's charge: a late payment of an older attempt that
+  already failed, arriving with no stored charge, is never swept. Its error log
+  (the charge id and the `purchase:<id>--<n>` reference) is the operator's cue
+  to check it at the provider and settle it by hand.
 - **An overpayment settles**, delivers the purchase and never more, and is
   reported — `excessCents` on `onSettled`, and a warning — for the host to
   return or keep.

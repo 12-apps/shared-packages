@@ -109,8 +109,11 @@ async function settledAlready(
   try {
     await deps.onDuplicatePayment?.(row.purchase, { amountCents: input.amountCents, providerChargeId: input.providerChargeId });
   } catch (error) {
-    // The outcome stands: a webhook handler that threw would only be replayed into the same answer.
+    // Rethrown so the webhook delivery fails and the provider replays it: the
+    // replay reaches this hook again (idempotent by `providerChargeId`), which
+    // is the only retry a duplicate payment gets — nothing is delivered either way.
     deps.logger.error(`purchase ${row.purchase.id}: onDuplicatePayment threw for ${input.providerChargeId}: ${messageOf(error)}`);
+    throw error;
   }
   return "duplicate-payment";
 }

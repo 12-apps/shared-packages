@@ -214,8 +214,9 @@ export interface OneOffPurchaseDeps {
    * A purchase already settled by one charge was paid AGAIN by another (an
    * older attempt's code paid late, say). Nothing is delivered for it; this
    * is where the host refunds or alerts. Called on every confirmation of that
-   * charge, so it must be idempotent by `providerChargeId`; a throw is logged
-   * and the outcome stands. Optional: absent, the error log is the only trace.
+   * charge, so it must be idempotent by `providerChargeId`. A throw is logged
+   * and RETHROWN, so the webhook delivery fails and the provider replays it
+   * into this hook again. Optional: absent, the error log is the only trace.
    */
   onDuplicatePayment?(purchase: Purchase, payment: { amountCents: number; providerChargeId: string }): Promise<void>;
   /**
@@ -259,7 +260,10 @@ export type PurchaseSettleOutcome =
   /**
    * A purchase charge with no input currency and no stored charge under its
    * reference: its currency cannot be checked, so it is refused (logged at
-   * error) and left to `reconcileDue`, which reads the provider's currency.
+   * error) and left to `reconcileDue`, which reads the provider's currency —
+   * but ONLY for the current attempt's charge. A late payment of an OLDER,
+   * already-failed attempt is never swept: that error log, naming the charge
+   * and its `--<n>` reference, is the operator's cue to settle it by hand.
    */
   | "unrecognised-charge"
   /** The reference names a purchase the host has no row for (logged). */
