@@ -15,6 +15,7 @@
 import { serviceWindowPolicy, type ChannelAdapter } from "../core/channel";
 import { parseWhatsAppPayload } from "./parse";
 import { sendWhatsAppMessage, type GraphConfig } from "./graph";
+import { downloadWhatsAppMedia } from "./media";
 import { META_SIGNATURE_HEADER, verifyMetaSignature, verifyMetaSubscription } from "./signature";
 
 /** The channel key every WhatsApp row carries. */
@@ -46,6 +47,8 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       }),
     send: ({ credential, accountId, to, content }) =>
       sendWhatsAppMessage(config.graph, { token: credential, phoneNumberId: accountId, to, content }),
+    fetchMedia: ({ credential, mediaId, maxBytes, timeoutMs }) =>
+      downloadWhatsAppMedia(config.graph, { token: credential, mediaId, maxBytes, ...(timeoutMs !== undefined ? { timeoutMs } : {}) }),
     policy: serviceWindowPolicy(WHATSAPP_SERVICE_WINDOW_MS),
   };
 }
@@ -53,7 +56,19 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
 export { META_SIGNATURE_HEADER, verifyMetaSignature, verifyMetaSubscription, type MetaHandshake } from "./signature";
 export { parseWhatsAppPayload, parseWhatsAppStatuses } from "./parse";
 export { DEFAULT_OPT_OUT_KEYWORDS, isOptOutText } from "./opt-out";
-export { GraphError, graphRequest, messageBody, sendWhatsAppMessage, type FetchPort, type GraphConfig } from "./graph";
+export {
+  DEFAULT_META_MEDIA_HOSTS,
+  GraphError,
+  graphRequest,
+  messageBody,
+  sendWhatsAppMessage,
+  type FetchBodyReader,
+  type FetchInit,
+  type FetchPort,
+  type FetchResponse,
+  type GraphConfig,
+} from "./graph";
+export { downloadWhatsAppMedia } from "./media";
 export {
   exchangeSignupCode,
   readSignupAccounts,

@@ -1,6 +1,7 @@
 import { connect, markError, revoke, type ConnectInput } from "./connections";
 import { engineContext } from "./context";
 import { processDelivery, receiveDelivery, reconcileInbox } from "./inbox";
+import { downloadMedia, type DownloadMediaOptions } from "./media";
 import type { MessagingEngineConfig } from "./ports";
 import { sweepRetention } from "./retention";
 import { sendMessage, type SendInput } from "./sender";
@@ -31,6 +32,14 @@ export function createMessagingEngine(config: MessagingEngineConfig) {
 
     // ── Sending ──────────────────────────────────────────────────────────────
     send: (input: SendInput) => sendMessage(ctx, input),
+
+    // ── Media ────────────────────────────────────────────────────────────────
+    /**
+     * Download an inbound audio message's media into memory (`{ bytes, mimeType, size }`),
+     * through its connection. Nothing is stored; throws `MessagingMediaError`.
+     */
+    downloadMedia: (tenantId: string, messageId: string, options?: DownloadMediaOptions) =>
+      downloadMedia(ctx, tenantId, messageId, options),
 
     // ── Connections ──────────────────────────────────────────────────────────
     connect: (input: ConnectInput) => connect(ctx, input),

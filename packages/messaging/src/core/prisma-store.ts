@@ -247,7 +247,7 @@ function guardWhere(guard: ConversationGuard | undefined): Record<string, unknow
 
 type MessageOperations = Pick<
   MessagingStore,
-  "findMessageByExternalId" | "insertMessage" | "updateMessage" | "listMessages" | "applyReceipt"
+  "findMessageByExternalId" | "insertMessage" | "updateMessage" | "getMessage" | "listMessages" | "applyReceipt"
 >;
 
 function messageOperations(client: Client): MessageOperations {
@@ -272,6 +272,9 @@ function messageOperations(client: Client): MessageOperations {
       const result = await delegate.updateMany({ where: { id, tenantId }, data: patch });
       if (result.count === 0) return null;
       return (await delegate.findUnique({ where: { id } })) as MessageView;
+    },
+    async getMessage(tenantId, id) {
+      return ((await (await client()).messagingMessage.findFirst({ where: { id, tenantId } })) as MessageView | null) ?? null;
     },
     async listMessages(tenantId, conversationId) {
       return (await (await client()).messagingMessage.findMany({

@@ -44,6 +44,16 @@ export interface ChannelAdapter {
    */
   send(input: ChannelSendInput): Promise<{ externalId: string }>;
 
+  /**
+   * Download one inbound message's media (a voice note) by the channel's media
+   * id, into memory. OPTIONAL: a channel with no media leaves it out, and the
+   * engine refuses a download through it (`UNSUPPORTED`). Throws
+   * {@link ChannelMediaFailure} when the channel refuses, or when the media is
+   * larger than `maxBytes` — declared OR actual — or past its deadline (`TIMEOUT`). The same rule as `send`: the
+   * opened credential is never logged, put in an error, or returned.
+   */
+  fetchMedia?(input: ChannelMediaInput): Promise<ChannelMedia>;
+
   /** When this channel lets the tenant send free-form messages. */
   readonly policy: SendPolicy;
 }
@@ -58,6 +68,54 @@ export interface ChannelSendInput {
   /** The recipient's address. */
   to: string;
   content: OutboundContent;
+}
+
+export interface ChannelMediaInput {
+  /** The opened credential of the connection the message arrived through. */
+  credential: string;
+  /** The connection's account on the channel (WhatsApp's phone_number_id). */
+  accountId: string;
+  /** The channel's id for the media, as the inbound message carried it. */
+  mediaId: string;
+  /** The most bytes the caller accepts. Larger media is refused, never truncated. */
+  maxBytes: number;
+  /**
+   * The deadline for the whole download, lookup and body included; past it the
+   * calls are aborted and the download fails `TIMEOUT`. Default
+   * {@link DEFAULT_MEDIA_TIMEOUT_MS}.
+   */
+  timeoutMs?: number;
+}
+
+/** The default deadline of one media download: 30 s. */
+export const DEFAULT_MEDIA_TIMEOUT_MS = 30_000;
+
+/** Is `value` a usable byte cap or deadline: a positive safe integer (never NaN, Infinity or 0). */
+export function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+/** Downloaded media: in memory only. The package never stores it. */
+export interface ChannelMedia {
+  bytes: Uint8Array;
+  /** The channel's MIME type for it (`audio/ogg; codecs=opus`), or `application/octet-stream`. */
+  mimeType: string;
+  /** `bytes.length`. */
+  size: number;
+}
+
+/**
+ * A media download the channel refused, or the adapter refused to finish.
+ * `TOO_LARGE` is the size cap, declared or actual; every other code is the
+ * adapter's or the channel's. Never carries the credential.
+ */
+export class ChannelMediaFailure extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ChannelMediaFailure";
+    this.code = code;
+  }
 }
 
 /** A channel refused or failed a send. `code` is the channel's own, as text. */

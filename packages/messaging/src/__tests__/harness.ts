@@ -1,3 +1,4 @@
+import type { ChannelAdapter } from "../core/channel";
 import { createMessagingEngine, type MessagingEngine } from "../core/engine";
 import { createMemoryMessagingStore } from "../core/memory-store";
 import type { MessagingHooks, MessagingLogger } from "../core/ports";
@@ -21,6 +22,7 @@ export interface RecordedCall {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  redirect?: string;
 }
 
 export const silent = { info: () => undefined, warn: () => undefined, error: () => undefined };
@@ -32,6 +34,8 @@ export function createHarness(
     answer?: (call: RecordedCall) => { status: number; body: unknown };
     retentionBatchSize?: number;
     logger?: MessagingLogger;
+    /** Reshape the WhatsApp adapter before it is mounted (drop a method, wrap one). */
+    adapter?: (adapter: ChannelAdapter) => ChannelAdapter;
   } = {},
 ) {
   const memory = createMemoryMessagingStore();
@@ -41,19 +45,26 @@ export function createHarness(
   const calls: RecordedCall[] = [];
   const answer = options.answer ?? (() => ({ status: 200, body: { messages: [{ id: `wamid.OUT-${calls.length}` }] } }));
   const fetch: FetchPort = async (url, init) => {
-    const call = { url, method: init.method, headers: init.headers, body: init.body ? (JSON.parse(init.body) as unknown) : null };
+    const call: RecordedCall = { url, method: init.method, headers: init.headers, body: init.body ? (JSON.parse(init.body) as unknown) : null };
+    if (init.redirect) call.redirect = init.redirect;
     calls.push(call);
     const { status, body } = answer(call);
+    // A Uint8Array answer is a binary body (a media download); anything else is JSON.
+    if (body instanceof Uint8Array) {
+      return { status, text: async () => Buffer.from(body).toString(), arrayBuffer: async () => body.slice().buffer };
+    }
     return { status, text: async () => JSON.stringify(body) };
   };
   const engine: MessagingEngine = createMessagingEngine({
     store,
     adapters: [
-      createWhatsAppAdapter({
-        appSecret: APP_SECRET,
-        verifyToken: VERIFY_TOKEN,
-        graph: { fetch, baseUrl: "https://graph.example.test", apiVersion: "v23.0" },
-      }),
+      (options.adapter ?? ((adapter) => adapter))(
+        createWhatsAppAdapter({
+          appSecret: APP_SECRET,
+          verifyToken: VERIFY_TOKEN,
+          graph: { fetch, baseUrl: "https://graph.example.test", apiVersion: "v23.0" },
+        }),
+      ),
     ],
     secrets: { seal: (plain) => `sealed:${Buffer.from(plain).toString("base64")}`, open: (sealed) => Buffer.from(sealed.slice(7), "base64").toString() },
     enqueue: {
