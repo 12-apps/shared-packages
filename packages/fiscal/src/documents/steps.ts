@@ -12,13 +12,22 @@
  * An online NFC-e is never sent again past `nfceOnlineToleranceMs` (SEFAZ
  * refuses a late `dhEmi`): where the point has a contingency series it goes
  * offline instead.
+ *
+ * A caller that cannot wait (a counter whose paper waits for the note) gives
+ * the send an ONLINE DEADLINE (`issue({ …, onlineDeadlineMs })`): an NFC-e at
+ * a point with a contingency series whose send is not answered by then — or is
+ * answered with no answer (`RETRYABLE`) — goes offline at once, exactly as a
+ * `CONTINGENCY` answer does. The send may still have reached SEFAZ, so the
+ * replaced number is marked unknown and looked up before it is voided; its
+ * late answer settles nothing.
  */
 
-import type { IssuerFailure, SigningMaterial } from "../issuer/port";
+import type { IssuerFailure, IssuerOutcome, SigningMaterial } from "../issuer/port";
 import { FISCAL_ISSUE } from "../manifest/permissions";
 import type { IssuedDocument } from "../sidecar/types";
 import { FISCAL_DOCUMENT_REJECTED, type FiscalContext, draftOf, xmlKeys } from "./context";
 import { FiscalDocumentError } from "./errors";
+import { computeAccessKey } from "./helpers";
 import { digestOf } from "./nfe-proc";
 import type { EmitterProfile, IssuingPoint } from "./profile";
 import type { FiscalDocument } from "./types";
@@ -145,21 +154,89 @@ function staleOnline(ctx: FiscalContext, document: FiscalDocument, point: Issuin
   return !knownToSefaz && canGoOffline(document, point) && pastOnlineTolerance(ctx, document);
 }
 
-/** Issue (or re-issue, for a SUBMITTED one) a document on its online series. */
+/** The failure a send not answered by its online deadline counts as: a contingency, its outcome unknown. */
+function pastDeadline(document: FiscalDocument): IssuerFailure {
+  return {
+    class: "CONTINGENCY",
+    code: null,
+    message: "SEFAZ did not answer before the online deadline.",
+    details: [],
+    accessKey: document.accessKey ?? computeAccessKey({ sale: document.sale, model: document.model, seriesKind: "ONLINE" }),
+    signedXml: null,
+    sefazReply: null,
+    outcomeUnknown: true,
+  };
+}
+
+/** The send, raced against the deadline (`deadlineAt`, epoch ms). A late answer is dropped: the number is looked up instead. */
+async function sendBefore(
+  send: Promise<IssuerOutcome<IssuedDocument>>,
+  document: FiscalDocument,
+  deadlineAt: number,
+): Promise<IssuerOutcome<IssuedDocument>> {
+  send.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<IssuerOutcome<IssuedDocument>>((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, error: pastDeadline(document) }), Math.max(0, deadlineAt - Date.now()));
+  });
+  try {
+    return await Promise.race([send, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The online send, bounded by the deadline when there is one. */
+function send(ctx: FiscalContext, document: FiscalDocument, signing: SigningMaterial, deadlineAt: number | null): Promise<IssuerOutcome<IssuedDocument>> {
+  const call = ctx.config.issuer.issue({ model: document.model, environment: document.environment, signing, document: document.sale });
+  return deadlineAt === null ? call : sendBefore(call, document, deadlineAt);
+}
+
+/** Whether a failed send moves the sale offline: a contingency always; with a deadline, an unanswered send too. */
+function goesOffline(error: IssuerFailure, deadlineAt: number | null): boolean {
+  return error.class === "CONTINGENCY" || (deadlineAt !== null && error.class === "RETRYABLE");
+}
+
+/**
+ * Issue (or re-issue, for a SUBMITTED one) a document on its online series.
+ * `deadlineAt` (epoch ms): the online deadline, for an NFC-e whose point can
+ * go offline (see the module doc); `null`, the send's own timeout rules.
+ */
 export async function submit(
   ctx: FiscalContext,
   document: FiscalDocument,
   profile: EmitterProfile,
   point: IssuingPoint,
   signing: SigningMaterial,
+  deadlineAt: number | null = null,
 ): Promise<FiscalDocument> {
   if (staleOnline(ctx, document, point)) return goOffline(ctx, document, profile, point, signing);
   const sent = document.status === "PENDING" ? await ctx.advance(document, { kind: "SUBMIT" }) : document;
-  const outcome = await ctx.config.issuer.issue({ model: sent.model, environment: sent.environment, signing, document: sent.sale });
+  const bounded = deadlineAt !== null && canGoOffline(sent, point) ? deadlineAt : null;
+  const outcome = await send(ctx, sent, signing, bounded);
   if (outcome.ok) return accept(ctx, sent, outcome.answer);
   if (FINAL_FAILURES.has(outcome.error.class)) return reject(ctx, sent, outcome.error);
   const retried = await ctx.advance(sent, { kind: "RETRY", error: outcome.error, ...(await keepSigned(ctx, sent, outcome.error)) });
-  return outcome.error.class === "CONTINGENCY" && canGoOffline(retried, point) ? goOffline(ctx, retried, profile, point, signing) : retried;
+  return goesOffline(outcome.error, bounded) && canGoOffline(retried, point) ? goOffline(ctx, retried, profile, point, signing) : retried;
+}
+
+/**
+ * A live online NFC-e the caller's deadline already passed — `onlineDeadlineMs`
+ * since it was numbered, still unanswered and not known to SEFAZ — goes offline
+ * now, at a point with a contingency series; anything else is answered as it is.
+ */
+async function offlineIfOverdue(
+  ctx: FiscalContext,
+  document: FiscalDocument,
+  profile: EmitterProfile,
+  point: IssuingPoint,
+  signing: SigningMaterial,
+  onlineDeadlineMs: number,
+): Promise<FiscalDocument> {
+  const waiting = document.status === "PENDING" || document.status === "SUBMITTED";
+  const overdue = ctx.config.now().getTime() - Date.parse(document.createdAt) >= onlineDeadlineMs;
+  if (!waiting || !overdue || document.protocol !== null || !canGoOffline(document, point)) return document;
+  return goOffline(ctx, document, profile, point, signing);
 }
 
 /** Transmit a document signed offline. */
@@ -170,4 +247,23 @@ export async function transmit(ctx: FiscalContext, document: FiscalDocument, sig
   if (outcome.ok) return accept(ctx, document, outcome.answer);
   if (FINAL_FAILURES.has(outcome.error.class)) return reject(ctx, document, outcome.error);
   return ctx.advance(document, { kind: "RETRY", error: outcome.error });
+}
+
+/** The live document of a lost race or an earlier call — moved offline when the caller's online deadline already passed. */
+export async function answerLive(
+  ctx: FiscalContext,
+  existing: FiscalDocument,
+  profile: EmitterProfile,
+  onlineDeadlineMs: number | undefined,
+): Promise<FiscalDocument> {
+  if (onlineDeadlineMs === undefined || existing.model !== "NFCE" || existing.seriesKind !== "ONLINE") return existing;
+  const point = await ctx.requirePoint(existing.ownerId, existing.issuingPointId);
+  return offlineIfOverdue(ctx, existing, profile, point, await ctx.material(profile), onlineDeadlineMs);
+}
+
+/** `onlineDeadlineMs`, when given, is a whole number of milliseconds, 0 or more. */
+export function assertOnlineDeadline(onlineDeadlineMs: number | undefined): void {
+  if (onlineDeadlineMs !== undefined && (!Number.isInteger(onlineDeadlineMs) || onlineDeadlineMs < 0)) {
+    throw new FiscalDocumentError("INVALID_INPUT", "onlineDeadlineMs must be a whole number of milliseconds, 0 or more.");
+  }
 }

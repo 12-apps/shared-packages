@@ -10,6 +10,7 @@
  * several orders) is the host's to know, never this package's.
  */
 
+import type { IssuerFailure } from "../issuer/port";
 import type { SaleForDocument } from "../sale/types";
 import type { SefazEnvironment, SidecarErrorClass } from "../sidecar/types";
 
@@ -190,4 +191,26 @@ export interface FiscalDocumentEvent {
   readonly errorClass: SidecarErrorClass | null;
   readonly code: string | null;
   readonly answer: unknown;
+}
+
+export interface CancelOrReturnInput {
+  readonly ownerId: string;
+  readonly documentId: string;
+  /** SEFAZ's 15–255 characters, sent with the cancel. */
+  readonly reason: string;
+  /** The NF-e (model 55) issuing point a return is numbered on. */
+  readonly returnPointId: string;
+}
+
+export interface CancelOrReturnResult {
+  /**
+   * `CANCELLED` inside the window; `RETURNED` past it (the return may itself
+   * still be SUBMITTED: the sweep settles it like any document); `REFUSED`
+   * when the issuer refused the cancel for any other reason (nothing changed).
+   */
+  readonly outcome: "CANCELLED" | "RETURNED" | "REFUSED";
+  /** The document asked about, as it stands: CANCELLED, or still AUTHORIZED beside its return. */
+  readonly document: FiscalDocument;
+  readonly returnDocument: FiscalDocument | null;
+  readonly failure: IssuerFailure | null;
 }

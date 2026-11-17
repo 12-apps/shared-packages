@@ -28,6 +28,8 @@ function scriptedIssuer(script: Partial<Record<Method, string[]>>) {
     received.push({ method, call });
     const next = script[method]?.shift();
     if (next === undefined) throw new Error(`no scripted answer for ${method}`);
+    // A send SEFAZ never answers (FUT-3047's online deadline): the promise stays pending.
+    if (next === "never") return new Promise(() => undefined);
     return recorded(next);
   };
   const issuer = {
@@ -375,5 +377,53 @@ describe("the document service", () => {
     await expect(
       service.createIssuingPoint("owner-1", { id: "register-2", model: "NFCE", onlineSeries: 2, contingencySeries: null, firstOnlineNumber: 1, firstContingencyNumber: 1 }),
     ).rejects.toThrow(/already belongs/);
+  });
+});
+
+describe("the online deadline (FUT-3047): a caller whose paper cannot wait", () => {
+  const BOUNDED = { ...ISSUE, onlineDeadlineMs: 20 } as const;
+
+  it("a send SEFAZ does not answer by the deadline goes offline on the point's contingency series, the online number looked up first", async () => {
+    const { service, store } = await setup({ issue: ["never"], signContingency: ["nfce-sign-contingency"] });
+
+    const offline = await service.issue(BOUNDED);
+
+    expect(offline).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY", series: 2, number: 1 });
+    const [online] = await store.listBySubject("owner-1", "order-77", "NFCE");
+    expect(online).toMatchObject({ status: "REPLACED", replacedById: offline.id, numberVoid: "LOOKUP_FIRST", outcomeUnknown: true });
+    expect(online?.accessKey).toMatch(/^\d{44}$/u);
+  });
+
+  it("an unanswered send goes offline at once under a deadline, where without one it stays SUBMITTED for the sweep", async () => {
+    const bounded = await setup({ issue: ["nfce-issue-retryable"], signContingency: ["nfce-sign-contingency"] });
+    expect(await bounded.service.issue(BOUNDED)).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY" });
+
+    const plain = await setup({ issue: ["nfce-issue-retryable"] });
+    expect(await plain.service.issue(ISSUE)).toMatchObject({ status: "SUBMITTED", seriesKind: "ONLINE", lastErrorClass: "RETRYABLE" });
+  });
+
+  it("an answer inside the deadline is kept: authorised online, nothing signed offline", async () => {
+    const { service, calls } = await setup({ issue: ["nfce-issue-authorized"] });
+
+    expect(await service.issue({ ...ISSUE, onlineDeadlineMs: 10_000 })).toMatchObject({ status: "AUTHORIZED", seriesKind: "ONLINE", number: 1201 });
+    expect(calls.map((call) => call.method)).toEqual(["issue"]);
+  });
+
+  it("a live online note still unanswered goes offline on a later call once the deadline since it was numbered passed — never before", async () => {
+    const { service, later } = await setup({ issue: ["nfce-issue-retryable"], signContingency: ["nfce-sign-contingency"] });
+    const first = await service.issue(ISSUE);
+    expect(first).toMatchObject({ status: "SUBMITTED" });
+
+    expect(await service.issue({ ...ISSUE, onlineDeadlineMs: 10_000 })).toMatchObject({ id: first.id, status: "SUBMITTED" });
+    later(10_000);
+    expect(await service.issue({ ...ISSUE, onlineDeadlineMs: 10_000 })).toMatchObject({ status: "CONTINGENCY", seriesKind: "CONTINGENCY" });
+  });
+
+  it("a point with no contingency series ignores the deadline, and a deadline that is not a whole number of ms is refused", async () => {
+    const { service } = await setup({ issue: ["nfce-issue-retryable"] });
+    await service.createIssuingPoint("owner-1", { id: "register-2", model: "NFCE", onlineSeries: 3, contingencySeries: null, firstOnlineNumber: 1, firstContingencyNumber: 1 });
+
+    expect(await service.issue({ ...ISSUE, subjectId: "order-78", issuingPointId: "register-2", onlineDeadlineMs: 20 })).toMatchObject({ status: "SUBMITTED", seriesKind: "ONLINE" });
+    await expect(service.issue({ ...ISSUE, subjectId: "order-79", onlineDeadlineMs: -1 })).rejects.toThrow(/onlineDeadlineMs/);
   });
 });

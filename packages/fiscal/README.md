@@ -148,6 +148,9 @@ const documents = createFiscalDocuments({
   newId: () => crypto.randomUUID(),
 });
 await documents.issue({ ownerId, subjectId, issuingPointId, model: "NFCE" });
+// A counter whose paper cannot wait gives the send an online deadline: unanswered by then
+// (or answered with no answer), the NFC-e goes offline on the point's contingency series.
+await documents.issue({ ownerId, subjectId, issuingPointId, model: "NFCE", onlineDeadlineMs: 10_000 });
 ```
 
 **One document is one number.** The state machine (`transition`) is pure:

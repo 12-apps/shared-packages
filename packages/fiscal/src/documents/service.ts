@@ -18,10 +18,11 @@ import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
 import { settleNumber, settleWithXml, storeNfeProc } from "./settle";
-import { signPending, submit, transmit } from "./steps";
-import { type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
+import { answerLive, assertOnlineDeadline, signPending, submit, transmit } from "./steps";
+import { type CancelOrReturnInput, type CancelOrReturnResult, type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
 
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
+export type { CancelOrReturnInput, CancelOrReturnResult } from "./types";
 
 export interface SweepReport {
   readonly advanced: Array<{ readonly documentId: string; readonly status: FiscalDocument["status"] }>;
@@ -33,6 +34,14 @@ export interface IssueInput {
   readonly subjectId: string;
   readonly issuingPointId: string;
   readonly model: FiscalDocumentModel;
+  /**
+   * NFC-e only, at a point with a contingency series: how long (ms, from this
+   * call) the online send may go unanswered before the sale goes offline on
+   * that series — a caller whose paper cannot wait (a counter, 10 s). A live
+   * online document numbered this long ago and still unanswered goes offline
+   * at once. Absent: the send's own timeout and the sweep's rules.
+   */
+  readonly onlineDeadlineMs?: number;
 }
 
 /** How long an NFC-e may wait in contingency before it must be transmitted (24 h); the warning goes out at 20 h. */
@@ -75,16 +84,19 @@ async function numberOrExisting(deps: Deps, input: Omit<IssueInput, "issuingPoin
 }
 
 async function issue(deps: Deps, input: IssueInput): Promise<FiscalDocument> {
+  assertOnlineDeadline(input.onlineDeadlineMs);
+  const deadlineAt = input.onlineDeadlineMs === undefined ? null : Date.now() + input.onlineDeadlineMs;
   const { profile, point } = await issuable(deps, input.ownerId, input.issuingPointId, input.model);
   const existing = await liveDocument(deps, input);
-  if (existing !== null) return existing;
+  if (existing !== null) return answerLive(deps.ctx, existing, profile, input.onlineDeadlineMs);
   const signing = await deps.ctx.material(profile);
   const draft = await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: input.subjectId, model: input.model });
   assertDraftFits(draft, input.model);
   const numbered = await numberOrExisting(deps, input, () =>
     deps.ctx.createNumbered({ profile, point, subjectId: input.subjectId, model: input.model, seriesKind: "ONLINE", draft }),
   );
-  return numbered.created ? submit(deps.ctx, numbered.document, profile, point, signing) : numbered.document;
+  if (!numbered.created) return answerLive(deps.ctx, numbered.document, profile, input.onlineDeadlineMs);
+  return submit(deps.ctx, numbered.document, profile, point, signing, deadlineAt);
 }
 
 /** Sign the sale offline at once (the register knows it is offline). A failure leaves it PENDING for the sweep. */
@@ -180,28 +192,6 @@ async function cancel(
 export const LATE_CANCEL_CODES = ["501"] as const;
 
 const isLateCancel = (code: string | null): boolean => code !== null && (LATE_CANCEL_CODES as readonly string[]).includes(code);
-
-export interface CancelOrReturnInput {
-  readonly ownerId: string;
-  readonly documentId: string;
-  /** SEFAZ's 15–255 characters, sent with the cancel. */
-  readonly reason: string;
-  /** The NF-e (model 55) issuing point a return is numbered on. */
-  readonly returnPointId: string;
-}
-
-export interface CancelOrReturnResult {
-  /**
-   * `CANCELLED` inside the window; `RETURNED` past it (the return may itself
-   * still be SUBMITTED: the sweep settles it like any document); `REFUSED`
-   * when the issuer refused the cancel for any other reason (nothing changed).
-   */
-  readonly outcome: "CANCELLED" | "RETURNED" | "REFUSED";
-  /** The document asked about, as it stands: CANCELLED, or still AUTHORIZED beside its return. */
-  readonly document: FiscalDocument;
-  readonly returnDocument: FiscalDocument | null;
-  readonly failure: IssuerFailure | null;
-}
 
 /** The subject's live return NF-e that quotes this key, if one was issued already. */
 async function liveReturnOf(deps: Deps, document: FiscalDocument): Promise<FiscalDocument | null> {
