@@ -26,7 +26,7 @@ import type { PagBankPaymentRawData } from './pagbank-declines';
  * The PSP of every PagBank charge, so the adapter's own constant: never read
  * off an end-to-end id, whose ISPB names the PAYER's bank.
  */
-export const PAGBANK_PSP_CNPJ_BASE = '08561701';
+const PAGBANK_PSP_CNPJ_BASE = '08561701';
 
 /** The acquirer trace a payment response may carry, beyond the decline fields. */
 export interface PagBankTraceRawData extends PagBankPaymentRawData {
@@ -35,7 +35,7 @@ export interface PagBankTraceRawData extends PagBankPaymentRawData {
 }
 
 /** As much of a charge as the transaction ids are read from. */
-export interface PagBankTransactionCharge {
+interface PagBankTransactionCharge {
   status?: unknown;
   paid_at?: unknown;
   payment_response?: { code?: unknown; reference?: unknown; raw_data?: PagBankTraceRawData };
