@@ -17,6 +17,8 @@ export interface CollapsibleProps {
   sx?: SxProps<Theme>;
   className?: string;
   dataTestId?: string;
+  /** `id` of the region element, so a toggle outside it can point `aria-controls` at it. */
+  id?: string;
 }
 
 export interface CollapsibleTriggerProps {

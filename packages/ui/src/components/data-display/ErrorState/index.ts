@@ -1,2 +1,2 @@
 export { ErrorState } from './ErrorState';
-export type { ErrorStateBaseProps, ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
+export type { ErrorStateBaseProps, ErrorStateIconFrame, ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';

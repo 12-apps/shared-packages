@@ -137,7 +137,7 @@ Components for displaying data, visualizations, and information to users.
 ### ErrorState
 **Purpose**: Display error messages with optional retry functionality
 **Use Cases**: API errors, network failures, validation errors, permission denied
-**Features**: Error/warning severity levels, retry button, custom icons, accessible alert role
+**Features**: Error/warning severity levels, retry button, custom icons (`iconFrame="none"` draws them bare, full opacity), accessible alert role
 **Location**: `src/components/data-display/ErrorState`
 **Docs**: `src/components/data-display/ErrorState/ErrorState.md`
 
@@ -643,7 +643,7 @@ Components for structuring and organizing page layouts.
 ### Collapsible
 **Purpose**: Content that can be collapsed/expanded
 **Use Cases**: Details sections, advanced options, condensed content
-**Features**: Smooth animations, trigger customization, controlled state
+**Features**: Smooth animations, trigger customization, controlled state, optional region `id` for an outside toggle's `aria-controls`
 **Location**: `src/components/layout/Collapsible`
 **Docs**: `src/components/layout/Collapsible/Collapsible.md`
 

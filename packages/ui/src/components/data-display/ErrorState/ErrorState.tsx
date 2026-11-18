@@ -23,7 +23,7 @@ import {
   RETRY_MIN_HEIGHT,
   RETRY_MIN_WIDTH,
 } from './ErrorState.metrics';
-import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
+import type { ErrorStateIconFrame, ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
 import { resolveTestId } from '../../../platform/test-id';
 import { rem, sxRem } from '../../../tokens/relative';
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
@@ -39,10 +39,18 @@ const paletteFor = (theme: Theme, severity: ErrorStateSeverity) =>
 const ErrorIcon: React.FC<{
   severity: ErrorStateSeverity;
   icon?: React.ReactNode;
+  iconFrame: ErrorStateIconFrame;
   testId: string;
-}> = ({ severity, icon, testId }) => {
+}> = ({ severity, icon, iconFrame, testId }) => {
   const theme = useTheme();
   const color = paletteFor(theme, severity);
+  if (iconFrame === 'none' && icon) {
+    return (
+      <Box data-testid={testId} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </Box>
+    );
+  }
   const Fallback = severity === 'error' ? ErrorOutlineIcon : WarningAmberIcon;
 
   return (
@@ -113,6 +121,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
     retryLabel = EN_US_UI_LABELS.errorState.retry,
     severity = 'error',
     icon,
+    iconFrame = 'disc',
     className,
   } = props;
   const theme = useTheme();
@@ -140,7 +149,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
         gap: theme.spacing(ERROR_STATE_GAP_UNITS),
       }}
     >
-      <ErrorIcon severity={severity} icon={icon} testId={testId('icon')} />
+      <ErrorIcon severity={severity} icon={icon} iconFrame={iconFrame} testId={testId('icon')} />
 
       <ErrorText title={title} message={message} titleId={titleId} testId={testId} />
 

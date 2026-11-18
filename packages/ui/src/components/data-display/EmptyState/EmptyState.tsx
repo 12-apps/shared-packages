@@ -1,7 +1,6 @@
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box/index.js';
-import Button from '@mui/material/Button/index.js';
 import Link from '@mui/material/Link/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
@@ -27,6 +26,7 @@ import {
 } from './EmptyState.metrics';
 import type { EmptyStateProps, EmptyStateVariant } from './EmptyState.types';
 import { resolveTestId } from '../../../platform/test-id';
+import { Button } from '../../form/Button/Button';
 import { rem, sxRem } from '../../../tokens/relative';
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
@@ -71,11 +71,14 @@ const Actions: React.FC<{
       {specs.map((spec) => (
         <Button
           key={spec.key}
-          variant={spec.variant}
+          variant={spec.variant === 'contained' ? 'solid' : 'outline'}
+          color="primary"
           onClick={spec.onClick}
-          startIcon={spec.icon && ACTION_ICONS[spec.icon]}
+          icon={spec.icon && ACTION_ICONS[spec.icon]}
           data-testid={testId(spec.key)}
-          sx={{ minWidth: sxRem(ACTION_MIN_WIDTH) }}
+          size="md"
+          // `style`, not `sx`: the house Button's own `sx` carries its size and a caller's `sx` would replace it.
+          style={{ minWidth: rem(theme, ACTION_MIN_WIDTH) }}
         >
           {spec.label}
         </Button>
