@@ -193,22 +193,22 @@ async function admit(
 }
 
 /**
- * At mount: a `caps` config on a db seam with no `notificationSendCounter`
- * delegate would drop every paid channel of every emit. Said once, loudly, as
- * soon as the seam answers — the mount itself is synchronous, so it cannot wait.
+ * A `caps` config on a db seam with no `notificationSendCounter` delegate would
+ * drop every paid channel of every emit. Said once, loudly — on the gate's
+ * first use, never at mount: a mount touches no database, so importing a host
+ * module that mounts notifications does no I/O.
  */
-export function checkCountersSeam(db: NotificationsDbProvider, logger: NotificationLogger): void {
-  Promise.resolve().then(db).then(
-    (client) => {
-      if (!client.notificationSendCounter) {
-        logger.error(
-          '@12-apps/notifications: `caps` needs the `notificationSendCounter` delegate on the db seam; ' +
-            'until it is there every paid channel degrades to the free ones.',
-        );
-      }
-    },
-    () => undefined,
-  );
+async function checkCountersSeam(db: NotificationsDbProvider, logger: NotificationLogger): Promise<void> {
+  try {
+    if (!(await db()).notificationSendCounter) {
+      logger.error(
+        '@12-apps/notifications: `caps` needs the `notificationSendCounter` delegate on the db seam; ' +
+          'until it is there every paid channel degrades to the free ones.',
+      );
+    }
+  } catch {
+    // A seam that cannot answer is reported by the use that needs it.
+  }
 }
 
 export function createCapsGate(
@@ -218,9 +218,12 @@ export function createCapsGate(
 ): CapsGate {
   const ctx: CapsContext = { db, config, logger };
   const capped = new Set<NotificationChannel>(config.channels ?? PAID_CHANNELS);
+  let seamChecked: Promise<void> | null = null;
+  const checkSeamOnce = (): Promise<void> => (seamChecked ??= checkCountersSeam(db, logger));
 
   return {
     async apply(userId, tenantId, channels) {
+      await checkSeamOnce();
       const paid = channels.filter((channel) => capped.has(channel));
       if (paid.length === 0) return channels;
       const free = (): NotificationChannel[] => channels.filter((channel) => !capped.has(channel));
@@ -246,12 +249,14 @@ export function createCapsGate(
     },
 
     async admitConfirmation(userId) {
+      await checkSeamOnce();
       const limits = await resolveLimits(ctx, null);
       if (!limits) return false;
       return admit(ctx, await counters(ctx), userId, limits);
     },
 
     async refundConfirmation(userId) {
+      await checkSeamOnce();
       const day = dayIn(config.timeZone, new Date());
       await giveBack(await counters(ctx), { scope: 'recipient', subjectId: userId, period: day });
     },

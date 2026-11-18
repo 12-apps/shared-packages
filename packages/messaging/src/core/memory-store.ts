@@ -210,6 +210,10 @@ function memoryMessages({ messages }: MemoryTables) {
       messages.set(id, next);
       return copy(next);
     },
+    async getMessage(tenantId, id) {
+      const row = messages.get(id);
+      return row && row.tenantId === tenantId ? copy(row) : null;
+    },
     async listMessages(tenantId, conversationId) {
       return [...messages.values()]
         .filter((row) => row.tenantId === tenantId && row.conversationId === conversationId)

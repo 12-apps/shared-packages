@@ -22,13 +22,43 @@ const STUB = { environment: 'SANDBOX' as const, fields: {}, stub: true };
 const PEM =
   '-----BEGIN CERTIFICATE REQUEST-----\nMIIBdz…\n-----END CERTIFICATE REQUEST-----';
 
-function mockFetch(response: unknown, status = 200) {
-  const spy = vi.fn().mockResolvedValue({
+function responseOf(body: string, status: number, contentType: string) {
+  const bytes = new TextEncoder().encode(body);
+  return {
     ok: status >= 200 && status < 300,
     status,
-    statusText: status === 200 ? 'OK' : 'Bad Request',
-    json: async () => response,
-    text: async () => JSON.stringify(response),
+    statusText: status === 406 ? 'Not Acceptable' : status < 300 ? 'OK' : 'Bad Request',
+    headers: new Headers({ 'content-type': contentType }),
+    json: async () => JSON.parse(body) as unknown,
+    text: async () => body,
+    arrayBuffer: async () => bytes.buffer,
+  };
+}
+
+function mockFetch(response: unknown, status = 200) {
+  const body = typeof response === 'string' ? response : JSON.stringify(response);
+  const spy = vi.fn().mockImplementation(async () => responseOf(body, status, 'application/json'));
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
+/**
+ * PagBank as production answered it on 2026-11-17 (FUT-5196), and as the
+ * sandbox still does: the CSR is a FILE (`application/pkcs10`), and a request
+ * that will only take JSON is refused with 406 before anything is minted.
+ */
+function mockPagBankFile(body: string | Uint8Array, contentType = 'application/pkcs10;charset=UTF-8') {
+  const spy = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+    const accept = (init.headers as Record<string, string>)['Accept'];
+    if (accept === 'application/json') {
+      return responseOf(
+        JSON.stringify({ path: '/public/wallets/apple-pay/csr', status: 406, error: 'Not Acceptable' }),
+        406,
+        'application/json',
+      );
+    }
+    const bytes = typeof body === 'string' ? new TextEncoder().encode(body) : body;
+    return { ...responseOf('', 201, contentType), arrayBuffer: async () => bytes.buffer };
   });
   vi.stubGlobal('fetch', spy);
   return spy;
@@ -87,6 +117,42 @@ describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', (
     const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
     expect(answer.csr).toBeNull();
     expect(answer.raw).toEqual({ unexpected: 'shape' });
+  });
+
+  it('FUT-5196: reads the CSR PagBank answers as application/pkcs10, never asking for JSON', async () => {
+    const spy = mockPagBankFile(`${PEM}\n`);
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
+    const [, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['Accept']).toBe('*/*');
+    expect(answer.csr).toBe(PEM);
+  });
+
+  it('FUT-5196: armours a CSR answered as DER bytes', async () => {
+    const der = Uint8Array.from([0x30, 0x82, 0x01, 0x17, 0x30, 0x81]);
+    mockPagBankFile(der, 'application/octet-stream');
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
+    expect(answer.csr).toBe(
+      ['-----BEGIN CERTIFICATE REQUEST-----', btoa(String.fromCharCode(...der)), '-----END CERTIFICATE REQUEST-----'].join('\n'),
+    );
+  });
+
+  it('FUT-5196: armours a CSR answered as bare base64', async () => {
+    mockPagBankFile('MIIBFzCBvgIBADBc\n', 'text/plain');
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE);
+    expect(answer.csr).toBe('-----BEGIN CERTIFICATE REQUEST-----\nMIIBFzCBvgIBADBc\n-----END CERTIFICATE REQUEST-----');
+  });
+
+  it('FUT-5196: a refused CSR still throws the typed provider error', async () => {
+    mockFetch({ error_messages: ['unauthorized'] }, 401);
+    await expect(pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.requestCsr(LIVE)).rejects.toThrow(ProviderRequestError);
+  });
+
+  it('FUT-5196: uploads the .cer without demanding a JSON answer', async () => {
+    const spy = mockPagBankFile('', 'application/json');
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate('-----BEGIN CERTIFICATE-----\nA\n-----END CERTIFICATE-----', LIVE);
+    const [, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['Accept']).toBe('*/*');
+    expect(answer.activated).toBe(true);
   });
 
   /**
