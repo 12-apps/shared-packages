@@ -25,6 +25,7 @@ import type {
   IbsCbsFigures,
   LineContribution,
   LineIbsCbs,
+  LinkedTransaction,
   PaymentMethod,
   ReferencedDocument,
   SaleForDocument,
@@ -73,6 +74,7 @@ function describedKeys(node: JsonSchemaNode): { required: string[]; properties: 
 /** Per case, the fields the type declares optional, which the schema leaves out of `required`. */
 const OPTIONAL: Readonly<Record<string, readonly string[]>> = {
   SaleForDocument: optional<SaleForDocument>({ operation: true, referencedDocuments: true }),
+  SalePayment: optional<SalePayment>({ linkedTransaction: true }),
 };
 
 const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
@@ -197,7 +199,12 @@ const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
   [
     "SalePayment",
     definition("payment"),
-    fields<SalePayment>({ method: true, amountCents: true, card: true, description: true }),
+    fields<SalePayment>({ method: true, amountCents: true, card: true, description: true, linkedTransaction: true }),
+  ],
+  [
+    "LinkedTransaction",
+    definition("payment").properties?.linkedTransaction ?? {},
+    fields<LinkedTransaction>({ transactionId: true, meansCode: true, pspCnpjBase: true, receiverCnpj: true }),
   ],
   [
     "CardDetails",

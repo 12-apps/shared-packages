@@ -175,7 +175,8 @@ export type DocumentEventKind =
   | "DEFER"
   | "RESIGN"
   | "RELEASE"
-  | "WARN";
+  | "WARN"
+  | "LINK_PAYMENT";
 
 /**
  * One transition, as stored. `answer` is what the fiscal service answered,

@@ -31,6 +31,7 @@ $nfce = Fixtures::issueBody('nfce-simples', $certificate, true);
 $late = $nfce;
 $late['document']['issuedAt'] = '2027-01-02T10:00:00-03:00';
 $contingency = ['since' => '2026-11-20T12:10:00-03:00', 'reason' => 'SEFAZ unreachable from the store'];
+$link = ['accessKey' => $key, 'protocol' => '135260000123456', 'sequence' => 1, 'payments' => [['transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', 'meansCode' => '17', 'pspCnpjBase' => '08561701', 'receiverCnpj' => '11222333000181']]];
 $inutilization = $auth + ['model' => 'nfce', 'uf' => 'SP', 'cnpj' => '11222333000181', 'year' => 2026, 'series' => 1, 'from' => 1300, 'to' => 1305, 'reason' => 'Numbers skipped by a failed batch'];
 
 /** @var array<string, array{string, array<string, mixed>, list<string|TransportFailure>}> $cases */
@@ -47,6 +48,9 @@ $cases = [
     'nfce-cancel' => ['/nfce/cancel', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Customer gave up the order'], ['cancel-135-registered']],
     'nfce-cancel-late' => ['/nfce/cancel', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Customer gave up the order'], ['cancel-501-late']],
     'nfce-cancel-substitution' => ['/nfce/cancel-substitution', $auth + ['accessKey' => $key, 'protocol' => '135260000123456', 'reason' => 'Replaced by the document issued in contingency', 'substituteAccessKey' => '35261111222333000181650020000000019482139071'], ['cancel-substitution-135-registered']],
+    'nfce-link-payment' => ['/nfce/link-payment', $auth + $link, ['link-payment-135-registered']],
+    'nfce-link-payment-duplicate' => ['/nfce/link-payment', $auth + ['sequence' => 2] + $link, ['link-payment-573-duplicate-event', 'lookup-100-authorized-with-link-payment']],
+    'nfce-link-payment-duplicate-other' => ['/nfce/link-payment', $auth + ['sequence' => 2] + $link, ['link-payment-573-duplicate-event', 'lookup-100-authorized-with-other-link-payment']],
     'nfce-lookup-authorized' => ['/nfce/lookup', $auth + ['accessKey' => $key], ['lookup-100-authorized']],
     'nfce-lookup-not-found' => ['/nfce/lookup', $auth + ['accessKey' => $key], ['lookup-217-not-found']],
     'inutilize' => ['/inutilize', $inutilization, ['inutilize-102-homologated']],

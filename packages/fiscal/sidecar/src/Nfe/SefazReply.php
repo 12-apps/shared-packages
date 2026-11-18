@@ -68,6 +68,27 @@ final class SefazReply
         return $node === null ? null : (string) $this->dom->saveXML($node);
     }
 
+    /**
+     * Every `$tag` element, serialised, in document order.
+     *
+     * @return list<string>
+     */
+    public function all(string $tag): array
+    {
+        $found = [];
+        foreach ($this->dom->getElementsByTagName($tag) as $node) {
+            $found[] = (string) $this->dom->saveXML($node);
+        }
+        return $found;
+    }
+
+    /** The attribute `$name` of the first `$tag` element, or null. */
+    public function attribute(string $tag, string $name): ?string
+    {
+        $node = $this->group($tag);
+        return $node === null || !$node->hasAttribute($name) ? null : $node->getAttribute($name);
+    }
+
     public function has(string $group): bool
     {
         return $this->group($group) !== null;

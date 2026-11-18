@@ -80,6 +80,22 @@ export interface CancelBySubstitutionRequest extends CancelRequest {
   readonly substituteAccessKey: string;
 }
 
+/** `POST /<model>/link-payment`: the event 110300 for one transaction (NT 2026.006 v1.00). */
+export interface LinkPaymentRequest extends Authenticated {
+  readonly accessKey: string;
+  /** The authorisation protocol (`nProt`). */
+  readonly protocol: string;
+  /** `nSeqEvento`, 1–20: this document's how-manieth 110300. */
+  readonly sequence: number;
+  /** Exactly one entry: the event's schema carries a single `gPgto`. */
+  readonly payments: ReadonlyArray<{
+    readonly transactionId: string;
+    readonly meansCode: string;
+    readonly pspCnpjBase: string;
+    readonly receiverCnpj: string;
+  }>;
+}
+
 /** `POST /<model>/lookup`. */
 export interface LookupRequest extends Authenticated {
   readonly accessKey: string;
@@ -154,6 +170,28 @@ export interface CancelledDocument extends SefazAnswer {
   readonly registeredAt: string | null;
   /** The `procEventoNFe`. */
   readonly eventXml: string | null;
+}
+
+/**
+ * `/link-payment`: the event registered. On 573 "Duplicidade de Evento" the
+ * service looks the key up and answers the event SEFAZ already holds at that
+ * `nSeqEvento`, with its own XML and the transaction it carries — which may be
+ * another transaction than the one sent (`statusCode` "573" tells the two apart).
+ */
+export interface RegisteredPaymentLink extends SefazAnswer {
+  readonly status: "REGISTERED";
+  readonly accessKey: string;
+  readonly protocol: string | null;
+  readonly registeredAt: string | null;
+  /** The `procEventoNFe`. */
+  readonly eventXml: string | null;
+  /** The `gPgto` SEFAZ registered at this `nSeqEvento`. */
+  readonly transaction: {
+    readonly transactionId: string;
+    readonly meansCode: string;
+    readonly pspCnpjBase: string;
+    readonly receiverCnpj: string;
+  };
 }
 
 /** `/lookup`: what SEFAZ knows of the key. `NOT_FOUND` is an answer, not an error. */

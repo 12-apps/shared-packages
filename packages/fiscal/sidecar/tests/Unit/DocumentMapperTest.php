@@ -73,6 +73,36 @@ final class DocumentMapperTest extends TestCase
         self::assertNotSame('', $x('//n:infNFeSupl/n:qrCode'), 'an NFC-e carries its QR code');
     }
 
+    public function testAPaymentStartedBeforeTheDocumentIsLinkedInGPgtoVinc(): void
+    {
+        $document = Fixtures::document('nfce-simples');
+        $document['payments'][0] = [
+            'method' => 'PIX_DYNAMIC', 'amountCents' => 4000, 'card' => null, 'description' => null,
+            'linkedTransaction' => [
+                'transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', 'meansCode' => '17',
+                'pspCnpjBase' => '08561701', 'receiverCnpj' => '11222333000181',
+            ],
+        ];
+        $document['payments'][1]['linkedTransaction'] = null;
+        $xml = $this->signedDocument($document, Model::NFCE);
+        $x = self::xpath($xml);
+
+        self::assertXsdValid($xml);
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $x('//n:gPgtoVinc/n:gPgto[@nPag="1"]/@idTransacao'));
+        self::assertSame('17', $x('//n:gPgtoVinc/n:gPgto[@nPag="1"]/n:tpMeioPgto'));
+        self::assertSame('11222333000181', $x('//n:gPgtoVinc/n:gPgto/n:CNPJReceb'));
+        self::assertSame('08561701', $x('//n:gPgtoVinc/n:gPgto/n:CNPJBasePSP'));
+        self::assertSame('', $x('//n:gPgtoVinc/n:gPgto[@nPag="2"]/@nPag'), 'the unlinked cash payment is not in the group');
+        self::assertSame('infAdic', self::nextSibling($xml), 'the group sits where the layout puts it, before infAdic');
+    }
+
+    public function testADocumentWithNoLinkedPaymentHasNoGPgtoVinc(): void
+    {
+        $x = self::xpath($this->signed('nfce-simples', Model::NFCE));
+
+        self::assertSame('', $x('//n:gPgtoVinc/n:gPgto/@nPag'));
+    }
+
     public function testAnNfeWithACompanyBuyerAndAnIntermediary(): void
     {
         $xml = $this->signed('nfe-normal-company-buyer', Model::NFE);
@@ -311,7 +341,15 @@ final class DocumentMapperTest extends TestCase
     /** @param array{since: string, reason: string}|null $contingency */
     private function signed(string $fixture, Model $model, ?array $contingency = null): string
     {
-        $document = Fixtures::document($fixture);
+        return $this->signedDocument(Fixtures::document($fixture), $model, $contingency);
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @param array{since: string, reason: string}|null $contingency
+     */
+    private function signedDocument(array $document, Model $model, ?array $contingency = null): string
+    {
         $built = (new DocumentMapper())->build($document, $model, 2, $contingency);
         $tools = Sefaz::tools(
             new RecordedTransport(),
@@ -336,6 +374,16 @@ final class DocumentMapperTest extends TestCase
             $node = $xpath->query($query)?->item(0);
             return $node === null ? '' : (string) $node->nodeValue;
         };
+    }
+
+    /** The element right after `gPgtoVinc` (the layout's order: pag, infIntermed, gPgtoVinc, infAdic). */
+    private static function nextSibling(string $xml): string
+    {
+        $dom = new DOMDocument();
+        $dom->loadXML($xml);
+        $group = $dom->getElementsByTagName('gPgtoVinc')->item(0);
+        $next = $group?->nextSibling;
+        return $next === null ? '' : $next->localName;
     }
 
     private static function assertXsdValid(string $xml): void

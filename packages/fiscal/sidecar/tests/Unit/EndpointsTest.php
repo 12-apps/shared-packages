@@ -30,11 +30,13 @@ final class EndpointsTest extends TestCase
             'POST /nfce/cancel',
             'POST /nfce/cancel-substitution',
             'POST /nfce/issue',
+            'POST /nfce/link-payment',
             'POST /nfce/lookup',
             'POST /nfce/sign-contingency',
             'POST /nfce/transmit',
             'POST /nfe/cancel',
             'POST /nfe/issue',
+            'POST /nfe/link-payment',
             'POST /nfe/lookup',
             'POST /nfe/transmit',
         ], $kernel->router()->table());
@@ -48,7 +50,7 @@ final class EndpointsTest extends TestCase
 
         self::assertSame(200, $response->status);
         self::assertSame('ok', $response->body['status']);
-        self::assertSame('v5.2.9', $response->body['libraries']['nfephp-org/sped-nfe']);
+        self::assertSame('v5.2.11', $response->body['libraries']['nfephp-org/sped-nfe']);
         self::assertSame('PL_010_V1.30', $response->body['nfeSchemas']);
     }
 
@@ -159,6 +161,85 @@ final class EndpointsTest extends TestCase
         self::assertSame('135260000200001', $response->body['protocol']);
         self::assertStringContainsString('<procEventoNFe', $response->body['eventXml']);
         self::assertStringContainsString('<tpEvento>110111</tpEvento>', $transport->sent[0]['envelope']);
+    }
+
+    public function testLinkPaymentSendsEvent110300WithTheTransaction(): void
+    {
+        $transport = new RecordedTransport('link-payment-135-registered');
+        [$kernel] = Fixtures::kernel($transport);
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame('REGISTERED', $response->body['status']);
+        self::assertSame('135260000200077', $response->body['protocol']);
+        self::assertStringContainsString('<procEventoNFe', $response->body['eventXml']);
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $response->body['transaction']['transactionId']);
+        $envelope = $transport->sent[0]['envelope'];
+        self::assertStringContainsString('<tpEvento>110300</tpEvento>', $envelope);
+        self::assertStringContainsString('<nSeqEvento>2</nSeqEvento>', $envelope);
+        self::assertStringContainsString('<descEvento>Vinculação Pagamento</descEvento>', $envelope);
+        self::assertStringContainsString(
+            '<nProt>135260000123456</nProt><gPgto idTransacao="7f3c2a91e04b4c1d9a0b11c2d3e4f5a6"><tpMeioPgto>17</tpMeioPgto>'
+            . '<CNPJReceb>11222333000181</CNPJReceb><CNPJBasePSP>08561701</CNPJBasePSP></gPgto>',
+            $envelope,
+        );
+    }
+
+    public function testARetriedLinkIsAnsweredWithTheRegisteredEventLookedUp(): void
+    {
+        $transport = new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized-with-link-payment');
+        [$kernel] = Fixtures::kernel($transport);
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame(['REGISTERED', '573', '135260000200077'], [$response->body['status'], $response->body['statusCode'], $response->body['protocol']]);
+        self::assertStringStartsWith('<procEventoNFe', $response->body['eventXml']);
+        self::assertStringContainsString('<nSeqEvento>2</nSeqEvento>', $response->body['eventXml']);
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $response->body['transaction']['transactionId']);
+        self::assertCount(2, $transport->sent);
+    }
+
+    public function testADuplicateHeldByAnotherTransactionAnswersThatTransaction(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized-with-other-link-payment'));
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame(
+            ['transactionId' => '9a9a9a9a9a9a4b4b8c8c7d7d7d7d7d7d', 'meansCode' => '17', 'receiverCnpj' => '11222333000181', 'pspCnpjBase' => '08561701'],
+            $response->body['transaction'],
+        );
+        self::assertSame('135260000200078', $response->body['protocol']);
+    }
+
+    public function testADuplicateTheLookupCannotShowIsRetryable(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized'));
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(['RETRYABLE', '573'], [$response->body['error']['class'], $response->body['error']['code']]);
+    }
+
+    public function testLinkPaymentRefusesAMeansWithNoTpMeioPgtoAndSendsNothing(): void
+    {
+        $transport = new RecordedTransport('link-payment-135-registered');
+        [$kernel] = Fixtures::kernel($transport);
+
+        $card = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link(['meansCode' => '03'])));
+        $long = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link(['transactionId' => str_repeat('a', 36)])));
+        $two = $this->link();
+        $two['payments'][] = $two['payments'][0];
+        $twice = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($two));
+
+        self::assertSame(
+            ['INVALID', 'INVALID', 'INVALID'],
+            [$card->body['error']['class'], $long->body['error']['class'], $twice->body['error']['class']],
+        );
+        self::assertSame([], $transport->sent);
     }
 
     public function testCancelOutsideTheWindowIsRejectedWithItsCode(): void
@@ -279,6 +360,24 @@ final class EndpointsTest extends TestCase
             'certificate' => ['pfxBase64' => self::$certificate->base64(), 'password' => self::$certificate->password],
             'accessKey' => '35261111222333000181650010000012011482139076',
         ] + $extra;
+    }
+
+    /**
+     * @param array<string, string> $override
+     * @return array<string, mixed>
+     */
+    private function link(array $override = []): array
+    {
+        return [
+            'protocol' => '135260000123456',
+            'sequence' => 2,
+            'payments' => [$override + [
+                'transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6',
+                'meansCode' => '17',
+                'pspCnpjBase' => '08561701',
+                'receiverCnpj' => '11222333000181',
+            ]],
+        ];
     }
 
     /** @return array<string, mixed> */

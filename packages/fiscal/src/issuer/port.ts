@@ -12,7 +12,7 @@
  */
 
 import type { FiscalDocumentModel } from "../documents/types";
-import type { SaleForDocument } from "../sale/types";
+import type { LinkedTransaction, SaleForDocument } from "../sale/types";
 import type {
   CancelledDocument,
   ContingencyEntry,
@@ -21,6 +21,7 @@ import type {
   InutilizedRange,
   IssuedDocument,
   LookedUpDocument,
+  RegisteredPaymentLink,
   SefazEnvironment,
   SidecarErrorBody,
   SidecarHealth,
@@ -73,6 +74,21 @@ export interface CancelBySubstitutionCall extends Call {
   readonly substituteAccessKey: string;
 }
 
+/** The event 110300 "Vinculação Pagamento" (NT 2026.006 v1.00): one transaction linked to an authorised document. */
+export interface LinkPaymentCall extends Call {
+  readonly model: FiscalDocumentModel;
+  readonly accessKey: string;
+  readonly protocol: string;
+  /** `nSeqEvento`, 1–20. */
+  readonly sequence: number;
+  /**
+   * The transactions the event links. Exactly ONE today: the event's schema
+   * (`e110300_v1.00.xsd`) carries a single `gPgto`, so the service refuses any
+   * other count as INVALID; the list is the NT group's own shape.
+   */
+  readonly payments: readonly LinkedTransaction[];
+}
+
 export interface LookupCall extends Call {
   readonly model: FiscalDocumentModel;
   readonly accessKey: string;
@@ -99,6 +115,13 @@ export interface Issuer {
   cancel(call: CancelCall): Promise<IssuerOutcome<CancelledDocument>>;
   cancelBySubstitution(call: CancelBySubstitutionCall): Promise<IssuerOutcome<CancelledDocument>>;
   lookup(call: LookupCall): Promise<IssuerOutcome<LookedUpDocument>>;
+  /**
+   * The event 110300. Optional on the port so an issuer written before it
+   * still satisfies the type; one that lacks it cannot link (the document
+   * service answers `NOT_SUPPORTED`), and a host may read its presence as
+   * "this issuer writes `gPgtoVinc`".
+   */
+  linkPayment?(call: LinkPaymentCall): Promise<IssuerOutcome<RegisteredPaymentLink>>;
   inutilize(call: InutilizeCall): Promise<IssuerOutcome<InutilizedRange>>;
   health(): Promise<SidecarHealth>;
 }
