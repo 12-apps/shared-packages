@@ -55,6 +55,7 @@ function MyCollapsible() {
 | keepMounted | boolean | false | Keep content in DOM when collapsed |
 | sx | SxProps<Theme> | - | MUI styling system |
 | className | string | - | CSS class name |
+| id | string | - | `id` of the region element; point a toggle's `aria-controls` at it |
 
 ### CollapsibleTrigger Props
 

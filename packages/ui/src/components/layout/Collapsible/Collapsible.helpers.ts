@@ -28,6 +28,7 @@ interface RegionState {
   open: boolean;
   disabled: boolean;
   dataTestId?: string;
+  id?: string;
 }
 
 /**
@@ -35,7 +36,8 @@ interface RegionState {
  * assistive technology whatever its `open` prop says, because it cannot be
  * operated to see the rest.
  */
-export const regionAttrs = ({ open, disabled, dataTestId }: RegionState) => ({
+export const regionAttrs = ({ open, disabled, dataTestId, id }: RegionState) => ({
+  id,
   'data-disabled': disabled,
   'data-testid': dataTestId,
   role: 'region',

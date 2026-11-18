@@ -53,6 +53,23 @@ export const Default: Story = {
   ),
 };
 
+/** `id` lands on the region, so a toggle outside it can set `aria-controls`. */
+export const WithRegionId: Story = {
+  args: { open: true, id: 'details-region' },
+  render: (args) => (
+    <>
+      <button type="button" aria-expanded={args.open} aria-controls="details-region">
+        Toggle details
+      </button>
+      <Collapsible {...args}>
+        <CollapsibleContent>
+          <Typography variant="body1">Region reachable through its id.</Typography>
+        </CollapsibleContent>
+      </Collapsible>
+    </>
+  ),
+};
+
 export const AllVariants: Story = {
   render: () => (
     <Box>

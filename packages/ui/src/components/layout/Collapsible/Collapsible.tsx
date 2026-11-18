@@ -63,6 +63,7 @@ const DefaultCollapsible: React.FC<VariantProps> = ({
   sx,
   className,
   dataTestId,
+  id,
   transition: _transition,
   easing: _easing,
   ...otherProps
@@ -78,7 +79,7 @@ const DefaultCollapsible: React.FC<VariantProps> = ({
     }}
     className={className}
     unmountOnExit={!keepMounted}
-    {...regionAttrs({ open, disabled, dataTestId })}
+    {...regionAttrs({ open, disabled, dataTestId, id })}
     {...otherProps}
   >
     <Box>{children}</Box>
@@ -95,6 +96,7 @@ const AnimatedCollapsible: React.FC<VariantProps> = ({
   sx,
   className,
   dataTestId,
+  id,
   duration: _duration,
   easing: _easing,
   ...otherProps
@@ -113,7 +115,7 @@ const AnimatedCollapsible: React.FC<VariantProps> = ({
         ...sx,
       }}
       className={className}
-      {...regionAttrs({ open, disabled, dataTestId })}
+      {...regionAttrs({ open, disabled, dataTestId, id })}
       {...otherProps}
     >
       <Box ref={contentRef}>{(keepMounted || (open && !disabled)) && children}</Box>
