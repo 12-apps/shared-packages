@@ -251,10 +251,44 @@ nothing leaves `REJECTED`, `DENIED`, `REPLACED` or `CANCELLED` for `AUTHORIZED`
   answered or put in an error. The CSC's id and token are saved together or
   not at all.
 
-**Not in this release** (FUT-4717): an offline register signing on a block of
-the contingency series reserved in advance, recording what it signed, and
-voiding the known rest of a finished block. The port it will build on is
-declared, unimplemented: `ContingencyBlockSource`.
+### Contingency blocks: a register that signs offline (FUT-4717)
+
+A register that may lose the server signs its NFC-e itself, on a block of its
+point's contingency series reserved in advance, and hands the signed XMLs in
+when it is back. The service is the `ContingencyBlockSource`; both of the
+package's stores keep the blocks (`ContingencyBlockStore`, tables
+`fiscal_contingency_blocks` and `fiscal_contingency_voids`); a host store
+without them answers `NOT_SUPPORTED` from these methods only.
+
+- `reserveBlock({ ownerId, issuingPointId, holder, size? })` → `{ id, series,
+  from, to, holder, fate, … }`. `holder` is the host's opaque id of the
+  register's install; `size` defaults to 50 (`DEFAULT_CONTINGENCY_BLOCK_SIZE`).
+  One `UPDATE … next_number = next_number + size` on the series' counter, the
+  row `issueOffline` draws from: the server's own contingency never numbers
+  inside a block.
+- `recordSigned({ ownerId, subjectId, signedXml, holder, sale? })` → the
+  subject's `CONTINGENCY` document: series, number, `cNF`, key, `dhEmi`,
+  `dhCont`/`xJust`, the total and the buyer READ FROM THE XML, the rest of the
+  sale from `sale` or the host's `SaleSource`; the XML stored like a
+  server-signed one; due for the next transmission pass at once. Refused as
+  `CONTINGENCY_XML_REFUSED` (nothing recorded): another CNPJ or environment,
+  not model 65, not `tpEmis = 9`, a key whose check digit or fields are
+  wrong, no signature, a number outside every block of that holder, a key
+  recorded for another subject, a number recorded under another key.
+  Idempotent on the key. A subject with a live NFC-e is `SUBJECT_HAS_DOCUMENT`.
+- The note is transmitted by `transmitContingency` from its stored XML,
+  never rebuilt from the sale; rejected, it stays live with its number for
+  `resendContingency`, like every contingency NFC-e.
+- `closeBlock({ ownerId, holder, series, from, sequenceUsed })`: the holder is
+  done; `sequenceUsed` is the highest number it used (`from - 1`: none).
+  `abandonBlocks({ ownerId, holder })`: the install is gone.
+- `listKnownGaps({ before })`, `listUnknownRanges({})` and
+  `voidKnownGaps({ before })` (the monthly job: one `inutilize` per range,
+  once; a failure is reported and retried on the next pass). KNOWN: below the
+  highest number the holder handed in, and above what a closed block's holder
+  said it used. UNKNOWN (flagged, never voided): between the highest handed
+  in and what it said it used, and everything above the highest handed in of
+  an abandoned block. A block with nothing left to account for is settled.
 
 NFS-e is not covered: only the platform's own NFS-e is planned (FUT-2242).
 
@@ -268,6 +302,14 @@ payments, the fiscal message and the key, the consumer, the number and
 protocol, and the QR code (a line carrying `qrCode`, for the host to
 rasterise). Each line is `{ text, align, emphasis }`, the shape
 `@12-apps/thermal-printing` encodes, at 32 or 48 columns.
+
+A register that signs on its own block (FUT-4717) prints the signed XML it
+holds, before any authorisation: `contingencyBox: true` frames the
+"EMITIDA EM CONTINGÊNCIA" / "Pendente de autorização" notice between two `=`
+rules (off by default, so every other paper is unchanged). The QR code is the
+one the fiscal service built from the CSC when it signed. The `./danfe` entry
+reaches no store, database or network module, so it runs in a desktop
+renderer as it does on a server.
 
 ## The manifest
 

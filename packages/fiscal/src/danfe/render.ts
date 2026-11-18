@@ -46,6 +46,13 @@ export interface DanfeNfceInput {
   readonly xml: string;
   readonly paperWidth: PaperWidth;
   readonly labels: DanfeNfceLabels;
+  /**
+   * Frame the contingency notice of a note signed offline and not yet
+   * authorised in a box (a `=` rule above and below it), the paper a register
+   * signing on its own prints (FUT-4717). Off by default: the paper is as it
+   * always was.
+   */
+  readonly contingencyBox?: boolean;
 }
 
 /** `1234` cents → `12,34`; thousands with a dot, as the DANFE prints money. */
@@ -119,8 +126,8 @@ class Paper {
     for (const piece of closing) this.lines.push({ division, text: piece, align: "left", emphasis });
   }
 
-  rule(division: DanfeDivision): void {
-    this.lines.push({ division, text: "-".repeat(this.width), align: "left", emphasis: "normal" });
+  rule(division: DanfeDivision, char = "-"): void {
+    this.lines.push({ division, text: char.repeat(this.width), align: "left", emphasis: "normal" });
   }
 }
 
@@ -199,14 +206,18 @@ function totalsPart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels, count: n
   paper.rule("IV");
 }
 
-function fiscalMessagePart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels): void {
+function fiscalMessagePart(paper: Paper, doc: Parsed, labels: DanfeNfceLabels, box: boolean): void {
   if (doc.homologation) paper.add("V", labels.homologation, "center", "bold");
+  const pending = doc.contingency && doc.infProt === null;
+  const framed = box && pending;
+  if (framed) paper.rule("V", "=");
   if (doc.contingency) paper.add("V", labels.contingency, "center", "bold");
   // Offline and not yet authorised: ONE copy, the consumer's (reprints are the same paper).
-  if (doc.contingency && doc.infProt === null) {
+  if (pending) {
     paper.add("V", labels.pendingAuthorization, "center", "bold");
     paper.add("V", labels.consumerCopy, "center", "bold");
   }
+  if (framed) paper.rule("V", "=");
   paper.add("V", labels.lookupByKey, "center");
   paper.add("V", text(doc.supl, "urlChave") ?? "", "center");
   paper.add("V", groupKey(doc.accessKey), "center");
@@ -257,7 +268,7 @@ export function renderDanfeNfce(input: DanfeNfceInput): DanfeLine[] {
   issuerPart(paper, doc, input.labels);
   const count = itemsPart(paper, doc, input.labels);
   totalsPart(paper, doc, input.labels, count);
-  fiscalMessagePart(paper, doc, input.labels);
+  fiscalMessagePart(paper, doc, input.labels, input.contingencyBox === true);
   consumerPart(paper, doc, input.labels);
   identificationPart(paper, doc, input.labels);
   qrPart(paper, doc, input.labels);

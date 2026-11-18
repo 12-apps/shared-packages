@@ -8,13 +8,16 @@
  */
 
 import { FiscalDocumentError } from "./errors";
-import type { FiscalStore, NumberRequest } from "./ports";
+import { memoryBlockMethods } from "./memory-blocks";
+import type { ContingencyBlock, ContingencyBlockStore, FiscalStore, NumberRequest } from "./ports";
 import type { EmitterProfile, IssuingPoint } from "./profile";
 import { type FiscalDocument, type FiscalDocumentEvent, OWED_VOIDS, isLive } from "./types";
 
 const MAX_NUMBER = 999_999_999;
 
-export interface MemoryFiscalStore extends FiscalStore {
+export interface MemoryFiscalStore extends FiscalStore, ContingencyBlockStore {
+  /** The contingency blocks, by id (FUT-4717). */
+  readonly blocks: Map<string, ContingencyBlock>;
   /** Every event, in order, for assertions. */
   readonly events: FiscalDocumentEvent[];
   /** The next number each counter would hand out, keyed `cnpj|environment|model|series`. */
@@ -75,6 +78,7 @@ export function createMemoryFiscalStore(): MemoryFiscalStore {
     [...state.documents.values()].sort((a, b) => key(a).localeCompare(key(b)));
 
   return {
+    ...memoryBlockMethods({ ...state, counterKey }),
     events: state.events,
     counters: state.counters,
     getProfile: async (ownerId) => profiles.get(ownerId) ?? null,

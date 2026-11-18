@@ -75,6 +75,7 @@ describe("the fiscal manifest", () => {
       "./notifications",
       "./sale",
       "./sidecar",
+      "./sidecar/extensions.json",
       "./sidecar/schema/*",
       "./tables/*",
       "./package.json",

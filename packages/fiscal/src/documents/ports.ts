@@ -108,23 +108,173 @@ export interface FiscalStore {
   listExpiringCertificates(before: string): Promise<EmitterProfile[]>;
 }
 
+/** A run of numbers of one series, both ends included. */
+export interface NumberRange {
+  readonly from: number;
+  readonly to: number;
+}
+
 /**
- * DECLARED, NOT IMPLEMENTED (FUT-4717): what an offline register needs from
- * the package that owns every number. A register that cannot reach the server
- * signs on a block of its contingency series reserved in advance; back
+ * - `OPEN`: the holder may still sign on it.
+ * - `CLOSED`: the holder said it is done with it and how far it got (`usedUpTo`).
+ * - `ABANDONED`: the holder is gone (a new install took its place): what it
+ *   signed above the highest number it handed in is unknown, never voided.
+ */
+export type ContingencyBlockFate = "OPEN" | "CLOSED" | "ABANDONED";
+
+export const CONTINGENCY_BLOCK_FATES: readonly ContingencyBlockFate[] = ["OPEN", "CLOSED", "ABANDONED"];
+
+/**
+ * Numbers of an issuing point's contingency series reserved for one holder
+ * (the host's opaque id of a register that may go offline) to sign on with no
+ * server. Drawn from the series' ONE counter — the counter the server's own
+ * contingency (`issueOffline`, going offline after a silent SEFAZ) draws from
+ * — so nothing else is ever numbered inside a block.
+ */
+export interface ContingencyBlock extends NumberRange {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly issuingPointId: string;
+  readonly issuerCnpj: string;
+  readonly environment: SefazEnvironment;
+  readonly model: "NFCE";
+  readonly series: number;
+  readonly holder: string;
+  readonly fate: ContingencyBlockFate;
+  /** The highest number the holder said it used when it closed the block (`from - 1`: none); `null` otherwise. */
+  readonly usedUpTo: number | null;
+  readonly reservedAt: string;
+  readonly closedAt: string | null;
+  /** When every number of the block was accounted for (a document, or voided); `null` while one is not. */
+  readonly settledAt: string | null;
+}
+
+/** A block, with the numbers recorded on it and the ranges voided at SEFAZ. */
+export interface ContingencyBlockState extends ContingencyBlock {
+  /** Numbers inside the block that carry a document, ascending. */
+  readonly documented: readonly number[];
+  readonly voided: readonly NumberRange[];
+}
+
+/**
+ * A range of a block with no document: KNOWN unused (voided by
+ * `voidKnownGaps`) or UNKNOWN (flagged for the store, never voided).
+ */
+export interface ContingencyGap extends NumberRange {
+  readonly blockId: string;
+  readonly ownerId: string;
+  readonly issuingPointId: string;
+  readonly issuerCnpj: string;
+  readonly environment: SefazEnvironment;
+  readonly series: number;
+  readonly holder: string;
+  readonly reservedAt: string;
+}
+
+/**
+ * The rows behind contingency blocks (FUT-4717). Both of the package's stores
+ * implement it (`createPrismaFiscalStore`, `createMemoryFiscalStore`); a host
+ * with its own `FiscalStore` and without these gets `NOT_SUPPORTED` from the
+ * block methods of the service, and everything else as before.
+ *
+ * - `reserveContingencyBlock` advances the series' counter by `size` and
+ *   records the block, in one transaction (no row back: not that point's
+ *   contingency series; past 999 999 999: `SERIES_EXHAUSTED`).
+ * - `recordSignedDocument` inserts a document and its event together; a
+ *   second live document of the subject is `SUBJECT_HAS_DOCUMENT`, a key or
+ *   number recorded already is `CONFLICT`.
+ * - `closeContingencyBlock` moves an OPEN block only (`false` otherwise).
+ * - `recordContingencyVoid` records a voided range once (`false` when the
+ *   range was recorded before).
+ */
+export interface ContingencyBlockStore {
+  reserveContingencyBlock(input: {
+    readonly request: NumberRequest;
+    readonly size: number;
+    readonly id: string;
+    readonly holder: string;
+    readonly at: string;
+  }): Promise<ContingencyBlock>;
+  /** The block holding `number` of the series, whoever holds it, with its documents and voids. */
+  findContingencyBlock(input: {
+    readonly ownerId: string;
+    readonly issuerCnpj: string;
+    readonly environment: SefazEnvironment;
+    readonly series: number;
+    readonly number: number;
+  }): Promise<ContingencyBlockState | null>;
+  /**
+   * One page of the blocks a filter selects, ordered by `(reservedAt, id)`;
+   * `after` is the last block of the previous page (keyset): the caller reads
+   * pages until one comes back empty.
+   */
+  listContingencyBlocks(input: {
+    readonly ownerId?: string;
+    readonly holder?: string;
+    readonly fates?: readonly ContingencyBlockFate[];
+    readonly reservedBefore?: string;
+    /** Leave out the blocks whose every number is accounted for. */
+    readonly unsettledOnly?: boolean;
+    readonly after?: { readonly reservedAt: string; readonly id: string };
+    readonly limit: number;
+  }): Promise<ContingencyBlockState[]>;
+  closeContingencyBlock(input: {
+    readonly id: string;
+    readonly fate: "CLOSED" | "ABANDONED";
+    readonly usedUpTo: number | null;
+    readonly at: string;
+  }): Promise<boolean>;
+  settleContingencyBlock(input: { readonly id: string; readonly at: string }): Promise<void>;
+  recordContingencyVoid(input: {
+    readonly id: string;
+    readonly blockId: string;
+    readonly range: NumberRange;
+    readonly protocol: string | null;
+    readonly eventXmlKey: string | null;
+    readonly at: string;
+  }): Promise<boolean>;
+  getDocumentByAccessKey(ownerId: string, accessKey: string): Promise<FiscalDocument | null>;
+  recordSignedDocument(document: FiscalDocument, event: FiscalDocumentEvent): Promise<FiscalDocument>;
+}
+
+/**
+ * What an offline register needs from the package that owns every number
+ * (FUT-4717), implemented by `createFiscalDocuments` over a store that is
+ * also a {@link ContingencyBlockStore}. A register that cannot reach the
+ * server signs on a block of its contingency series reserved in advance; back
  * online, it hands in what it signed, and the known rest of a finished block
- * is voided — an unknown range never is. The interface is named now so the
- * register's ticket builds against it; nothing in this release calls it.
+ * is voided — an unknown range never is.
  */
 export interface ContingencyBlockSource {
-  /** Reserve the next `size` numbers of the point's contingency series for one register. */
-  reserveBlock(input: { readonly ownerId: string; readonly issuingPointId: string; readonly size: number }): Promise<{
+  /** Reserve the next `size` (default 50) numbers of the point's contingency series for one holder. */
+  reserveBlock(input: {
+    readonly ownerId: string;
+    readonly issuingPointId: string;
+    readonly holder: string;
+    readonly size?: number;
+  }): Promise<ContingencyBlock>;
+  /**
+   * Record an XML the holder signed offline as the subject's `CONTINGENCY`
+   * document, owed a transmission now. Idempotent on the access key.
+   * `sale`: the sale as the host knows it; absent, the host's `SaleSource`
+   * answers it.
+   */
+  recordSigned(input: {
+    readonly ownerId: string;
+    readonly subjectId: string;
+    readonly signedXml: string;
+    readonly holder: string;
+    readonly sale?: SaleDraft;
+  }): Promise<FiscalDocument>;
+  /**
+   * The holder is done with the block: `sequenceUsed` is the highest number
+   * it used (`from - 1`: none). The numbers above it are known unused.
+   */
+  closeBlock(input: {
+    readonly ownerId: string;
+    readonly holder: string;
     readonly series: number;
     readonly from: number;
-    readonly to: number;
-  }>;
-  /** Record an XML the register signed offline as a CONTINGENCY document of the block. */
-  recordSigned(input: { readonly ownerId: string; readonly subjectId: string; readonly signedXml: string }): Promise<FiscalDocument>;
-  /** The block is finished: void the numbers known unused (`sequenceUsed` tells which were). */
-  closeBlock(input: { readonly ownerId: string; readonly series: number; readonly from: number; readonly sequenceUsed: number }): Promise<void>;
+    readonly sequenceUsed: number;
+  }): Promise<ContingencyBlock>;
 }

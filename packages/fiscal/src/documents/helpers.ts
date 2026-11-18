@@ -81,6 +81,9 @@ export const xmlKeys = {
   linkPayment: (accessKey: string, sequence: number) => `fiscal/${accessKey}/link-payment-${sequence}.xml`,
   inutilization: (document: FiscalDocument) =>
     `fiscal/inutilization/${document.environment}/${document.model}/${document.ownerId}/${document.series}-${document.number}.xml`,
+  /** A range of a contingency block voided at once (FUT-4717). */
+  inutilizedRange: (gap: { environment: string; ownerId: string; series: number; from: number; to: number }) =>
+    `fiscal/inutilization/${gap.environment}/NFCE/${gap.ownerId}/${gap.series}-${gap.from}-${gap.to}.xml`,
 };
 
 /** The IBGE code of each federative unit: the access key's first two digits. */

@@ -57,6 +57,7 @@
       "types": "./dist/sidecar/index.d.ts",
       "default": "./dist/sidecar/index.js"
     },
+    "./sidecar/extensions.json": "./sidecar/extensions.json",
     "./sidecar/schema/*": "./sidecar/schema/*",
     "./tables/*": "./tables/*",
     "./package.json": "./package.json"
