@@ -43,6 +43,7 @@ describe('the Prisma refund retry store and a part baseline (FUT-4951)', () => {
     const row = await createPrismaRefundRetryStore(d.port).insert(NEW_ROW);
     expect(d.create.mock.calls[0]![0].data).not.toHaveProperty('refundedBeforeCents');
     expect(d.create.mock.calls[0]![0].data).not.toHaveProperty('refundedBeforeAt');
+    expect(d.create.mock.calls[0]![0].data).not.toHaveProperty('lastSentCents');
     expect(row).not.toHaveProperty('refundedBeforeCents');
   });
 
@@ -59,5 +60,15 @@ describe('the Prisma refund retry store and a part baseline (FUT-4951)', () => {
     );
     d.findUnique.mockResolvedValueOnce({ ...d.create.mock.calls[0]![0].data, id: 'row-1', version: 1, refundedBeforeCents: 1_200, refundedBeforeAt: new Date('2026-11-18T15:00:01.000Z') });
     expect(await store.find('pagbank', 'CHAR_1', 'part:1')).toMatchObject({ refundedBeforeCents: 1_200, refundedBeforeAt: '2026-11-18T15:00:01.000Z' });
+  });
+
+  it('a part settled REFUNDED writes what its settling send asked, and reads it back', async () => {
+    const d = delegate();
+    const store = createPrismaRefundRetryStore(d.port);
+    const row = (await store.insert(NEW_ROW))!;
+    await store.saveIf({ ...row, lastSentCents: 209, settledHow: 'REFUNDED', settledAt: '2026-11-18T15:01:00.000Z' }, 0);
+    expect(d.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ lastSentCents: 209, version: 1 }) }));
+    d.findUnique.mockResolvedValueOnce({ ...d.create.mock.calls[0]![0].data, id: 'row-1', version: 1, lastSentCents: 209 });
+    expect(await store.find('pagbank', 'CHAR_1', 'part:1')).toMatchObject({ lastSentCents: 209 });
   });
 });

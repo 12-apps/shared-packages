@@ -256,6 +256,8 @@ model PaymentRefundRetry {
   // before the part's first send, and when. Null until then.
   refundedBeforeCents Int?      @map("refunded_before_cents")
   refundedBeforeAt    DateTime? @map("refunded_before_at")
+  // A part settled REFUNDED: what its settling send asked (FUT-4951).
+  lastSentCents       Int?      @map("last_sent_cents")
   // The compare-and-set counter.
   version          Int       @default(0)
   createdAt        DateTime  @default(now()) @map("created_at")

@@ -58,6 +58,8 @@ export interface RefundSeriesRow extends RefundRetryState {
    */
   refundedBeforeCents?: number | null;
   refundedBeforeAt?: string | null;
+  /** A part settled REFUNDED: what its settling send asked (the part, or what was still owed) (FUT-4951). */
+  lastSentCents?: number | null;
   /** The compare-and-set counter: every write asks for the version it read. */
   version: number;
 }

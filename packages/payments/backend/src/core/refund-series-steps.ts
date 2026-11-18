@@ -15,7 +15,7 @@ import {
   type RefundRetryState,
 } from './refund-retry';
 import type { FirstAttemptResult, RefundRetrierDeps, RefundSeriesView } from './refund-series';
-import { baselineFor, baselineOf, blockersOf, deferredUntil, isPart, owedCents, pressSiblings, siblingsOf } from './refund-series-part';
+import { ambiguousSince, baselineFor, baselineOf, blockersOf, deferredUntil, isPart, owedCents, pressSiblings, provenBack, siblingsOf } from './refund-series-part';
 import type { RefundSeriesKey, RefundSeriesRow, RefundSeriesSettlement } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { RefundSnapshot } from './types';
@@ -95,8 +95,8 @@ function report(ctx: SeriesContext, row: Pick<RefundSeriesRow, 'merchant' | 'pro
 }
 
 /** Settle a series behind the version it was read at; answers the stored row or null. */
-function settle(ctx: SeriesContext, row: RefundSeriesRow, how: RefundSeriesSettlement) {
-  return ctx.store.saveIf({ ...row, settledAt: ctx.clock().toISOString(), settledHow: how, claimedAt: null, nextAt: null }, row.version);
+function settle(ctx: SeriesContext, row: RefundSeriesRow, how: RefundSeriesSettlement, extra: Partial<RefundSeriesRow> = {}) {
+  return ctx.store.saveIf({ ...row, ...extra, settledAt: ctx.clock().toISOString(), settledHow: how, claimedAt: null, nextAt: null }, row.version);
 }
 
 /** Open (or re-open, for a new cancel) the series of `key` in `state`. */
@@ -235,7 +235,8 @@ async function sendOne(ctx: SeriesContext, claimed: RefundSeriesRow, signal: Abo
   if (snapshot.status === 'FAILED') return answeredFailed(ctx, claimed);
   // A part: what went back THROUGH this series is the part, whether this send asked all of it or the rest.
   await ctx.host.refunded(claimed, { snapshot, adopted: false, ...(isPart(claimed) ? { refundedCents: claimed.amountCents } : {}) });
-  await settle(ctx, claimed, 'REFUNDED');
+  // A part keeps what its settling send asked: what landed after a sibling's baseline (FUT-4951).
+  await settle(ctx, claimed, 'REFUNDED', isPart(claimed) ? { lastSentCents: cents } : {});
 }
 
 /**
@@ -253,6 +254,8 @@ async function sendPart(ctx: SeriesContext, claimed: RefundSeriesRow, signal: Ab
     const based = await ctx.store.saveIf({ ...claimed, refundedBeforeCents: readBack, refundedBeforeAt: ctx.clock().toISOString() }, claimed.version);
     return based ? sendOne(ctx, based, signal) : undefined;
   }
+  // A sibling adopted since, whose money may have landed before or after this baseline: a person decides.
+  if (ambiguousSince(claimed, siblings)) return refusedAttempt(ctx, claimed, 'UNKNOWN', new Error('a sibling refund adopted since the baseline'), true);
   const owed = owedCents(claimed, readBack, siblings);
   if (owed <= 0) return adopt(ctx, claimed, claimed.amountCents);
   return sendOne(ctx, claimed, signal, owed);
@@ -274,10 +277,6 @@ async function attempt(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: r
   return sendOne(ctx, claimed, signal);
 }
 
-/** A part read back whose figure proves nothing is owed any more (FUT-4951). */
-const provenBack = (claimed: RefundSeriesRow, seen: Consulted, siblings: readonly RefundSeriesRow[]): boolean =>
-  seen.kind === 'OWED' && seen.readBack !== null && isPart(claimed) && baselineOf(claimed) !== null && owedCents(claimed, seen.readBack, siblings) <= 0;
-
 /** A dead claimant held the LAST attempt: consult only, adopt or give up. */
 async function close(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: readonly RefundSeriesRow[] = []): Promise<void> {
   if (!(await ctx.host.stillOwed(claimed))) {
@@ -286,7 +285,7 @@ async function close(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: rea
   }
   const seen = await consult(ctx, claimed, deadline(ctx));
   if (seen.kind === 'BACK') return adopt(ctx, claimed, seen.refundedCents);
-  if (provenBack(claimed, seen, siblings)) return adopt(ctx, claimed, claimed.amountCents);
+  if (seen.kind === 'OWED' && provenBack(claimed, seen.readBack, siblings)) return adopt(ctx, claimed, claimed.amountCents);
   const refusal = claimed.refusal ?? 'UNKNOWN';
   const saved = await ctx.store.saveIf(
     { ...claimed, refusal, exhausted: true, nextAt: null, claimedAt: null, reported: true },

@@ -38,6 +38,7 @@ interface RetryColumns {
   /** FUT-4951's baseline; optional so a client generated before its migration still reads the rows. */
   refundedBeforeCents?: number | null;
   refundedBeforeAt?: Date | null;
+  lastSentCents?: number | null;
 }
 
 interface RetryRow extends RetryColumns {
@@ -86,6 +87,7 @@ function toRow(row: RetryRow): RefundSeriesRow {
     settledHow: row.settledHow as RefundSeriesSettlement | null,
     // A client generated before the baseline's migration has no such column: the row has no baseline.
     ...(row.refundedBeforeCents !== undefined ? { refundedBeforeCents: row.refundedBeforeCents, refundedBeforeAt: iso(row.refundedBeforeAt ?? null) } : {}),
+    ...(row.lastSentCents !== undefined ? { lastSentCents: row.lastSentCents } : {}),
     version: row.version,
   };
 }
@@ -120,9 +122,11 @@ function columnsOf(row: NewRefundSeriesRow): RetryColumns {
  * one (absent) writes nothing there, so a host whose client predates the columns keeps working
  * until a provider with read-back asks for a baseline.
  */
-function baselineColumns(row: NewRefundSeriesRow): Pick<RetryColumns, 'refundedBeforeCents' | 'refundedBeforeAt'> {
-  if (row.refundedBeforeCents === undefined) return {};
-  return { refundedBeforeCents: row.refundedBeforeCents, refundedBeforeAt: date(row.refundedBeforeAt ?? null) };
+function baselineColumns(row: NewRefundSeriesRow): Pick<RetryColumns, 'refundedBeforeCents' | 'refundedBeforeAt' | 'lastSentCents'> {
+  return {
+    ...(row.refundedBeforeCents !== undefined ? { refundedBeforeCents: row.refundedBeforeCents, refundedBeforeAt: date(row.refundedBeforeAt ?? null) } : {}),
+    ...(row.lastSentCents !== undefined ? { lastSentCents: row.lastSentCents } : {}),
+  };
 }
 
 /** A unique violation: another writer inserted the row first. */

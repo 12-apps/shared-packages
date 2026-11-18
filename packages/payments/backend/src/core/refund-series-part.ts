@@ -13,6 +13,9 @@ import type { RefundRetryStore, RefundSeriesKey, RefundSeriesRow } from './refun
 /** The series' own fields this module reads. */
 type PartRow = Pick<RefundSeriesRow, 'id' | 'providerChargeId' | 'amountCents' | 'refundedBeforeCents' | 'refundedBeforeAt'>;
 
+/** A baseline's instant in ms; NaN when there is none. */
+const baselineMs = (row: Pick<RefundSeriesRow, 'refundedBeforeAt'>): number => (row.refundedBeforeAt ? Date.parse(row.refundedBeforeAt) : Number.NaN);
+
 /** A part series: one with an amount. */
 export const isPart = (row: Pick<RefundSeriesRow, 'amountCents'>): boolean => row.amountCents !== null;
 
@@ -62,23 +65,40 @@ export function deferredUntil(blockers: readonly RefundSeriesRow[], now: Date): 
     claimHeld(other, now) ? Date.parse(other.claimedAt!) + REFUND_CLAIM_TTL_MS : Date.parse(other.nextAt ?? ''),
   );
   const earliest = Math.min(...resolves.filter((ms) => !Number.isNaN(ms)));
-  return new Date(Math.max(now.getTime() + DEFER_MIN_MS, earliest + 1_000)).toISOString();
+  return new Date(Math.max(now.getTime() + DEFER_MIN_MS, Number.isFinite(earliest) ? earliest + 1_000 : 0)).toISOString();
+}
+
+/** A sibling settled as money back after this part's baseline was read. */
+const settledSince = (other: RefundSeriesRow, since: number, how: 'REFUNDED' | 'ADOPTED'): boolean =>
+  other.settledHow === how && other.settledAt !== null && Date.parse(other.settledAt) > since;
+
+/**
+ * What sibling parts took back after this part's baseline was read: theirs, not this part's.
+ * - A sibling settled REFUNDED since: its settling send landed after the baseline (it held this part
+ *   back while it ran), so what that send asked counts, whatever the sibling's own baseline.
+ * - A sibling ADOPTED since counts only when its own first send came after this baseline, since then
+ *   none of its money can be inside it. One adopted with an older baseline is {@link ambiguousSince}.
+ */
+function siblingsSince(row: PartRow, siblings: readonly RefundSeriesRow[]): number {
+  const since = baselineMs(row);
+  if (Number.isNaN(since)) return 0;
+  const refunded = siblings.filter((other) => settledSince(other, since, 'REFUNDED'));
+  const adopted = siblings.filter((other) => settledSince(other, since, 'ADOPTED') && baselineMs(other) >= since);
+  return (
+    refunded.reduce((sum, other) => sum + (other.lastSentCents ?? other.amountCents ?? 0), 0) +
+    adopted.reduce((sum, other) => sum + (other.amountCents ?? 0), 0)
+  );
 }
 
 /**
- * What sibling parts settled as money back after the baseline was read: theirs, not this part's. Only
- * a sibling whose OWN first send came after this baseline counts, since none of its money can be
- * inside it; one sent earlier may already be, so it is left out and whatever of it landed later counts
- * as this part's. The error can only leave the buyer short, never paid twice.
+ * A sibling ADOPTED since this baseline whose own baseline is older (or absent): its money may have
+ * landed before this baseline (inside it) or after (not this part's), and nothing tells which. The
+ * part is then neither adopted nor sent: it goes pending, so a person decides.
  */
-function siblingsSince(row: PartRow, siblings: readonly RefundSeriesRow[]): number {
-  const since = row.refundedBeforeAt ? Date.parse(row.refundedBeforeAt) : Number.NaN;
-  if (Number.isNaN(since)) return 0;
-  return siblings
-    .filter((other) => (other.settledHow === 'REFUNDED' || other.settledHow === 'ADOPTED') && other.settledAt !== null)
-    .filter((other) => Date.parse(other.settledAt!) > since)
-    .filter((other) => other.refundedBeforeAt != null && Date.parse(other.refundedBeforeAt) >= since)
-    .reduce((sum, other) => sum + (other.amountCents ?? 0), 0);
+export function ambiguousSince(row: PartRow, siblings: readonly RefundSeriesRow[]): boolean {
+  const since = baselineMs(row);
+  if (Number.isNaN(since)) return false;
+  return siblings.some((other) => settledSince(other, since, 'ADOPTED') && !(baselineMs(other) >= since));
 }
 
 /**
@@ -104,3 +124,7 @@ export async function pressSiblings(store: RefundRetryStore, stored: RefundSerie
 /** A series re-opened for ANOTHER claim starts with no baseline; the same claim keeps its own, never moved. */
 export const baselineFor = (stored: RefundSeriesRow, key: Pick<RefundSeriesKey, 'boundTo'>) =>
   stored.boundTo === key.boundTo || baselineOf(stored) === null ? {} : { refundedBeforeCents: null, refundedBeforeAt: null };
+
+/** A part read back whose figure proves nothing is owed any more: adopted by a CLOSE (a dead claimant's last attempt). */
+export const provenBack = (row: RefundSeriesRow, readBack: number | null, siblings: readonly RefundSeriesRow[]): boolean =>
+  readBack !== null && isPart(row) && baselineOf(row) !== null && !ambiguousSince(row, siblings) && owedCents(row, readBack, siblings) <= 0;

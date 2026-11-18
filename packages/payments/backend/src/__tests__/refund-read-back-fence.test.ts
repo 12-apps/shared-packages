@@ -31,31 +31,40 @@ const X = part('part:x', 509);
 const Y = part('part:y', 300);
 const Z = part('part:z', 200);
 
-type Next = 'OK' | 'DOWN' | 'LOST';
+type Next = 'OK' | 'DOWN' | 'LOST' | { lostPart: number };
 const down = () => new ProviderRequestError('pagbank', 'answered 503', { httpStatus: 503 });
 
 function world() {
   const instants = [new Date(T0)];
-  const provider = { refundedCents: 0, readThrows: 0, script: [] as Next[], sent: [] as number[] };
+  /** CHAR_1's figure, its script and its sends; `other` is every other charge (another store's), which always answers. */
+  const provider = { refundedCents: 0, readThrows: 0, script: [] as Next[], sent: [] as number[], other: {} as Record<string, number> };
+  const refundedOf = (charge: string) => (charge === 'CHAR_1' ? provider.refundedCents : (provider.other[charge] ?? 0));
   const gateway = {
-    refund: vi.fn(async (_m: unknown, _p: unknown, input: { amount?: { amountCents: number } }) => {
-      const cents = input.amount?.amountCents ?? CAPTURE - provider.refundedCents;
+    refund: vi.fn(async (_m: unknown, _p: unknown, input: { providerChargeId: string; amount?: { amountCents: number } }) => {
+      const charge = input.providerChargeId;
+      const cents = input.amount?.amountCents ?? CAPTURE - refundedOf(charge);
+      const answer = { provider: 'pagbank', providerChargeId: charge, providerRefundId: `r${charge}${cents}`, status: 'REFUNDED' as const, amount: { amountCents: cents, currency: 'BRL' } };
+      if (charge !== 'CHAR_1') {
+        provider.other[charge] = refundedOf(charge) + cents;
+        return answer;
+      }
       provider.sent.push(cents);
       const next = provider.script.shift() ?? 'OK';
       if (next === 'DOWN') throw down();
-      provider.refundedCents += cents;
-      if (next === 'LOST') throw down();
-      return { provider: 'pagbank', providerChargeId: 'CHAR_1', providerRefundId: `r${provider.refundedCents}`, status: 'REFUNDED' as const, amount: { amountCents: cents, currency: 'BRL' } };
+      provider.refundedCents += typeof next === 'object' ? next.lostPart : cents;
+      if (next !== 'OK') throw down();
+      return answer;
     }),
-    refreshCharge: vi.fn(async () => {
-      if (provider.readThrows > 0) {
+    refreshCharge: vi.fn(async (_m: unknown, _p: unknown, charge: string) => {
+      if (charge === 'CHAR_1' && provider.readThrows > 0) {
         provider.readThrows -= 1;
         throw down();
       }
+      const refunded = refundedOf(charge);
       return {
-        status: provider.refundedCents > 0 ? ('PARTIALLY_REFUNDED' as const) : ('PAID' as const),
+        status: refunded >= CAPTURE ? ('REFUNDED' as const) : refunded > 0 ? ('PARTIALLY_REFUNDED' as const) : ('PAID' as const),
         amount: { amountCents: CAPTURE, currency: 'BRL' },
-        refundedAmount: { amountCents: provider.refundedCents, currency: 'BRL' },
+        refundedAmount: { amountCents: refunded, currency: 'BRL' },
       };
     }),
   };
@@ -68,7 +77,7 @@ function world() {
     at(ms);
     await retrier.runDue();
   };
-  const row = async (key: { subject: string }) => (await store.find('pagbank', 'CHAR_1', key.subject))!;
+  const row = async (key: { subject: string; providerChargeId?: string }) => (await store.find('pagbank', key.providerChargeId ?? 'CHAR_1', key.subject))!;
   return { retrier, provider, store, at, tick, row };
 }
 
@@ -116,7 +125,7 @@ describe('B1: a held-back part is deferred, so it never stalls the sweep at the 
 });
 
 describe('B2: a sibling sent before the baseline is not subtracted again', () => {
-  it('Y landed unproven, X landed unproven on top of it: pressing Y then X adopts both, 809 back, never 1109', async () => {
+  it('Y landed unproven, X landed unproven on top of it: pressing Y then X adopts Y, X goes pending, 809 back, never 1109', async () => {
     const w = world();
     w.provider.script.push('LOST');
     await w.retrier.openDue(Y);
@@ -137,7 +146,9 @@ describe('B2: a sibling sent before the baseline is not subtracted again', () =>
     expect(await w.row(Y)).toMatchObject({ settledHow: 'ADOPTED' });
     w.at(T0 + 41 * MIN);
     await w.retrier.press(X);
-    expect(await w.row(X)).toMatchObject({ settledHow: 'ADOPTED' });
+    // Round 2: Y was adopted since X's baseline with an older baseline of its own, so nothing tells whether
+    // its money is inside X's baseline. X is neither adopted nor sent: pending, for a person (FUT-4951 R2-B1).
+    expect(await w.row(X)).toMatchObject({ settledAt: null, exhausted: true });
     expect(w.provider.sent).toEqual([300, 509]);
     expect(w.provider.refundedCents).toBe(809);
   });
@@ -157,4 +168,89 @@ describe('N1: a blind part past its first attempt whose consult fails stays pend
     expect(w.provider.sent).toEqual([]);
     expect(await w.row(X)).toMatchObject({ attempt: 3, exhausted: true, settledAt: null });
   });
+});
+
+/** Y (300) then X (509) each run out of attempts in an outage, nothing landed: both pending, baselines 0. */
+async function bothPendingAfterOutage(w: ReturnType<typeof world>): Promise<void> {
+  w.provider.script.push('DOWN', 'DOWN', 'DOWN', 'DOWN');
+  await w.retrier.openDue(Y);
+  for (const ms of [T0, T0 + 30_000, T0 + 5 * MIN, T0 + 15 * MIN]) await w.tick(ms);
+  w.provider.script.push('DOWN', 'DOWN', 'DOWN', 'DOWN');
+  await w.retrier.openDue(X);
+  for (const ms of [T0 + 20 * MIN, T0 + 20 * MIN + 30_000, T0 + 25 * MIN, T0 + 35 * MIN]) await w.tick(ms);
+  for (const key of [Y, X]) expect(await w.row(key)).toMatchObject({ exhausted: true, settledAt: null, refundedBeforeCents: 0 });
+}
+
+describe('R2-B1: a sibling REFUNDED after the baseline is subtracted by what its settling send asked', () => {
+  /** Press one pending part, then the other, after the outage; answers what each press sent. */
+  async function pressInOrder(first: typeof X, second: typeof X) {
+    const w = world();
+    await bothPendingAfterOutage(w);
+    w.at(T0 + 40 * MIN);
+    await w.retrier.press(first);
+    w.at(T0 + 41 * MIN);
+    await w.retrier.press(second);
+    for (const key of [X, Y]) expect(await w.row(key)).toMatchObject({ settledHow: 'REFUNDED', lastSentCents: key.amountCents });
+    return { sent: w.provider.sent.slice(8), total: w.provider.refundedCents };
+  }
+
+  it('Q2: after an outage, pressing Y then X refunds 809, each part once', async () => {
+    expect(await pressInOrder(Y, X)).toEqual({ sent: [300, 509], total: 809 });
+  });
+
+  it('Q2: after an outage, pressing X then Y refunds 809, each part once', async () => {
+    expect(await pressInOrder(X, Y)).toEqual({ sent: [509, 300], total: 809 });
+  });
+
+  it('partial: Y\'s 200 landed before X\'s baseline and its last 100 after it; X is sent whole, never 200 again', async () => {
+    await partialScenario();
+  });
+
+  /** Y lands 200 of its 300 before X's baseline (answer lost), its last 100 after it. */
+  async function partialScenario() {
+    const w = world();
+    w.provider.script.push({ lostPart: 200 }, 'DOWN', 'DOWN', 'DOWN');
+    await w.retrier.openDue(Y);
+    for (const ms of [T0, T0 + 30_000, T0 + 5 * MIN, T0 + 15 * MIN]) await w.tick(ms);
+    // Y's attempts 2–4 read 200 back and send the 100 still owed, with no answer.
+    expect(w.provider.sent).toEqual([300, 100, 100, 100]);
+    w.provider.script.push('DOWN', 'DOWN', 'DOWN', 'DOWN');
+    await w.retrier.openDue(X);
+    for (const ms of [T0 + 20 * MIN, T0 + 20 * MIN + 30_000, T0 + 25 * MIN, T0 + 35 * MIN]) await w.tick(ms);
+    expect(await w.row(X)).toMatchObject({ exhausted: true, refundedBeforeCents: 200 });
+    w.at(T0 + 40 * MIN);
+    await w.retrier.press(Y); // reads 200 back, sends the last 100
+    w.at(T0 + 41 * MIN);
+    await w.retrier.press(X); // +100 since its baseline, all of it Y's settling send: X owes all 509
+    expect(w.provider.sent.slice(8)).toEqual([100, 509]);
+    expect(w.provider.refundedCents).toBe(809);
+    expect(await w.row(Y)).toMatchObject({ settledHow: 'REFUNDED', lastSentCents: 100 });
+    expect(await w.row(X)).toMatchObject({ settledHow: 'REFUNDED', lastSentCents: 509 });
+  }
+});
+
+describe('R2-N2: a held-back part never takes another store\'s slot for more than one tick', () => {
+  it('another store\'s due row is refunded the tick after the held-back rows are deferred', async () => {
+    await otherStoreScenario();
+  });
+
+  /** X in doubt, Y and Z held back behind it, and another store's whole-charge row due meanwhile. */
+  async function otherStoreScenario() {
+    const w = world();
+    const other = { ...X, merchant: { kind: 'TENANT' as const, id: 'tenant-2' }, reference: 'ref-2', providerChargeId: 'CHAR_2', subject: 'order', boundTo: 'order', amountCents: null };
+    w.provider.script.push('DOWN');
+    await w.retrier.openDue(X);
+    await w.tick(T0); // X in doubt, next at T0 + 30 s
+    w.at(T0 + 10_000);
+    await w.retrier.openDue(Y);
+    await w.retrier.openDue(Z);
+    w.at(T0 + 20_000);
+    await w.retrier.openDue(other);
+    await w.tick(T0 + 30_000); // Y and Z take the two slots and are deferred
+    expect(await w.row(other)).toMatchObject({ attempt: 0, settledAt: null });
+    await w.tick(T0 + 90_000); // the other store's row, then X
+    expect(await w.row(other)).toMatchObject({ settledHow: 'REFUNDED' });
+    expect(w.provider.other.CHAR_2).toBe(CAPTURE);
+    expect(await w.row(X)).toMatchObject({ settledHow: 'REFUNDED' });
+  }
 });
