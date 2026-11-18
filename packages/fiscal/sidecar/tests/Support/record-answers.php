@@ -31,7 +31,7 @@ $nfce = Fixtures::issueBody('nfce-simples', $certificate, true);
 $late = $nfce;
 $late['document']['issuedAt'] = '2027-01-02T10:00:00-03:00';
 $contingency = ['since' => '2026-11-20T12:10:00-03:00', 'reason' => 'SEFAZ unreachable from the store'];
-$link = ['accessKey' => $key, 'protocol' => '135260000123456', 'sequence' => 1, 'transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', 'meansCode' => '17', 'pspCnpjBase' => '08561701', 'receiverCnpj' => '11222333000181'];
+$link = ['accessKey' => $key, 'protocol' => '135260000123456', 'sequence' => 1, 'payments' => [['transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', 'meansCode' => '17', 'pspCnpjBase' => '08561701', 'receiverCnpj' => '11222333000181']]];
 $inutilization = $auth + ['model' => 'nfce', 'uf' => 'SP', 'cnpj' => '11222333000181', 'year' => 2026, 'series' => 1, 'from' => 1300, 'to' => 1305, 'reason' => 'Numbers skipped by a failed batch'];
 
 /** @var array<string, array{string, array<string, mixed>, list<string|TransportFailure>}> $cases */

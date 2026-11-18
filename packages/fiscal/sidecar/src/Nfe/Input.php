@@ -105,6 +105,16 @@ final class Input
         return $value;
     }
 
+    /** @return list<mixed> */
+    public function list(string $field): array
+    {
+        $value = $this->body[$field] ?? null;
+        if (!is_array($value) || !array_is_list($value)) {
+            throw ServiceError::invalid("$field must be a list.");
+        }
+        return $value;
+    }
+
     public function text(string $field, int $min, int $max): string
     {
         $value = $this->body[$field] ?? null;

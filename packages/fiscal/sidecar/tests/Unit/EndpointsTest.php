@@ -200,10 +200,16 @@ final class EndpointsTest extends TestCase
         $transport = new RecordedTransport('link-payment-135-registered');
         [$kernel] = Fixtures::kernel($transport);
 
-        $card = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed(['meansCode' => '03'] + $this->link()));
-        $long = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed(['transactionId' => str_repeat('a', 36)] + $this->link()));
+        $card = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link(['meansCode' => '03'])));
+        $long = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link(['transactionId' => str_repeat('a', 36)])));
+        $two = $this->link();
+        $two['payments'][] = $two['payments'][0];
+        $twice = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($two));
 
-        self::assertSame(['INVALID', 'INVALID'], [$card->body['error']['class'], $long->body['error']['class']]);
+        self::assertSame(
+            ['INVALID', 'INVALID', 'INVALID'],
+            [$card->body['error']['class'], $long->body['error']['class'], $twice->body['error']['class']],
+        );
         self::assertSame([], $transport->sent);
     }
 
@@ -327,16 +333,21 @@ final class EndpointsTest extends TestCase
         ] + $extra;
     }
 
-    /** @return array<string, mixed> */
-    private function link(): array
+    /**
+     * @param array<string, string> $override
+     * @return array<string, mixed>
+     */
+    private function link(array $override = []): array
     {
         return [
             'protocol' => '135260000123456',
             'sequence' => 2,
-            'transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6',
-            'meansCode' => '17',
-            'pspCnpjBase' => '08561701',
-            'receiverCnpj' => '11222333000181',
+            'payments' => [$override + [
+                'transactionId' => '7f3c2a91e04b4c1d9a0b11c2d3e4f5a6',
+                'meansCode' => '17',
+                'pspCnpjBase' => '08561701',
+                'receiverCnpj' => '11222333000181',
+            ]],
         ];
     }
 

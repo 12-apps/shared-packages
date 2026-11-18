@@ -260,8 +260,8 @@ describe("the document service", () => {
       const second = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX, BOLETO] });
       expect(second).toMatchObject({ linked: [BOLETO.transactionId], alreadyLinked: [PIX.transactionId] });
 
-      const sent = calls.filter((call) => call.method === "linkPayment").map((call) => call.call as { sequence: number; payment: unknown; protocol: string });
-      expect(sent.map(({ sequence, payment }) => [sequence, payment])).toEqual([[1, PIX], [2, BOLETO]]);
+      const sent = calls.filter((call) => call.method === "linkPayment").map((call) => call.call as { sequence: number; payments: unknown; protocol: string });
+      expect(sent.map(({ sequence, payments }) => [sequence, payments])).toEqual([[1, [PIX]], [2, [BOLETO]]]);
       expect(sent[0]?.protocol).toBe(document.protocol);
       const events = await service.listEvents("owner-1", document.id);
       expect(events.filter((event) => event.kind === "LINK_PAYMENT")).toHaveLength(2);

@@ -87,10 +87,13 @@ export interface LinkPaymentRequest extends Authenticated {
   readonly protocol: string;
   /** `nSeqEvento`, 1–20: this document's how-manieth 110300. */
   readonly sequence: number;
-  readonly transactionId: string;
-  readonly meansCode: string;
-  readonly pspCnpjBase: string;
-  readonly receiverCnpj: string;
+  /** Exactly one entry: the event's schema carries a single `gPgto`. */
+  readonly payments: ReadonlyArray<{
+    readonly transactionId: string;
+    readonly meansCode: string;
+    readonly pspCnpjBase: string;
+    readonly receiverCnpj: string;
+  }>;
 }
 
 /** `POST /<model>/lookup`. */

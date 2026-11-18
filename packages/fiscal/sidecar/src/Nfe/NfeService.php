@@ -152,13 +152,22 @@ final class NfeService
         ]);
     }
 
-    /** The event's `gPgto` (schema `TEventoPgto`): the transaction id is an attribute, then the means, the receiver, the PSP. */
+    /**
+     * The event's `gPgto` (schema `TEventoPgto`): the transaction id is an
+     * attribute, then the means, the receiver, the PSP. `payments` holds exactly
+     * one entry, since the event's schema carries a single `gPgto`.
+     */
     private static function paymentGroup(Input $in): string
     {
-        $id = htmlspecialchars($in->pattern('transactionId', '/^[\x21-\x7E]{2,35}$/', '2 to 35 printable characters'), ENT_XML1 | ENT_QUOTES);
-        $means = $in->pattern('meansCode', '/^(15|17|18|20|23|24)$/', 'an IT 2026.001 tpMeioPgto (15, 17, 18, 20, 23, 24)');
-        $receiver = $in->pattern('receiverCnpj', '/^[A-Z0-9]{12}[0-9]{2}$/', 'a 14-character CNPJ');
-        $psp = $in->pattern('pspCnpjBase', '/^[A-Z0-9]{8}$/', 'an 8-character CNPJ base');
+        $payments = $in->list('payments');
+        if (count($payments) !== 1 || !is_array($payments[0])) {
+            throw ServiceError::invalid('payments must hold exactly one transaction: the event 110300 carries one gPgto.');
+        }
+        $one = new Input($payments[0]);
+        $id = htmlspecialchars($one->pattern('transactionId', '/^[\x21-\x7E]{2,35}$/', '2 to 35 printable characters'), ENT_XML1 | ENT_QUOTES);
+        $means = $one->pattern('meansCode', '/^(15|17|18|20|23|24)$/', 'an IT 2026.001 tpMeioPgto (15, 17, 18, 20, 23, 24)');
+        $receiver = $one->pattern('receiverCnpj', '/^[A-Z0-9]{12}[0-9]{2}$/', 'a 14-character CNPJ');
+        $psp = $one->pattern('pspCnpjBase', '/^[A-Z0-9]{8}$/', 'an 8-character CNPJ base');
         return "<gPgto idTransacao=\"$id\"><tpMeioPgto>$means</tpMeioPgto>"
             . "<CNPJReceb>$receiver</CNPJReceb><CNPJBasePSP>$psp</CNPJBasePSP></gPgto>";
     }

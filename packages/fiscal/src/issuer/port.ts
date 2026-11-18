@@ -81,7 +81,12 @@ export interface LinkPaymentCall extends Call {
   readonly protocol: string;
   /** `nSeqEvento`, 1–20. */
   readonly sequence: number;
-  readonly payment: LinkedTransaction;
+  /**
+   * The transactions the event links. Exactly ONE today: the event's schema
+   * (`e110300_v1.00.xsd`) carries a single `gPgto`, so the service refuses any
+   * other count as INVALID; the list is the NT group's own shape.
+   */
+  readonly payments: readonly LinkedTransaction[];
 }
 
 export interface LookupCall extends Call {

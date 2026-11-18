@@ -77,7 +77,7 @@ export async function linkPayment(deps: Deps, input: LinkPaymentInput): Promise<
   const signing = pending.length === 0 ? null : await deps.ctx.material(await deps.ctx.requireProfile(input.ownerId));
   for (const payment of pending) {
     const sequence = byEvents.length + linked.length + 1;
-    const outcome = await send({ model: document.model, environment: document.environment, signing: signing!, accessKey, protocol, sequence, payment });
+    const outcome = await send({ model: document.model, environment: document.environment, signing: signing!, accessKey, protocol, sequence, payments: [payment] });
     if (!outcome.ok) return { linked, alreadyLinked, failure: outcome.error, document };
     const { eventXml } = outcome.answer;
     const eventXmlKey = eventXml === null ? null : xmlKeys.linkPayment(accessKey, sequence);

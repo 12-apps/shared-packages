@@ -144,14 +144,14 @@ export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
         reason,
         substituteAccessKey,
       } satisfies CancelBySubstitutionRequest),
-    linkPayment: ({ model, environment, signing, accessKey, protocol, sequence, payment }) =>
+    linkPayment: ({ model, environment, signing, accessKey, protocol, sequence, payments }) =>
       call(`/${modelPath(model)}/link-payment`, {
         environment,
         certificate: signing.certificate,
         accessKey,
         protocol,
         sequence,
-        ...payment,
+        payments,
       } satisfies LinkPaymentRequest),
     lookup: ({ model, environment, signing, accessKey }) =>
       call(`/${modelPath(model)}/lookup`, { environment, certificate: signing.certificate, accessKey } satisfies LookupRequest),
