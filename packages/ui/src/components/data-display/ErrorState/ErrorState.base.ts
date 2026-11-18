@@ -9,6 +9,9 @@ import type * as React from 'react';
  */
 export type ErrorStateSeverity = 'error' | 'warning';
 
+/** `disc` (default) draws the icon in the tinted 80px disc; `none` draws it bare. */
+export type ErrorStateIconFrame = 'disc' | 'none';
+
 export interface ErrorStateBaseProps {
   /**
    * The error message to display
@@ -41,6 +44,14 @@ export interface ErrorStateBaseProps {
    * Optional custom icon to display
    */
   icon?: React.ReactNode;
+
+  /**
+   * How the icon is framed. `disc` draws it inside the severity-tinted disc at
+   * reduced opacity; `none` draws it bare and at full opacity, which is what a
+   * mascot or illustration passed as `icon` needs.
+   * @default 'disc'
+   */
+  iconFrame?: ErrorStateIconFrame;
 
   /**
    * Test ID for component testing

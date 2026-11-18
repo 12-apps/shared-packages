@@ -16,7 +16,7 @@ import {
   RETRY_MIN_WIDTH,
   errorStatePalette,
 } from './ErrorState.metrics';
-import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types.native';
+import type { ErrorStateIconFrame, ErrorStateProps, ErrorStateSeverity } from './ErrorState.types.native';
 import { Icon } from '../../../icons/Icon.native';
 import { webAria } from '../../../platform/aria';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -79,13 +79,22 @@ export function retryStyle(theme: UiTheme): ViewStyle {
 function ErrorIcon({
   severity,
   icon,
+  iconFrame = 'disc',
   testId,
 }: {
   severity: ErrorStateSeverity;
   icon?: React.ReactNode;
+  iconFrame?: ErrorStateIconFrame;
   testId: string;
 }): React.JSX.Element {
   const theme = useUiTheme();
+  if (iconFrame === 'none' && icon) {
+    return (
+      <View testID={testId} style={{ alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </View>
+    );
+  }
   const glyph = severity === 'error' ? 'ErrorOutline' : 'WarningAmber';
   return (
     <View testID={testId} style={iconBoxStyle(theme, severity)}>
@@ -134,6 +143,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(function ErrorSt
     retryLabel = EN_US_UI_LABELS.errorState.retry,
     severity = 'error',
     icon,
+    iconFrame,
     style,
     ...others
   } = props;
@@ -160,7 +170,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(function ErrorSt
       ]}
       {...rest}
     >
-      <ErrorIcon severity={severity} icon={icon} testId={testId('icon')} />
+      <ErrorIcon severity={severity} icon={icon} iconFrame={iconFrame} testId={testId('icon')} />
 
       <ErrorText title={title} message={message} titleId={titleId} testId={testId} />
 

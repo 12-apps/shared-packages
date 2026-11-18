@@ -23,6 +23,11 @@ const meta: Meta<typeof ErrorState> = {
       options: ['error', 'warning'],
       description: 'Visual severity of the error state',
     },
+    iconFrame: {
+      control: 'radio',
+      options: ['disc', 'none'],
+      description: 'disc (default): tinted disc at reduced opacity; none: the icon bare, full opacity',
+    },
     message: {
       control: 'text',
       description: 'The error message to display',
@@ -62,6 +67,15 @@ export const WithRetryButton: Story = {
   args: {
     message: 'Failed to load data. Please try again.',
     onRetry: fn(),
+  },
+};
+
+/** `iconFrame="none"` draws a mascot or illustration bare, at full opacity. */
+export const BareIcon: Story = {
+  args: {
+    message: 'The request failed.',
+    icon: <BugReportIcon sx={{ fontSize: 64 }} />,
+    iconFrame: 'none',
   },
 };
 
