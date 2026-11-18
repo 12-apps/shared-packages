@@ -16,7 +16,6 @@ import type { LookedUpDocument } from "../sidecar/types";
 import { FISCAL_CONTINGENCY_DEADLINE, FiscalContext, assertConfig, assertDraftFits, assertReason, issuerOf, totalsOf, xmlKeys } from "./context";
 import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
-import type { ContingencyBlockSource } from "./ports";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
 import { settleNumber, settleWithXml, storeNfeProc } from "./settle";
 import { linkPayment } from "./payment-link";
@@ -377,19 +376,14 @@ export function createFiscalDocuments(config: FiscalDocumentsServiceConfig) {
     },
     /** One pass of the retry sweep: PENDING/SUBMITTED documents and owed numbers whose next attempt has come. */
     sweep: async (limit: number): Promise<SweepReport> => run(deps, await store.listDue({ now: deps.ctx.nowIso(), limit })),
-    /**
-     * Contingency blocks (FUT-4717) — the {@link ContingencyBlockSource} — over a
-     * store that keeps them (both of the package's do); `NOT_SUPPORTED` otherwise.
-     */
+    /** Contingency blocks (FUT-4717), the ContingencyBlockSource; `NOT_SUPPORTED` over a store without them. */
     reserveBlock: reserveBlock.bind(null, deps),
     recordSigned: recordSigned.bind(null, deps),
     closeBlock: closeBlock.bind(null, deps),
-    /** A holder that is gone (a new install): its open blocks are abandoned, their unknown rest flagged, never voided. */
     abandonBlocks: abandonBlocks.bind(null, deps),
     listBlocks: listBlocks.bind(null, deps),
     listKnownGaps: listKnownGaps.bind(null, deps),
     listUnknownRanges: listUnknownRanges.bind(null, deps),
-    /** One pass of the gap job: inutilize every known unused range of the blocks reserved before `before`, once. */
     voidKnownGaps: voidKnownGaps.bind(null, deps),
     /** One pass of the contingency transmission, then the 20-hour deadline warnings. */
     async transmitContingency(limit: number): Promise<SweepReport> {
@@ -402,7 +396,3 @@ export function createFiscalDocuments(config: FiscalDocumentsServiceConfig) {
 
 
 export type FiscalDocuments = ReturnType<typeof createFiscalDocuments>;
-
-// The service is the package's ContingencyBlockSource.
-const _source: (documents: FiscalDocuments) => ContingencyBlockSource = (documents) => documents;
-void _source;

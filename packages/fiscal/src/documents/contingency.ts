@@ -175,14 +175,32 @@ async function blockOf(store: ContingencyBlockStore, ownerId: string, note: Sign
   return block;
 }
 
-export async function recordSigned(deps: Deps, input: Parameters<ContingencyBlockSource["recordSigned"]>[0]): Promise<FiscalDocument> {
-  const store = blockStore(deps.config.store);
+/** The note, parsed and checked against the owner's profile. */
+async function checkedNote(deps: Deps, input: Parameters<ContingencyBlockSource["recordSigned"]>[0]) {
   assertHolder(input.holder);
   if (typeof input.subjectId !== "string" || input.subjectId === "") throw new FiscalDocumentError("INVALID_INPUT", "subjectId is required.");
   const note = parseSignedContingencyNote(input.signedXml);
   const profile = await deps.ctx.requireProfile(input.ownerId);
   if (note.issuerCnpj !== profile.cnpj) refuse("the XML's issuer is not the owner's CNPJ.");
   if (note.environment !== profile.environment) refuse(`the XML was signed for ${note.environment}, the owner issues in ${profile.environment}.`);
+  return { note, profile };
+}
+
+/** Insert the note; a concurrent upload of the same note is answered, a number under another key refused. */
+async function insertNote(store: ContingencyBlockStore, document: FiscalDocument, holder: string, subjectId: string): Promise<FiscalDocument> {
+  try {
+    return await store.recordSignedDocument(document, signedEvent(document, holder));
+  } catch (error) {
+    if (!(error instanceof FiscalDocumentError) || error.code !== "CONFLICT") throw error;
+    const raced = await store.getDocumentByAccessKey(document.ownerId, document.accessKey ?? "");
+    if (raced !== null) return replayed(raced, subjectId);
+    return refuse(`number ${document.number} of series ${document.series} is recorded under another key.`);
+  }
+}
+
+export async function recordSigned(deps: Deps, input: Parameters<ContingencyBlockSource["recordSigned"]>[0]): Promise<FiscalDocument> {
+  const store = blockStore(deps.config.store);
+  const { note, profile } = await checkedNote(deps, input);
   const existing = await store.getDocumentByAccessKey(input.ownerId, note.accessKey);
   if (existing !== null) return replayed(existing, input.subjectId);
   const block = await blockOf(store, input.ownerId, note, input.holder);
@@ -191,15 +209,7 @@ export async function recordSigned(deps: Deps, input: Parameters<ContingencyBloc
   const xmlKey = xmlKeys.signed(note.accessKey);
   await deps.config.storage.put(xmlKey, input.signedXml, "application/xml");
   const document = signedDocument(deps, { ownerId: input.ownerId, subjectId: input.subjectId, draft, note, block, xmlKey }, profile);
-  try {
-    return await store.recordSignedDocument(document, signedEvent(document, input.holder));
-  } catch (error) {
-    if (!(error instanceof FiscalDocumentError) || error.code !== "CONFLICT") throw error;
-    // A concurrent upload of the same note won, or the number carries another key.
-    const raced = await store.getDocumentByAccessKey(input.ownerId, note.accessKey);
-    if (raced !== null) return replayed(raced, input.subjectId);
-    return refuse(`number ${note.number} of series ${note.series} is recorded under another key.`);
-  }
+  return insertNote(store, document, input.holder, input.subjectId);
 }
 
 async function heldBlock(store: ContingencyBlockStore, input: { ownerId: string; holder: string; series: number; from: number }): Promise<ContingencyBlockState> {
@@ -306,6 +316,20 @@ async function voidGap(deps: Deps, store: ContingencyBlockStore, gap: Contingenc
   return { voided: [{ ...gap, protocol: outcome.answer.protocol }], failures: [] };
 }
 
+/** Void one block's known ranges; settle it when nothing is left to account for. */
+async function voidBlock(deps: Deps, store: ContingencyBlockStore, block: ContingencyBlockState): Promise<GapVoidReport> {
+  const voided: GapVoidReport["voided"][number][] = [];
+  const failures: GapVoidReport["failures"][number][] = [];
+  for (const range of accountFor(block).known) {
+    const one = await voidGap(deps, store, gapOf(block, range));
+    voided.push(...one.voided);
+    failures.push(...one.failures);
+  }
+  const done = voided.map(({ from, to }) => ({ from, to }));
+  if (isSettled({ ...block, voided: [...block.voided, ...done] })) await store.settleContingencyBlock({ id: block.id, at: deps.ctx.nowIso() });
+  return { voided, failures };
+}
+
 /**
  * One pass of the gap job: every KNOWN unused range of a block reserved
  * before `before` is inutilized once (one call per range); a failure is
@@ -322,15 +346,9 @@ export async function voidKnownGaps(deps: Deps, input: { before: string; ownerId
     limit: GAP_PASS_LIMIT,
   });
   for (const block of blocks) {
-    const ranges = accountFor(block).known;
-    const voided: Array<{ from: number; to: number }> = [];
-    for (const range of ranges) {
-      const one = await voidGap(deps, store, gapOf(block, range));
-      report.voided.push(...one.voided);
-      report.failures.push(...one.failures);
-      if (one.voided.length > 0) voided.push(range);
-    }
-    if (isSettled({ ...block, voided: [...block.voided, ...voided] })) await store.settleContingencyBlock({ id: block.id, at: deps.ctx.nowIso() });
+    const one = await voidBlock(deps, store, block);
+    report.voided.push(...one.voided);
+    report.failures.push(...one.failures);
   }
   return report;
 }

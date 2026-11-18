@@ -111,14 +111,22 @@ async function post<T>(config: SidecarIssuerConfig, base: string, path: string, 
   return { ok: false, error: unanswered(`POST ${path} answered HTTP ${status} without the service's error body.`) };
 }
 
-export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
+function assertIssuerConfig(config: SidecarIssuerConfig): void {
   if (typeof config?.baseUrl !== "string" || config.baseUrl === "") throw new TypeError("createSidecarIssuer needs baseUrl.");
   if (typeof config.fetch !== "function") throw new TypeError("createSidecarIssuer needs fetch.");
   if (!Number.isInteger(config.timeoutMs) || config.timeoutMs <= 0) throw new TypeError("createSidecarIssuer needs a positive timeoutMs.");
-  if (config.token !== undefined && (typeof config.token !== "string" || config.token.length < 32 || /\s/.test(config.token))) {
+  assertToken(config.token);
+}
+
+function assertToken(token: unknown): void {
+  if (token !== undefined && (typeof token !== "string" || token.length < 32 || /\s/.test(token))) {
     // Never quoted: the message names the rule, not the value.
     throw new TypeError("createSidecarIssuer's token must be at least 32 characters, with no whitespace.");
   }
+}
+
+export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
+  assertIssuerConfig(config);
   let baseEnd = config.baseUrl.length;
   while (baseEnd > 0 && config.baseUrl[baseEnd - 1] === "/") baseEnd -= 1;
   const base = config.baseUrl.slice(0, baseEnd);

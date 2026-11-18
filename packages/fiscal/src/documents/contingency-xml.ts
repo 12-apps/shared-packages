@@ -70,22 +70,56 @@ function assertKeyMatches(key: string, ide: string, cnpj: string): void {
  * XML with no signature. The issuer's CNPJ and the block are the caller's to
  * check against its profile and its blocks.
  */
-export function parseSignedContingencyNote(signedXml: string): SignedContingencyNote {
+interface Parts {
+  readonly infNFe: string;
+  readonly ide: string;
+  readonly emit: string;
+  readonly accessKey: string;
+}
+
+/** The blocks every check reads, or a refusal naming what is missing. */
+function assertSignedNote(signedXml: string): void {
   if (typeof signedXml !== "string" || signedXml.trim() === "") refuse("signedXml is empty.");
   if (element(signedXml, "nfeProc") !== null || element(signedXml, "protNFe") !== null) refuse("the XML is authorised already, not a signed note.");
+  if (element(signedXml, "Signature") === null) refuse("the XML is not signed.");
+}
+
+function partsOf(signedXml: string): Parts {
+  assertSignedNote(signedXml);
   const infNFe = element(signedXml, "infNFe");
   const ide = infNFe === null ? null : element(infNFe, "ide");
   const emit = infNFe === null ? null : element(infNFe, "emit");
   const accessKey = accessKeyOf(signedXml);
   if (infNFe === null || ide === null || emit === null || accessKey === null) refuse("the XML is not an NF-e: no infNFe, ide, emit or access key.");
-  if (element(signedXml, "Signature") === null) refuse("the XML is not signed.");
+  return { infNFe, ide, emit, accessKey };
+}
+
+/** An NFC-e (65) signed offline (`tpEmis` 9) under a key whose check digit and fields hold. */
+function assertOfflineNfce({ ide, accessKey }: Parts, issuerCnpj: string): void {
   if (required(ide, "mod") !== "65") refuse("the XML is not an NFC-e (model 65).");
   if (required(ide, "tpEmis") !== "9") refuse("the XML is not signed in offline contingency (tpEmis 9).");
   if (!isValidAccessKey(accessKey)) refuse("the access key's check digit is wrong.");
-  const issuerCnpj = required(emit, "CNPJ");
   assertKeyMatches(accessKey, ide, issuerCnpj);
-  const total = element(infNFe, "ICMSTot");
+}
+
+function buyerOf(infNFe: string): string | null {
   const dest = element(infNFe, "dest");
+  return text(dest, "CPF") ?? text(dest, "CNPJ") ?? text(dest, "idEstrangeiro");
+}
+
+/**
+ * Parse and check a station-signed NFC-e. Refuses (`CONTINGENCY_XML_REFUSED`)
+ * anything but a model 65 signed in offline contingency (`tpEmis = 9`, with
+ * `dhCont` and `xJust`), a key whose check digit or fields are wrong, and an
+ * XML with no signature. The issuer's CNPJ and the block are the caller's to
+ * check against its profile and its blocks.
+ */
+export function parseSignedContingencyNote(signedXml: string): SignedContingencyNote {
+  const parts = partsOf(signedXml);
+  const { infNFe, ide, emit, accessKey } = parts;
+  const issuerCnpj = required(emit, "CNPJ");
+  assertOfflineNfce(parts, issuerCnpj);
+  const total = element(infNFe, "ICMSTot");
   return {
     accessKey,
     issuerCnpj,
@@ -97,6 +131,6 @@ export function parseSignedContingencyNote(signedXml: string): SignedContingency
     contingency: { since: required(ide, "dhCont"), reason: required(ide, "xJust") },
     totalCents: cents(text(total, "vNF")),
     discountCents: cents(text(total, "vDesc")),
-    buyerTaxId: text(dest, "CPF") ?? text(dest, "CNPJ") ?? text(dest, "idEstrangeiro"),
+    buyerTaxId: buyerOf(infNFe),
   };
 }

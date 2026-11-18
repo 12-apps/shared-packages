@@ -16,7 +16,7 @@ import type { InutilizeCall, TransmitCall } from "../../../issuer/port";
 import { computeAccessKey, draftOf } from "../../context";
 import { FiscalDocumentError } from "../../errors";
 import { createMemoryFiscalStore } from "../../memory";
-import type { ContingencyBlockStore, FiscalStore } from "../../ports";
+import type { ContingencyBlockSource, ContingencyBlockStore, FiscalStore } from "../../ports";
 import { createFiscalDocuments } from "../../service";
 import { createSigningIdentities } from "../../signing";
 import { createPrismaFiscalStore } from "../../sql-store";
@@ -138,6 +138,9 @@ async function setup(makeStore: () => Promise<FiscalStore & ContingencyBlockStor
     id: "register-1", model: "NFCE", onlineSeries: 1, contingencySeries: 2, firstOnlineNumber: 1201, firstContingencyNumber: 1,
   });
   const later = (ms: number) => void (clock.at += ms);
+  // The service is the package's ContingencyBlockSource.
+  const source: ContingencyBlockSource = service;
+  void source;
   return { service, store, objects, saleFor, later, ...fake };
 }
 
