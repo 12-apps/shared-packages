@@ -1,12 +1,12 @@
 import type { ChargeTransaction } from './charge-transaction';
+import type { FiscalSplitInput, SplitArrangement } from './fiscal-split';
+export type { FiscalSplitInput, SplitArrangement };
 import type { CardDetails } from './card-details';
 import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
 import type { ChargeSupersession } from './supersession';
 import type { WalletType } from './wallet-types';
-
 export type { DebitCapability, ThreeDSecureSession } from './card-funding';
-
 export type { SettlementHints };
 /** The probe verdict types, re-exported so `core/types` stays the one door. */
 export type { ProbeCheck, ProbeFault, ProbeOutcome } from './probe';
@@ -139,6 +139,7 @@ export interface ChargeInput {
    * race that reaches the provider twice cannot double-charge.
    */
   idempotencyKey?: string;
+  fiscalSplit?: FiscalSplitInput; // the tax it informs to the split payment, `./fiscal-split` (FUT-2239)
 }
 
 /** Normalized decline taxonomy (superset of common acquirer reasons). */
@@ -295,6 +296,7 @@ export interface ProviderCapabilities {
   partialRefundMethods?: readonly PaymentMethodKind[];
   /** Marketplace-style split of one charge across recipients. */
   splits: boolean;
+  splitArrangements?: readonly SplitArrangement[]; // accepting `ChargeInput.fiscalSplit`; absent: none
   webhooks: boolean;
   tokenization: ClientTokenization;
   /**
