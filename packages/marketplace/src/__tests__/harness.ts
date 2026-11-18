@@ -71,6 +71,8 @@ interface HarnessOptions {
   cancellationHooks?: boolean;
   /** The engine's override of every adapter's cancellation answer window. */
   cancellationWindowMs?: number;
+  /** The host's say on an automatic acceptance; absent, the port is not bound. */
+  mayAutoAccept?: (clientId: string) => Promise<boolean>;
   /** The host's catalogue port, for the catalogue suites (FUT-4768). */
   catalogue?: MarketplaceCataloguePort;
   /** A database other than the in-memory one (the PGlite suite's). */
@@ -95,6 +97,7 @@ export function createHarness(options: HarnessOptions = {}) {
   const auditDbs: MarketplaceDb[] = [];
   const admitted: MarketplaceAdmissionRequest[] = [];
   const cancellationConfirmed: string[] = [];
+  const autoAcceptAsked: string[] = [];
   const cancellationFailed: { orderId: string; reason: CancellationFailureReason }[] = [];
   const cancellationHooks = options.cancellationHooks
     ? {
@@ -134,6 +137,14 @@ export function createHarness(options: HarnessOptions = {}) {
       summarize: async (_clientId, ids) =>
         new Map(ids.map((id) => [id, { buyerName: "Buyer", totalCents: 1000, unmappedLines: 0, createdAt: null }])),
       ...cancellationHooks,
+      ...(options.mayAutoAccept
+        ? {
+            mayAutoAccept: (clientId: string) => {
+              autoAcceptAsked.push(clientId);
+              return options.mayAutoAccept!(clientId);
+            },
+          }
+        : {}),
     },
     secrets: { seal, open },
     http: http.http,
@@ -212,6 +223,7 @@ export function createHarness(options: HarnessOptions = {}) {
     accepted,
     refused,
     enqueued,
+    autoAcceptAsked,
     queued,
     published,
     logged,

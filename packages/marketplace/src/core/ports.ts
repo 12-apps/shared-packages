@@ -185,6 +185,17 @@ export interface MarketplaceOrderPort {
   catalogHas(clientId: string, subjectRef: string): Promise<boolean>;
   /** The store said yes, or the connection auto-accepts. */
   onAccepted(clientId: string, orderId: string): Promise<void>;
+  /**
+   * OPTIONAL. May an arriving order of this tenant be accepted automatically?
+   * Asked once per NEW order of a connection with auto-accept on, before the
+   * ingest's transaction (never for a redelivery, never with auto-accept off).
+   * `false` declines the automatic acceptance: the order lands exactly as it
+   * would with auto-accept off — AWAITING on the clock, no confirm queued, no
+   * `onAccepted` — and a person decides it. The order itself is never refused.
+   * A throw is logged and declines too. Absent: every auto-accept proceeds.
+   * Answer it cheaply: it sits on the ingest path of every order.
+   */
+  mayAutoAccept?(clientId: string): Promise<boolean>;
   /** The store said no, the marketplace cancelled, or the clock lapsed. */
   onRefused(clientId: string, orderId: string, reason: MarketplaceRefusal): Promise<void>;
   /**
