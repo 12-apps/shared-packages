@@ -30,7 +30,10 @@ export interface IngestResult {
   created: boolean;
   /** SKUs that arrived with nothing behind them, in this order. */
   unmappedSkus: string[];
-  /** Whether the connection's policy made this order born accepted. */
+  /**
+   * Whether this order was born accepted: the connection auto-accepts AND the
+   * host's `mayAutoAccept`, when bound, allowed it.
+   */
   autoAccepted: boolean;
 }
 
@@ -79,10 +82,10 @@ function acceptanceData(
   orderId: string,
   order: NormalizedMarketplaceOrder,
   settings: IngestSettings,
+  accepted: boolean,
   now: Date,
   clockStartsAt: Date,
 ): Record<string, unknown> {
-  const accepted = settings.autoAccept;
   return {
     clientId,
     orderId,
@@ -99,6 +102,31 @@ function acceptanceData(
     // The order's SKUs: what a cancellation's offending SKUs are checked against.
     lineSkus: [...new Set(order.lines.map((line) => line.externalSku))],
   };
+}
+
+/**
+ * The host's say on an automatic acceptance (`order.mayAutoAccept`), asked
+ * only when the connection auto-accepts. Absent, it allows. A declined
+ * auto-accept is never a refused order: the order lands on the clock and a
+ * person decides it — so a host half that throws declines rather than failing
+ * the ingest, which would hold a paid order back until the sweep.
+ */
+async function hostAllowsAutoAccept(
+  ctx: EngineContext,
+  clientId: string,
+  order: NormalizedMarketplaceOrder,
+): Promise<boolean> {
+  const ask = ctx.ports.order.mayAutoAccept;
+  if (!ask) return true;
+  try {
+    return await ask.call(ctx.ports.order, clientId);
+  } catch (error) {
+    ctx.ports.logger.warn(
+      `marketplace: mayAutoAccept threw for ${order.provider} order ${order.externalOrderId}; it lands awaiting a decision`,
+      error,
+    );
+    return false;
+  }
 }
 
 /**
@@ -147,7 +175,7 @@ export async function ingestMarketplaceOrder(
     return { orderId: existing.orderId, created: false, unmappedSkus: [], autoAccepted: false };
   }
 
-  const accepted = settings.autoAccept;
+  const accepted = settings.autoAccept && (await hostAllowsAutoAccept(ctx, clientId, order));
   // ONE transaction for the host's order, the SKU rows, the acceptance row and
   // the liveness stamp: the host's `create` is handed the transaction's client,
   // so an acceptance that cannot be written (a concurrent ingest won the
@@ -156,7 +184,7 @@ export async function ingestMarketplaceOrder(
   const { orderId, unmappedSkus } = await ctx.ports.transaction(async (tx) => {
     const lines = await composeLines(tx, clientId, order, now);
     const created = await ctx.ports.order.create(clientId, order, lines, tx);
-    await tx.marketplaceAcceptance.create({ data: acceptanceData(clientId, created, order, settings, now, clockStartsAt) });
+    await tx.marketplaceAcceptance.create({ data: acceptanceData(clientId, created, order, settings, accepted, now, clockStartsAt) });
     await markMarketplaceEventSeen(tx, clientId, order.provider, now);
     return { orderId: created, unmappedSkus: lines.filter((l) => l.subjectRef === null).map((l) => l.externalSku) };
   });

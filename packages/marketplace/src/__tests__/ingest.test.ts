@@ -46,6 +46,89 @@ describe("ingest", () => {
     expect(h.http.requests).toHaveLength(0);
   });
 
+  describe("the host's say on an automatic acceptance (mayAutoAccept)", () => {
+    it("absent: an auto-accepting connection still bears the order accepted", async () => {
+      const h = createHarness();
+      await h.connect("IFOOD", { autoAccept: true });
+
+      await deliverIfood(h, ifoodPlaced("ext-1"));
+
+      expect(h.acceptance("order-1")).toMatchObject({ status: "ACCEPTED", acknowledgedAt: h.clock.at });
+      expect(h.accepted).toEqual(["order-1"]);
+      expect(h.enqueued.map((job) => job.payload)).toEqual([
+        { clientId: TENANT, orderId: "order-1", action: "confirm" },
+      ]);
+      expect(h.autoAcceptAsked).toEqual([]);
+    });
+
+    it("true: the order is born accepted, asked once with the tenant", async () => {
+      const h = createHarness({ mayAutoAccept: async () => true });
+      await h.connect("IFOOD", { autoAccept: true });
+
+      await deliverIfood(h, ifoodPlaced("ext-1"));
+
+      expect(h.autoAcceptAsked).toEqual([TENANT]);
+      expect(h.acceptance("order-1")).toMatchObject({ status: "ACCEPTED", acknowledgedAt: h.clock.at });
+      expect(h.accepted).toEqual(["order-1"]);
+      expect(h.enqueued.map((job) => job.payload)).toEqual([
+        { clientId: TENANT, orderId: "order-1", action: "confirm" },
+      ]);
+    });
+
+    it("false: the order lands awaiting a decision, with no confirm queued and no host half", async () => {
+      const h = createHarness({ mayAutoAccept: async () => false });
+      await h.connect("IFOOD", { autoAccept: true });
+
+      const outcome = await deliverIfood(h, ifoodPlaced("ext-1"));
+
+      expect(outcome).toMatchObject({ kind: "ingested", orderId: "order-1" });
+      expect(h.autoAcceptAsked).toEqual([TENANT]);
+      expect(h.acceptance("order-1")).toMatchObject({
+        status: "AWAITING",
+        acknowledgeBy: new Date(h.clock.at.getTime() + 300_000),
+        acknowledgedAt: null,
+      });
+      expect(h.accepted).toEqual([]);
+      expect(h.enqueued).toHaveLength(0);
+      expect(h.http.requests).toHaveLength(0);
+      // Declined is not decided: the store still accepts it by hand.
+      expect(await h.engine.decide({ clientId: TENANT, orderId: "order-1", decision: "ACCEPT" })).toMatchObject({
+        kind: "decided",
+      });
+      expect(h.accepted).toEqual(["order-1"]);
+    });
+
+    it("a throw declines like false, and the order still lands", async () => {
+      const h = createHarness({
+        mayAutoAccept: async () => {
+          throw new Error("host is down");
+        },
+      });
+      await h.connect("IFOOD", { autoAccept: true });
+
+      const outcome = await deliverIfood(h, ifoodPlaced("ext-1"));
+
+      expect(outcome).toMatchObject({ kind: "ingested", orderId: "order-1" });
+      expect(h.acceptance("order-1")).toMatchObject({ status: "AWAITING" });
+      expect(h.accepted).toEqual([]);
+      expect(h.enqueued).toHaveLength(0);
+    });
+
+    it("is not asked when the connection does not auto-accept, nor for a redelivery", async () => {
+      const off = createHarness({ mayAutoAccept: async () => true });
+      await off.connect();
+      await deliverIfood(off, ifoodPlaced("ext-1"));
+      expect(off.autoAcceptAsked).toEqual([]);
+      expect(off.acceptance("order-1")).toMatchObject({ status: "AWAITING" });
+
+      const on = createHarness({ mayAutoAccept: async () => false });
+      await on.connect("IFOOD", { autoAccept: true });
+      await deliverIfood(on, ifoodPlaced("ext-1"));
+      await deliverIfood(on, ifoodPlaced("ext-1", "another-event-id"));
+      expect(on.autoAcceptAsked).toEqual([TENANT]);
+    });
+  });
+
   it("[I4] a later accept of a born-accepted order is stale: no second host half, no second confirm", async () => {
     const h = createHarness();
     await h.connect("IFOOD", { autoAccept: true });
