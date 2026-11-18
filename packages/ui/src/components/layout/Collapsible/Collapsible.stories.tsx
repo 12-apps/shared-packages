@@ -2,6 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import Card from '@mui/material/Card/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import * as React from 'react';
 import { fn } from 'storybook/test';
 
 import { Collapsible, CollapsibleContent,CollapsibleTrigger } from './Collapsible';
@@ -55,19 +56,28 @@ export const Default: Story = {
 
 /** `id` lands on the region, so a toggle outside it can set `aria-controls`. */
 export const WithRegionId: Story = {
-  args: { open: true, id: 'details-region' },
-  render: (args) => (
-    <>
-      <button type="button" aria-expanded={args.open} aria-controls="details-region">
-        Toggle details
-      </button>
-      <Collapsible {...args}>
-        <CollapsibleContent>
-          <Typography variant="body1">Region reachable through its id.</Typography>
-        </CollapsibleContent>
-      </Collapsible>
-    </>
-  ),
+  args: { open: true, id: 'details-region', onToggle: fn() },
+  render: function Render(args) {
+    const [open, setOpen] = React.useState(Boolean(args.open));
+
+    return (
+      <>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="details-region"
+          onClick={() => setOpen((value) => !value)}
+        >
+          Toggle details
+        </button>
+        <Collapsible {...args} open={open}>
+          <CollapsibleContent>
+            <Typography variant="body1">Region reachable through its id.</Typography>
+          </CollapsibleContent>
+        </Collapsible>
+      </>
+    );
+  },
 };
 
 export const AllVariants: Story = {

@@ -76,7 +76,9 @@ const Actions: React.FC<{
           onClick={spec.onClick}
           icon={spec.icon && ACTION_ICONS[spec.icon]}
           data-testid={testId(spec.key)}
-          sx={{ minWidth: sxRem(ACTION_MIN_WIDTH) }}
+          size="md"
+          // `style`, not `sx`: the house Button's own `sx` carries its size and a caller's `sx` would replace it.
+          style={{ minWidth: rem(theme, ACTION_MIN_WIDTH) }}
         >
           {spec.label}
         </Button>
