@@ -13,6 +13,7 @@ import nfceIssueRetryable from "./sidecar/nfce-issue-retryable.json";
 import nfceIssueUnanswered from "./sidecar/nfce-issue-unanswered.json";
 import nfceLinkPayment from "./sidecar/nfce-link-payment.json";
 import nfceLinkPaymentDuplicate from "./sidecar/nfce-link-payment-duplicate.json";
+import nfceLinkPaymentDuplicateOther from "./sidecar/nfce-link-payment-duplicate-other.json";
 import nfceLookupAuthorized from "./sidecar/nfce-lookup-authorized.json";
 import nfceLookupNotFound from "./sidecar/nfce-lookup-not-found.json";
 import nfceSignContingency from "./sidecar/nfce-sign-contingency.json";
@@ -39,6 +40,7 @@ export const RECORDED_ANSWERS: Readonly<Record<string, RecordedAnswer>> = {
   "nfce-cancel-substitution": nfceCancelSubstitution,
   "nfce-link-payment": nfceLinkPayment,
   "nfce-link-payment-duplicate": nfceLinkPaymentDuplicate,
+  "nfce-link-payment-duplicate-other": nfceLinkPaymentDuplicateOther,
   "nfce-issue-2027": nfceIssue2027,
   "nfce-issue-auth": nfceIssueAuth,
   "nfce-issue-authorized": nfceIssueAuthorized,

@@ -65,11 +65,12 @@ export type DocumentInput =
   | { readonly kind: "RELEASE" }
   /** The 24-hour contingency deadline warning went out. */
   | { readonly kind: "WARN" }
-  /** SEFAZ registered the event 110300 linking `payment` to the document; its XML is at `eventXmlKey`. */
+  /** SEFAZ registered the event 110300 #`sequence` linking `payment` to the document; its XML is at `eventXmlKey`. */
   | {
       readonly kind: "LINK_PAYMENT";
       readonly answer: RegisteredPaymentLink;
       readonly payment: LinkedTransaction;
+      readonly sequence: number;
       readonly eventXmlKey: string | null;
     };
 

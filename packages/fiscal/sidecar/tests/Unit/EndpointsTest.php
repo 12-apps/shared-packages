@@ -174,6 +174,7 @@ final class EndpointsTest extends TestCase
         self::assertSame('REGISTERED', $response->body['status']);
         self::assertSame('135260000200077', $response->body['protocol']);
         self::assertStringContainsString('<procEventoNFe', $response->body['eventXml']);
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $response->body['transaction']['transactionId']);
         $envelope = $transport->sent[0]['envelope'];
         self::assertStringContainsString('<tpEvento>110300</tpEvento>', $envelope);
         self::assertStringContainsString('<nSeqEvento>2</nSeqEvento>', $envelope);
@@ -185,14 +186,42 @@ final class EndpointsTest extends TestCase
         );
     }
 
-    public function testARetriedLinkIsRegisteredWithNoEventOfItsOwn(): void
+    public function testARetriedLinkIsAnsweredWithTheRegisteredEventLookedUp(): void
     {
-        [$kernel] = Fixtures::kernel(new RecordedTransport('link-payment-573-duplicate-event'));
+        $transport = new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized-with-link-payment');
+        [$kernel] = Fixtures::kernel($transport);
 
         $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
 
         self::assertSame(200, $response->status, json_encode($response->body) ?: '');
-        self::assertSame(['REGISTERED', '573', null], [$response->body['status'], $response->body['statusCode'], $response->body['eventXml']]);
+        self::assertSame(['REGISTERED', '573', '135260000200077'], [$response->body['status'], $response->body['statusCode'], $response->body['protocol']]);
+        self::assertStringStartsWith('<procEventoNFe', $response->body['eventXml']);
+        self::assertStringContainsString('<nSeqEvento>2</nSeqEvento>', $response->body['eventXml']);
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $response->body['transaction']['transactionId']);
+        self::assertCount(2, $transport->sent);
+    }
+
+    public function testADuplicateHeldByAnotherTransactionAnswersThatTransaction(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized-with-other-link-payment'));
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame(
+            ['transactionId' => '9a9a9a9a9a9a4b4b8c8c7d7d7d7d7d7d', 'meansCode' => '17', 'receiverCnpj' => '11222333000181', 'pspCnpjBase' => '08561701'],
+            $response->body['transaction'],
+        );
+        self::assertSame('135260000200078', $response->body['protocol']);
+    }
+
+    public function testADuplicateTheLookupCannotShowIsRetryable(): void
+    {
+        [$kernel] = Fixtures::kernel(new RecordedTransport('link-payment-573-duplicate-event', 'lookup-100-authorized'));
+
+        $response = Fixtures::call($kernel, 'POST', '/nfce/link-payment', $this->keyed($this->link()));
+
+        self::assertSame(['RETRYABLE', '573'], [$response->body['error']['class'], $response->body['error']['code']]);
     }
 
     public function testLinkPaymentRefusesAMeansWithNoTpMeioPgtoAndSendsNothing(): void

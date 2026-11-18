@@ -2,9 +2,9 @@
     "path": "/nfce/link-payment",
     "request": {
         "environment": "homologacao",
+        "sequence": 2,
         "accessKey": "35261111222333000181650010000012011482139076",
         "protocol": "135260000123456",
-        "sequence": 1,
         "payments": [
             {
                 "transactionId": "7f3c2a91e04b4c1d9a0b11c2d3e4f5a6",
@@ -18,11 +18,17 @@
     "body": {
         "statusCode": "573",
         "statusReason": "Rejeição: Duplicidade de Evento",
-        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4\"><retEnvEvento versao=\"1.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><idLote>202611172358502</idLote><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>128</cStat><xMotivo>Lote de Evento Processado</xMotivo><retEvento versao=\"1.00\"><infEvento><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>573</cStat><xMotivo>Rejeição: Duplicidade de Evento</xMotivo><chNFe>35261111222333000181650010000012011482139076</chNFe><tpEvento>110300</tpEvento><nSeqEvento>1</nSeqEvento><dhRegEvento>2026-11-20T13:05:00-03:00</dhRegEvento></infEvento></retEvento></retEnvEvento></nfeResultMsg></soap:Body></soap:Envelope>",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4\"><retEnvEvento versao=\"1.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><idLote>202611180231093</idLote><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>128</cStat><xMotivo>Lote de Evento Processado</xMotivo><retEvento versao=\"1.00\"><infEvento><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>573</cStat><xMotivo>Rejeição: Duplicidade de Evento</xMotivo><chNFe>35261111222333000181650010000012011482139076</chNFe><tpEvento>110300</tpEvento><nSeqEvento>1</nSeqEvento><dhRegEvento>2026-11-20T13:05:00-03:00</dhRegEvento></infEvento></retEvento></retEnvEvento></nfeResultMsg></soap:Body></soap:Envelope>",
         "status": "REGISTERED",
         "accessKey": "35261111222333000181650010000012011482139076",
-        "protocol": null,
-        "registeredAt": null,
-        "eventXml": null
+        "protocol": "135260000200077",
+        "registeredAt": "2026-11-20T13:00:02-03:00",
+        "eventXml": "<procEventoNFe versao=\"1.00\"><evento versao=\"1.00\"><infEvento Id=\"ID1103003526111122233300018165001000001201148213907602\"><cOrgao>35</cOrgao><tpAmb>2</tpAmb><chNFe>35261111222333000181650010000012011482139076</chNFe><tpEvento>110300</tpEvento><nSeqEvento>2</nSeqEvento><verEvento>1.00</verEvento><detEvento versao=\"1.00\"><descEvento>Vinculação Pagamento</descEvento><cOrgaoAutor>35</cOrgaoAutor><tpAutor>1</tpAutor><verAplic>sidecar</verAplic><nProt>135260000123456</nProt><gPgto idTransacao=\"7f3c2a91e04b4c1d9a0b11c2d3e4f5a6\"><tpMeioPgto>17</tpMeioPgto><CNPJReceb>11222333000181</CNPJReceb><CNPJBasePSP>08561701</CNPJBasePSP></gPgto></detEvento></infEvento></evento><retEvento versao=\"1.00\"><infEvento><tpAmb>2</tpAmb><verAplic>SP_EVENTOS_PL_100</verAplic><cOrgao>35</cOrgao><cStat>135</cStat><xMotivo>Evento registrado e vinculado a NF-e</xMotivo><chNFe>35261111222333000181650010000012011482139076</chNFe><tpEvento>110300</tpEvento><nSeqEvento>2</nSeqEvento><dhRegEvento>2026-11-20T13:00:02-03:00</dhRegEvento><nProt>135260000200077</nProt></infEvento></retEvento></procEventoNFe>",
+        "transaction": {
+            "transactionId": "7f3c2a91e04b4c1d9a0b11c2d3e4f5a6",
+            "meansCode": "17",
+            "receiverCnpj": "11222333000181",
+            "pspCnpjBase": "08561701"
+        }
     }
 }

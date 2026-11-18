@@ -83,7 +83,9 @@ export function scrubSecrets(value: unknown): unknown {
 }
 
 function answerOf(input: DocumentInput): unknown {
-  if (input.kind === "LINK_PAYMENT") return { ...input.answer, payment: input.payment, eventXmlKey: input.eventXmlKey };
+  if (input.kind === "LINK_PAYMENT") {
+    return { ...input.answer, payment: input.payment, sequence: input.sequence, eventXmlKey: input.eventXmlKey };
+  }
   if ("answer" in input) return input.answer;
   if ("error" in input && input.error !== null) return { error: input.error };
   if (input.kind === "DEFER") return { reason: input.reason };

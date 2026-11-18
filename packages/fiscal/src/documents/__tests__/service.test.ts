@@ -286,6 +286,35 @@ describe("the document service", () => {
       expect(await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] })).toMatchObject({ linked: [PIX.transactionId] });
     });
 
+    it("a 573 for the same transaction (its recording lost) keeps the XML SEFAZ holds and records it once", async () => {
+      const { service, stored } = await setup({ issue: ["nfce-issue-authorized"], linkPayment: ["nfce-link-payment", "nfce-link-payment-duplicate"] });
+      const document = await service.issue(ISSUE);
+      await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [BOLETO] });
+      const retried = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] });
+      expect(retried).toMatchObject({ linked: [PIX.transactionId], failure: null });
+      const events = (await service.listEvents("owner-1", document.id)).filter((event) => event.kind === "LINK_PAYMENT");
+      expect(events.map((event) => event.answer as { sequence: number; payment: { transactionId: string } }).map(({ sequence, payment }) => [sequence, payment.transactionId])).toEqual([
+        [1, BOLETO.transactionId],
+        [2, PIX.transactionId],
+      ]);
+      expect(stored.get(`fiscal/${document.accessKey}/link-payment-2.xml`)).toContain('idTransacao="7f3c2a91e04b4c1d9a0b11c2d3e4f5a6"');
+    });
+
+    it("a 573 held by another transaction is recorded as that one, and the payment goes out at the next sequence", async () => {
+      const { service, calls } = await setup({ issue: ["nfce-issue-authorized"], linkPayment: ["nfce-link-payment-duplicate-other", "nfce-link-payment"] });
+      const document = await service.issue(ISSUE);
+      const result = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] });
+      expect(result).toMatchObject({ linked: [PIX.transactionId], failure: null });
+      const sent = calls.filter((call) => call.method === "linkPayment").map((call) => (call.call as { sequence: number }).sequence);
+      expect(sent).toEqual([1, 2]);
+      const events = (await service.listEvents("owner-1", document.id)).filter((event) => event.kind === "LINK_PAYMENT");
+      expect(events.map((event) => event.answer as { sequence: number; payment: { transactionId: string } }).map(({ sequence, payment }) => [sequence, payment.transactionId])).toEqual([
+        [1, "9a9a9a9a9a9a4b4b8c8c7d7d7d7d7d7d"],
+        [2, PIX.transactionId],
+      ]);
+      expect(await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] })).toMatchObject({ linked: [], alreadyLinked: [PIX.transactionId] });
+    });
+
     it("refuses a document that is not authorised, and an issuer with no event 110300", async () => {
       const { service } = await setup({ issue: ["nfce-issue-rejected"] });
       await service.issue(ISSUE).catch(() => null);

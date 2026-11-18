@@ -172,7 +172,12 @@ export interface CancelledDocument extends SefazAnswer {
   readonly eventXml: string | null;
 }
 
-/** `/link-payment`: the event registered. A retry SEFAZ calls a duplicate (573) answers with no protocol or XML. */
+/**
+ * `/link-payment`: the event registered. On 573 "Duplicidade de Evento" the
+ * service looks the key up and answers the event SEFAZ already holds at that
+ * `nSeqEvento`, with its own XML and the transaction it carries — which may be
+ * another transaction than the one sent (`statusCode` "573" tells the two apart).
+ */
 export interface RegisteredPaymentLink extends SefazAnswer {
   readonly status: "REGISTERED";
   readonly accessKey: string;
@@ -180,6 +185,13 @@ export interface RegisteredPaymentLink extends SefazAnswer {
   readonly registeredAt: string | null;
   /** The `procEventoNFe`. */
   readonly eventXml: string | null;
+  /** The `gPgto` SEFAZ registered at this `nSeqEvento`. */
+  readonly transaction: {
+    readonly transactionId: string;
+    readonly meansCode: string;
+    readonly pspCnpjBase: string;
+    readonly receiverCnpj: string;
+  };
 }
 
 /** `/lookup`: what SEFAZ knows of the key. `NOT_FOUND` is an answer, not an error. */

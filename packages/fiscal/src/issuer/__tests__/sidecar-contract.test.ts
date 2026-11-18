@@ -130,7 +130,7 @@ describe("the sidecar issuer, against the service's recorded answers", () => {
     expect(expectFailure(await issuerFor(late.fetch).cancel({ model: "NFCE", environment, signing: SIGNING, ...request }), "nfce-cancel-late").code).toBe("501");
   });
 
-  it("links a payment transaction (110300), and answers a retry SEFAZ calls a duplicate as REGISTERED with no event", async () => {
+  it("links a payment transaction (110300), and answers a duplicate with the event SEFAZ holds, looked up", async () => {
     const { accessKey, protocol, sequence, payments } = RECORDINGS["nfce-link-payment"]!.request as {
       accessKey: string;
       protocol: string;
@@ -143,9 +143,16 @@ describe("the sidecar issuer, against the service's recorded answers", () => {
     expect(outcome.ok && [outcome.answer.status, outcome.answer.protocol]).toEqual(["REGISTERED", "135260000200077"]);
     expect(outcome.ok && outcome.answer.eventXml).toContain('<gPgto idTransacao="7f3c2a91e04b4c1d9a0b11c2d3e4f5a6">');
 
+    expect(outcome.ok && outcome.answer.transaction.transactionId).toBe("7f3c2a91e04b4c1d9a0b11c2d3e4f5a6");
+
     const duplicate = replaying("nfce-link-payment-duplicate");
-    const again = await issuerFor(duplicate.fetch).linkPayment!({ model: "NFCE", environment, signing: SIGNING, accessKey, protocol, sequence, payments });
-    expect(again.ok && [again.answer.status, again.answer.statusCode, again.answer.eventXml]).toEqual(["REGISTERED", "573", null]);
+    const again = await issuerFor(duplicate.fetch).linkPayment!({ model: "NFCE", environment, signing: SIGNING, accessKey, protocol, sequence: 2, payments });
+    expect(again.ok && [again.answer.status, again.answer.statusCode, again.answer.protocol]).toEqual(["REGISTERED", "573", "135260000200077"]);
+    expect(again.ok && again.answer.eventXml).toContain('<gPgto idTransacao="7f3c2a91e04b4c1d9a0b11c2d3e4f5a6">');
+
+    const other = replaying("nfce-link-payment-duplicate-other");
+    const held = await issuerFor(other.fetch).linkPayment!({ model: "NFCE", environment, signing: SIGNING, accessKey, protocol, sequence: 2, payments });
+    expect(held.ok && held.answer.transaction.transactionId).toBe("9a9a9a9a9a9a4b4b8c8c7d7d7d7d7d7d");
   });
 
   it("cancels by substitution (110112), naming the contingency document that replaced it", async () => {
