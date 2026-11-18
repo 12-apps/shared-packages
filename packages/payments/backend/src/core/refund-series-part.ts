@@ -54,7 +54,7 @@ export const blockersOf = (row: RefundSeriesRow, siblings: readonly RefundSeries
   siblings.filter((other) => holdsBack(row, other, now));
 
 /** The least a held-back part waits, so it never keeps the sweep's oldest slots tick after tick. */
-export const DEFER_MIN_MS = 30_000;
+const DEFER_MIN_MS = 30_000;
 
 /**
  * When a held-back part is due again: just after the earliest moment one of its blockers can resolve
