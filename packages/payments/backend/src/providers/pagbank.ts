@@ -294,13 +294,13 @@ const capabilities: ProviderCapabilities = {
   partialRefunds: false,
   partialRefundMethods: PARTIAL_REFUND_METHODS,
   splits: false,
-  splitArrangements: ['PIX_DINAMICO'], // the QR it mints; `PagbankOptions.fiscalSplitFields`
   webhooks: true,
   tokenization: 'PUBLIC_KEY',
   activationCharge: true,
   // Refuses `customer.email` equal to the receiving account's (40002).
   payerEmail: true,
 };
+const STUB_SPLIT_CAPABILITIES: ProviderCapabilities = { ...capabilities, splitArrangements: ['PIX_DINAMICO'] };
 // No `installments` quote (FUT-4382): PagBank's buyer-paid interest is unproven
 // until a sandbox run, so a cycle in 2..12 is refused, never charged at the
 // principal. `fundingOf` still passes an order's own count through unchanged.
@@ -332,7 +332,9 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>, options
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
     authMode: 'oauth',
-    capabilities,
+    // An arrangement is declared only by the build that writes it (FUT-2239):
+    // the dynamic QR it mints, under `fiscalSplitFields: 'stub'`.
+    capabilities: options.fiscalSplitFields === 'stub' ? STUB_SPLIT_CAPABILITIES : capabilities,
     simulatedSandbox: true, // sandbox.api.pagseguro.com moves no money (FUT-4432)
     credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,

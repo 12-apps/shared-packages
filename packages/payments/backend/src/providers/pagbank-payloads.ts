@@ -43,8 +43,12 @@ export function pixPayload(
         amount: { value: input.amount.amountCents, currency: input.amount.currency },
         payment_method: { type: 'PIX', pix: { expiration_date: expiresAt } },
         // The split payment's informed tax (FUT-2239): sent ONLY under the
-        // `'stub'` field set until PagBank publishes its own; absent ⇒ nothing.
-        ...fiscalSplitFieldsOf(input.fiscalSplit, fiscalSplitFields),
+        // `'stub'` field set until PagBank publishes its own, and never on
+        // PRODUCTION credentials (the stub names are unofficial); else nothing.
+        ...fiscalSplitFieldsOf(
+          input.fiscalSplit,
+          credentials.environment === 'PRODUCTION' ? 'none' : fiscalSplitFields,
+        ),
       },
     ],
     notification_urls: notificationUrls(credentials),
@@ -55,7 +59,9 @@ export function pixPayload(
 export interface PagbankOptions {
   /**
    * The wire form of `ChargeInput.fiscalSplit` (FUT-2239). Absent or `'none'`:
-   * never sent. `'stub'`: the CGIBS field set, for homologação rehearsal only.
+   * never sent, and the adapter declares no `splitArrangements`. `'stub'`: the
+   * CGIBS field set, for homologação rehearsal only — written on SANDBOX
+   * credentials alone, and the only build that declares `PIX_DINAMICO`.
    */
   fiscalSplitFields?: FiscalSplitFields;
 }

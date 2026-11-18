@@ -59,6 +59,25 @@ describe('pagbank adapter — fiscal split pass-through (FUT-2239)', () => {
     expect(body.charges[0]?.['splitFiscal']).toEqual({ vlCbsInf: 66, vlIbsInf: 1, docFiscal: '3'.repeat(44) });
   });
 
+  it('Given a fiscalSplit and the stub field set on PRODUCTION credentials, Then nothing is sent (stub names are unofficial)', async () => {
+    const spy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ id: 'ORDE_1', charges: [{ id: 'CHAR_1', status: 'WAITING', qr_code: { id: 'QRCO_1', text: 'emv' } }] }),
+      text: async () => '{}',
+    });
+    vi.stubGlobal('fetch', spy);
+    await pagbankProvider(PT_BR_PAGBANK_COPY, { fiscalSplitFields: 'stub' }).createCharge(
+      { ...pixInput(), fiscalSplit: SPLIT },
+      { ...LIVE, environment: 'PRODUCTION' as const },
+    );
+    const body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
+      charges: Array<Record<string, unknown>>;
+    };
+    expect(body.charges[0]).not.toHaveProperty('splitFiscal');
+  });
+
   it('Given a card charge with a fiscalSplit and the stub field set, Then nothing is sent (a card is no arrangement)', async () => {
     const body = await sentBody({ ...cardInput(), fiscalSplit: SPLIT }, { fiscalSplitFields: 'stub' });
     expect(body.charges[0]).not.toHaveProperty('splitFiscal');
@@ -76,7 +95,16 @@ describe('capabilities contract — split arrangements (FUT-2239)', () => {
     });
   }
 
-  it('PagBank declares the dynamic Pix QR it mints, and nothing else', () => {
-    expect(pagbankProvider(PT_BR_PAGBANK_COPY).capabilities.splitArrangements).toEqual(['PIX_DINAMICO']);
+  it('PagBank built with the stub field set declares the dynamic Pix QR it mints, and nothing else', () => {
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY, { fiscalSplitFields: 'stub' }).capabilities.splitArrangements).toEqual([
+      'PIX_DINAMICO',
+    ]);
+  });
+
+  it('PagBank built without the stub field set declares no arrangement (it would write nothing)', () => {
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY).capabilities.splitArrangements ?? []).toEqual([]);
+    expect(pagbankProvider(PT_BR_PAGBANK_COPY, { fiscalSplitFields: 'none' }).capabilities.splitArrangements ?? []).toEqual(
+      [],
+    );
   });
 });
