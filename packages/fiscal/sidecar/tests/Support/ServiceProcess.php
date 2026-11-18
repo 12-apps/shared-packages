@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fiscal\Sidecar\Tests\Support;
 
+use Fiscal\Sidecar\Platform;
 use RuntimeException;
 
 /**
@@ -33,7 +34,7 @@ final class ServiceProcess
         $self = new self($port, $tmpdir);
         $env = ['TMPDIR' => $tmpdir, 'PATH' => (string) getenv('PATH')] + $env;
         $process = proc_open(
-            [PHP_BINARY, '-d', 'display_errors=stderr', '-S', "127.0.0.1:$port", '-t', "$root/public", $frontController],
+            [PHP_BINARY, ...self::launchFlags(), '-S', "127.0.0.1:$port", '-t', "$root/public", $frontController],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             $root,
@@ -47,6 +48,21 @@ final class ServiceProcess
         stream_set_blocking($self->stderr, false);
         $self->waitUntilListening();
         return $self;
+    }
+
+    /**
+     * The `-d` flags a bundled PHP is launched with (README, `extensions.json`'s
+     * `ini`): the tests run the service exactly as a desktop install does.
+     *
+     * @return list<string>
+     */
+    private static function launchFlags(): array
+    {
+        $flags = [];
+        foreach (Platform::required()['ini'] as $name => $value) {
+            $flags = [...$flags, '-d', "$name=$value"];
+        }
+        return $flags;
     }
 
     /**

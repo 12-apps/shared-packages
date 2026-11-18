@@ -97,7 +97,9 @@ with the error: the key is spoken for, and an NFC-e can be signed offline.
 - The request log is one JSON line per call on stderr: time, method, path,
   status, duration, error class and SEFAZ code. Nothing read from the body is
   ever in it, and stack traces carry no arguments
-  (`zend.exception_ignore_args`).
+  (`zend.exception_ignore_args`; in the image from `docker/php.ini`, on a
+  bundled PHP from the launch flags below — and the launch token is a
+  `#[\SensitiveParameter]` besides).
 
 ## Running without Docker (a bundled PHP)
 
@@ -106,10 +108,23 @@ offline (FUT-4717) — runs the service with a PHP of its own, bound to the
 loopback only, with a token minted at each launch:
 
 ```sh
-php sidecar/bin/check-platform.php        # exit 1, naming what this PHP lacks
+FLAGS="-d display_errors=0 -d log_errors=1 -d zend.exception_ignore_args=1 \
+  -d zend.exception_string_param_max_len=0 -d file_uploads=0"
+php $FLAGS sidecar/bin/check-platform.php   # exit 1, naming what this PHP or launch lacks
 FISCAL_SIDECAR_TOKEN=<random, 32+ chars> \
-  php -S 127.0.0.1:<port> -t sidecar/public sidecar/public/index.php
+  php $FLAGS -S 127.0.0.1:<port> -t sidecar/public sidecar/public/index.php
 ```
+
+- **Always launch with those flags** (`SIDECAR_PHP_LAUNCH_FLAGS` in
+  `@12-apps/fiscal/sidecar`, `ini` in `extensions.json`). They are what the
+  image's `docker/php.ini` guarantees, and a bundled PHP has none of them on
+  its own: without them an error or a deprecation is printed into the response
+  ahead of the JSON (the issuer reads that call as unanswered, its outcome
+  unknown), and an escaping exception prints its trace WITH arguments.
+  `-d` flags rather than `-c docker/php.ini`, whose `error_log = /dev/stderr`
+  a Windows desktop does not have. `bin/check-platform.php` fails a launch
+  without them (`zend.exception_ignore_args` off, say), and the PHPUnit
+  suite starts the service with exactly these flags.
 
 - **Bind `127.0.0.1`, never `0.0.0.0`.** Binding is the launcher's: the
   service cannot tell a loopback caller from another. The token is what keeps

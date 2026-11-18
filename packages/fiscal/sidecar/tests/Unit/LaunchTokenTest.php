@@ -99,4 +99,11 @@ final class LaunchTokenTest extends TestCase
         self::assertStringNotContainsString(strrev(self::TOKEN), $log);
         self::assertStringNotContainsString(self::TOKEN, (string) json_encode([$refused, $health, $wrong]));
     }
+
+    public function testATraceNeverCarriesTheToken(): void
+    {
+        $token = (new \ReflectionMethod(Kernel::class, '__construct'))->getParameters()[2];
+        self::assertSame('token', $token->getName());
+        self::assertCount(1, $token->getAttributes(\SensitiveParameter::class));
+    }
 }

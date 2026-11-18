@@ -60,10 +60,52 @@ final class PlatformTest extends TestCase
         self::assertSame(['PHP 8.3 is required, this is 8.30.0'], Platform::missing(['curl', 'Reflection', 'soap'], '8.30.0', $required));
     }
 
+    /** The `-d` flags the README launches the service with, from `extensions.json`'s `ini`. */
+    private static function launchFlags(array $overrides = []): string
+    {
+        $flags = '';
+        foreach ([...Platform::required()['ini'], ...$overrides] as $name => $value) {
+            $flags .= ' -d ' . escapeshellarg("$name=$value");
+        }
+        return $flags;
+    }
+
+    public function testTheLaunchSettingsAreTheImagesPhpIni(): void
+    {
+        $image = parse_ini_file(dirname(__DIR__, 2) . '/docker/php.ini', false, INI_SCANNER_RAW);
+        self::assertIsArray($image);
+        foreach (Platform::required()['ini'] as $name => $wanted) {
+            self::assertArrayHasKey($name, $image);
+            self::assertSame([], Platform::unsafeSettings(static fn () => $image[$name], [$name => $wanted]), $name);
+        }
+    }
+
+    public function testUnsafeSettingsNamesWhatALaunchDropped(): void
+    {
+        $settings = ['zend.exception_ignore_args' => '1', 'display_errors' => '0'];
+        self::assertSame([], Platform::unsafeSettings(static fn (string $n) => $n === 'display_errors' ? 'Off' : 'On', $settings));
+        self::assertSame(
+            ["the setting zend.exception_ignore_args must be 1 (launch with -d zend.exception_ignore_args=1), this is '0'",
+             "the setting display_errors must be 0 (launch with -d display_errors=0), this is 'STDOUT'"],
+            Platform::unsafeSettings(static fn (string $n) => $n === 'display_errors' ? 'STDOUT' : '0', $settings),
+        );
+    }
+
+    public function testTheCheckScriptFailsALaunchWithoutExceptionIgnoreArgs(): void
+    {
+        $script = escapeshellarg(dirname(__DIR__, 2) . '/bin/check-platform.php');
+        exec(escapeshellarg(PHP_BINARY) . self::launchFlags(['zend.exception_ignore_args' => '0']) . " $script 2>&1", $output, $code);
+        self::assertSame(1, $code);
+        self::assertContains(
+            "fiscal sidecar: the setting zend.exception_ignore_args must be 1 (launch with -d zend.exception_ignore_args=1), this is '0'",
+            $output,
+        );
+    }
+
     public function testTheCheckScriptAnswersThisPhpAsPlatformDoes(): void
     {
         $script = dirname(__DIR__, 2) . '/bin/check-platform.php';
-        exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1', $output, $code);
+        exec(escapeshellarg(PHP_BINARY) . self::launchFlags() . ' ' . escapeshellarg($script) . ' 2>&1', $output, $code);
         $expected = Platform::missing(get_loaded_extensions(), PHP_VERSION);
         self::assertSame($expected === [] ? 0 : 1, $code, implode("\n", $output));
         foreach ($expected as $problem) {

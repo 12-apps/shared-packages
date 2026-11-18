@@ -33,6 +33,7 @@ final class Kernel
     public function __construct(
         private readonly array $modules,
         private readonly RequestLog $log,
+        #[\SensitiveParameter]
         private readonly ?string $token = null,
     ) {
         if ($token !== null && strlen($token) < 32) {

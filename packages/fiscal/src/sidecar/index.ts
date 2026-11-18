@@ -6,6 +6,6 @@
  */
 
 export { SIDECAR_ERROR_CLASSES } from "./types";
-export { SIDECAR_PHP_EXTENSIONS, SIDECAR_PHP_VERSION } from "./platform";
+export { SIDECAR_PHP_EXTENSIONS, SIDECAR_PHP_LAUNCH_FLAGS, SIDECAR_PHP_SETTINGS, SIDECAR_PHP_VERSION } from "./platform";
 export type { SidecarPhpExtension } from "./platform";
 export type * from "./types";
