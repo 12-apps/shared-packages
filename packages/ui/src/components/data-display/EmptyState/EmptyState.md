@@ -20,7 +20,7 @@ interface EmptyStateProps {
 
 - Clear title + optional description and help link.
 - Optional illustration area sized responsively.
-- Action variant surfaces primary/secondary CTAs.
+- Action variant surfaces primary/secondary CTAs, drawn with the house `Button` (sentence case, like every other button).
 
 **A11y**
 
