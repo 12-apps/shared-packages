@@ -116,6 +116,53 @@ final class NfeService
         );
     }
 
+    /**
+     * `POST /<model>/link-payment`: NT 2026.006 v1.00's event 110300
+     * "Vinculação Pagamento", one payment transaction linked to an authorised
+     * document after the fact. One transaction per event (the schema's single
+     * `gPgto`), numbered by the caller's `sequence` (`nSeqEvento`, 1–20).
+     * 573 "Duplicidade de Evento" is what a retry of a registered event gets,
+     * so it answers REGISTERED too, with no event XML of its own.
+     */
+    public function linkPayment(Model $model, Input $in): Response
+    {
+        $environment = $in->environment();
+        $key = self::keyOf($model, $in);
+        $protocol = $in->pattern('protocol', '/^[0-9]{15}$/', 'the 15-digit authorisation protocol');
+        $sequence = $in->digits('sequence', 1, 20);
+        $tagAdic = '<cOrgaoAutor>' . substr($key, 0, 2) . '</cOrgaoAutor><tpAutor>1</tpAutor>'
+            . '<verAplic>' . DocumentMapper::PROCESS_VERSION . '</verAplic>'
+            . "<nProt>$protocol</nProt>" . self::paymentGroup($in);
+        $tools = $this->toolsForKey($in, $model, $environment, $key);
+        $reply = $this->settled(
+            fn (): string => $tools->sefazEvento(UFList::getUFByCode((int) substr($key, 0, 2)), $key, Tools::EVT_VINCULACAO_PAGAMENTO, $sequence, $tagAdic),
+            false,
+        );
+        $status = $reply->status() === '128' ? (string) $reply->value('cStat', 'infEvento') : $reply->status();
+        $duplicate = $status === '573';
+        if (!$duplicate && !in_array($status, self::EVENT_REGISTERED, true)) {
+            throw Classifier::fromStatus($status, self::reasonOf($reply, 'infEvento'), $reply, false);
+        }
+        return new Response(200, self::answer($reply, $status, 'infEvento') + [
+            'status' => 'REGISTERED',
+            'accessKey' => $key,
+            'protocol' => $duplicate ? null : (string) $reply->value('nProt', 'infEvento'),
+            'registeredAt' => $duplicate ? null : (string) $reply->value('dhRegEvento', 'infEvento'),
+            'eventXml' => $duplicate ? null : self::protocolled($tools->lastRequest, $reply->raw),
+        ]);
+    }
+
+    /** The event's `gPgto` (schema `TEventoPgto`): the transaction id is an attribute, then the means, the receiver, the PSP. */
+    private static function paymentGroup(Input $in): string
+    {
+        $id = htmlspecialchars($in->pattern('transactionId', '/^[\x21-\x7E]{2,35}$/', '2 to 35 printable characters'), ENT_XML1 | ENT_QUOTES);
+        $means = $in->pattern('meansCode', '/^(15|17|18|20|23|24)$/', 'an IT 2026.001 tpMeioPgto (15, 17, 18, 20, 23, 24)');
+        $receiver = $in->pattern('receiverCnpj', '/^[A-Z0-9]{12}[0-9]{2}$/', 'a 14-character CNPJ');
+        $psp = $in->pattern('pspCnpjBase', '/^[A-Z0-9]{8}$/', 'an 8-character CNPJ base');
+        return "<gPgto idTransacao=\"$id\"><tpMeioPgto>$means</tpMeioPgto>"
+            . "<CNPJReceb>$receiver</CNPJReceb><CNPJBasePSP>$psp</CNPJBasePSP></gPgto>";
+    }
+
     /** One cancel event, sent and settled: 218/573 and a request with no answer are looked up. */
     private function sendCancel(Tools $tools, string $key, callable $send): Response
     {

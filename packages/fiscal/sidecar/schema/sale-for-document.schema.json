@@ -415,7 +415,24 @@
             }
           ]
         },
-        "description": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 2, "maxLength": 60 }] }
+        "description": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 2, "maxLength": 60 }] },
+        "linkedTransaction": {
+          "description": "gPgtoVinc (NT 2026.006 v1.00): the payment transaction started before the document, linked by its id. Absent or null: no link.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["transactionId", "meansCode", "pspCnpjBase", "receiverCnpj"],
+              "properties": {
+                "transactionId": { "type": "string", "pattern": "^[\\x21-\\x7E]{2,35}$" },
+                "meansCode": { "enum": ["15", "17", "18", "20", "23", "24"] },
+                "pspCnpjBase": { "type": "string", "pattern": "^[A-Z0-9]{8}$" },
+                "receiverCnpj": { "$ref": "#/definitions/cnpj" }
+              }
+            }
+          ]
+        }
       }
     }
   }

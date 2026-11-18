@@ -379,6 +379,7 @@ final class DocumentMapper
                 'tpIntegra' => $card === null ? null : ($card['integrated'] ? 1 : 2),
             ]);
         }
+        $this->paymentLinks($make, $d['payments']);
         if ($d['intermediary'] !== null) {
             $make->tagIntermed((object) [
                 'CNPJ' => $d['intermediary']['cnpj'],
@@ -396,6 +397,32 @@ final class DocumentMapper
                 'xContato' => $tech['contactName'],
                 'email' => $tech['email'],
                 'fone' => $tech['phone'],
+            ]);
+        }
+    }
+
+    /**
+     * `gPgtoVinc` (NT 2026.006 v1.00, YC01): every payment whose transaction was
+     * started before the document, linked by its id. `nPag` is the payment's
+     * position among the document's payments. The caller decides whether the
+     * environment accepts the group (it is optional in the layout, and the
+     * fisco's own production activation is announced for 2027).
+     *
+     * @param list<array<string, mixed>> $payments
+     */
+    private function paymentLinks(Make $make, array $payments): void
+    {
+        foreach (array_values($payments) as $index => $payment) {
+            $link = $payment['linkedTransaction'] ?? null;
+            if ($link === null) {
+                continue;
+            }
+            $make->tagPgtoVinc((object) [
+                'nPag' => $index + 1,
+                'idTransacao' => $link['transactionId'],
+                'tpMeioPgto' => $link['meansCode'],
+                'CNPJReceb' => $link['receiverCnpj'],
+                'CNPJBasePSP' => $link['pspCnpjBase'],
             ]);
         }
     }
