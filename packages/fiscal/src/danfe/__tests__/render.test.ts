@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { DANFE_NFCE_EN_US } from "../en-US";
@@ -75,5 +78,46 @@ describe("the DANFE NFC-e", () => {
     expect([money("0.5"), money("1234.56"), money("1000000"), money(null)]).toEqual(["0,50", "1.234,56", "1.000.000,00", "0,00"]);
     expect(wrap("NOTA FISCAL EMITIDA EM AMBIENTE", 12)).toEqual(["NOTA FISCAL", "EMITIDA EM", "AMBIENTE"]);
     expect(wrap("see https://example.test/abcdefghij", 10)).toEqual(["see", "https://ex", "ample.test", "/abcdefghi", "j"]);
+  });
+});
+
+/** The modules `./danfe` reaches outside its own folder, read once when the file loads. */
+const DANFE_REACHES = (() => {
+  const root = join(import.meta.dirname, "..");
+  const seen = new Set<string>();
+  const visit = (file: string) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    // eslint-disable-next-line test-flakiness/no-unmocked-fs -- reads this package's own source, read-only, once at load
+    for (const match of readFileSync(file, "utf8").matchAll(/^(?:import|export)[^;]*?from "(\.[^"]+)"/gms)) {
+      visit(join(dirname(file), `${match[1]}.ts`));
+    }
+  };
+  visit(join(root, "index.ts"));
+  return [...seen].map((file) => relative(join(root, ".."), file)).filter((file) => !file.startsWith("danfe/"));
+})();
+
+describe("the DANFE of a note a register signed offline (FUT-4717)", () => {
+  it("frames the contingency notice in a box when asked, with the key and the QR code the CSC built", () => {
+    const lines = renderDanfeNfce({ xml: OFFLINE, paperWidth: 80, labels: DANFE_NFCE_PT_BR, contingencyBox: true });
+    const notice = lines.filter((line) => line.division === "V").map((line) => line.text);
+    const box = "=".repeat(DANFE_COLUMNS[80]);
+    expect(notice.slice(notice.indexOf(box), notice.lastIndexOf(box) + 1)).toEqual([
+      box, "EMITIDA EM CONTINGÊNCIA", "Pendente de autorização", "Via consumidor", box,
+    ]);
+    const qr = lines.find((line) => line.qrCode !== undefined);
+    expect(qr?.qrCode).toContain("35261111222333000181650010000012019482139071");
+    expect(texts(lines).join(" ")).toContain("3526 1111 2223 3300 0181 6500 1000 0012 0194 8213 9071");
+  });
+
+  it("prints no box unless asked, and none on a note already authorised", () => {
+    const plain = texts(renderDanfeNfce({ xml: OFFLINE, paperWidth: 58, labels: DANFE_NFCE_PT_BR }));
+    expect(plain.some((text) => text.startsWith("==="))).toBe(false);
+    const authorised = texts(renderDanfeNfce({ xml: AUTHORIZED, paperWidth: 58, labels: DANFE_NFCE_PT_BR, contingencyBox: true }));
+    expect(authorised.some((text) => text.startsWith("==="))).toBe(false);
+  });
+
+  it("reaches no database, store or network module: the danfe entry imports only itself and the error type", () => {
+    expect(DANFE_REACHES).toEqual(["documents/errors.ts"]);
   });
 });

@@ -303,6 +303,14 @@ protocol, and the QR code (a line carrying `qrCode`, for the host to
 rasterise). Each line is `{ text, align, emphasis }`, the shape
 `@12-apps/thermal-printing` encodes, at 32 or 48 columns.
 
+A register that signs on its own block (FUT-4717) prints the signed XML it
+holds, before any authorisation: `contingencyBox: true` frames the
+"EMITIDA EM CONTINGÊNCIA" / "Pendente de autorização" notice between two `=`
+rules (off by default, so every other paper is unchanged). The QR code is the
+one the fiscal service built from the CSC when it signed. The `./danfe` entry
+reaches no store, database or network module, so it runs in a desktop
+renderer as it does on a server.
+
 ## The manifest
 
 `@12-apps/fiscal/manifest` declares the permissions `fiscal:read`,
