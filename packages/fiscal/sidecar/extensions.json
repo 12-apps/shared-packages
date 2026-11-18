@@ -1,0 +1,5 @@
+{
+  "php": "8.3",
+  "extensions": ["curl", "dom", "filter", "json", "libxml", "mbstring", "openssl", "reflection", "simplexml", "soap", "zlib"],
+  "sapi": ["cli", "cli-server"]
+}

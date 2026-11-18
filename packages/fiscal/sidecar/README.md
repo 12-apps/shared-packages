@@ -99,6 +99,41 @@ with the error: the key is spoken for, and an NFC-e can be signed offline.
   ever in it, and stack traces carry no arguments
   (`zend.exception_ignore_args`).
 
+## Running without Docker (a bundled PHP)
+
+A host that cannot run the image — a desktop register that must issue
+offline (FUT-4717) — runs the service with a PHP of its own, bound to the
+loopback only, with a token minted at each launch:
+
+```sh
+php sidecar/bin/check-platform.php        # exit 1, naming what this PHP lacks
+FISCAL_SIDECAR_TOKEN=<random, 32+ chars> \
+  php -S 127.0.0.1:<port> -t sidecar/public sidecar/public/index.php
+```
+
+- **Bind `127.0.0.1`, never `0.0.0.0`.** Binding is the launcher's: the
+  service cannot tell a loopback caller from another. The token is what keeps
+  another process of the same machine out; the launcher passes it in the
+  environment, never on the command line (a process listing prints argv).
+- **The PHP:** 8.3, with exactly the extensions `extensions.json` lists
+  (`@12-apps/fiscal/sidecar/extensions.json`; `SIDECAR_PHP_EXTENSIONS` in
+  `@12-apps/fiscal/sidecar`): `curl` (the SEFAZ transport), `dom`, `filter`
+  (json-schema), `json`, `libxml`, `mbstring` (sped-common), `openssl`,
+  `reflection` (php-enum), `simplexml`, `soap` and `zlib`, plus the
+  command-line SAPI with its built-in server. A PHPUnit test keeps the list
+  equal to every `ext-*` of `composer.json` and the locked libraries, so a
+  library bump that needs a new extension fails here, and
+  `bin/check-platform.php` fails the host's build that bundles a PHP without
+  it.
+- **The libraries:** the tarball ships `composer.json` and `composer.lock`,
+  not `vendor/`. A host build runs
+  `composer install --no-dev --classmap-authoritative --ignore-platform-req=ext-soap`
+  in a copy of `sidecar/` (the Dockerfile's own command) and bundles the
+  result with `public/`, `src/` and `schema/`.
+- The trust store and the OpenSSL legacy provider are the image's
+  (`docker/`): outside it, point `FISCAL_SEFAZ_CA_BUNDLE` at the system bundle
+  plus `docker/icp-brasil.pem`, and `OPENSSL_CONF` at `docker/openssl.cnf`.
+
 ## Configuration
 
 | variable | default | |
