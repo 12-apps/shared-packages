@@ -54,7 +54,8 @@ model FiscalIssuingPoint {
   contingencySeries Int?     @map("contingency_series")
   createdAt         DateTime @default(now()) @map("created_at")
 
-  counters FiscalNumberCounter[]
+  counters          FiscalNumberCounter[]
+  contingencyBlocks FiscalContingencyBlock[]
 
   @@index([ownerId])
   @@map("fiscal_issuing_points")
@@ -155,4 +156,52 @@ model FiscalDocumentEvent {
 
   @@index([documentId, at])
   @@map("fiscal_document_events")
+}
+
+// A block of a contingency series handed to one holder (the host's opaque id
+// of a register that may go offline) to sign on with no server (FUT-4717).
+// Drawn from the series' counter, so no other document numbers inside it.
+// The CHECKs (fate, range, usedUpTo) are the migration's.
+model FiscalContingencyBlock {
+  id             String    @id
+  ownerId        String    @map("owner_id")
+  issuingPointId String    @map("issuing_point_id")
+  issuerCnpj     String    @map("issuer_cnpj")
+  environment    String
+  model          String
+  series         Int
+  firstNumber    Int       @map("first_number")
+  lastNumber     Int       @map("last_number")
+  holder         String
+  // OPEN | CLOSED | ABANDONED
+  fate           String    @default("OPEN")
+  // The highest number the holder reported it used (CLOSED); null otherwise.
+  usedUpTo       Int?      @map("used_up_to")
+  reservedAt     DateTime  @map("reserved_at")
+  closedAt       DateTime? @map("closed_at")
+  // Every number accounted for (a document, or voided).
+  settledAt      DateTime? @map("settled_at")
+  issuingPoint   FiscalIssuingPoint @relation(fields: [issuingPointId], references: [id], onDelete: Restrict)
+
+  voids FiscalContingencyVoid[]
+
+  @@unique([issuerCnpj, environment, model, series, firstNumber], map: "fiscal_contingency_blocks_first_key")
+  @@index([ownerId, holder])
+  @@index([issuingPointId])
+  @@map("fiscal_contingency_blocks")
+}
+
+// A range of a block inutilized at SEFAZ: a known gap, voided once.
+model FiscalContingencyVoid {
+  id          String                 @id
+  blockId     String                 @map("block_id")
+  firstNumber Int                    @map("first_number")
+  lastNumber  Int                    @map("last_number")
+  protocol    String?
+  eventXmlKey String?                @map("event_xml_key")
+  voidedAt    DateTime               @map("voided_at")
+  block       FiscalContingencyBlock @relation(fields: [blockId], references: [id], onDelete: Restrict)
+
+  @@unique([blockId, firstNumber])
+  @@map("fiscal_contingency_voids")
 }

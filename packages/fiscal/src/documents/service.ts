@@ -19,6 +19,7 @@ import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
 import { settleNumber, settleWithXml, storeNfeProc } from "./settle";
 import { linkPayment } from "./payment-link";
+import { abandonBlocks, closeBlock, listBlocks, listKnownGaps, listUnknownRanges, recordSigned, reserveBlock, voidKnownGaps } from "./contingency";
 import { answerLive, assertOnlineDeadline, signPending, submit, transmit } from "./steps";
 import { type CancelOrReturnInput, type CancelOrReturnResult, type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
 
@@ -374,6 +375,15 @@ export function createFiscalDocuments(config: FiscalDocumentsServiceConfig) {
     },
     /** One pass of the retry sweep: PENDING/SUBMITTED documents and owed numbers whose next attempt has come. */
     sweep: async (limit: number): Promise<SweepReport> => run(deps, await store.listDue({ now: deps.ctx.nowIso(), limit })),
+    /** Contingency blocks (FUT-4717), the ContingencyBlockSource; `NOT_SUPPORTED` over a store without them. */
+    reserveBlock: reserveBlock.bind(null, deps),
+    recordSigned: recordSigned.bind(null, deps),
+    closeBlock: closeBlock.bind(null, deps),
+    abandonBlocks: abandonBlocks.bind(null, deps),
+    listBlocks: listBlocks.bind(null, deps),
+    listKnownGaps: listKnownGaps.bind(null, deps),
+    listUnknownRanges: listUnknownRanges.bind(null, deps),
+    voidKnownGaps: voidKnownGaps.bind(null, deps),
     /** One pass of the contingency transmission, then the 20-hour deadline warnings. */
     async transmitContingency(limit: number): Promise<SweepReport> {
       const report = await run(deps, await store.listContingency({ now: deps.ctx.nowIso(), limit }));

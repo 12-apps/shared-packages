@@ -239,3 +239,45 @@ describe("the sidecar issuer, when the service itself does not answer", () => {
     expect(() => createSidecarIssuer({ baseUrl: "http://x", fetch, timeoutMs: 0 })).toThrow(/timeoutMs/);
   });
 });
+
+/** A fetch that answers every call, and the `authorization` header each one carried (the launch token's tests). */
+function capturing(): { fetch: SidecarFetch; authorizations: () => Array<string | undefined> } {
+  const calls: Array<{ url: string; authorization: string | undefined }> = [];
+  const fetch: SidecarFetch = async (url, init) => {
+    calls.push({ url, authorization: init.headers["authorization"] });
+    if (url.endsWith("/health")) return { status: 200, text: async () => JSON.stringify({ status: "ok" }) };
+    return { status: 200, text: async () => JSON.stringify(RECORDINGS["inutilize"]!.body) };
+  };
+  return { fetch, authorizations: () => calls.map((call) => call.authorization) };
+}
+
+describe("the sidecar issuer's launch token (FUT-4717)", () => {
+  const TOKEN = "launch-token-0123456789abcdef0123456789";
+
+  const inutilize = {
+    model: "NFCE" as const, environment, signing: SIGNING, uf: "SP", cnpj: "11222333000181", year: 2026, series: 2, from: 3, to: 3,
+    reason: "Numero nao utilizado por falha na emissao",
+  };
+
+  it("sends the token as a bearer on every call, health included", async () => {
+    const captured = capturing();
+    const issuer = createSidecarIssuer({ baseUrl: "http://127.0.0.1:4000", fetch: captured.fetch, timeoutMs: 1000, token: TOKEN });
+    await issuer.inutilize(inutilize);
+    await issuer.health();
+    expect(captured.authorizations()).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`]);
+  });
+
+  it("sends no authorization header without a token", async () => {
+    const captured = capturing();
+    await createSidecarIssuer({ baseUrl: "http://127.0.0.1:4000", fetch: captured.fetch, timeoutMs: 1000 }).inutilize(inutilize);
+    expect(captured.authorizations()).toEqual([undefined]);
+  });
+
+  it("refuses a short or blank token without quoting it", () => {
+    const fetch: SidecarFetch = async () => ({ status: 200, text: async () => "{}" });
+    const make = (token: string) => () => createSidecarIssuer({ baseUrl: "http://x", fetch, timeoutMs: 1, token });
+    expect(make("short")).toThrow(/at least 32 characters/);
+    expect(make("short")).not.toThrow(/short/);
+    expect(make(`${"a".repeat(32)} b`)).toThrow(/whitespace/);
+  });
+});

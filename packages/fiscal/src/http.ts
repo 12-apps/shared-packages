@@ -75,6 +75,7 @@ export const FISCAL_ERROR_STATUS = {
   RETURN_NEEDS_REFERENCE: 422,
   RETURN_ON_NFCE: 422,
   RETURN_OF_NFCE_ONLY: 422,
+  CONTINGENCY_XML_REFUSED: 422,
 } as const satisfies Record<FiscalDocumentErrorCode, number>;
 
 /**

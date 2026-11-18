@@ -41,7 +41,14 @@ export type FiscalDocumentErrorCode =
    * the buyer's return NF-e of entry answers a consumer's NFC-e only; an NF-e
    * past its window is the issuer's own correction, not this path's.
    */
-  | "RETURN_OF_NFCE_ONLY";
+  | "RETURN_OF_NFCE_ONLY"
+  /**
+   * `recordSigned` (FUT-4717): an XML a holder signed offline that the package
+   * will not record — another CNPJ or environment, not a model 65, not
+   * `tpEmis = 9`, a key whose check digit or fields are wrong, or a number
+   * outside every block that holder was given. Nothing was recorded.
+   */
+  | "CONTINGENCY_XML_REFUSED";
 
 export class FiscalDocumentError extends Error {
   readonly code: FiscalDocumentErrorCode;

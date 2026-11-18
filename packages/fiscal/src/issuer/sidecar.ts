@@ -43,6 +43,13 @@ export interface SidecarIssuerConfig {
    * both; a shorter one turns answered calls into unknown outcomes.
    */
   readonly timeoutMs: number;
+  /**
+   * The service's launch token (`FISCAL_SIDECAR_TOKEN`, FUT-4717), sent as
+   * `Authorization: Bearer <token>` on every call: a service started with one
+   * answers nothing but `/health` without it. Absent: no header (a service
+   * reached only on a private network, started without a token).
+   */
+  readonly token?: string;
 }
 
 function unanswered(message: string): IssuerFailure {
@@ -77,13 +84,18 @@ function parse(text: string): unknown {
 }
 
 /** One POST to the service, its answer classified; never throws. */
+/** The headers every call carries: the bearer only when the service has a token. */
+function headersOf(config: SidecarIssuerConfig, base: Record<string, string>): Record<string, string> {
+  return config.token === undefined ? base : { ...base, authorization: `Bearer ${config.token}` };
+}
+
 async function post<T>(config: SidecarIssuerConfig, base: string, path: string, body: unknown): Promise<IssuerOutcome<T>> {
   let status: number;
   let text: string;
   try {
     const response = await config.fetch(`${base}${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
+      headers: headersOf(config, { "content-type": "application/json", accept: "application/json" }),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(config.timeoutMs),
     });
@@ -99,10 +111,22 @@ async function post<T>(config: SidecarIssuerConfig, base: string, path: string, 
   return { ok: false, error: unanswered(`POST ${path} answered HTTP ${status} without the service's error body.`) };
 }
 
-export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
+function assertIssuerConfig(config: SidecarIssuerConfig): void {
   if (typeof config?.baseUrl !== "string" || config.baseUrl === "") throw new TypeError("createSidecarIssuer needs baseUrl.");
   if (typeof config.fetch !== "function") throw new TypeError("createSidecarIssuer needs fetch.");
   if (!Number.isInteger(config.timeoutMs) || config.timeoutMs <= 0) throw new TypeError("createSidecarIssuer needs a positive timeoutMs.");
+  assertToken(config.token);
+}
+
+function assertToken(token: unknown): void {
+  if (token !== undefined && (typeof token !== "string" || token.length < 32 || /\s/.test(token))) {
+    // Never quoted: the message names the rule, not the value.
+    throw new TypeError("createSidecarIssuer's token must be at least 32 characters, with no whitespace.");
+  }
+}
+
+export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
+  assertIssuerConfig(config);
   let baseEnd = config.baseUrl.length;
   while (baseEnd > 0 && config.baseUrl[baseEnd - 1] === "/") baseEnd -= 1;
   const base = config.baseUrl.slice(0, baseEnd);
@@ -171,7 +195,7 @@ export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
     async health() {
       const response = await config.fetch(`${base}/health`, {
         method: "GET",
-        headers: { accept: "application/json" },
+        headers: headersOf(config, { accept: "application/json" }),
         signal: AbortSignal.timeout(config.timeoutMs),
       });
       if (response.status !== 200) throw new Error(`The fiscal service's /health answered HTTP ${response.status}.`);

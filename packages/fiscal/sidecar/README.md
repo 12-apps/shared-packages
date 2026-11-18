@@ -97,12 +97,63 @@ with the error: the key is spoken for, and an NFC-e can be signed offline.
 - The request log is one JSON line per call on stderr: time, method, path,
   status, duration, error class and SEFAZ code. Nothing read from the body is
   ever in it, and stack traces carry no arguments
-  (`zend.exception_ignore_args`).
+  (`zend.exception_ignore_args`; in the image from `docker/php.ini`, on a
+  bundled PHP from the launch flags below — and the launch token is a
+  `#[\SensitiveParameter]` besides).
+
+## Running without Docker (a bundled PHP)
+
+A host that cannot run the image — a desktop register that must issue
+offline (FUT-4717) — runs the service with a PHP of its own, bound to the
+loopback only, with a token minted at each launch:
+
+```sh
+FLAGS="-d display_errors=0 -d log_errors=1 -d zend.exception_ignore_args=1 \
+  -d zend.exception_string_param_max_len=0 -d file_uploads=0"
+php $FLAGS sidecar/bin/check-platform.php   # exit 1, naming what this PHP or launch lacks
+FISCAL_SIDECAR_TOKEN=<random, 32+ chars> \
+  php $FLAGS -S 127.0.0.1:<port> -t sidecar/public sidecar/public/index.php
+```
+
+- **Always launch with those flags** (`SIDECAR_PHP_LAUNCH_FLAGS` in
+  `@12-apps/fiscal/sidecar`, `ini` in `extensions.json`). They are what the
+  image's `docker/php.ini` guarantees, and a bundled PHP has none of them on
+  its own: without them an error or a deprecation is printed into the response
+  ahead of the JSON (the issuer reads that call as unanswered, its outcome
+  unknown), and an escaping exception prints its trace WITH arguments.
+  `-d` flags rather than `-c docker/php.ini`, whose `error_log = /dev/stderr`
+  a Windows desktop does not have. `bin/check-platform.php` fails a launch
+  without them (`zend.exception_ignore_args` off, say), and the PHPUnit
+  suite starts the service with exactly these flags.
+
+- **Bind `127.0.0.1`, never `0.0.0.0`.** Binding is the launcher's: the
+  service cannot tell a loopback caller from another. The token is what keeps
+  another process of the same machine out; the launcher passes it in the
+  environment, never on the command line (a process listing prints argv).
+- **The PHP:** 8.3, with exactly the extensions `extensions.json` lists
+  (`@12-apps/fiscal/sidecar/extensions.json`; `SIDECAR_PHP_EXTENSIONS` in
+  `@12-apps/fiscal/sidecar`): `curl` (the SEFAZ transport), `dom`, `filter`
+  (json-schema), `json`, `libxml`, `mbstring` (sped-common), `openssl`,
+  `reflection` (php-enum), `simplexml`, `soap` and `zlib`, plus the
+  command-line SAPI with its built-in server. A PHPUnit test keeps the list
+  equal to every `ext-*` of `composer.json` and the locked libraries, so a
+  library bump that needs a new extension fails here, and
+  `bin/check-platform.php` fails the host's build that bundles a PHP without
+  it.
+- **The libraries:** the tarball ships `composer.json` and `composer.lock`,
+  not `vendor/`. A host build runs
+  `composer install --no-dev --classmap-authoritative --ignore-platform-req=ext-soap`
+  in a copy of `sidecar/` (the Dockerfile's own command) and bundles the
+  result with `public/`, `src/` and `schema/`.
+- The trust store and the OpenSSL legacy provider are the image's
+  (`docker/`): outside it, point `FISCAL_SEFAZ_CA_BUNDLE` at the system bundle
+  plus `docker/icp-brasil.pem`, and `OPENSSL_CONF` at `docker/openssl.cnf`.
 
 ## Configuration
 
 | variable | default | |
 |---|---|---|
+| `FISCAL_SIDECAR_TOKEN` | unset | when set (32 characters or more), every route but `/health` answers only a call carrying `Authorization: Bearer <token>`, compared in constant time; any other call is `401` with `{ error: { class: "INVALID", code: "UNAUTHORIZED" } }`, refused before it is routed. The token is never logged nor answered. `createSidecarIssuer({ …, token })` sends it. A service embedded on a computer mints one per launch (FUT-4717); the container image, reached on a private network, may run without one. |
 | `FISCAL_SEFAZ_TIMEOUT_SECONDS` | `30` | connect timeout, TLS handshake included; the whole request gets 20 s more |
 | `FISCAL_SEFAZ_TLS_VERIFY` | on | SEFAZ's server certificate is verified. `off` is the only value that turns it off, and `/health` then reports `sefazTlsVerify: false`. Unverified, anyone on the path reads every document and can forge SEFAZ's answers. |
 | `FISCAL_SEFAZ_CA_BUNDLE` | the image's | a PEM replacing the trust store. The image builds `/etc/ssl/fiscal-sidecar-ca.pem` from its Mozilla bundle plus `docker/icp-brasil.pem` (the ICP-Brasil roots and intermediates ITI publishes, sha256-checked in the Dockerfile): some SEFAZ hosts present ICP-Brasil server certificates, others public ones. Outside the image the system bundle plus that PEM are used. |

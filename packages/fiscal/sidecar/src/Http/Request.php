@@ -7,13 +7,17 @@ namespace Fiscal\Sidecar\Http;
 use Fiscal\Sidecar\ServiceError;
 use JsonException;
 
-/** One HTTP request, as the kernel sees it: the method, the path and the raw body. */
+/**
+ * One HTTP request, as the kernel sees it: the method, the path, the raw body
+ * and the one header it reads, `Authorization` (the launch token, FUT-4717).
+ */
 final class Request
 {
     public function __construct(
         public readonly string $method,
         public readonly string $path,
         private readonly string $body,
+        public readonly ?string $authorization = null,
     ) {
     }
 
@@ -25,6 +29,7 @@ final class Request
             strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')),
             $path === '' ? '/' : $path,
             (string) file_get_contents('php://input'),
+            isset($_SERVER['HTTP_AUTHORIZATION']) ? (string) $_SERVER['HTTP_AUTHORIZATION'] : null,
         );
     }
 
