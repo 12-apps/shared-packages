@@ -20,10 +20,12 @@
  *   list are built with their screen tickets (FUT-2231, FUT-2238) from the
  *   owner's approved prototypes, over these routes.
  * - **No NFS-e.** Only the platform's own NFS-e is planned (FUT-2242).
- * - **No register blocks.** An offline register signing on a reserved block of
- *   the contingency series, and the voiding of a finished block's known rest,
- *   are FUT-4717's; the port is declared (`ContingencyBlockSource`) and not
- *   implemented.
+ * - **No register-block routes or job.** Contingency blocks are implemented
+ *   (FUT-4717): `createFiscalDocuments` is the `ContingencyBlockSource`
+ *   (reserve, record a signed note, close, abandon) and runs the gap pass
+ *   (`voidKnownGaps`, `listUnknownRanges`). The host wires them: the routes a
+ *   register calls, the monthly void job, and the store's flag of unknown
+ *   ranges.
  *
  * `@12-apps/wiring` is a TYPE-ONLY dependency: the manifest is a plain
  * `satisfies`-checked value, and the producer's assertions run in this

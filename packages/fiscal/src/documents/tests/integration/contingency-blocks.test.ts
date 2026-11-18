@@ -301,6 +301,56 @@ describe.each(STORES)("contingency blocks on the %s store", (_name, makeStore) =
     expect((await service.listUnknownRanges({})).map(({ from, to }) => [from, to])).toEqual([[6, 10]]);
   });
 
+  it("refuses a late note on a number voided at SEFAZ already: record 2, void, then record 1 is refused and records nothing", async () => {
+    const { service, inutilized, objects } = await setup(makeStore);
+    await service.reserveBlock({ ownerId: "owner-1", issuingPointId: "register-1", holder: "station-a", size: 10 });
+    await service.recordSigned({ ownerId: "owner-1", subjectId: "order-2", signedXml: stationNote(2).xml, holder: "station-a" });
+    await service.voidKnownGaps({ before: "2026-11-21T00:00:00.000Z" });
+    expect(inutilized.map(({ from, to }) => [from, to])).toEqual([[1, 1]]);
+    const late = stationNote(1);
+    await refusedAs(service.recordSigned({ ownerId: "owner-1", subjectId: "order-1", signedXml: late.xml, holder: "station-a" }), "CONTINGENCY_XML_REFUSED");
+    expect(await service.listBySubject("owner-1", "order-1", "NFCE")).toEqual([]);
+    expect([...objects.keys()].some((key) => key.includes(late.key))).toBe(false);
+    expect((await service.listBlocks({ ownerId: "owner-1" }))[0]?.documented).toEqual([2]);
+  });
+
+  it("refuses a note whose total or buyer is not the booked sale's, and records nothing", async () => {
+    const { service } = await setup(makeStore);
+    await service.reserveBlock({ ownerId: "owner-1", issuingPointId: "register-1", holder: "station-a" });
+    const refused = (mutate: (xml: string) => string) =>
+      refusedAs(service.recordSigned({ ownerId: "owner-1", subjectId: "order-1", signedXml: stationNote(3, { mutate }).xml, holder: "station-a" }), "CONTINGENCY_XML_REFUSED");
+    await refused((xml) => xml.replace("<vNF>50.90</vNF>", "<vNF>49.90</vNF>"));
+    await refused((xml) => xml.replace("</emit>", "</emit><dest><CPF>12345678909</CPF></dest>"));
+    expect(await service.listBySubject("owner-1", "order-1", "NFCE")).toEqual([]);
+  });
+
+  it("reads every page of blocks: a gap behind more never-settling blocks than one page holds is still voided and flagged", async () => {
+    const { service, store, inutilized } = await setup(makeStore);
+    const pages: Array<{ after?: unknown }> = [];
+    const list = store.listContingencyBlocks.bind(store);
+    // A store that answers at most 2 blocks a page, as a full page of 1000 would.
+    (store as { listContingencyBlocks: ContingencyBlockStore["listContingencyBlocks"] }).listContingencyBlocks = (input) => {
+      pages.push({ after: input.after });
+      return list({ ...input, limit: Math.min(input.limit, 2) });
+    };
+    for (let block = 0; block < 5; block += 1) {
+      await service.reserveBlock({ ownerId: "owner-1", issuingPointId: "register-1", holder: "station-a", size: 2 });
+    }
+    // Blocks 1-8 stay OPEN with nothing handed in (never settled); the fifth block's 9 is a known gap.
+    await service.recordSigned({ ownerId: "owner-1", subjectId: "order-10", signedXml: stationNote(10).xml, holder: "station-a" });
+    const before = "2026-11-21T00:00:00.000Z";
+    expect((await service.listKnownGaps({ before })).map(({ from, to }) => [from, to])).toEqual([[9, 9]]);
+    pages.length = 0;
+    const report = await service.voidKnownGaps({ before });
+    expect(report.voided.map(({ from, to }) => [from, to])).toEqual([[9, 9]]);
+    expect(inutilized.map(({ from, to }) => [from, to])).toEqual([[9, 9]]);
+    expect(pages.length).toBeGreaterThanOrEqual(3);
+    expect(pages.filter((page) => page.after !== undefined).length).toBeGreaterThanOrEqual(2);
+    await service.abandonBlocks({ ownerId: "owner-1", holder: "station-a" });
+    expect((await service.listUnknownRanges({})).map(({ from, to }) => [from, to])).toEqual([[1, 2], [3, 4], [5, 6], [7, 8]]);
+    expect(await service.listBlocks({ ownerId: "owner-1" })).toHaveLength(5);
+  });
+
   it("refuses to close a block the holder does not hold, or with a count outside it", async () => {
     const { service } = await setup(makeStore);
     await service.reserveBlock({ ownerId: "owner-1", issuingPointId: "register-1", holder: "station-a", size: 10 });

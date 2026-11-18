@@ -195,14 +195,19 @@ export interface ContingencyBlockStore {
     readonly holder: string;
     readonly at: string;
   }): Promise<ContingencyBlock>;
-  /** The block holding `number` of the series, whoever holds it. */
+  /** The block holding `number` of the series, whoever holds it, with its documents and voids. */
   findContingencyBlock(input: {
     readonly ownerId: string;
     readonly issuerCnpj: string;
     readonly environment: SefazEnvironment;
     readonly series: number;
     readonly number: number;
-  }): Promise<ContingencyBlock | null>;
+  }): Promise<ContingencyBlockState | null>;
+  /**
+   * One page of the blocks a filter selects, ordered by `(reservedAt, id)`;
+   * `after` is the last block of the previous page (keyset): the caller reads
+   * pages until one comes back empty.
+   */
   listContingencyBlocks(input: {
     readonly ownerId?: string;
     readonly holder?: string;
@@ -210,6 +215,7 @@ export interface ContingencyBlockStore {
     readonly reservedBefore?: string;
     /** Leave out the blocks whose every number is accounted for. */
     readonly unsettledOnly?: boolean;
+    readonly after?: { readonly reservedAt: string; readonly id: string };
     readonly limit: number;
   }): Promise<ContingencyBlockState[]>;
   closeContingencyBlock(input: {

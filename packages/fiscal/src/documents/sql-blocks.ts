@@ -109,28 +109,8 @@ async function insertSigned(db: FiscalPrismaClient, document: FiscalDocument, ev
   }
 }
 
-/** The blocks a filter selects, each with its documented numbers and voided ranges: three reads. */
-async function list(db: FiscalPrismaClient, input: Parameters<ContingencyBlockStore["listContingencyBlocks"]>[0]): Promise<ContingencyBlockState[]> {
-  const where: string[] = [];
-  const values: unknown[] = [];
-  const add = (clause: (n: number) => string, value: unknown) => {
-    values.push(value);
-    where.push(clause(values.length));
-  };
-  if (input.ownerId !== undefined) add((n) => `"owner_id" = $${n}`, input.ownerId);
-  if (input.holder !== undefined) add((n) => `"holder" = $${n}`, input.holder);
-  if (input.fates !== undefined) add((n) => `"fate" = ANY($${n}::text[])`, [...input.fates]);
-  if (input.reservedBefore !== undefined) add((n) => `"reserved_at" < $${n}::timestamp(3)`, input.reservedBefore);
-  if (input.unsettledOnly === true) where.push(`"settled_at" IS NULL`);
-  values.push(input.limit);
-  const blocks = (
-    await rows(
-      db,
-      `SELECT * FROM "fiscal_contingency_blocks" ${where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`}
-       ORDER BY "reserved_at", "first_number" LIMIT $${values.length}`,
-      ...values,
-    )
-  ).map(blockOf);
+/** The blocks, each with its documented numbers and voided ranges: two reads. */
+async function withState(db: FiscalPrismaClient, blocks: readonly ContingencyBlock[]): Promise<ContingencyBlockState[]> {
   if (blocks.length === 0) return [];
   const ids = blocks.map((block) => block.id);
   const documented = await rows(
@@ -149,6 +129,35 @@ async function list(db: FiscalPrismaClient, input: Parameters<ContingencyBlockSt
   }));
 }
 
+/** One keyset page of the blocks a filter selects, ordered by `(reserved_at, id)`, with their state. */
+async function list(db: FiscalPrismaClient, input: Parameters<ContingencyBlockStore["listContingencyBlocks"]>[0]): Promise<ContingencyBlockState[]> {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  const add = (clause: (n: number) => string, value: unknown) => {
+    values.push(value);
+    where.push(clause(values.length));
+  };
+  if (input.ownerId !== undefined) add((n) => `"owner_id" = $${n}`, input.ownerId);
+  if (input.holder !== undefined) add((n) => `"holder" = $${n}`, input.holder);
+  if (input.fates !== undefined) add((n) => `"fate" = ANY($${n}::text[])`, [...input.fates]);
+  if (input.reservedBefore !== undefined) add((n) => `"reserved_at" < $${n}::timestamp(3)`, input.reservedBefore);
+  if (input.unsettledOnly === true) where.push(`"settled_at" IS NULL`);
+  if (input.after !== undefined) {
+    values.push(input.after.reservedAt, input.after.id);
+    where.push(`("reserved_at", "id") > ($${values.length - 1}::timestamp(3), $${values.length})`);
+  }
+  values.push(input.limit);
+  const blocks = (
+    await rows(
+      db,
+      `SELECT * FROM "fiscal_contingency_blocks" ${where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`}
+       ORDER BY "reserved_at", "id" LIMIT $${values.length}`,
+      ...values,
+    )
+  ).map(blockOf);
+  return withState(db, blocks);
+}
+
 export function blockMethods(db: FiscalPrismaClient): ContingencyBlockStore {
   return {
     reserveContingencyBlock: (input) => reserve(db, input),
@@ -160,7 +169,7 @@ export function blockMethods(db: FiscalPrismaClient): ContingencyBlockStore {
            AND $5::integer BETWEEN "first_number" AND "last_number"`,
         input.ownerId, input.issuerCnpj, input.environment, input.series, input.number,
       );
-      return row === undefined ? null : blockOf(row);
+      return row === undefined ? null : ((await withState(db, [blockOf(row)]))[0] ?? null);
     },
     listContingencyBlocks: (input) => list(db, input),
     async closeContingencyBlock({ id, fate, usedUpTo, at }) {

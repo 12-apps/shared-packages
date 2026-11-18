@@ -37,6 +37,11 @@ function stateOf(block: ContingencyBlock, documents: Iterable<FiscalDocument>, v
   return { ...block, documented, voided };
 }
 
+/** Whether `block` sorts after `cursor` in the `(reservedAt, id)` keyset order. */
+function after(block: Pick<ContingencyBlock, "reservedAt" | "id">, cursor: Pick<ContingencyBlock, "reservedAt" | "id">): boolean {
+  return block.reservedAt > cursor.reservedAt || (block.reservedAt === cursor.reservedAt && block.id > cursor.id);
+}
+
 function insertSigned(state: MemoryBlockState, document: FiscalDocument, event: FiscalDocumentEvent): FiscalDocument {
   const all = [...state.documents.values()];
   if (all.some((other) => other.accessKey === document.accessKey || (sameSeries(other, document) && other.number === document.number))) {
@@ -78,7 +83,7 @@ export function memoryBlockMethods(state: MemoryBlockState): ContingencyBlockSto
       const found = [...blocks.values()].find(
         (b) => sameSeries(b, { ...input, model: "NFCE" }) && input.number >= b.from && input.number <= b.to,
       );
-      return found === undefined || found.ownerId !== input.ownerId ? null : found;
+      return found === undefined || found.ownerId !== input.ownerId ? null : stateOf(found, state.documents.values(), voids);
     },
     async listContingencyBlocks(input) {
       return [...blocks.values()]
@@ -87,7 +92,8 @@ export function memoryBlockMethods(state: MemoryBlockState): ContingencyBlockSto
         .filter((b) => input.fates === undefined || input.fates.includes(b.fate))
         .filter((b) => input.reservedBefore === undefined || b.reservedAt < input.reservedBefore)
         .filter((b) => !input.unsettledOnly || b.settledAt === null)
-        .sort((a, b) => a.reservedAt.localeCompare(b.reservedAt) || a.from - b.from)
+        .filter((b) => input.after === undefined || after(b, input.after))
+        .sort((a, b) => (after(a, b) ? 1 : after(b, a) ? -1 : 0))
         .slice(0, input.limit)
         .map((b) => stateOf(b, state.documents.values(), voids));
     },

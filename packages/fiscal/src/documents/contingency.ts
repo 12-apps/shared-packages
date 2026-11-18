@@ -13,7 +13,7 @@
 
 import { FiscalDocumentError } from "./errors";
 import { assertDraftFits, issuerOf, totalsOf, xmlKeys } from "./helpers";
-import { accountFor, gapOf, isSettled } from "./contingency-gaps";
+import { allBlocks, blockStore } from "./contingency-pass";
 import { type SignedContingencyNote, parseSignedContingencyNote } from "./contingency-xml";
 import type { Deps } from "./service-profile";
 import type {
@@ -22,8 +22,6 @@ import type {
   ContingencyBlockSource,
   ContingencyBlockState,
   ContingencyBlockStore,
-  ContingencyGap,
-  FiscalStore,
   SaleDraft,
 } from "./ports";
 import type { FiscalDocument, FiscalDocumentEvent } from "./types";
@@ -32,27 +30,6 @@ import type { FiscalDocument, FiscalDocumentEvent } from "./types";
 export const DEFAULT_CONTINGENCY_BLOCK_SIZE = 50;
 /** The largest block one call reserves. */
 export const MAX_CONTINGENCY_BLOCK_SIZE = 10_000;
-/** How many blocks one gap pass reads. */
-const GAP_PASS_LIMIT = 1_000;
-
-const BLOCK_METHODS = [
-  "reserveContingencyBlock",
-  "findContingencyBlock",
-  "listContingencyBlocks",
-  "closeContingencyBlock",
-  "settleContingencyBlock",
-  "recordContingencyVoid",
-  "getDocumentByAccessKey",
-  "recordSignedDocument",
-] as const;
-
-function blockStore(store: FiscalStore): FiscalStore & ContingencyBlockStore {
-  const candidate = store as FiscalStore & Partial<ContingencyBlockStore>;
-  if (BLOCK_METHODS.some((name) => typeof candidate[name] !== "function")) {
-    throw new FiscalDocumentError("NOT_SUPPORTED", "this FiscalStore does not keep contingency blocks (ContingencyBlockStore).");
-  }
-  return candidate as FiscalStore & ContingencyBlockStore;
-}
 
 function assertHolder(holder: unknown): asserts holder is string {
   if (typeof holder !== "string" || holder.trim() === "" || holder.length > 200) {
@@ -172,7 +149,18 @@ async function blockOf(store: ContingencyBlockStore, ownerId: string, note: Sign
   if (block === null || block.ownerId !== ownerId || block.holder !== holder) {
     refuse(`number ${note.number} of series ${note.series} is not inside a block held by ${holder}.`);
   }
+  // Voided at SEFAZ already (a late hand-in behind a higher number): it can never be authorised, the sale is issued online.
+  if (block.voided.some((range) => note.number >= range.from && note.number <= range.to)) {
+    refuse(`number ${note.number} of series ${note.series} was voided at SEFAZ.`);
+  }
   return block;
+}
+
+/** The XML must print what the booked sale says: its total and its buyer (a resend could never change them). */
+function assertMatchesSale(note: SignedContingencyNote, draft: SaleDraft): void {
+  const totalCents = totalsOf(draft).totalCents;
+  if (note.totalCents !== totalCents) refuse(`the XML's total (vNF ${note.totalCents} cents) is not the sale's (${totalCents} cents).`);
+  if (note.buyerTaxId !== (draft.buyer?.document.number ?? null)) refuse("the XML's buyer document is not the sale's.");
 }
 
 /** The note, parsed and checked against the owner's profile. */
@@ -206,23 +194,30 @@ export async function recordSigned(deps: Deps, input: Parameters<ContingencyBloc
   const block = await blockOf(store, input.ownerId, note, input.holder);
   const draft = input.sale ?? (await deps.config.sales.saleFor({ ownerId: input.ownerId, subjectId: input.subjectId, model: "NFCE" }));
   assertDraftFits(draft, "NFCE");
+  assertMatchesSale(note, draft);
   const xmlKey = xmlKeys.signed(note.accessKey);
   await deps.config.storage.put(xmlKey, input.signedXml, "application/xml");
   const document = signedDocument(deps, { ownerId: input.ownerId, subjectId: input.subjectId, draft, note, block, xmlKey }, profile);
   return insertNote(store, document, input.holder, input.subjectId);
 }
 
-async function heldBlock(store: ContingencyBlockStore, input: { ownerId: string; holder: string; series: number; from: number }): Promise<ContingencyBlockState> {
-  const blocks = await store.listContingencyBlocks({ ownerId: input.ownerId, holder: input.holder, limit: GAP_PASS_LIMIT });
-  const block = blocks.find((candidate) => candidate.series === input.series && candidate.from === input.from);
-  if (block === undefined) throw new FiscalDocumentError("NOT_FOUND", `${input.holder} holds no block of series ${input.series} from ${input.from}.`);
+async function heldBlock(
+  deps: Deps,
+  store: ContingencyBlockStore,
+  input: { ownerId: string; holder: string; series: number; from: number },
+): Promise<ContingencyBlockState> {
+  const profile = await deps.ctx.requireProfile(input.ownerId);
+  const block = await store.findContingencyBlock({
+    ownerId: input.ownerId, issuerCnpj: profile.cnpj, environment: profile.environment, series: input.series, number: input.from,
+  });
+  if (block === null || block.holder !== input.holder || block.from !== input.from) throw new FiscalDocumentError("NOT_FOUND", `${input.holder} holds no block of series ${input.series} from ${input.from}.`);
   return block;
 }
 
 export async function closeBlock(deps: Deps, input: Parameters<ContingencyBlockSource["closeBlock"]>[0]): Promise<ContingencyBlock> {
   const store = blockStore(deps.config.store);
   assertHolder(input.holder);
-  const block = await heldBlock(store, input);
+  const block = await heldBlock(deps, store, input);
   const used = input.sequenceUsed;
   if (!Number.isInteger(used) || used < block.from - 1 || used > block.to) {
     throw new FiscalDocumentError("INVALID_INPUT", `sequenceUsed must be from ${block.from - 1} to ${block.to}.`);
@@ -240,7 +235,7 @@ export async function closeBlock(deps: Deps, input: Parameters<ContingencyBlockS
 export async function abandonBlocks(deps: Deps, input: { ownerId: string; holder: string }): Promise<ContingencyBlock[]> {
   const store = blockStore(deps.config.store);
   assertHolder(input.holder);
-  const open = await store.listContingencyBlocks({ ownerId: input.ownerId, holder: input.holder, fates: ["OPEN"], limit: GAP_PASS_LIMIT });
+  const open = await allBlocks(store, { ownerId: input.ownerId, holder: input.holder, fates: ["OPEN"] });
   const at = deps.ctx.nowIso();
   const abandoned: ContingencyBlock[] = [];
   for (const block of open) {
@@ -255,100 +250,8 @@ export async function listBlocks(
   deps: Deps,
   input: { ownerId: string; holder?: string; fates?: readonly ContingencyBlockFate[] },
 ): Promise<ContingencyBlockState[]> {
-  return blockStore(deps.config.store).listContingencyBlocks({ ...input, limit: GAP_PASS_LIMIT });
+  return allBlocks(blockStore(deps.config.store), input);
 }
 
-/** Known unused ranges of blocks reserved before `before` (ISO 8601), across owners unless one is named. */
-export async function listKnownGaps(deps: Deps, input: { before: string; ownerId?: string }): Promise<ContingencyGap[]> {
-  const blocks = await blockStore(deps.config.store).listContingencyBlocks({
-    ...(input.ownerId === undefined ? {} : { ownerId: input.ownerId }),
-    reservedBefore: input.before,
-    unsettledOnly: true,
-    limit: GAP_PASS_LIMIT,
-  });
-  return blocks.flatMap((block) => accountFor(block).known.map((range) => gapOf(block, range)));
-}
-
-/** Ranges whose fate is unknown — flagged for the store, never voided. */
-export async function listUnknownRanges(deps: Deps, input: { ownerId?: string }): Promise<ContingencyGap[]> {
-  const blocks = await blockStore(deps.config.store).listContingencyBlocks({
-    ...(input.ownerId === undefined ? {} : { ownerId: input.ownerId }),
-    fates: ["CLOSED", "ABANDONED"],
-    unsettledOnly: true,
-    limit: GAP_PASS_LIMIT,
-  });
-  return blocks.flatMap((block) => accountFor(block).unknown.map((range) => gapOf(block, range)));
-}
-
-export interface GapVoidReport {
-  readonly voided: ReadonlyArray<ContingencyGap & { readonly protocol: string | null }>;
-  readonly failures: ReadonlyArray<ContingencyGap & { readonly class: string; readonly code: string | null; readonly message: string }>;
-}
-
-async function voidGap(deps: Deps, store: ContingencyBlockStore, gap: ContingencyGap): Promise<GapVoidReport> {
-  const profile = await deps.ctx.requireProfile(gap.ownerId);
-  const outcome = await deps.config.issuer.inutilize({
-    model: "NFCE",
-    environment: gap.environment,
-    signing: await deps.ctx.material(profile),
-    uf: profile.address.uf,
-    cnpj: gap.issuerCnpj,
-    year: Number(gap.reservedAt.slice(0, 4)),
-    series: gap.series,
-    from: gap.from,
-    to: gap.to,
-    reason: deps.config.reasons.inutilization,
-  });
-  if (!outcome.ok) {
-    return { voided: [], failures: [{ ...gap, class: outcome.error.class, code: outcome.error.code, message: outcome.error.message }] };
-  }
-  const xml = outcome.answer.inutilizationXml;
-  const eventXmlKey = xml === null ? null : xmlKeys.inutilizedRange(gap);
-  if (eventXmlKey !== null) await deps.config.storage.put(eventXmlKey, xml ?? "", "application/xml");
-  await store.recordContingencyVoid({
-    id: deps.config.newId(),
-    blockId: gap.blockId,
-    range: { from: gap.from, to: gap.to },
-    protocol: outcome.answer.protocol,
-    eventXmlKey,
-    at: deps.ctx.nowIso(),
-  });
-  return { voided: [{ ...gap, protocol: outcome.answer.protocol }], failures: [] };
-}
-
-/** Void one block's known ranges; settle it when nothing is left to account for. */
-async function voidBlock(deps: Deps, store: ContingencyBlockStore, block: ContingencyBlockState): Promise<GapVoidReport> {
-  const voided: GapVoidReport["voided"][number][] = [];
-  const failures: GapVoidReport["failures"][number][] = [];
-  for (const range of accountFor(block).known) {
-    const one = await voidGap(deps, store, gapOf(block, range));
-    voided.push(...one.voided);
-    failures.push(...one.failures);
-  }
-  const done = voided.map(({ from, to }) => ({ from, to }));
-  if (isSettled({ ...block, voided: [...block.voided, ...done] })) await store.settleContingencyBlock({ id: block.id, at: deps.ctx.nowIso() });
-  return { voided, failures };
-}
-
-/**
- * One pass of the gap job: every KNOWN unused range of a block reserved
- * before `before` is inutilized once (one call per range); a failure is
- * reported and tried again on the next pass. A block left with nothing to
- * account for is settled and read no more. Unknown ranges are never voided.
- */
-export async function voidKnownGaps(deps: Deps, input: { before: string; ownerId?: string }): Promise<GapVoidReport> {
-  const store = blockStore(deps.config.store);
-  const report = { voided: [] as GapVoidReport["voided"][number][], failures: [] as GapVoidReport["failures"][number][] };
-  const blocks = await store.listContingencyBlocks({
-    ...(input.ownerId === undefined ? {} : { ownerId: input.ownerId }),
-    reservedBefore: input.before,
-    unsettledOnly: true,
-    limit: GAP_PASS_LIMIT,
-  });
-  for (const block of blocks) {
-    const one = await voidBlock(deps, store, block);
-    report.voided.push(...one.voided);
-    report.failures.push(...one.failures);
-  }
-  return report;
-}
+export { listKnownGaps, listUnknownRanges, voidKnownGaps } from "./contingency-pass";
+export type { GapVoidReport } from "./contingency-pass";
