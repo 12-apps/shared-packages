@@ -61,6 +61,7 @@
     "20261114120000_messaging_connector",
     "20261116120000_add_report_schedule",
     "20261116190000_paid_channel_consent",
-    "20261118120000_fiscal_link_payment_event"
+    "20261118120000_fiscal_link_payment_event",
+    "20261118120000_payment_refund_retries_refunded_before"
   ]
 }
