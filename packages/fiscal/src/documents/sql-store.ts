@@ -21,7 +21,8 @@
 
 import { FiscalDocumentError } from "./errors";
 import type { Transition } from "./machine";
-import type { FiscalStore, NumberRequest } from "./ports";
+import type { ContingencyBlockStore, FiscalStore, NumberRequest } from "./ports";
+import { blockMethods } from "./sql-blocks";
 import { FISCAL_NEXT_NUMBER_SQL } from "./sql";
 import {
   DOCUMENT_COLUMNS,
@@ -233,10 +234,10 @@ function documentMethods(db: FiscalPrismaClient): Omit<FiscalStore, keyof Profil
   };
 }
 
-export function createPrismaFiscalStore(config: { readonly prisma: FiscalPrismaClient }): FiscalStore {
+export function createPrismaFiscalStore(config: { readonly prisma: FiscalPrismaClient }): FiscalStore & ContingencyBlockStore {
   const db = config?.prisma;
   if (typeof db?.$transaction !== "function" || typeof db.$queryRawUnsafe !== "function") {
     throw new TypeError("createPrismaFiscalStore needs prisma: the host's Prisma client.");
   }
-  return { ...profileMethods(db), ...documentMethods(db) };
+  return { ...profileMethods(db), ...documentMethods(db), ...blockMethods(db) };
 }

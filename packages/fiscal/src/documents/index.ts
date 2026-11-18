@@ -11,7 +11,29 @@ export { DOCUMENT_TRANSITIONS, FINAL_STATUSES, MAX_FAILURES, canTransition, scru
 export type { DocumentInput, Transition } from "./machine";
 export { FiscalDocumentError } from "./errors";
 export type { FiscalDocumentErrorCode } from "./errors";
-export type { Cipher, ContingencyBlockSource, DocumentStorage, FiscalStore, NumberRequest, SaleDraft, SaleSource } from "./ports";
+export type {
+  Cipher,
+  ContingencyBlock,
+  ContingencyBlockFate,
+  ContingencyBlockSource,
+  ContingencyBlockState,
+  ContingencyBlockStore,
+  ContingencyGap,
+  DocumentStorage,
+  FiscalStore,
+  NumberRange,
+  NumberRequest,
+  SaleDraft,
+  SaleSource,
+} from "./ports";
+export { CONTINGENCY_BLOCK_FATES } from "./ports";
+export { DEFAULT_CONTINGENCY_BLOCK_SIZE, MAX_CONTINGENCY_BLOCK_SIZE } from "./contingency";
+export type { GapVoidReport } from "./contingency";
+export { accountFor as accountForContingencyBlock } from "./contingency-gaps";
+export type { BlockAccount } from "./contingency-gaps";
+export { parseSignedContingencyNote } from "./contingency-xml";
+export type { SignedContingencyNote } from "./contingency-xml";
+export { FISCAL_RESERVE_BLOCK_SQL } from "./sql-blocks";
 export { createPlatformIdentity, createSigningIdentities, createStoreCertificateIdentity } from "./signing";
 export type { SigningIdentities, SigningIdentity } from "./signing";
 export { parseCertificateUpload, parseIssuingPointInput, parseProfileInput } from "./profile-input";
