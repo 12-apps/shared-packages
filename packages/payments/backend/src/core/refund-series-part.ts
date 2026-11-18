@@ -1,4 +1,4 @@
-import { claimHeld } from './refund-retry';
+import { claimHeld, REFUND_CLAIM_TTL_MS } from './refund-retry';
 import type { RefundRetryStore, RefundSeriesKey, RefundSeriesRow } from './refund-series-store';
 
 /**
@@ -19,14 +19,25 @@ export const isPart = (row: Pick<RefundSeriesRow, 'amountCents'>): boolean => ro
 /** The baseline read before the part's first send; null while nothing was sent with one. */
 export const baselineOf = (row: Pick<RefundSeriesRow, 'refundedBeforeCents'>): number | null => row.refundedBeforeCents ?? null;
 
+/** A series that may have moved money nobody has proven yet: a baseline is set, and it is neither settled nor out of attempts. */
+const inDoubt = (row: RefundSeriesRow): boolean => row.settledAt === null && baselineOf(row) !== null && !row.exhausted;
+
+/** Doubts are taken oldest baseline first, the id breaking a tie. */
+const olderDoubt = (a: RefundSeriesRow, b: RefundSeriesRow): boolean => {
+  const at = Date.parse(a.refundedBeforeAt ?? '');
+  const bt = Date.parse(b.refundedBeforeAt ?? '');
+  return at !== bt ? at < bt : a.id < b.id;
+};
+
 /**
- * A series that may have moved money nobody has proven yet: a baseline is set
- * (something was sent) and it is neither settled nor out of attempts, or an
- * attempt of it holds its claim now.
+ * Does `other` hold `row` back (one doubt per charge)? While its attempt holds its claim, always.
+ * While it is in doubt, only a row with no baseline yet or a younger doubt waits, so of two doubts on
+ * one charge the older always goes first and the two can never wait for each other.
  */
-export function inDoubt(row: RefundSeriesRow, now: Date): boolean {
-  if (row.settledAt !== null) return false;
-  return (baselineOf(row) !== null && !row.exhausted) || claimHeld(row, now);
+function holdsBack(row: RefundSeriesRow, other: RefundSeriesRow, now: Date): boolean {
+  if (other.settledAt !== null) return false;
+  if (claimHeld(other, now)) return true;
+  return inDoubt(other) && (baselineOf(row) === null || olderDoubt(other, row));
 }
 
 /** The other series kept for the same charge (one read, over the reference's index). */
@@ -35,16 +46,38 @@ export async function siblingsOf(store: RefundRetryStore, row: RefundSeriesRow):
   return rows.filter((other) => other.providerChargeId === row.providerChargeId && other.id !== row.id);
 }
 
-/** One doubt per charge: another series of it is in doubt, so this part waits for the next tick. */
-export const fenced = (siblings: readonly RefundSeriesRow[], now: Date): boolean => siblings.some((other) => inDoubt(other, now));
+/** The siblings that hold `row` back now; none: it may go. */
+export const blockersOf = (row: RefundSeriesRow, siblings: readonly RefundSeriesRow[], now: Date): RefundSeriesRow[] =>
+  siblings.filter((other) => holdsBack(row, other, now));
 
-/** What sibling parts settled as money back after the baseline was read: theirs, not this part's. */
+/** The least a held-back part waits, so it never keeps the sweep's oldest slots tick after tick. */
+export const DEFER_MIN_MS = 30_000;
+
+/**
+ * When a held-back part is due again: just after the earliest moment one of its blockers can resolve
+ * (its next attempt, or the end of the claim it holds), and never sooner than {@link DEFER_MIN_MS}.
+ */
+export function deferredUntil(blockers: readonly RefundSeriesRow[], now: Date): string {
+  const resolves = blockers.map((other) =>
+    claimHeld(other, now) ? Date.parse(other.claimedAt!) + REFUND_CLAIM_TTL_MS : Date.parse(other.nextAt ?? ''),
+  );
+  const earliest = Math.min(...resolves.filter((ms) => !Number.isNaN(ms)));
+  return new Date(Math.max(now.getTime() + DEFER_MIN_MS, earliest + 1_000)).toISOString();
+}
+
+/**
+ * What sibling parts settled as money back after the baseline was read: theirs, not this part's. Only
+ * a sibling whose OWN first send came after this baseline counts, since none of its money can be
+ * inside it; one sent earlier may already be, so it is left out and whatever of it landed later counts
+ * as this part's. The error can only leave the buyer short, never paid twice.
+ */
 function siblingsSince(row: PartRow, siblings: readonly RefundSeriesRow[]): number {
   const since = row.refundedBeforeAt ? Date.parse(row.refundedBeforeAt) : Number.NaN;
   if (Number.isNaN(since)) return 0;
   return siblings
     .filter((other) => (other.settledHow === 'REFUNDED' || other.settledHow === 'ADOPTED') && other.settledAt !== null)
     .filter((other) => Date.parse(other.settledAt!) > since)
+    .filter((other) => other.refundedBeforeAt != null && Date.parse(other.refundedBeforeAt) >= since)
     .reduce((sum, other) => sum + (other.amountCents ?? 0), 0);
 }
 
@@ -65,7 +98,7 @@ export function owedCents(row: PartRow, refundedNow: number, siblings: readonly 
 export async function pressSiblings(store: RefundRetryStore, stored: RefundSeriesRow | null, now: Date): Promise<RefundSeriesRow[] | null> {
   if (!stored || !isPart(stored)) return [];
   const siblings = await siblingsOf(store, stored);
-  return fenced(siblings, now) ? null : siblings;
+  return blockersOf(stored, siblings, now).length > 0 ? null : siblings;
 }
 
 /** A series re-opened for ANOTHER claim starts with no baseline; the same claim keeps its own, never moved. */

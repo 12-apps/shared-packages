@@ -15,7 +15,7 @@ import {
   type RefundRetryState,
 } from './refund-retry';
 import type { FirstAttemptResult, RefundRetrierDeps, RefundSeriesView } from './refund-series';
-import { baselineFor, baselineOf, fenced, isPart, owedCents, pressSiblings, siblingsOf } from './refund-series-part';
+import { baselineFor, baselineOf, blockersOf, deferredUntil, isPart, owedCents, pressSiblings, siblingsOf } from './refund-series-part';
 import type { RefundSeriesKey, RefundSeriesRow, RefundSeriesSettlement } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { RefundSnapshot } from './types';
@@ -268,7 +268,8 @@ async function attempt(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: r
   const signal = deadline(ctx);
   const seen = await consult(ctx, claimed, signal);
   if (seen.kind === 'BACK') return adopt(ctx, claimed, seen.refundedCents);
-  if (seen.kind === 'UNKNOWN') return refusedAttempt(ctx, claimed, 'UNKNOWN', seen.error);
+  // A blind part past its first attempt may have been sent by a claimant that died: never resent unread (B2).
+  if (seen.kind === 'UNKNOWN') return refusedAttempt(ctx, claimed, 'UNKNOWN', seen.error, blindPart(claimed) && claimed.attempt > 1);
   if (isPart(claimed)) return sendPart(ctx, claimed, signal, seen.readBack, siblings);
   return sendOne(ctx, claimed, signal);
 }
@@ -298,9 +299,10 @@ async function runRow(ctx: SeriesContext, row: RefundSeriesRow): Promise<void> {
   const now = ctx.clock();
   const due = refundDueNow(row, now);
   if (due === null) return;
-  // One doubt per charge (FUT-4951): a part waits, with no attempt spent, while a sibling may have moved money.
+  // One doubt per charge (FUT-4951): a part held back by a sibling is deferred in one write, no attempt spent.
   const siblings = isPart(row) ? await siblingsOf(ctx.store, row) : [];
-  if (fenced(siblings, now)) return;
+  const blockers = blockersOf(row, siblings, now);
+  if (blockers.length > 0) return void (await ctx.store.saveIf({ ...row, nextAt: deferredUntil(blockers, now) }, row.version));
   const state = due === 'CLOSE' ? { ...row, claimedAt: now.toISOString() } : nextClaim(now, row);
   // The claim's expiry is its `nextAt`, so the sweep finds a dead claimant.
   const claimed = await ctx.store.saveIf(withState(row, { ...state, nextAt: claimExpiry(now) }), row.version);

@@ -237,7 +237,9 @@ const CAPTURED: ReadonlySet<ChargeSnapshot['status']> = new Set(['PAID', 'PARTIA
 /**
  * `summary.refunded` as the snapshot's `refundedAmount` (FUT-4951): what went back so far, the
  * figure the adapter already judges every partial refund by (FUT-4571). A captured charge naming
- * no summary has refunded nothing, the same reading as {@link refundedCents}.
+ * no summary has refunded nothing, the same reading as {@link refundedCents}. `charge` is the
+ * deciding charge ({@link settledCharge}); when that is not the captured one (a declined earlier
+ * attempt first), its status is not captured, so no figure is emitted and the part falls back.
  */
 function refundedAmountOf(status: ChargeSnapshot['status'], charge: PagBankOrderCharge | undefined): Pick<ChargeSnapshot, 'refundedAmount'> {
   return CAPTURED.has(status) ? { refundedAmount: { amountCents: refundedCents(charge), currency: 'BRL' } } : {};
