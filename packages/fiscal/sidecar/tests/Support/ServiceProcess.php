@@ -23,14 +23,15 @@ final class ServiceProcess
     {
     }
 
-    public static function start(string $frontController): self
+    /** @param array<string, string> $env extra environment for the process (`FISCAL_SIDECAR_TOKEN`, say) */
+    public static function start(string $frontController, array $env = []): self
     {
         $root = dirname(__DIR__, 2);
         $tmpdir = sys_get_temp_dir() . '/fiscal-sidecar-tmp-' . bin2hex(random_bytes(6));
         mkdir($tmpdir, 0700);
         $port = self::freePort();
         $self = new self($port, $tmpdir);
-        $env = ['TMPDIR' => $tmpdir, 'PATH' => (string) getenv('PATH')];
+        $env = ['TMPDIR' => $tmpdir, 'PATH' => (string) getenv('PATH')] + $env;
         $process = proc_open(
             [PHP_BINARY, '-d', 'display_errors=stderr', '-S', "127.0.0.1:$port", '-t', "$root/public", $frontController],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
@@ -50,9 +51,10 @@ final class ServiceProcess
 
     /**
      * @param array<string, mixed>|null $body
+     * @param list<string> $headers extra request headers
      * @return array{status: int, body: array<string, mixed>}
      */
-    public function call(string $method, string $path, ?array $body = null): array
+    public function call(string $method, string $path, ?array $body = null, array $headers = []): array
     {
         $curl = curl_init("http://127.0.0.1:{$this->port}$path");
         curl_setopt_array($curl, [
@@ -61,7 +63,7 @@ final class ServiceProcess
             CURLOPT_TIMEOUT => 30,
             CURLOPT_PROXY => '',
             CURLOPT_NOPROXY => '*',
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', ...$headers],
         ]);
         if ($body !== null) {
             curl_setopt($curl, CURLOPT_POSTFIELDS, (string) json_encode($body));

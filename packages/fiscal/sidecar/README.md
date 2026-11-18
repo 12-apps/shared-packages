@@ -103,6 +103,7 @@ with the error: the key is spoken for, and an NFC-e can be signed offline.
 
 | variable | default | |
 |---|---|---|
+| `FISCAL_SIDECAR_TOKEN` | unset | when set (32 characters or more), every route but `/health` answers only a call carrying `Authorization: Bearer <token>`, compared in constant time; any other call is `401` with `{ error: { class: "INVALID", code: "UNAUTHORIZED" } }`, refused before it is routed. The token is never logged nor answered. `createSidecarIssuer({ …, token })` sends it. A service embedded on a computer mints one per launch (FUT-4717); the container image, reached on a private network, may run without one. |
 | `FISCAL_SEFAZ_TIMEOUT_SECONDS` | `30` | connect timeout, TLS handshake included; the whole request gets 20 s more |
 | `FISCAL_SEFAZ_TLS_VERIFY` | on | SEFAZ's server certificate is verified. `off` is the only value that turns it off, and `/health` then reports `sefazTlsVerify: false`. Unverified, anyone on the path reads every document and can forge SEFAZ's answers. |
 | `FISCAL_SEFAZ_CA_BUNDLE` | the image's | a PEM replacing the trust store. The image builds `/etc/ssl/fiscal-sidecar-ca.pem` from its Mozilla bundle plus `docker/icp-brasil.pem` (the ICP-Brasil roots and intermediates ITI publishes, sha256-checked in the Dockerfile): some SEFAZ hosts present ICP-Brasil server certificates, others public ones. Outside the image the system bundle plus that PEM are used. |

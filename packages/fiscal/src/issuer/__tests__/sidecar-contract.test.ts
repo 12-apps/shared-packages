@@ -239,3 +239,44 @@ describe("the sidecar issuer, when the service itself does not answer", () => {
     expect(() => createSidecarIssuer({ baseUrl: "http://x", fetch, timeoutMs: 0 })).toThrow(/timeoutMs/);
   });
 });
+
+describe("the sidecar issuer's launch token (FUT-4717)", () => {
+  const TOKEN = "launch-token-0123456789abcdef0123456789";
+
+  function capturing() {
+    const headers: Array<Record<string, string>> = [];
+    const fetch: SidecarFetch = async (url, init) => {
+      headers.push(init.headers);
+      if (url.endsWith("/health")) return { status: 200, text: async () => JSON.stringify({ status: "ok" }) };
+      return { status: 200, text: async () => JSON.stringify(RECORDINGS["inutilize"]!.body) };
+    };
+    return { fetch, headers };
+  }
+
+  const inutilize = {
+    model: "NFCE" as const, environment, signing: SIGNING, uf: "SP", cnpj: "11222333000181", year: 2026, series: 2, from: 3, to: 3,
+    reason: "Numero nao utilizado por falha na emissao",
+  };
+
+  it("sends the token as a bearer on every call, health included", async () => {
+    const { fetch, headers } = capturing();
+    const issuer = createSidecarIssuer({ baseUrl: "http://127.0.0.1:4000", fetch, timeoutMs: 1000, token: TOKEN });
+    await issuer.inutilize(inutilize);
+    await issuer.health();
+    expect(headers.map((h) => h["authorization"])).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`]);
+  });
+
+  it("sends no authorization header without a token", async () => {
+    const { fetch, headers } = capturing();
+    await createSidecarIssuer({ baseUrl: "http://127.0.0.1:4000", fetch, timeoutMs: 1000 }).inutilize(inutilize);
+    expect(headers[0]).not.toHaveProperty("authorization");
+  });
+
+  it("refuses a short or blank token without quoting it", () => {
+    const fetch: SidecarFetch = async () => ({ status: 200, text: async () => "{}" });
+    const make = (token: string) => () => createSidecarIssuer({ baseUrl: "http://x", fetch, timeoutMs: 1, token });
+    expect(make("short")).toThrow(/at least 32 characters/);
+    expect(make("short")).not.toThrow(/short/);
+    expect(make(`${"a".repeat(32)} b`)).toThrow(/whitespace/);
+  });
+});
