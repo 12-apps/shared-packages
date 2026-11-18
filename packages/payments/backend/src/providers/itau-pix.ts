@@ -137,8 +137,18 @@ export function snapshotFromCob(cob: ItauCob, reference?: string): ChargeSnapsho
     amount: { amountCents, currency: 'BRL' },
     method: 'PIX',
     pix: cob.pixCopiaECola ? { qrText: cob.pixCopiaECola, expiresAt: expiresAtOf(cob) } : undefined,
+    ...(cob.status === 'CONCLUIDA' ? { refundedAmount: { amountCents: refundedOfCob(cob), currency: 'BRL' } } : {}),
     raw: cob,
   };
+}
+
+/**
+ * A concluded cob's `refundedAmount` (FUT-4951): its devoluções settled or on their way back,
+ * failed ones excluded — {@link committedRefundCents}, the figure the adapter already refunds by.
+ */
+function refundedOfCob(cob: ItauCob): number {
+  const pix = cob.pix?.[0];
+  return pix ? committedRefundCents(pix) : 0;
 }
 
 /** BACEN caps `devedor.nome` at 200 characters. */

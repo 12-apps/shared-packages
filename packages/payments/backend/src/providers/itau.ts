@@ -323,6 +323,7 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
       splits: false,
       webhooks: true,
       tokenization: 'NONE',
+      refundReadBack: true, // the cob's devoluções, failed ones excluded (FUT-4951)
     },
     credentialSchema: ({ locale }) => itauCredentialSchema(copy(locale ?? undefined).fields),
     customerSchema: [

@@ -50,6 +50,14 @@ export interface RefundSeriesRow extends RefundRetryState {
   cause: string | null;
   settledAt: string | null;
   settledHow: RefundSeriesSettlement | null;
+  /**
+   * A part's baseline (FUT-4951): the charge's refunded total the provider reported right before
+   * the part's FIRST send, and when it was read. Written once, before that send, and never moved
+   * afterwards; null (or absent, on a row written before it) until then, and on a provider with no
+   * read-back. Every later attempt measures what is still owed against it.
+   */
+  refundedBeforeCents?: number | null;
+  refundedBeforeAt?: string | null;
   /** The compare-and-set counter: every write asks for the version it read. */
   version: number;
 }

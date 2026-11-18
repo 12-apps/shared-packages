@@ -252,6 +252,10 @@ model PaymentRefundRetry {
   settledAt        DateTime? @map("settled_at")
   // REFUNDED | ADOPTED | BY_HAND | ENDED (CHECK in migration).
   settledHow       String?   @map("settled_how")
+  // A part's baseline (FUT-4951): the charge's refunded total read right
+  // before the part's first send, and when. Null until then.
+  refundedBeforeCents Int?      @map("refunded_before_cents")
+  refundedBeforeAt    DateTime? @map("refunded_before_at")
   // The compare-and-set counter.
   version          Int       @default(0)
   createdAt        DateTime  @default(now()) @map("created_at")
