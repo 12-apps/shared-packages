@@ -77,6 +77,8 @@ export const xmlKeys = {
     `fiscal/${accessKey}/signed-${trimEnd(digest.replace(/\+/g, "-").replace(/\//g, "_"), "=")}.xml`,
   authorized: (accessKey: string) => `fiscal/${accessKey}/authorized.xml`,
   cancel: (accessKey: string) => `fiscal/${accessKey}/cancel.xml`,
+  /** The event 110300 of `nSeqEvento` `sequence`. */
+  linkPayment: (accessKey: string, sequence: number) => `fiscal/${accessKey}/link-payment-${sequence}.xml`,
   inutilization: (document: FiscalDocument) =>
     `fiscal/inutilization/${document.environment}/${document.model}/${document.ownerId}/${document.series}-${document.number}.xml`,
 };

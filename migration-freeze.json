@@ -12,6 +12,7 @@
   "packages/entity-lifecycle/prisma/migrations/20260813120000_add_entity_lifecycle_tables/migration.sql": "5d8ff9c0dbeceec590842d9a83a6fdab93de6bc8ea188c5bd9d358267fa2a14f",
   "packages/feature-flags/prisma/migrations/20260820120000_add_user_feature_grants/migration.sql": "02880b95e4d863dcfb43c0eca291ab1617412b90fbba4535ea4c421a92c121eb",
   "packages/fiscal/prisma/migrations/20261113220000_fiscal_documents/migration.sql": "b21989f56dd74494475b7d47b6e536267415bf046ac634aa0fb3729d5f33f7ef",
+  "packages/fiscal/prisma/migrations/20261118120000_fiscal_link_payment_event/migration.sql": "7d7ff0c2529f0e5e5020a86f1aca248b009bbc3ba2babd588faaf0bc77ba0756",
   "packages/i18n/prisma/migrations/20260826170000_locale_preferences/migration.sql": "e691c1d79a4499f17f3a9bd0cd326882c4c108511e798f2fb0f2bd4d30d16eeb",
   "packages/jobs/prisma/migrations/20260727190000_sweep_leases/migration.sql": "c5c5441ea0d6629d9b32b066e5fb01ce76ff109db3f5c3d3df55eba628378997",
   "packages/marketplace/prisma/migrations/20261111200000_marketplace_engine/migration.sql": "c79de2b44c34670ac60a2d91754ff5e741c821e5af7f7a015c3b4dff23c6ffae",

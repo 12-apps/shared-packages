@@ -11,9 +11,10 @@ import type {
   InutilizedRange,
   IssuedDocument,
   LookedUpDocument,
+  RegisteredPaymentLink,
   SidecarErrorBody,
 } from "../sidecar/types";
-import type { SaleForDocument } from "../sale/types";
+import type { LinkedTransaction, SaleForDocument } from "../sale/types";
 import { FiscalDocumentError } from "./errors";
 import { type DocumentEventKind, type DocumentTotals, type FiscalDocument, type NumberVoid, isLive } from "./types";
 
@@ -63,7 +64,14 @@ export type DocumentInput =
   /** A person took a document back from `attention`: the sweep may try again. */
   | { readonly kind: "RELEASE" }
   /** The 24-hour contingency deadline warning went out. */
-  | { readonly kind: "WARN" };
+  | { readonly kind: "WARN" }
+  /** SEFAZ registered the event 110300 linking `payment` to the document; its XML is at `eventXmlKey`. */
+  | {
+      readonly kind: "LINK_PAYMENT";
+      readonly answer: RegisteredPaymentLink;
+      readonly payment: LinkedTransaction;
+      readonly eventXmlKey: string | null;
+    };
 
 type InputOf<K extends DocumentEventKind> = Extract<DocumentInput, { kind: K }>;
 type Step = { readonly [K in DocumentEventKind]: (document: FiscalDocument, input: InputOf<K>) => Partial<FiscalDocument> };
@@ -257,4 +265,5 @@ export const STEPS: Step = {
   },
   // `deadlineWarnedAt` is the transition's own time, set by `transition`.
   WARN: () => ({}),
+  LINK_PAYMENT: () => ({}),
 };

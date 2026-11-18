@@ -130,6 +130,27 @@ describe("the sidecar issuer, against the service's recorded answers", () => {
     expect(expectFailure(await issuerFor(late.fetch).cancel({ model: "NFCE", environment, signing: SIGNING, ...request }), "nfce-cancel-late").code).toBe("501");
   });
 
+  it("links a payment transaction (110300), and answers a retry SEFAZ calls a duplicate as REGISTERED with no event", async () => {
+    const { accessKey, protocol, sequence, ...payment } = RECORDINGS["nfce-link-payment"]!.request as {
+      accessKey: string;
+      protocol: string;
+      sequence: number;
+      transactionId: string;
+      meansCode: "17";
+      pspCnpjBase: string;
+      receiverCnpj: string;
+    };
+    const ok = replaying("nfce-link-payment");
+    const outcome = await issuerFor(ok.fetch).linkPayment!({ model: "NFCE", environment, signing: SIGNING, accessKey, protocol, sequence, payment });
+    expectSentAsRecorded("nfce-link-payment", ok.sent[0]!);
+    expect(outcome.ok && [outcome.answer.status, outcome.answer.protocol]).toEqual(["REGISTERED", "135260000200077"]);
+    expect(outcome.ok && outcome.answer.eventXml).toContain('<gPgto idTransacao="7f3c2a91e04b4c1d9a0b11c2d3e4f5a6">');
+
+    const duplicate = replaying("nfce-link-payment-duplicate");
+    const again = await issuerFor(duplicate.fetch).linkPayment!({ model: "NFCE", environment, signing: SIGNING, accessKey, protocol, sequence, payment });
+    expect(again.ok && [again.answer.status, again.answer.statusCode, again.answer.eventXml]).toEqual(["REGISTERED", "573", null]);
+  });
+
   it("cancels by substitution (110112), naming the contingency document that replaced it", async () => {
     const request = RECORDINGS["nfce-cancel-substitution"]!.request as {
       accessKey: string;

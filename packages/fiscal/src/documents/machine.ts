@@ -21,6 +21,9 @@
  * final state. A rejected contingency NFC-e is the one way back: the store
  * corrects it and it is signed again under the same number (`RESIGN`).
  *
+ * `LINK_PAYMENT` records an event 110300 SEFAZ registered on an authorised
+ * document (a payment transaction linked after the fact); it changes nothing.
+ *
  * `DEFER`, `RELEASE` and `WARN` record what the sweep and a person did without
  * changing the state: a failed step counts toward {@link MAX_FAILURES}, after
  * which the document waits for a person (`attention`).
@@ -52,6 +55,7 @@ export const DOCUMENT_TRANSITIONS: Readonly<Record<DocumentEventKind, readonly F
   RESIGN: ["REJECTED"],
   RELEASE: ANY,
   WARN: ["CONTINGENCY"],
+  LINK_PAYMENT: ["AUTHORIZED"],
 };
 
 /** The states nothing but a lookup, a cancel or an inutilization of the number may follow. */
@@ -79,6 +83,7 @@ export function scrubSecrets(value: unknown): unknown {
 }
 
 function answerOf(input: DocumentInput): unknown {
+  if (input.kind === "LINK_PAYMENT") return { ...input.answer, payment: input.payment, eventXmlKey: input.eventXmlKey };
   if ("answer" in input) return input.answer;
   if ("error" in input && input.error !== null) return { error: input.error };
   if (input.kind === "DEFER") return { reason: input.reason };

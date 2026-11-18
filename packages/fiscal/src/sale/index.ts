@@ -5,4 +5,5 @@
  * `@12-apps/fiscal/sidecar/schema/sale-for-document.schema.json`.
  */
 
+export { PAYMENT_LINK_MEANS } from "./types";
 export type * from "./types";

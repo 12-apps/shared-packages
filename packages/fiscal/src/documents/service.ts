@@ -18,11 +18,13 @@ import { FiscalDocumentError } from "./errors";
 import { canTransition } from "./machine";
 import { type Deps, type FiscalDocumentsServiceConfig, createIssuingPoint, saveProfile, uploadCertificate } from "./service-profile";
 import { settleNumber, settleWithXml, storeNfeProc } from "./settle";
+import { linkPayment } from "./payment-link";
 import { answerLive, assertOnlineDeadline, signPending, submit, transmit } from "./steps";
 import { type CancelOrReturnInput, type CancelOrReturnResult, type DocumentTotals, type FiscalDocument, type FiscalDocumentModel, isLive } from "./types";
 
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
 export type { CancelOrReturnInput, CancelOrReturnResult } from "./types";
+export type { LinkPaymentInput, LinkPaymentResult } from "./payment-link";
 
 export interface SweepReport {
   readonly advanced: Array<{ readonly documentId: string; readonly status: FiscalDocument["status"] }>;
@@ -356,6 +358,8 @@ export function createFiscalDocuments(config: FiscalDocumentsServiceConfig) {
      * (501) — issue the buyer's return NF-e of entry quoting it. Idempotent.
      */
     cancelOrReturn: cancelOrReturn.bind(null, deps),
+    /** Link payment transactions to an authorised document (event 110300), once each. Idempotent. */
+    linkPayment: linkPayment.bind(null, deps),
     /** Ask SEFAZ what it knows of the key; a state the answer moves is recorded. */
     lookup: lookup.bind(null, deps),
     /** A person takes a document back from `attention`; the sweep tries it again. */

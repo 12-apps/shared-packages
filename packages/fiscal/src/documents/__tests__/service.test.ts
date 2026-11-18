@@ -37,6 +37,7 @@ function scriptedIssuer(script: Partial<Record<Method, string[]>>) {
     signContingency: answer("signContingency"),
     transmit: answer("transmit"),
     cancel: answer("cancel"),
+    linkPayment: answer("linkPayment"),
     lookup: answer("lookup"),
     inutilize: answer("inutilize"),
     health: async () => ({ status: "ok" as const, libraries: {}, nfeSchemas: "", sefazTlsVerify: true }),
@@ -125,7 +126,7 @@ async function setup(script: Partial<Record<Method, string[]>>, profile: Partial
     firstContingencyNumber: 1,
   });
   const later = (ms: number) => void (clock.at += ms);
-  return { service: documents, store: memoryStore, calls: scripted.calls, stored: objects, notified: emitted, later,
+  return { service: documents, store: memoryStore, calls: scripted.calls, issuer: scripted.issuer, stored: objects, notified: emitted, later,
     returnDraft: () => sources.returnDraft,
     setReturnDraft: (next: SaleDraft | null) => {
       sources.returnDraft = next;
@@ -245,6 +246,58 @@ describe("the document service", () => {
     const other = await service.issue({ ...ISSUE, subjectId: "order-78" });
     const late = await service.cancel({ ownerId: "owner-1", documentId: other.id, reason: "Pedido cancelado pelo cliente" });
     expect(late).toMatchObject({ failure: { class: "REJECTED", code: "501" }, document: { status: "AUTHORIZED" } });
+  });
+
+  describe("linkPayment (event 110300, FUT-2239)", () => {
+    const PIX = { transactionId: "7f3c2a91e04b4c1d9a0b11c2d3e4f5a6", meansCode: "17", pspCnpjBase: "08561701", receiverCnpj: "11222333000181" } as const;
+    const BOLETO = { ...PIX, transactionId: "34191790010104351004791020150008", meansCode: "15" } as const;
+
+    it("links each transaction once: SEFAZ is asked for the new one only, and the event and its XML are kept", async () => {
+      const { service, calls, stored } = await setup({ issue: ["nfce-issue-authorized"], linkPayment: ["nfce-link-payment", "nfce-link-payment"] });
+      const document = await service.issue(ISSUE);
+      const first = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] });
+      expect(first).toMatchObject({ linked: [PIX.transactionId], alreadyLinked: [], failure: null, document: { status: "AUTHORIZED" } });
+      const second = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX, BOLETO] });
+      expect(second).toMatchObject({ linked: [BOLETO.transactionId], alreadyLinked: [PIX.transactionId] });
+
+      const sent = calls.filter((call) => call.method === "linkPayment").map((call) => call.call as { sequence: number; payment: unknown; protocol: string });
+      expect(sent.map(({ sequence, payment }) => [sequence, payment])).toEqual([[1, PIX], [2, BOLETO]]);
+      expect(sent[0]?.protocol).toBe(document.protocol);
+      const events = await service.listEvents("owner-1", document.id);
+      expect(events.filter((event) => event.kind === "LINK_PAYMENT")).toHaveLength(2);
+      expect(stored.get(`fiscal/${document.accessKey}/link-payment-1.xml`)).toContain("<procEventoNFe");
+      expect(await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [BOLETO, PIX] })).toMatchObject({ linked: [] });
+      expect(calls.filter((call) => call.method === "linkPayment")).toHaveLength(2);
+    });
+
+    it("never sends a transaction the document's own gPgtoVinc carries", async () => {
+      const linkedDraft = { ...DRAFT, payments: DRAFT.payments.map((payment, index) => (index === 0 ? { ...payment, linkedTransaction: PIX } : payment)) };
+      const { service, calls } = await setup({ issue: ["nfce-issue-authorized"] }, {}, linkedDraft);
+      const document = await service.issue(ISSUE);
+      expect(await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] })).toMatchObject({ linked: [], alreadyLinked: [PIX.transactionId] });
+      expect(calls.some((call) => call.method === "linkPayment")).toBe(false);
+    });
+
+    it("answers SEFAZ's refusal and records nothing, so the next call tries again", async () => {
+      const { service } = await setup({ issue: ["nfce-issue-authorized"], linkPayment: ["nfce-cancel-late", "nfce-link-payment"] });
+      const document = await service.issue(ISSUE);
+      const refused = await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] });
+      expect(refused).toMatchObject({ linked: [], failure: { class: "REJECTED" } });
+      expect(await service.linkPayment({ ownerId: "owner-1", documentId: document.id, payments: [PIX] })).toMatchObject({ linked: [PIX.transactionId] });
+    });
+
+    it("refuses a document that is not authorised, and an issuer with no event 110300", async () => {
+      const { service } = await setup({ issue: ["nfce-issue-rejected"] });
+      await service.issue(ISSUE).catch(() => null);
+      const [document] = await service.listBySubject("owner-1", ISSUE.subjectId, "NFCE");
+      expect(document?.status).not.toBe("AUTHORIZED");
+      await expect(service.linkPayment({ ownerId: "owner-1", documentId: document!.id, payments: [PIX] })).rejects.toMatchObject({ code: "TRANSITION_REFUSED" });
+
+      const fresh = await setup({ issue: ["nfce-issue-authorized"] });
+      const authorised = await fresh.service.issue(ISSUE);
+      delete (fresh.issuer as { linkPayment?: unknown }).linkPayment;
+      await expect(fresh.service.linkPayment({ ownerId: "owner-1", documentId: authorised.id, payments: [PIX] })).rejects.toMatchObject({ code: "NOT_SUPPORTED" });
+    });
   });
 
   describe("cancelOrReturn", () => {

@@ -80,6 +80,19 @@ export interface CancelBySubstitutionRequest extends CancelRequest {
   readonly substituteAccessKey: string;
 }
 
+/** `POST /<model>/link-payment`: the event 110300 for one transaction (NT 2026.006 v1.00). */
+export interface LinkPaymentRequest extends Authenticated {
+  readonly accessKey: string;
+  /** The authorisation protocol (`nProt`). */
+  readonly protocol: string;
+  /** `nSeqEvento`, 1–20: this document's how-manieth 110300. */
+  readonly sequence: number;
+  readonly transactionId: string;
+  readonly meansCode: string;
+  readonly pspCnpjBase: string;
+  readonly receiverCnpj: string;
+}
+
 /** `POST /<model>/lookup`. */
 export interface LookupRequest extends Authenticated {
   readonly accessKey: string;
@@ -150,6 +163,16 @@ export interface CancelledDocument extends SefazAnswer {
   readonly status: "CANCELLED";
   readonly accessKey: string;
   /** The event's protocol. */
+  readonly protocol: string | null;
+  readonly registeredAt: string | null;
+  /** The `procEventoNFe`. */
+  readonly eventXml: string | null;
+}
+
+/** `/link-payment`: the event registered. A retry SEFAZ calls a duplicate (573) answers with no protocol or XML. */
+export interface RegisteredPaymentLink extends SefazAnswer {
+  readonly status: "REGISTERED";
+  readonly accessKey: string;
   readonly protocol: string | null;
   readonly registeredAt: string | null;
   /** The `procEventoNFe`. */

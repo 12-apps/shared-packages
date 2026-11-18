@@ -30,7 +30,8 @@ export {
 } from "./context";
 export type { FiscalDocumentsConfig, FiscalNotifyPort, FiscalReasons } from "./context";
 export { CONTINGENCY_WARNING_AFTER_MS, LATE_CANCEL_CODES, createFiscalDocuments } from "./service";
-export type { CancelOrReturnInput, CancelOrReturnResult, CertificateFacts, FiscalDocuments, FiscalDocumentsServiceConfig, IssueInput, SweepReport } from "./service";
+export type { CancelOrReturnInput, CancelOrReturnResult, CertificateFacts, FiscalDocuments, FiscalDocumentsServiceConfig, IssueInput, LinkPaymentInput, LinkPaymentResult, SweepReport } from "./service";
+export { MAX_PAYMENT_LINKS } from "./payment-link";
 export { createMemoryFiscalStore } from "./memory";
 export type { MemoryFiscalStore } from "./memory";
 export { FISCAL_NEXT_NUMBER_SQL } from "./sql";

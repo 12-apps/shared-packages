@@ -17,6 +17,7 @@ import type {
   CancelRequest,
   InutilizeRequest,
   IssueRequest,
+  LinkPaymentRequest,
   LookupRequest,
   SidecarErrorBody,
   SidecarHealth,
@@ -143,6 +144,15 @@ export function createSidecarIssuer(config: SidecarIssuerConfig): Issuer {
         reason,
         substituteAccessKey,
       } satisfies CancelBySubstitutionRequest),
+    linkPayment: ({ model, environment, signing, accessKey, protocol, sequence, payment }) =>
+      call(`/${modelPath(model)}/link-payment`, {
+        environment,
+        certificate: signing.certificate,
+        accessKey,
+        protocol,
+        sequence,
+        ...payment,
+      } satisfies LinkPaymentRequest),
     lookup: ({ model, environment, signing, accessKey }) =>
       call(`/${modelPath(model)}/lookup`, { environment, certificate: signing.certificate, accessKey } satisfies LookupRequest),
     inutilize: ({ model, environment, signing, uf, cnpj, year, series, from, to, reason }) =>

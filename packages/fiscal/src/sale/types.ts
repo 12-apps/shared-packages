@@ -208,6 +208,29 @@ export interface CardDetails {
   readonly authorizationCode: string | null;
 }
 
+/**
+ * `tpMeioPgto` (Informe Técnico 2026.001 v1.01): the means a linked payment
+ * transaction moved by — 15 boleto, 17 Pix QR dinâmico, 18 TED, 20 Pix by key
+ * or static QR, 23 Pix automático, 24 TEF. A card and cash have none.
+ */
+export const PAYMENT_LINK_MEANS = ["15", "17", "18", "20", "23", "24"] as const;
+export type PaymentLinkMeans = (typeof PAYMENT_LINK_MEANS)[number];
+
+/**
+ * `gPgtoVinc/gPgto` (NT 2026.006 v1.00): a payment transaction started before
+ * the document — a Pix QR raised, a boleto generated — linked by its id, so the
+ * split payment can find the document. The event 110300 links one after the fact.
+ */
+export interface LinkedTransaction {
+  /** `idTransacao`, 2–35 characters: the Pix txid, the boleto's or the transfer's id. */
+  readonly transactionId: string;
+  readonly meansCode: PaymentLinkMeans;
+  /** `CNPJBasePSP`: the 8-character CNPJ base of the receiver's payment institution. */
+  readonly pspCnpjBase: string;
+  /** `CNPJReceb`: who receives the money (the issuer, or a platform receiving for it). */
+  readonly receiverCnpj: string;
+}
+
 export interface SalePayment {
   readonly method: PaymentMethod;
   readonly amountCents: number;
@@ -215,6 +238,13 @@ export interface SalePayment {
   readonly card: CardDetails | null;
   /** `xPag`: required when `method` is `OTHER`. */
   readonly description: string | null;
+  /**
+   * The transaction this payment was started as, written in `gPgtoVinc` with
+   * `nPag` = its position. Absent or `null`: no link. The host decides whether
+   * the environment accepts the group (optional in the layout; its production
+   * activation is the fisco's).
+   */
+  readonly linkedTransaction?: LinkedTransaction | null;
 }
 
 /** `finNFe` 1–4. */
