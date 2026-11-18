@@ -1,5 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
-import type { CredentialFieldSpec, ProviderCapabilities } from '../core/types';
+import type { CredentialFieldSpec } from '../core/types';
 import {
   resolvePaymentsCopy,
   type PaymentsCopySource,
@@ -19,7 +19,8 @@ import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { pixPayload, summaryItems, type PagbankOptions } from './pagbank-payloads';
 import { captureCharge, findChargeByReference, getCharge } from './pagbank-operations';
-import { PARTIAL_REFUND_METHODS, refund } from './pagbank-refund';
+import { refund } from './pagbank-refund';
+import { pagbankCapabilities } from './pagbank-capabilities';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
@@ -128,7 +129,10 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials, copy:
   };
 }
 
-function createChargeWith(copy: PagbankCopy, options: PagbankOptions): NonNullable<PaymentProviderAdapter['createCharge']> {
+function createChargeWith(
+  copy: PagbankCopy,
+  options: PagbankOptions,
+): NonNullable<PaymentProviderAdapter['createCharge']> {
   return async (input, credentials) => {
     if (credentials.stub) return stubCharge(NAME, input, credentials);
     // The provider-side idempotency key: a retried create is deduped by PagBank
@@ -275,32 +279,6 @@ const browserKey = {
     }),
 };
 
-/** What PagBank can do. Hoisted for the size gate, like `browserKey` above. */
-const capabilities: ProviderCapabilities = {
-  methods: ['PIX', 'CARD'],
-  // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
-  // Declared here — the single capability source — so the gateway skips a
-  // wallet charge on any provider that never made this claim, and the
-  // checkout gates its buttons on the same fact. Apple Pay additionally
-  // needs the certificate round-trip (`applePay` below) completed for the
-  // merchant account before a charge can authorize.
-  wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
-  // DEBIT_CARD with PagBank's own 3-D Secure (FUT-3754); `debit` below
-  // mints the browser's session.
-  debit: true,
-  savedCards: true,
-  refunds: true,
-  // Card refunds in part; Pix waits for a sandbox run (FUT-4571).
-  partialRefunds: false,
-  partialRefundMethods: PARTIAL_REFUND_METHODS,
-  splits: false,
-  webhooks: true,
-  tokenization: 'PUBLIC_KEY',
-  activationCharge: true,
-  // Refuses `customer.email` equal to the receiving account's (40002).
-  payerEmail: true,
-};
-const STUB_SPLIT_CAPABILITIES: ProviderCapabilities = { ...capabilities, splitArrangements: ['PIX_DINAMICO'] };
 // No `installments` quote (FUT-4382): PagBank's buyer-paid interest is unproven
 // until a sandbox run, so a cycle in 2..12 is refused, never charged at the
 // principal. `fundingOf` still passes an order's own count through unchanged.
@@ -332,9 +310,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>, options
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
     authMode: 'oauth',
-    // An arrangement is declared only by the build that writes it (FUT-2239):
-    // the dynamic QR it mints, under `fiscalSplitFields: 'stub'`.
-    capabilities: options.fiscalSplitFields === 'stub' ? STUB_SPLIT_CAPABILITIES : capabilities,
+    capabilities: pagbankCapabilities(options),
     simulatedSandbox: true, // sandbox.api.pagseguro.com moves no money (FUT-4432)
     credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
