@@ -26,7 +26,6 @@ import { type CancelOrReturnInput, type CancelOrReturnResult, type DocumentTotal
 export type { CertificateFacts, FiscalDocumentsServiceConfig } from "./service-profile";
 export type { CancelOrReturnInput, CancelOrReturnResult } from "./types";
 export type { LinkPaymentInput, LinkPaymentResult } from "./payment-link";
-export type { GapVoidReport } from "./contingency";
 
 export interface SweepReport {
   readonly advanced: Array<{ readonly documentId: string; readonly status: FiscalDocument["status"] }>;

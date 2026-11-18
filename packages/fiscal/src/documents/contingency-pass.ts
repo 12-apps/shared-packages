@@ -12,7 +12,7 @@ import type { Deps } from "./service-profile";
 import type { ContingencyBlockState, ContingencyBlockStore, ContingencyGap, FiscalStore } from "./ports";
 
 /** How many blocks one read of a pass asks for; the pass reads pages until one comes back empty. */
-export const BLOCK_PAGE_SIZE = 1_000;
+const BLOCK_PAGE_SIZE = 1_000;
 
 const BLOCK_METHODS = [
   "reserveContingencyBlock",
@@ -36,7 +36,7 @@ export function blockStore(store: FiscalStore): FiscalStore & ContingencyBlockSt
 type BlockFilter = Omit<Parameters<ContingencyBlockStore["listContingencyBlocks"]>[0], "limit" | "after">;
 
 /** Every page of the blocks a filter selects, in `(reservedAt, id)` order, to exhaustion. */
-export async function* blockPages(store: ContingencyBlockStore, filter: BlockFilter): AsyncGenerator<ContingencyBlockState[]> {
+async function* blockPages(store: ContingencyBlockStore, filter: BlockFilter): AsyncGenerator<ContingencyBlockState[]> {
   let after: { reservedAt: string; id: string } | undefined;
   for (;;) {
     const page = await store.listContingencyBlocks({ ...filter, ...(after === undefined ? {} : { after }), limit: BLOCK_PAGE_SIZE });

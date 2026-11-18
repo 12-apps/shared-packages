@@ -18,7 +18,7 @@
 import type { ContingencyBlockState, ContingencyGap, NumberRange } from "./ports";
 
 /** Consecutive numbers as ranges, ascending. */
-export function rangesOf(numbers: readonly number[]): NumberRange[] {
+function rangesOf(numbers: readonly number[]): NumberRange[] {
   const sorted = [...new Set(numbers)].sort((a, b) => a - b);
   const ranges: NumberRange[] = [];
   for (const number of sorted) {
@@ -36,7 +36,7 @@ function between(from: number, to: number, keep: (n: number) => boolean): number
 }
 
 /** The highest number of the block a document was recorded on (`from - 1`: none). */
-export function highestRecorded(block: ContingencyBlockState): number {
+function highestRecorded(block: ContingencyBlockState): number {
   const inside = block.documented.filter((n) => n >= block.from && n <= block.to);
   return inside.length === 0 ? block.from - 1 : Math.max(...inside);
 }

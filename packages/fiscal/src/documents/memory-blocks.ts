@@ -12,7 +12,7 @@ import { type FiscalDocument, type FiscalDocumentEvent, isLive } from "./types";
 
 const MAX_NUMBER = 999_999_999;
 
-export interface MemoryBlockState {
+interface MemoryBlockState {
   readonly counters: Map<string, number>;
   readonly seriesOwner: Map<string, string>;
   readonly documents: Map<string, FiscalDocument>;
