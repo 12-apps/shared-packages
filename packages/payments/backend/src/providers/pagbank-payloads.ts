@@ -7,6 +7,7 @@ import type { PagbankCopy } from './copy';
 import type { ChargeInput, ResolvedCredentials } from '../core/types';
 import { customerPayload, notificationUrls } from './pagbank-http';
 import { chargeDescription } from './shared';
+import { fiscalSplitFieldsOf, type FiscalSplitFields } from '../core/fiscal-split';
 
 /**
  * The one summary line the Orders API requires; its amount equals the total
@@ -24,7 +25,13 @@ export function summaryItems(input: ChargeInput, copy: PagbankCopy) {
  * back as `charges[].qr_code`. The order-level `qr_codes[]` this used to send
  * is the form PagBank's integration team asked us to stop testing with.
  */
-export function pixPayload(input: ChargeInput, credentials: ResolvedCredentials, copy: PagbankCopy, expiresAt: string) {
+export function pixPayload(
+  input: ChargeInput,
+  credentials: ResolvedCredentials,
+  copy: PagbankCopy,
+  expiresAt: string,
+  fiscalSplitFields?: FiscalSplitFields,
+) {
   return {
     reference_id: input.reference,
     customer: customerPayload(input.customer),
@@ -35,8 +42,20 @@ export function pixPayload(input: ChargeInput, credentials: ResolvedCredentials,
         description: chargeDescription(input, 64),
         amount: { value: input.amount.amountCents, currency: input.amount.currency },
         payment_method: { type: 'PIX', pix: { expiration_date: expiresAt } },
+        // The split payment's informed tax (FUT-2239): sent ONLY under the
+        // `'stub'` field set until PagBank publishes its own; absent ⇒ nothing.
+        ...fiscalSplitFieldsOf(input.fiscalSplit, fiscalSplitFields),
       },
     ],
     notification_urls: notificationUrls(credentials),
   };
+}
+
+/** How a host builds the PagBank adapter (`pagbankProvider(copy, options)`). */
+export interface PagbankOptions {
+  /**
+   * The wire form of `ChargeInput.fiscalSplit` (FUT-2239). Absent or `'none'`:
+   * never sent. `'stub'`: the CGIBS field set, for homologação rehearsal only.
+   */
+  fiscalSplitFields?: FiscalSplitFields;
 }

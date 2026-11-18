@@ -17,7 +17,7 @@ import {
 import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
-import { pixPayload, summaryItems } from './pagbank-payloads';
+import { pixPayload, summaryItems, type PagbankOptions } from './pagbank-payloads';
 import { captureCharge, findChargeByReference, getCharge } from './pagbank-operations';
 import { PARTIAL_REFUND_METHODS, refund } from './pagbank-refund';
 import { pagbankVault } from './pagbank-vault';
@@ -128,9 +128,7 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials, copy:
   };
 }
 
-function createChargeWith(
-  copy: PagbankCopy,
-): NonNullable<PaymentProviderAdapter['createCharge']> {
+function createChargeWith(copy: PagbankCopy, options: PagbankOptions): NonNullable<PaymentProviderAdapter['createCharge']> {
   return async (input, credentials) => {
     if (credentials.stub) return stubCharge(NAME, input, credentials);
     // The provider-side idempotency key: a retried create is deduped by PagBank
@@ -140,7 +138,7 @@ function createChargeWith(
       const expiresAt = new Date(Date.now() + PIX_TTL_MS).toISOString();
       const res = await pagbankRequest<PagBankPixResponse>('/orders', credentials, {
         method: 'POST',
-        body: pixPayload(input, credentials, copy, expiresAt),
+        body: pixPayload(input, credentials, copy, expiresAt, options.fiscalSplitFields),
         idempotencyKey,
       });
       return mapPix(res, input, expiresAt);
@@ -296,6 +294,7 @@ const capabilities: ProviderCapabilities = {
   partialRefunds: false,
   partialRefundMethods: PARTIAL_REFUND_METHODS,
   splits: false,
+  splitArrangements: ['PIX_DINAMICO'], // the QR it mints; `PagbankOptions.fiscalSplitFields`
   webhooks: true,
   tokenization: 'PUBLIC_KEY',
   activationCharge: true,
@@ -321,7 +320,7 @@ const capabilities: ProviderCapabilities = {
 const MINIMUM_CHARGE_CENTS = 100;
 
 // `copy` is resolved at each BOUNDARY below, never once here — `src/copy-source.ts`.
-export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): PaymentProviderAdapter {
+export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>, options: PagbankOptions = {}): PaymentProviderAdapter {
   const copy = (locale?: string): PagbankCopy => resolvePaymentsCopy(source, locale);
 
   return {
@@ -343,7 +342,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     checkoutScreen: 'pix-and-card',
 
     verifyCredentials: (credentials, locale) => verifyPagbankCredentials(copy(locale))(credentials),
-    createCharge: (input, credentials) => createChargeWith(copy(input.locale))(input, credentials),
+    createCharge: (input, credentials) => createChargeWith(copy(input.locale), options)(input, credentials),
     oauth: pagbankOAuth,
 
     // Card vaulting WITHOUT a purchase (FUT-478/FUT-183) — the dedicated
