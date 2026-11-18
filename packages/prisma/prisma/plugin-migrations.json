@@ -62,6 +62,7 @@
     "20261116120000_add_report_schedule",
     "20261116190000_paid_channel_consent",
     "20261118120000_fiscal_link_payment_event",
+    "20261118120000_payment_refund_retries_refunded_before",
     "20261118180000_fiscal_contingency_blocks"
   ]
 }

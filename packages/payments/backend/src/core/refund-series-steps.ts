@@ -15,6 +15,7 @@ import {
   type RefundRetryState,
 } from './refund-retry';
 import type { FirstAttemptResult, RefundRetrierDeps, RefundSeriesView } from './refund-series';
+import { ambiguousSince, baselineFor, baselineOf, blockersOf, deferredUntil, isPart, owedCents, pressSiblings, provenBack, siblingsOf } from './refund-series-part';
 import type { RefundSeriesKey, RefundSeriesRow, RefundSeriesSettlement } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { RefundSnapshot } from './types';
@@ -45,14 +46,12 @@ const deadline = (ctx: SeriesContext) => AbortSignal.timeout(ctx.attemptMs ?? RE
  */
 const endpointFailure = (error: unknown): boolean => isProviderEndpointFailure(error) || isRequestTimeout(error);
 
-/** A part has no read-back that proves it went back, so a no-answer on one is never retried blind (review B2). */
-const isPart = (row: Pick<RefundSeriesRow, 'amountCents'>): boolean => row.amountCents !== null;
 const claimExpiry = (now: Date) => new Date(now.getTime() + REFUND_CLAIM_TTL_MS).toISOString();
 
-function refundInput(row: Pick<RefundSeriesRow, 'providerChargeId' | 'amountCents'>, signal: AbortSignal, reason?: string): RefundInput {
+function refundInput(row: Pick<RefundSeriesRow, 'providerChargeId' | 'amountCents'>, signal: AbortSignal, reason?: string, cents = row.amountCents): RefundInput {
   return {
     providerChargeId: row.providerChargeId,
-    ...(row.amountCents !== null ? { amount: { amountCents: row.amountCents, currency: 'BRL' } } : {}),
+    ...(cents !== null ? { amount: { amountCents: cents, currency: 'BRL' } } : {}),
     ...(reason ? { reason } : {}),
     retriedByCaller: true,
     signal,
@@ -96,8 +95,8 @@ function report(ctx: SeriesContext, row: Pick<RefundSeriesRow, 'merchant' | 'pro
 }
 
 /** Settle a series behind the version it was read at; answers the stored row or null. */
-function settle(ctx: SeriesContext, row: RefundSeriesRow, how: RefundSeriesSettlement) {
-  return ctx.store.saveIf({ ...row, settledAt: ctx.clock().toISOString(), settledHow: how, claimedAt: null, nextAt: null }, row.version);
+function settle(ctx: SeriesContext, row: RefundSeriesRow, how: RefundSeriesSettlement, extra: Partial<RefundSeriesRow> = {}) {
+  return ctx.store.saveIf({ ...row, ...extra, settledAt: ctx.clock().toISOString(), settledHow: how, claimedAt: null, nextAt: null }, row.version);
 }
 
 /** Open (or re-open, for a new cancel) the series of `key` in `state`. */
@@ -106,7 +105,7 @@ async function open(ctx: SeriesContext, key: RefundSeriesKey, state: RefundRetry
   const inserted = await ctx.store.insert({ ...rowFields(key), ...state, of: state.of });
   if (inserted) return inserted;
   const stored = await ctx.store.find(key.provider, key.providerChargeId, key.subject);
-  return stored ? ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: state.of }, stored.version) : null;
+  return stored ? ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: state.of, ...baselineFor(stored, key) }, stored.version) : null;
 }
 
 /** A refusal of attempt 1: none for good opens a series; "not yet" and no answer do (I4). */
@@ -163,7 +162,7 @@ async function adopt(ctx: SeriesContext, row: RefundSeriesRow, refundedCents: nu
 }
 
 /** What a consult says of the charge: its money back (with the amount it shows), still owed, or no answer. */
-type Consulted = { kind: 'BACK'; refundedCents: number | null } | { kind: 'OWED' } | { kind: 'UNKNOWN'; error: unknown };
+type Consulted = { kind: 'BACK'; refundedCents: number | null } | { kind: 'OWED'; readBack: number | null } | { kind: 'UNKNOWN'; error: unknown };
 
 /**
  * Read the charge under the attempt's deadline. A whole charge REFUNDED or
@@ -174,7 +173,9 @@ async function consult(ctx: SeriesContext, row: Pick<RefundSeriesRow, 'merchant'
   try {
     const charge = await ctx.gateway.refreshCharge(row.merchant, row.provider, row.providerChargeId, undefined, { signal });
     const back = charge.status === 'REFUNDED' || (row.amountCents === null && charge.status === 'CANCELED');
-    return back ? { kind: 'BACK', refundedCents: row.amountCents ?? charge.amount?.amountCents ?? null } : { kind: 'OWED' };
+    if (back) return { kind: 'BACK', refundedCents: row.amountCents ?? charge.amount?.amountCents ?? null };
+    // The provider's refunded total, when its adapter reads it back (FUT-4951); null: it cannot say.
+    return { kind: 'OWED', readBack: charge.refundedAmount?.amountCents ?? null };
   } catch (error) {
     return { kind: 'UNKNOWN', error };
   }
@@ -186,11 +187,14 @@ async function consultedCents(ctx: SeriesContext, key: RefundSeriesKey): Promise
   return seen.kind === 'BACK' ? seen.refundedCents : (key.amountCents ?? null);
 }
 
-/** Write a refused attempt's state behind its claim; report a give-up once per series. */
-async function refusedAttempt(ctx: SeriesContext, claimed: RefundSeriesRow, refusal: RefundRefusal, error: unknown): Promise<void> {
+/**
+ * Write a refused attempt's state behind its claim; report a give-up once per series. `pending`
+ * ends the series for a person: a part sent with no read-back that got no answer is never sent
+ * again blind (B2); one with a baseline stays on the schedule, read back first (FUT-4951).
+ */
+async function refusedAttempt(ctx: SeriesContext, claimed: RefundSeriesRow, refusal: RefundRefusal, error: unknown, pending = false): Promise<void> {
   const after = afterRefusal(claimed, refusal, ctx.clock());
-  // A part whose cancel got no answer is not sent again blind: a person decides (B2).
-  const next = refusal === 'UNKNOWN' && isPart(claimed) ? { ...after, nextAt: null, exhausted: true } : after;
+  const next = pending ? { ...after, nextAt: null, exhausted: true } : after;
   const reportNow = next.exhausted && !next.reported;
   const saved = await ctx.store.saveIf(withState(claimed, reportNow ? { ...next, reported: true } : next), claimed.version);
   if (!saved) return;
@@ -198,26 +202,67 @@ async function refusedAttempt(ctx: SeriesContext, claimed: RefundSeriesRow, refu
   if (reportNow) report(ctx, saved, refusal, error);
 }
 
-/** Send the claimed attempt's ONE cancel and write its answer. */
-async function sendOne(ctx: SeriesContext, claimed: RefundSeriesRow, signal: AbortSignal): Promise<void> {
+/** A part sent with no baseline: nothing can prove later whether it went back (B2). */
+const blindPart = (row: RefundSeriesRow): boolean => isPart(row) && baselineOf(row) === null;
+
+/** The cancel threw: adopted when nothing was left to refund, else a refusal (a blind part's no answer is final). */
+function sendFailed(ctx: SeriesContext, claimed: RefundSeriesRow, error: unknown): Promise<void> {
+  if (isNothingToRefund(error)) return adopt(ctx, claimed, claimed.amountCents);
+  const refusal = isRequestTimeout(error) || !isProviderEndpointFailure(error) ? 'UNKNOWN' : refundRefusalOf(error);
+  return refusedAttempt(ctx, claimed, refusal, error, refusal === 'UNKNOWN' && blindPart(claimed));
+}
+
+/** The provider answered FAILED: a part read back takes it as no answer (read back next time); otherwise final. */
+function answeredFailed(ctx: SeriesContext, claimed: RefundSeriesRow): Promise<void> {
+  if (!isPart(claimed) || blindPart(claimed)) return refusedAttempt(ctx, claimed, 'REFUSED', null);
+  return refusedAttempt(ctx, claimed, 'UNKNOWN', new Error(`the provider answered the refund of ${claimed.providerChargeId} FAILED`));
+}
+
+/**
+ * Send the claimed attempt's ONE cancel (`cents`: what a part still owes) and write its answer. A
+ * part read back (a baseline is set) takes no answer and FAILED alike as "not known": the next
+ * attempt reads back first, so asking again is safe (FUT-4951).
+ */
+async function sendOne(ctx: SeriesContext, claimed: RefundSeriesRow, signal: AbortSignal, cents = claimed.amountCents): Promise<void> {
   // The deadline already fired during the consult: nothing is sent past it (B1).
   if (signal.aborted) return refusedAttempt(ctx, claimed, 'UNKNOWN', signal.reason);
   let snapshot: RefundSnapshot;
   try {
-    snapshot = await ctx.gateway.refund(claimed.merchant, claimed.provider, refundInput(claimed, signal));
+    snapshot = await ctx.gateway.refund(claimed.merchant, claimed.provider, refundInput(claimed, signal, undefined, cents));
   } catch (error) {
-    if (isNothingToRefund(error)) return adopt(ctx, claimed, claimed.amountCents);
-    const refusal = isRequestTimeout(error) || !isProviderEndpointFailure(error) ? 'UNKNOWN' : refundRefusalOf(error);
-    return refusedAttempt(ctx, claimed, refusal, error);
+    return sendFailed(ctx, claimed, error);
   }
-  // The provider answered that the cancel did not take: an answer, waiting changes nothing.
-  if (snapshot.status === 'FAILED') return refusedAttempt(ctx, claimed, 'REFUSED', null);
-  await ctx.host.refunded(claimed, { snapshot, adopted: false });
-  await settle(ctx, claimed, 'REFUNDED');
+  if (snapshot.status === 'FAILED') return answeredFailed(ctx, claimed);
+  // A part: what went back THROUGH this series is the part, whether this send asked all of it or the rest.
+  await ctx.host.refunded(claimed, { snapshot, adopted: false, ...(isPart(claimed) ? { refundedCents: claimed.amountCents } : {}) });
+  // A part keeps what its settling send asked: what landed after a sibling's baseline (FUT-4951).
+  await settle(ctx, claimed, 'REFUNDED', isPart(claimed) ? { lastSentCents: cents } : {});
 }
 
-/** ONE claimed attempt: still owed? consult, then one cancel (I2, I3). */
-async function attempt(ctx: SeriesContext, claimed: RefundSeriesRow): Promise<void> {
+/**
+ * A part's attempt after its consult (FUT-4951): with no read-back, B2 (sent once; a later attempt
+ * gives up); else the baseline is written before the first send, and every later attempt sends only
+ * what the read-back proves is still owed, or adopts the part when nothing is.
+ */
+async function sendPart(ctx: SeriesContext, claimed: RefundSeriesRow, signal: AbortSignal, readBack: number | null, siblings: readonly RefundSeriesRow[]): Promise<void> {
+  const baseline = baselineOf(claimed);
+  if (readBack === null) {
+    if (baseline === null) return sendOne(ctx, claimed, signal);
+    return refusedAttempt(ctx, claimed, 'UNKNOWN', new Error('the provider did not read the refunded total back'), true);
+  }
+  if (baseline === null) {
+    const based = await ctx.store.saveIf({ ...claimed, refundedBeforeCents: readBack, refundedBeforeAt: ctx.clock().toISOString() }, claimed.version);
+    return based ? sendOne(ctx, based, signal) : undefined;
+  }
+  // A sibling adopted since, whose money may have landed before or after this baseline: a person decides.
+  if (ambiguousSince(claimed, siblings)) return refusedAttempt(ctx, claimed, 'UNKNOWN', new Error('a sibling refund adopted since the baseline'), true);
+  const owed = owedCents(claimed, readBack, siblings);
+  if (owed <= 0) return adopt(ctx, claimed, claimed.amountCents);
+  return sendOne(ctx, claimed, signal, owed);
+}
+
+/** ONE claimed attempt: still owed? consult, then one cancel (I2, I3); a part's siblings for its owed sum. */
+async function attempt(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: readonly RefundSeriesRow[] = []): Promise<void> {
   if (!(await ctx.host.stillOwed(claimed))) {
     await settle(ctx, claimed, 'ENDED');
     return;
@@ -226,18 +271,21 @@ async function attempt(ctx: SeriesContext, claimed: RefundSeriesRow): Promise<vo
   const signal = deadline(ctx);
   const seen = await consult(ctx, claimed, signal);
   if (seen.kind === 'BACK') return adopt(ctx, claimed, seen.refundedCents);
-  if (seen.kind === 'UNKNOWN') return refusedAttempt(ctx, claimed, 'UNKNOWN', seen.error);
+  // A blind part past its first attempt may have been sent by a claimant that died: never resent unread (B2).
+  if (seen.kind === 'UNKNOWN') return refusedAttempt(ctx, claimed, 'UNKNOWN', seen.error, blindPart(claimed) && claimed.attempt > 1);
+  if (isPart(claimed)) return sendPart(ctx, claimed, signal, seen.readBack, siblings);
   return sendOne(ctx, claimed, signal);
 }
 
 /** A dead claimant held the LAST attempt: consult only, adopt or give up. */
-async function close(ctx: SeriesContext, claimed: RefundSeriesRow): Promise<void> {
+async function close(ctx: SeriesContext, claimed: RefundSeriesRow, siblings: readonly RefundSeriesRow[] = []): Promise<void> {
   if (!(await ctx.host.stillOwed(claimed))) {
     await settle(ctx, claimed, 'ENDED');
     return;
   }
   const seen = await consult(ctx, claimed, deadline(ctx));
   if (seen.kind === 'BACK') return adopt(ctx, claimed, seen.refundedCents);
+  if (seen.kind === 'OWED' && provenBack(claimed, seen.readBack, siblings)) return adopt(ctx, claimed, claimed.amountCents);
   const refusal = claimed.refusal ?? 'UNKNOWN';
   const saved = await ctx.store.saveIf(
     { ...claimed, refusal, exhausted: true, nextAt: null, claimedAt: null, reported: true },
@@ -250,11 +298,15 @@ async function runRow(ctx: SeriesContext, row: RefundSeriesRow): Promise<void> {
   const now = ctx.clock();
   const due = refundDueNow(row, now);
   if (due === null) return;
+  // One doubt per charge (FUT-4951): a part held back by a sibling is deferred in one write, no attempt spent.
+  const siblings = isPart(row) ? await siblingsOf(ctx.store, row) : [];
+  const blockers = blockersOf(row, siblings, now);
+  if (blockers.length > 0) return void (await ctx.store.saveIf({ ...row, nextAt: deferredUntil(blockers, now) }, row.version));
   const state = due === 'CLOSE' ? { ...row, claimedAt: now.toISOString() } : nextClaim(now, row);
   // The claim's expiry is its `nextAt`, so the sweep finds a dead claimant.
   const claimed = await ctx.store.saveIf(withState(row, { ...state, nextAt: claimExpiry(now) }), row.version);
   if (!claimed) return;
-  return due === 'CLOSE' ? close(ctx, claimed) : attempt(ctx, claimed);
+  return due === 'CLOSE' ? close(ctx, claimed, siblings) : attempt(ctx, claimed, siblings);
 }
 
 /** The sweep: run the attempts that are due. Answers how many were looked at. */
@@ -288,9 +340,12 @@ function claimNewSeries(ctx: SeriesContext, key: RefundSeriesKey, stored: Refund
   const now = ctx.clock();
   const state: RefundRetryState = { ...firstClaim(now, current), reported: false, nextAt: claimExpiry(now) };
   return stored
-    ? ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: undefined }, stored.version)
+    ? ctx.store.saveIf({ ...stored, ...rowFields(key), ...state, of: undefined, ...baselineFor(stored, key) }, stored.version)
     : ctx.store.insert({ ...rowFields(key), ...state });
 }
+
+/** A series still running, or an attempt of it in flight. */
+const running = (current: RefundSeriesRow | null, now: Date): boolean => current !== null && (!current.exhausted || claimHeld(current, now));
 
 /** "Tentar estornar de novo": a new series, attempt 1 now with a consult; a no-op while one runs (C21, C22). */
 export async function pressSeries(ctx: SeriesContext, key: RefundSeriesKey): Promise<RefundSeriesView | null> {
@@ -300,9 +355,12 @@ export async function pressSeries(ctx: SeriesContext, key: RefundSeriesKey): Pro
   // only ENDED (an undo that kept its claim) is restartable: the host asked, so the money is owed (review R2).
   if (stored && !current && stored.boundTo === key.boundTo && stored.settledHow !== 'ENDED') return null;
   // A series still running (or an attempt in flight): the press answers it, never a second one.
-  if (current && (!current.exhausted || claimHeld(current, ctx.clock()))) return seriesView(ctx, current);
+  if (running(current, ctx.clock())) return seriesView(ctx, current);
+  const siblings = await pressSiblings(ctx.store, stored, ctx.clock());
+  // Another series of the charge may have moved money: the press waits for it (one doubt per charge).
+  if (siblings === null) return seriesView(ctx, current);
   const claimed = await claimNewSeries(ctx, key, stored, current);
-  if (claimed) await attempt(ctx, claimed);
+  if (claimed) await attempt(ctx, claimed, siblings);
   return seriesView(ctx, await findLive(ctx, key));
 }
 

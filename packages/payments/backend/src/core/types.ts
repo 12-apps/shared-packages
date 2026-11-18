@@ -2,6 +2,8 @@ import type { ChargeTransaction } from './charge-transaction';
 import type { FiscalSplitInput, SplitArrangement } from './fiscal-split';
 export type { FiscalSplitInput, SplitArrangement };
 import type { CardDetails } from './card-details';
+import type { ClientTokenization } from './client-tokenization';
+export type { ClientTokenization };
 import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
 import type { ChargeSupersession } from './supersession';
@@ -228,6 +230,11 @@ export interface ChargeSnapshot {
   transaction?: ChargeTransaction;
   /** Set by this package when a newer charge replaced this unvoided one (FUT-4072). */
   superseded?: ChargeSupersession;
+  /**
+   * The provider's own CUMULATIVE refunded total (settled or on its way back, never a failed refund),
+   * set by an adapter declaring `refundReadBack` (FUT-4951). Absent means "cannot say", never 0.
+   */
+  refundedAmount?: Money;
   /** Verbatim provider payload, for audit/debugging. Never branch on it. */
   raw?: unknown;
 }
@@ -251,17 +258,6 @@ export interface RefundSnapshot {
   amount: Money;
   raw?: unknown;
 }
-
-/**
- * How card data gets from the buyer's browser to the provider without
- * touching the host's servers:
- *
- *   NONE        no client-side step (PIX/boleto only, or hosted checkout)
- *   PUBLIC_KEY  encrypt the card in-browser with the provider's public key
- *   SDK         load the provider's JS SDK / elements to mint a token
- *   REDIRECT    hosted checkout page; no card data in the host at all
- */
-export type ClientTokenization = 'NONE' | 'PUBLIC_KEY' | 'SDK' | 'REDIRECT';
 
 /**
  * The digital-wallet descriptors (FUT-471/472) — their own module for the
@@ -331,6 +327,8 @@ export interface ProviderCapabilities {
   environments?: readonly PaymentEnvironment[];
   /** It judges `customer.email`, so the activation step asks for it (FUT-4200). Default false. */
   payerEmail?: boolean;
+  /** Every `getCharge` snapshot of a captured charge carries `refundedAmount` (FUT-4951). Default false. */
+  refundReadBack?: boolean;
 }
 
 /** Who confirms a charge was paid — see `ProviderCapabilities.confirmation`. */

@@ -26,6 +26,8 @@ const capabilities: ProviderCapabilities = {
   activationCharge: true,
   // Refuses `customer.email` equal to the receiving account's (40002).
   payerEmail: true,
+  // `summary.refunded` on every captured charge it reads back (FUT-4951).
+  refundReadBack: true,
 };
 const STUB_SPLIT_CAPABILITIES: ProviderCapabilities = { ...capabilities, splitArrangements: ['PIX_DINAMICO'] };
 

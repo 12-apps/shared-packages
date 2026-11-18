@@ -215,18 +215,34 @@ export function orderSnapshot(
   const value = paid?.amount?.value;
   const settled = paid?.status === 'PAID';
   const captured = typeof value === 'number' ? value : undefined;
+  const status = orderStatus(res, paid);
   return {
     provider: NAME,
     providerChargeId: typeof paid?.id === 'string' ? paid.id : fallbackChargeId,
     // The `reference_id` we sent, echoed back — see `ChargeSnapshot.reference`.
     ...(typeof res.reference_id === 'string' ? { reference: res.reference_id } : {}),
-    status: orderStatus(res, paid),
+    status,
     amount: { amountCents: capturedAmountCents(NAME, settled, captured), currency: 'BRL' },
     method: methodOfCharge(paid),
     ...(typeof res.id === 'string' ? { settlementHints: { orderId: res.id } } : {}),
     transaction: pagbankTransaction(paid),
+    ...refundedAmountOf(status, paid),
     raw: res,
   };
+}
+
+/** Statuses of a CAPTURED charge: the ones `refundReadBack` promises a figure on (FUT-4951). */
+const CAPTURED: ReadonlySet<ChargeSnapshot['status']> = new Set(['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED']);
+
+/**
+ * `summary.refunded` as the snapshot's `refundedAmount` (FUT-4951): what went back so far, the
+ * figure the adapter already judges every partial refund by (FUT-4571). A captured charge naming
+ * no summary has refunded nothing, the same reading as {@link refundedCents}. `charge` is the
+ * deciding charge ({@link settledCharge}); when that is not the captured one (a declined earlier
+ * attempt first), its status is not captured, so no figure is emitted and the part falls back.
+ */
+function refundedAmountOf(status: ChargeSnapshot['status'], charge: PagBankOrderCharge | undefined): Pick<ChargeSnapshot, 'refundedAmount'> {
+  return CAPTURED.has(status) ? { refundedAmount: { amountCents: refundedCents(charge), currency: 'BRL' } } : {};
 }
 
 type PagBankPixCharge = NonNullable<PagBankPixResponse['charges']>[number];

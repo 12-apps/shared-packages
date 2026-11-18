@@ -29,6 +29,8 @@ export {
   type RefundSeriesView,
 } from './core/refund-series';
 export { endRefundSeriesFor } from './core/refund-series-end';
+/** What a captured charge can still give back, by the provider's read-back (FUT-4951). */
+export { refundableCents } from './core/refundable';
 export type {
   NewRefundSeriesRow,
   RefundRetryStore,
