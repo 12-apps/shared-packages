@@ -125,26 +125,34 @@ function legacyCredentials(credentials: ResolvedCredentials): { email: string; t
  * consult (FUT-3722). Never throws: an unknown code, an outage or a refusal is
  * false, and the delivery is refused (PagBank redelivers a real one).
  */
-export async function legacyNotificationKnown(notificationCode: string, credentials: ResolvedCredentials): Promise<boolean> {
+export async function legacyNotificationKnown(
+  notificationCode: string,
+  credentials: ResolvedCredentials,
+  timeoutMs = LEGACY_LOOKUP_TIMEOUT_MS,
+): Promise<boolean> {
   try {
-    parseTransaction(await fetchNotificationXml(notificationCode, credentials), notificationCode);
+    parseTransaction(await fetchNotificationXml(notificationCode, credentials, AbortSignal.timeout(timeoutMs)), notificationCode);
     return true;
   } catch {
     return false;
   }
 }
 
+/** The lookup runs inside a webhook request when it verifies one (FUT-5371): it may not hang it. */
+const LEGACY_LOOKUP_TIMEOUT_MS = 5_000;
+
 /** GET the notification's XML from the legacy host, error contract intact. */
 async function fetchNotificationXml(
   notificationCode: string,
   credentials: ResolvedCredentials,
+  signal?: AbortSignal,
 ): Promise<string> {
   const { email, token } = legacyCredentials(credentials);
   const base = credentials.environment === 'PRODUCTION' ? LEGACY_HOSTS.PRODUCTION : LEGACY_HOSTS.SANDBOX;
   const query = new URLSearchParams({ email, token });
   const res = await fetch(
     `${base}/v3/transactions/notifications/${encodeURIComponent(notificationCode)}?${query.toString()}`,
-    { method: 'GET', headers: { Accept: 'application/xml' } },
+    { method: 'GET', headers: { Accept: 'application/xml' }, ...(signal ? { signal } : {}) },
   );
   const text = await res.text().catch(() => '');
   if (!res.ok) {

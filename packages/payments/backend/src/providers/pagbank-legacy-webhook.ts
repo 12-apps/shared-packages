@@ -1,7 +1,7 @@
 import type { NormalizedWebhookEvent, ResolvedCredentials, WebhookDelivery } from '../core/types';
 import { legacyNotificationKnown } from './pagbank-legacy-notifications';
 import { postTransactionEvents, unsignedLegacyNotification } from './pagbank-webhook';
-import { isConnectConnection, legacyUnresolvable } from './pagbank-webhook-auth';
+import { isConnectConnection, legacyUnresolvable, signerOf } from './pagbank-webhook-auth';
 
 /**
  * The PagBank adapter's webhook surface for legacy post-transaction
@@ -16,7 +16,8 @@ import { isConnectConnection, legacyUnresolvable } from './pagbank-webhook-auth'
  *   signature;
  * - a Connect seller with no account token apart cannot ask it, ever: the
  *   delivery is acknowledged so PagBank stops redelivering, and `parse` turns
- *   it into NO event, so a forged one costs nothing and stores nothing.
+ *   it into NO event, reported once per delivery, so a forged one stores
+ *   nothing. A SIGNED legacy delivery is never dropped: it parks as before.
  *
  * Any other unsigned body falls through to the order path, unchanged.
  */
@@ -34,12 +35,28 @@ export function unsignedSigner(delivery: WebhookDelivery, credentials: ResolvedC
   return isConnectConnection(credentials) ? 'orderConsult' : null;
 }
 
+/** Hears of each unsigned legacy notification acknowledged and dropped (`PagbankOptions.onUnresolvableLegacy`). */
+type OnDropped = (notice: { notificationCode: string; reason: string }) => void;
+
 /**
- * The events of a legacy delivery, or null when the body is the order JSON:
- * none for one nothing could ever resolve for this seller (acknowledged, never
- * stored); otherwise the parked UNKNOWN event (`pagbank-webhook.ts`).
+ * The events of a legacy delivery, or null when the body is the order JSON.
+ *
+ * Only an UNSIGNED one for a seller that can never resolve its code yields
+ * none (acknowledged, never stored), and each such drop is reported, with its
+ * code. A SIGNED one is stored as the parked UNKNOWN event whatever the seller
+ * (`pagbank-webhook.ts`), so the host's resolver runs and fails or reports it
+ * as it always did.
  */
-export function legacyEvents(delivery: WebhookDelivery, credentials: ResolvedCredentials, eventId: string): NormalizedWebhookEvent[] | null {
-  if (unsignedLegacyNotification(delivery.rawBody) && legacyUnresolvable(credentials)) return [];
+export function legacyEvents(
+  delivery: WebhookDelivery,
+  credentials: ResolvedCredentials,
+  eventId: string,
+  onDropped?: OnDropped,
+): NormalizedWebhookEvent[] | null {
+  const unsigned = unsignedLegacyNotification(delivery.rawBody);
+  if (unsigned && legacyUnresolvable(credentials) && signerOf(delivery, credentials) === null) {
+    onDropped?.({ notificationCode: unsigned.notificationCode, reason: 'unsigned, and a Connect seller with no legacyToken cannot resolve it' });
+    return [];
+  }
   return postTransactionEvents(delivery.rawBody, eventId);
 }

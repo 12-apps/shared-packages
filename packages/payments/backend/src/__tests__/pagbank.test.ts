@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderRequestError } from '../core/errors';
 import { createMemoryChargeStore } from '../memory';
 import { pagbankProvider } from '../providers/pagbank';
+import { legacyNotificationKnown } from '../providers/pagbank-legacy-notifications';
 import { pagbankIdempotencyKey } from '../providers/pagbank-http';
 import { cardInput, pixInput } from './fixtures';
 import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
@@ -799,13 +800,43 @@ describe('pagbank adapter — webhooks', () => {
       return spy;
     };
 
-    it('a Connect seller: acknowledged with no call to PagBank, and NOTHING is stored', async () => {
+    it('a Connect seller, unsigned: acknowledged with no call to PagBank, NOTHING stored, and each drop reported with its code', async () => {
       const spy = lookup(200, xml);
-      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const dropped: { notificationCode: string; reason: string }[] = [];
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY, { onUnresolvableLegacy: (notice) => dropped.push(notice) });
       await expect(adapter.webhook.verify(legacy, connect)).resolves.toBe(true);
+      await expect(adapter.webhook.parse(legacy, connect)).resolves.toEqual([]);
       await expect(adapter.webhook.parse(legacy, connect)).resolves.toEqual([]);
       expect(adapter.webhook.signer?.(legacy, connect)).toBe('legacyAcknowledged');
       expect(spy).not.toHaveBeenCalled();
+      expect(dropped.map((notice) => notice.notificationCode)).toEqual([CODE, CODE]);
+      expect(dropped[0]?.reason).toMatch(/legacyToken/u);
+    });
+
+    it('a Connect seller, SIGNED: stored as the parked UNKNOWN event exactly as before, never dropped', async () => {
+      const rawBody = `notificationCode=${CODE}&notificationType=transaction`;
+      const signed = { ...legacy, headers: { 'x-authenticity-token': createHash('sha256').update(`seller_tok-${rawBody}`).digest('hex') } };
+      const dropped: unknown[] = [];
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY, { onUnresolvableLegacy: (notice) => dropped.push(notice) });
+      await expect(adapter.webhook.verify(signed, connect)).resolves.toBe(true);
+      const events = await adapter.webhook.parse(signed, connect);
+      expect(events).toEqual([
+        expect.objectContaining({ type: 'UNKNOWN', raw: { notificationCode: CODE, notificationType: 'transaction' } }),
+      ]);
+      expect(dropped).toEqual([]);
+    });
+
+    it('a lookup that does not answer in time is a refusal, never a hung request', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+            }),
+        ),
+      );
+      await expect(legacyNotificationKnown(CODE, pasted, 20)).resolves.toBe(false);
     });
 
     it('a pasted token: accepted only when the legacy lookup knows the code, refused when it does not', async () => {

@@ -156,7 +156,7 @@ function createChargeWith(
   };
 }
 
-const webhook: PaymentProviderAdapter['webhook'] = {
+const webhookWith = (options: PagbankOptions): PaymentProviderAdapter['webhook'] => ({
   async verify(delivery, credentials) {
     if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
     if (signerOf(delivery, credentials) !== null) return true;
@@ -184,7 +184,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
    */
   async parse(delivery, credentials) {
     const eventId = sha256Hex(delivery.rawBody);
-    const postTransaction = legacyEvents(delivery, credentials, eventId);
+    const postTransaction = legacyEvents(delivery, credentials, eventId, options.onUnresolvableLegacy);
     if (postTransaction) return postTransaction;
     const body = verifiedByConsult(delivery, credentials)
       ? await requireConsultedOrder(delivery, credentials)
@@ -228,7 +228,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
     }
     return events;
   },
-};
+});
 
 /**
  * The historical per-store webhook path this integration has always used —
@@ -347,7 +347,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>, options
     refund,
     captureCharge,
 
-    webhook,
+    webhook: webhookWith(options),
 
     // No walkthrough: homologação is the PLATFORM's, once. PagBank exempts
     // "clientes que usam plataformas de e-commerce ou módulos", so a store
