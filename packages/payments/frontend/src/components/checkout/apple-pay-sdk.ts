@@ -50,9 +50,19 @@ const SDK_TIMEOUT_MS = 15_000;
 export type ApplePaySdkLoader = () => Promise<ApplePaySessionClass | null>;
 
 /** The in-flight (or settled) load — one script tag per page; a failed load may be retried by a later mount. */
-const loader: { pending: Promise<ApplePaySessionClass | null> | null; loaded: ApplePaySessionClass | null } = {
+const loader: {
+  pending: Promise<ApplePaySessionClass | null> | null;
+  loaded: ApplePaySessionClass | null;
+  /**
+   * The tag of a load that timed out. Taking it away would not stop its fetch, and a
+   * second tag would then run Apple's file twice (`customElements.define` throws
+   * "already defined"), so a retry waits on this one instead of appending another.
+   */
+  straggler: HTMLScriptElement | null;
+} = {
   pending: null,
   loaded: null,
+  straggler: null,
 };
 
 /** The class when it can pay on this device, else `null` — `canMakePayments` never throws past here. */
@@ -76,24 +86,45 @@ function isSdkClass(Session: ApplePaySessionClass): boolean {
   return Session === loader.loaded || (Session as unknown as { isNotWebkit?: unknown }).isNotWebkit === true;
 }
 
-/** Append Apple's script; a load that fails or times out takes its tag away again, so a retry adds only one. */
-function appendScript(): Promise<ApplePaySessionClass | null> {
+/**
+ * Wait for Apple's script tag: a new one, or the tag of an earlier load that
+ * timed out (see {@link loader}.straggler), so Apple's file is never appended
+ * twice. A tag that errors is taken away so the next mount can try again; one
+ * that times out stays, and is the one the next mount waits on.
+ */
+function awaitScript(): Promise<ApplePaySessionClass | null> {
   return new Promise((resolve) => {
-    const script = document.createElement("script");
+    // A timed-out tag something else took off the page will never answer: start afresh.
+    if (loader.straggler && !loader.straggler.isConnected) loader.straggler = null;
+    const fresh = loader.straggler === null;
+    const script = loader.straggler ?? document.createElement("script");
     const settle = (Session: ApplePaySessionClass | null): void => {
       clearTimeout(timer);
       script.onload = null;
       script.onerror = null;
+      loader.straggler = null;
       if (!Session) script.remove();
       resolve(Session);
     };
-    const timer = setTimeout(() => settle(null), SDK_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      // Kept, not removed: it may still run. Its own late answer only clears the slot.
+      loader.straggler = script;
+      script.onload = () => {
+        loader.straggler = null;
+      };
+      script.onerror = () => {
+        loader.straggler = null;
+        script.remove();
+      };
+      resolve(null);
+    }, SDK_TIMEOUT_MS);
+    script.onload = () => settle(applePaySessionClass());
+    script.onerror = () => settle(null);
+    if (!fresh) return;
     script.src = APPLE_PAY_SDK_URL;
     script.integrity = APPLE_PAY_SDK_INTEGRITY;
     script.crossOrigin = "anonymous";
     script.async = true;
-    script.onload = () => settle(applePaySessionClass());
-    script.onerror = () => settle(null);
     document.head.appendChild(script);
   });
 }
@@ -114,7 +145,7 @@ const loadApplePaySdk: ApplePaySdkLoader = () => {
     loader.pending = null;
     loader.loaded = null;
   }
-  loader.pending ??= appendScript().then((Session) => {
+  loader.pending ??= awaitScript().then((Session) => {
     loader.loaded = Session;
     // A failed load leaves the page free to try again on the next mount.
     if (!Session) loader.pending = null;

@@ -8,8 +8,10 @@
  * `window` the way Apple's script installs it, and the tag's `load` or
  * `error` is fired. Pinned:
  *
- *  - two mounts at once share ONE tag; a load that fails or times out takes
- *    its tag away, and the next mount tries again with one new tag;
+ *  - two mounts at once share ONE tag; a load that fails takes its tag away,
+ *    and the next mount tries again with one new tag; a load that times out
+ *    keeps its tag (it may still run), and the next mount waits on that same
+ *    tag instead of running Apple's file twice;
  *  - an SDK that arrives after its load was given up on is still Apple's SDK,
  *    never mistaken for Safari's own session;
  *  - a caller's inline loader does not re-run the load on every render;
@@ -77,7 +79,7 @@ describe("loading Apple's SDK", () => {
     await act(async () => scripts()[0]?.onerror?.(new Event("error")));
   });
 
-  it("gives a load up after 15 s, taking its tag away", async () => {
+  it("gives a load up after 15 s, keeping its tag, which may still run", async () => {
     vi.useFakeTimers();
     const hook = renderHook(() => useApplePaySession(true));
     expect(scripts()).toHaveLength(1);
@@ -87,7 +89,48 @@ describe("loading Apple's SDK", () => {
     });
 
     expect(hook.result.current).toMatchObject({ Session: null, via: null, loading: false });
+    expect(scripts()).toHaveLength(1);
+  });
+
+  it("waits on a timed-out tag instead of appending a second, so Apple's file never runs twice", async () => {
+    vi.useFakeTimers();
+    const given = renderHook(() => useApplePaySession(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(given.result.current.Session).toBeNull();
+
+    const retry = renderHook(() => useApplePaySession(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(scripts()).toHaveLength(1);
+    expect(retry.result.current.loading).toBe(true);
+
+    const Late = sessionClass({ sdk: true });
+    install(Late);
+    await act(async () => scripts()[0]?.onload?.(new Event("load")));
+
+    expect(retry.result.current).toMatchObject({ Session: Late, via: "sdk", loading: false });
+    expect(scripts()).toHaveLength(1);
+  });
+
+  it("drops a timed-out tag that later errors, and the next mount appends one new tag", async () => {
+    vi.useFakeTimers();
+    renderHook(() => useApplePaySession(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    await act(async () => scripts()[0]?.onerror?.(new Event("error")));
     expect(scripts()).toHaveLength(0);
+
+    const retry = renderHook(() => useApplePaySession(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(scripts()).toHaveLength(1);
+    expect(retry.result.current.loading).toBe(true);
+    await act(async () => scripts()[0]?.onerror?.(new Event("error")));
   });
 
   it("never takes an SDK that arrived after its load was given up on for Safari's own session", async () => {
@@ -107,7 +150,8 @@ describe("loading Apple's SDK", () => {
 
     expect(withoutSdk.result.current).toMatchObject({ Session: null, via: null });
     await waitFor(() => expect(withSdk.result.current).toMatchObject({ Session: Late, via: "sdk" }));
-    expect(scripts()).toHaveLength(0);
+    // Only the given-up tag, which ran late; no second one was appended.
+    expect(scripts()).toHaveLength(1);
   });
 
   it("answers Safari's own session as native, without loading anything", () => {
