@@ -209,7 +209,9 @@ describe('ProductionScenarioList — the card refunds (PG3, C33)', () => {
     });
 
     expect(text('googlePay')).toMatch(/^Google Pay · pago, não estornado — 3 de 3 tentativas recusadas pelo PagBank/u);
-    fireEvent.click(screen.getByRole('button', { name: 'Tentar estornar o cartão de novo' }));
+    // A wallet is not "o cartão": the press names the refund.
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar o estorno de novo' }));
     expect(onRetryRefund).toHaveBeenCalledTimes(1);
   });
 

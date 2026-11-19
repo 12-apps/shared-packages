@@ -135,12 +135,18 @@ function countingDown(pix: ProductionPixView | null): boolean {
  * the server presses each open refund, whatever the Pix is doing.
  */
 function pressOf(pix: ProductionPixView | null): 'PIX' | 'CARD' | 'EVERY' | null {
-  const pixOut = pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true ? 1 : 0;
-  const cardsOut = (pix?.cards ?? []).filter((card) => card.exhausted).length;
-  if (pixOut + cardsOut > 1) return 'EVERY';
-  if (pixOut) return 'PIX';
-  return cardsOut ? 'CARD' : null;
+  const open = [...(pixRefundOut(pix) ? ['pix'] : []), ...(pix?.cards ?? []).filter((card) => card.exhausted).map((card) => card.scenario)];
+  if (open.length === 0) return null;
+  if (open.length > 1) return 'EVERY';
+  if (open[0] === 'pix') return 'PIX';
+  // "o cartão" names a credit or debit card; a wallet's press says "o estorno" (FUT-5371).
+  return PLAIN_CARDS.has(open[0]!) ? 'CARD' : 'EVERY';
 }
+
+/** The Pix is paid and its refund's attempts ran out. */
+const pixRefundOut = (pix: ProductionPixView | null): boolean => pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true;
+
+const PLAIN_CARDS: ReadonlySet<string> = new Set(['credit', 'debit']);
 
 /** The press's label and test id. */
 function pressLabel(press: 'PIX' | 'CARD' | 'EVERY', copy: Copy): { label: string; testId: string } {
