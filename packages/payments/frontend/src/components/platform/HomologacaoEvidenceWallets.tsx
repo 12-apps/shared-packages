@@ -328,6 +328,7 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
             label={copy.applePayButton}
             onPress={wallets.apple.press}
             testId="evidence-apple-pay-sdk"
+            height={5}
             sx={{ height: 40, width: { xs: '100%', sm: 240 }, '& > apple-pay-button': { '--apple-pay-button-border-radius': (t: Theme) => t.spacing(0.5) } }}
           />
         ) : wallets.apple ? (

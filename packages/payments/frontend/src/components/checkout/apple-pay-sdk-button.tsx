@@ -13,11 +13,13 @@ import { useEffect, useRef, type JSX } from "react";
  * Held, the element is marked disabled, described by the reason, and a press
  * does nothing.
  */
-export function ApplePaySdkButton({ label, onPress, testId, held = null, sx }: {
+export function ApplePaySdkButton({ label, onPress, testId, height, held = null, sx }: {
   /** The accessible name — the element's own text is Apple's. */
   label: string;
   onPress: () => void;
   testId: string;
+  /** The button's height, in theme spacing units. */
+  height: number;
   /** The id of the element saying why the button cannot act yet, or `null`. */
   held?: string | null;
   sx?: SxProps<Theme>;
@@ -67,10 +69,12 @@ export function ApplePaySdkButton({ label, onPress, testId, held = null, sx }: {
       sx={[
         {
           pointerEvents: held ? "none" : undefined,
+          // Apple's element sizes itself from these two variables, not from its box: a
+          // percentage height is ignored and the element keeps its own, taller one.
           "& > apple-pay-button": {
             display: "block",
             "--apple-pay-button-width": "100%",
-            "--apple-pay-button-height": "100%",
+            "--apple-pay-button-height": (t: Theme) => t.spacing(height),
           },
         },
         ...(Array.isArray(sx) ? sx : [sx]),

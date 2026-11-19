@@ -151,6 +151,7 @@ function AppleSdkWalletButton({ label, onPress, held }: { label: string; onPress
       onPress={onPress}
       held={held.describedBy}
       testId="list-apple-pay-sdk"
+      height={WALLET_HEIGHT}
       sx={{
         ...pill(isHeld),
         "& > apple-pay-button": { "--apple-pay-button-border-radius": (t: Theme) => t.spacing(WALLET_HEIGHT / 2) },
