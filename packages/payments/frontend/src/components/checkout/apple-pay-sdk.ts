@@ -88,7 +88,7 @@ function appendScript(): Promise<ApplePaySessionClass | null> {
  * device can pay with it. Never throws. A class already on the window (Safari's
  * own, or a harness's) is answered without a request.
  */
-export const loadApplePaySdk: ApplePaySdkLoader = () => {
+const loadApplePaySdk: ApplePaySdkLoader = () => {
   const installed = applePaySessionClass();
   if (installed) return Promise.resolve(payable(installed));
   if (typeof document === "undefined") return Promise.resolve(null);
