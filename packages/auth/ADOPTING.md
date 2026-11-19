@@ -616,3 +616,74 @@ shows up in `assemble()`'s report rather than in a bug about a page nobody
 mounted. Screen names are the KEYS of the built surface, and a test asserts
 they resolve — a rename that did not reach the surface is a host-side undefined
 component, which renders as a blank page with nothing in any log.
+
+## Deleting one's own account (`accountDeletion`)
+
+A person deletes their own account with a grace window (`graceDays`, a whole
+number of days, at least 1): scheduling signs them out everywhere at once, a
+fresh sign-in during the window reaches only "Sua conta será excluída em
+<data> — Cancelar exclusão / Sair", and the purge runs when the window ends.
+Every schedule, cancel and purge is audited through the host's writer; the
+person is mailed at scheduling, 7 days and 1 day before the purge ("não dá
+para recuperar"), and on cancel. A window of 7 days or less sends no 7-day
+reminder; one of a single day sends neither reminder.
+
+1. **Schema.** `pnpm --filter @12-apps/auth prisma:sync` copies
+   `AuthAccountState` (`auth_account_states`, no foreign key) and its migration.
+2. **API.** `createApiAuth({ …, accountDeletion: { graceDays, timeZone,
+   userIdByEmail, resolveCaller, hasPassword, checkPassword, blockers,
+   forfeits, onScheduled, erase, emailOf, mail, audit, getDb } })`.
+   - Sign-in stamps `uid` (the host's claim, or `userIdByEmail`), `sv` (the
+     session epoch) and, for a provider in `freshSignInProviders` (default
+     `google`), `at`.
+   - `auth()` answers no session for a token signed in before the last
+     scheduling or cancel, after the purge, **or while the deletion is
+     pending** — fail-closed, so a host route cannot serve a pending session
+     by forgetting a check. The deletion's own routes read the caller with
+     `apiAuth.auth(request, { allowPending: true })` in `resolveCaller`.
+   - `GET <basePath>/session` (the endpoint a SPA boots from) answers the same:
+     `{}` and the cookie cleared for a revoked token, `deletion.purgeAt` on a
+     pending one.
+   - Mount `apiAuth.accountDeletion.routes` (`GET`, `POST`, `cancel` at
+     `<mount>/cancel`).
+   - A host that reads sessions another way calls
+     `apiAuth.accountDeletion.standing(uid, { sv })` where it resolves the user.
+   - **The password's attempt limit is the host's.** `checkPassword` is the
+     host's own sign-in check and must include its rate limit; the package
+     adds none.
+   - The check reads the row every request (one primary-key read, no cache),
+     so a revocation holds on every instance at once.
+3. **Job.** Hand `apiAuth.accountDeletion.job` to the host's runner
+   (`defineJob({ ...job, queue })`): one hourly sweep flushes the mail outbox,
+   sends the due reminders and runs the due purges, paged so no row starves
+   another. `sweep(now)` is idempotent and callable directly. `erase` must be
+   idempotent: a failed purge keeps a 30-minute lease and runs again after it
+   — and a purge slower than the lease may be run (erase and its audit) twice
+   by two passes — and a purge once claimed can no longer be cancelled. Until
+   it is claimed, the person may still cancel, even past the date. Failures go to
+   `onError` (default `console.error`).
+4. **Mails.** Each one goes through a one-slot outbox on the row and is cleared
+   only once it left, so an outage (or an e-mail the host cannot find yet) is
+   retried, never lost. Each send first takes the slot (a 5-minute lease keyed
+   on the kind and the purge date, re-checking that the window is still the one
+   the mail names), so two passes never both send, and a mail for a window
+   that was cancelled or re-scheduled is not sent. **One duplicate is
+   possible:** a process that dies after the mail left and before the slot was
+   cleared sends it again once the lease expires. A mail never holds the
+   purge: a due purge runs first, and a mail still owed to a purged account is
+   dropped. `accountDeletionMail(kind, purgeAt, locale, timeZone)` gives the
+   subject, the line and the button for the host's own layout.
+5. **Web.** `createWebAuth({ accountDeletion: { mount, facts, timeZone } })`
+   gives `webAuth.accountDeletion.DeleteAccountPage` and
+   `PendingDeletionScreen`; render the latter in place of everything while
+   `pendingDeletionOf(session)` is set. `facts.goes` / `facts.stays` say what
+   the host erases and keeps: they are the host's promises, so the package
+   ships none. A cancel moves the session epoch too, so the person signs in
+   again after it. The page draws its own card (capped at 720px) and its own
+   `h1` ("Excluir conta"): mount it where the host's frame does not repeat that
+   title. `blockerAction(kind)` and `forfeitAction(kind)` give each link's words
+   per kind (a vale cannot be refunded; credit can).
+
+What stays in the host is configuration: its blockers, what is given up (and
+how the host zeroes it at the purge), and its erasure of every row that holds
+the person.

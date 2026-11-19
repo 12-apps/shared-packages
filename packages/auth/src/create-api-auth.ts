@@ -17,6 +17,9 @@ import {
 } from "./credentials-provider";
 import { withOAuthErrorReturn } from "./oauth-error-return";
 import type { SignInClaims } from "./sign-in-claims";
+import { createAccountDeletion, type AccountDeletion } from "./account-deletion";
+import { sessionCookieNameFor } from "./session-cookie";
+import type { AccountDeletionConfig } from "./account-deletion/types";
 
 /**
  * The backend half of `@12-apps/auth`, as one factory taking one config object.
@@ -115,6 +118,14 @@ export interface ApiAuthConfig {
    * `session.claims` on every request, with no database read (FUT-3906).
    */
   signInClaims?: SignInClaims;
+  /**
+   * Deleting one's own account (`./account-deletion`): the grace window, the
+   * session revocation, the routes, the reminders and the purge job. On, the
+   * sign-in stamps the session epoch (`sv`) and the sign-in time (`at`) beside
+   * the host's claims, keyed by the host's `uid` claim; `auth()` answers no
+   * session for a revoked token and marks a pending one with `deletion`.
+   */
+  accountDeletion?: AccountDeletionConfig;
   /** Where an unauthenticated visitor is sent. Defaults to `/login`. */
   signInPage?: string;
   /**
@@ -155,12 +166,19 @@ export interface ApiAuth {
   };
   /** Serve one `/api/auth/**` request. */
   handler: (request: Request) => Promise<Response>;
-  /** The session for an incoming request, or `null`. */
-  auth: (request: Request) => Promise<Session | null>;
+  /**
+   * The session for an incoming request, or `null`. With `accountDeletion` on,
+   * a session whose account's deletion is pending is `null` too — fail-closed,
+   * so no host route serves it by forgetting a check — unless the caller asks
+   * with `{ allowPending: true }` (the deletion's own routes).
+   */
+  auth: (request: Request, options?: { allowPending?: boolean }) => Promise<Session | null>;
   /** Is this email on the admin allowlist? */
   isAdmin: (email: string | null | undefined) => boolean;
   /** The built Auth.js config, for hosts that need to inspect it. */
   config: AuthConfig;
+  /** The account-deletion feature, when `accountDeletion` was configured. */
+  accountDeletion?: AccountDeletion;
 }
 
 /** Normalise the allowlist to the comma-separated form `isAdminEmail` takes. */
@@ -252,12 +270,14 @@ function resolveProviders(options: ApiAuthConfig): Provider[] | undefined {
  */
 export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
   const allowlist = toAllowlist(options.adminEmails);
+  const deletion = options.accountDeletion ? createAccountDeletion(options.accountDeletion) : undefined;
+  const signInClaims = withDeletionClaims(options.signInClaims, deletion);
   const getAdminEmails = (): string | undefined => allowlist ?? getEnv().ADMIN_EMAILS;
 
   const config = buildAuthConfig({
     getSignInGate: () => options.signInGate ?? null,
     getSessionAdmin: () => options.sessionAdmin ?? null,
-    getSignInClaims: () => options.signInClaims ?? null,
+    getSignInClaims: () => signInClaims ?? null,
     providers: resolveProviders(options),
     getAdminEmails,
     signInPage: options.signInPage,
@@ -270,12 +290,18 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
   // Opt-in: a failed OAuth round trip returns to the page that started it, not
   // to the one error page Auth.js knows (FUT-4595, `./oauth-error-return`).
   // Off, every request goes to Auth.js exactly as before.
-  const handler = (request: Request): Promise<Response> => {
+  const route = (request: Request): Promise<Response> => {
     const forwarded = reqWithEnvUrl(request, options.authUrl ?? process.env.AUTH_URL);
     return options.errorReturnsToStart === true
       ? withOAuthErrorReturn(forwarded, serve, config)
       : serve(forwarded);
   };
+  // The session endpoint every SPA boots from answers the same as `auth()`:
+  // a revoked token reads as signed out, a pending one carries `deletion`.
+  const handler = (request: Request): Promise<Response> =>
+    deletion && request.method === "GET" && new URL(request.url).pathname === `${config.basePath ?? "/api/auth"}/session`
+      ? route(request).then((response) => answerSessionStanding(response, deletion, options.authUrl ?? process.env.AUTH_URL))
+      : route(request);
 
   /**
    * Deliberately routed through {@link handler} rather than decoding the cookie
@@ -288,18 +314,19 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
    * would let a caller's `Origin`/`Referer` reach Auth.js's CSRF checks from a
    * route that never meant to perform an auth action.
    */
-  const auth = async (request: Request): Promise<Session | null> => {
+  const auth = async (request: Request, read: { allowPending?: boolean } = {}): Promise<Session | null> => {
     const { origin } = new URL(request.url);
     const basePath = config.basePath ?? "/api/auth";
     const cookie = request.headers.get("cookie");
     const sessionRequest = new Request(`${origin}${basePath}/session`, {
       headers: cookie ? { cookie } : {},
     });
-    const response = await handler(sessionRequest);
+    const response = await route(sessionRequest);
     if (!response.ok) return null;
     // Auth.js answers 200 `{}` — not 401 — when there is no valid session.
     const session = (await response.json()) as Partial<Session> | null;
-    return session?.user ? (session as Session) : null;
+    if (!session?.user) return null;
+    return deletion ? readDeletionStanding(session as Session, deletion, read.allowPending === true) : (session as Session);
   };
 
   return {
@@ -308,5 +335,60 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
     auth,
     isAdmin: (email) => isAdminEmail(email, getAdminEmails()),
     config,
+    ...(deletion ? { accountDeletion: deletion } : {}),
   };
+}
+
+/** The host's claims, plus `uid`, the session epoch and (for a fresh-capable provider) the sign-in time. */
+function withDeletionClaims(host: SignInClaims | undefined, deletion: AccountDeletion | undefined): SignInClaims | undefined {
+  if (!deletion) return host;
+  return async (params) => {
+    const claims = host ? await host(params) : {};
+    // Never a token the revocation check cannot place: no `uid`, resolve it.
+    const uid = claims.uid ?? (await deletion.userIdByEmail(params.email));
+    return uid ? { ...claims, uid, ...(await deletion.signInClaims(uid, params.provider)) } : claims;
+  };
+}
+
+/**
+ * The revocation check on a session: a token signed in before its person's
+ * deletion was scheduled (or cancelled), or whose account was purged, is no
+ * session; one whose deletion is pending carries `deletion.purgeAt`. A token
+ * with no `uid` claim is placed by its e-mail, never admitted unchecked.
+ */
+async function withDeletionStanding(session: Session, deletion: AccountDeletion): Promise<Session | null> {
+  const claims = (session as Session & { claims?: Record<string, string> }).claims ?? {};
+  const uid = claims.uid ?? (session.user?.email ? await deletion.userIdByEmail(session.user.email) : null);
+  if (!uid) return session;
+  const standing = await deletion.standing(uid, { sv: claims.sv ?? null });
+  if (standing.state === "revoked") return null;
+  if (standing.state === "pending") return { ...session, deletion: { purgeAt: standing.purgeAt.toISOString() } } as Session;
+  return session;
+}
+
+/** `auth()`'s answer with deletion on: revoked is none, and pending is none unless asked for. */
+async function readDeletionStanding(session: Session, deletion: AccountDeletion, allowPending: boolean): Promise<Session | null> {
+  const standing = await withDeletionStanding(session, deletion);
+  if (!standing) return null;
+  return allowPending || !("deletion" in standing) ? standing : null;
+}
+
+/** `GET <basePath>/session`, told the standing: `{}` and the cookie cleared for a revoked token. */
+async function answerSessionStanding(response: Response, deletion: AccountDeletion, authUrl: string | undefined): Promise<Response> {
+  if (!response.ok) return response;
+  const body = (await response.clone().json().catch(() => null)) as Partial<Session> | null;
+  if (!body?.user) return response;
+  const standing = await withDeletionStanding(body as Session, deletion);
+  if (standing === body) return response;
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  if (standing === null) {
+    headers.delete("set-cookie");
+    const name = sessionCookieNameFor(authUrl);
+    // A `__Secure-` cookie is only replaced by one that is itself Secure.
+    const secure = name.startsWith("__Secure-") ? "; Secure" : "";
+    headers.append("set-cookie", `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`);
+    return new Response("{}", { status: 200, headers });
+  }
+  return new Response(JSON.stringify(standing), { status: 200, headers });
 }

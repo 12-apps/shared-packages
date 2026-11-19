@@ -63,6 +63,8 @@
     "20261116190000_paid_channel_consent",
     "20261118120000_fiscal_link_payment_event",
     "20261118120000_payment_refund_retries_refunded_before",
-    "20261118180000_fiscal_contingency_blocks"
+    "20261118180000_fiscal_contingency_blocks",
+    "20261119180000_auth_account_deletion",
+    "20261119190000_auth_account_mail_claim"
   ]
 }

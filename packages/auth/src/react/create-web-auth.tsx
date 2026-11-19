@@ -12,6 +12,7 @@ import {
 import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
 import { useCredentialsSignIn } from "./credentials-sign-in";
 import { postPasswordSignIn, type PasswordSignInResult } from "./password-signin";
+import { createWebAccountDeletion, type WebAccountDeletion, type WebAccountDeletionConfig } from "./account-deletion";
 
 /**
  * The browser half of `@12-apps/auth`, as one factory taking one config object.
@@ -118,6 +119,8 @@ export interface WebAuthConfig {
    * hung on a session request nothing was left to answer.
    */
   fetchImpl?: typeof fetch;
+  /** Deleting one's own account: the page and the pending screen, on this session (`./account-deletion`). */
+  accountDeletion?: WebAccountDeletionConfig;
 }
 
 export interface WebAuth {
@@ -125,6 +128,8 @@ export interface WebAuth {
   SessionProvider: (props: { children: ReactNode }) => JSX.Element;
   /** Read the session; throws outside the provider. */
   useSession: () => SessionContextValue;
+  /** Present when `accountDeletion` was configured. */
+  accountDeletion?: WebAccountDeletion;
 }
 
 /**
@@ -375,5 +380,11 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     return value;
   }
 
-  return { SessionProvider, useSession };
+  return {
+    SessionProvider,
+    useSession,
+    ...(config.accountDeletion
+      ? { accountDeletion: createWebAccountDeletion({ fetchImpl, ...config.accountDeletion }, { useSession }) }
+      : {}),
+  };
 }
