@@ -616,3 +616,39 @@ shows up in `assemble()`'s report rather than in a bug about a page nobody
 mounted. Screen names are the KEYS of the built surface, and a test asserts
 they resolve — a rename that did not reach the surface is a host-side undefined
 component, which renders as a blank page with nothing in any log.
+
+## Deleting one's own account (`accountDeletion`)
+
+A person deletes their own account with a grace window (the host's `graceDays`;
+Future Pay passes 15): scheduling signs them out everywhere at once, a fresh
+sign-in during the window reaches only "Sua conta será excluída em <data> —
+Cancelar exclusão / Sair", and the purge runs when the window ends. Every
+schedule, cancel and purge is audited through the host's writer; the person is
+mailed at scheduling, 7 days and 1 day before the purge ("não dá para
+recuperar"), and on cancel.
+
+1. **Schema.** `pnpm --filter @12-apps/auth prisma:sync` copies
+   `AuthAccountState` (`auth_account_states`, no foreign key) and its migration.
+2. **API.** `createApiAuth({ …, accountDeletion: { graceDays, resolveCaller,
+   hasPassword, checkPassword, blockers, forfeits, onScheduled, erase, emailOf,
+   mail, audit, getDb } })`. The host's `signInClaims` must stamp `uid`; the
+   package adds `sv` (the session epoch) and `at` (the sign-in time), and
+   `auth()` answers no session for a revoked token and marks a pending one with
+   `deletion.purgeAt`. Mount `apiAuth.accountDeletion.routes` (`GET`, `POST`,
+   `cancel` at `<mount>/cancel`), and open only that mount to a pending session
+   (`isOpenWhilePending(pathname, mount)`). A host that resolves sessions some
+   other way calls `apiAuth.accountDeletion.standing(uid, { sv })` where it
+   resolves the user.
+3. **Job.** Hand `apiAuth.accountDeletion.job` to the host's runner
+   (`defineJob({ ...job, queue })`): one hourly sweep sends the due reminders
+   and runs the due purges. `sweep(now)` is idempotent and callable directly.
+4. **Web.** `createWebAccountDeletion({ mount, signInWithGoogle, signOut })`
+   gives `DeleteAccountPage` and `PendingDeletionScreen`; render the latter in
+   place of everything while `pendingDeletionOf(session)` is set.
+5. **Mails.** `accountDeletionMail(kind, purgeAt, locale)` gives the subject,
+   the line and the button for the host's own layout.
+
+What stays in the host is configuration: its blockers (a pedido in progress,
+an open comanda…), what is given up (store credit shown, zeroed at the purge
+by the host's own ledger entry), and its erasure of every row that holds the
+person.

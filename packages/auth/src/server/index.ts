@@ -132,3 +132,6 @@ export {
   isTokenExpired,
   issueToken,
 } from "../tokens";
+
+/** Deleting one's own account (FUT-5322): `createApiAuth({ accountDeletion })`, or on its own. */
+export * from "../account-deletion";

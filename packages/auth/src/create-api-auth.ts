@@ -17,6 +17,8 @@ import {
 } from "./credentials-provider";
 import { withOAuthErrorReturn } from "./oauth-error-return";
 import type { SignInClaims } from "./sign-in-claims";
+import { createAccountDeletion, type AccountDeletion } from "./account-deletion";
+import type { AccountDeletionConfig } from "./account-deletion/types";
 
 /**
  * The backend half of `@12-apps/auth`, as one factory taking one config object.
@@ -115,6 +117,14 @@ export interface ApiAuthConfig {
    * `session.claims` on every request, with no database read (FUT-3906).
    */
   signInClaims?: SignInClaims;
+  /**
+   * Deleting one's own account (`./account-deletion`): the grace window, the
+   * session revocation, the routes, the reminders and the purge job. On, the
+   * sign-in stamps the session epoch (`sv`) and the sign-in time (`at`) beside
+   * the host's claims, keyed by the host's `uid` claim; `auth()` answers no
+   * session for a revoked token and marks a pending one with `deletion`.
+   */
+  accountDeletion?: AccountDeletionConfig;
   /** Where an unauthenticated visitor is sent. Defaults to `/login`. */
   signInPage?: string;
   /**
@@ -161,6 +171,8 @@ export interface ApiAuth {
   isAdmin: (email: string | null | undefined) => boolean;
   /** The built Auth.js config, for hosts that need to inspect it. */
   config: AuthConfig;
+  /** The account-deletion feature, when `accountDeletion` was configured. */
+  accountDeletion?: AccountDeletion;
 }
 
 /** Normalise the allowlist to the comma-separated form `isAdminEmail` takes. */
@@ -252,12 +264,14 @@ function resolveProviders(options: ApiAuthConfig): Provider[] | undefined {
  */
 export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
   const allowlist = toAllowlist(options.adminEmails);
+  const deletion = options.accountDeletion ? createAccountDeletion(options.accountDeletion) : undefined;
+  const signInClaims = withDeletionClaims(options.signInClaims, deletion);
   const getAdminEmails = (): string | undefined => allowlist ?? getEnv().ADMIN_EMAILS;
 
   const config = buildAuthConfig({
     getSignInGate: () => options.signInGate ?? null,
     getSessionAdmin: () => options.sessionAdmin ?? null,
-    getSignInClaims: () => options.signInClaims ?? null,
+    getSignInClaims: () => signInClaims ?? null,
     providers: resolveProviders(options),
     getAdminEmails,
     signInPage: options.signInPage,
@@ -299,7 +313,8 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
     if (!response.ok) return null;
     // Auth.js answers 200 `{}` — not 401 — when there is no valid session.
     const session = (await response.json()) as Partial<Session> | null;
-    return session?.user ? (session as Session) : null;
+    if (!session?.user) return null;
+    return deletion ? withDeletionStanding(session as Session, deletion) : (session as Session);
   };
 
   return {
@@ -308,5 +323,31 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
     auth,
     isAdmin: (email) => isAdminEmail(email, getAdminEmails()),
     config,
+    ...(deletion ? { accountDeletion: deletion } : {}),
   };
+}
+
+/** The host's claims, plus the session epoch and sign-in time when deletion is on. */
+function withDeletionClaims(host: SignInClaims | undefined, deletion: AccountDeletion | undefined): SignInClaims | undefined {
+  if (!deletion) return host;
+  return async (params) => {
+    const claims = host ? await host(params) : {};
+    const uid = claims.uid;
+    return uid ? { ...claims, ...(await deletion.signInClaims(uid)) } : claims;
+  };
+}
+
+/**
+ * The revocation check on the session read: a token signed in before its
+ * person's deletion was scheduled, or whose account was purged, is no session;
+ * one whose deletion is pending carries `deletion.purgeAt`, and the host opens
+ * only the deletion's routes to it (`isOpenWhilePending`).
+ */
+async function withDeletionStanding(session: Session, deletion: AccountDeletion): Promise<Session | null> {
+  const claims = (session as Session & { claims?: Record<string, string> }).claims ?? {};
+  if (!claims.uid) return session;
+  const standing = await deletion.standing(claims.uid, { sv: claims.sv ?? null });
+  if (standing.state === "revoked") return null;
+  if (standing.state === "pending") return { ...session, deletion: { purgeAt: standing.purgeAt.toISOString() } } as Session;
+  return session;
 }
