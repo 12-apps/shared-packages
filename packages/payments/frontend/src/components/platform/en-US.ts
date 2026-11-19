@@ -169,6 +169,7 @@ const BASE: Omit<PlatformHomologacaoCopy, 'productionEvidence'> = {
       names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
       hint: "Tap each wallet before generating; without it, that wallet's section stays pending.",
       googlePayButtonLocale: 'en',
+      applePayButtonLocale: 'en-US',
       applePayButton: 'Pay with Apple Pay',
       applePaySheetTotal: 'Homologation test',
       applePayCannotStart: 'Apple Pay is not configured.',

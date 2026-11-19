@@ -217,7 +217,13 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
     appleAbsent: appleAbsence(input, apple !== null, session.loading),
     /** The host carries wallets but no Google Pay for this seller: say so, rather than draw nothing. */
     googleAbsent: input.config !== null && !google,
-    /** What phase 2 gets: each wallet's answer, or why it could not be offered here. */
+    /**
+     * What phase 2 gets: each wallet's answer, or why it could not be offered
+     * here. "Generate" pressed while Apple's SDK is still loading records
+     * Apple Pay as NOT_AVAILABLE, on purpose: there was no button to press at
+     * that moment, and the run never waits on a script (its section stays
+     * pending, and a later run with the button records it).
+     */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
         const result = results[wallet] ?? notOffered(wallet, input, { google: client !== null, apple: apple !== null });
@@ -326,6 +332,7 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
         {wallets.apple?.via === 'sdk' ? (
           <ApplePaySdkButton
             label={copy.applePayButton}
+            locale={copy.applePayButtonLocale}
             onPress={wallets.apple.press}
             testId="evidence-apple-pay-sdk"
             height={5}

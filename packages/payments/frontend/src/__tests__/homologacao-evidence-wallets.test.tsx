@@ -430,6 +430,23 @@ describe('HomologacaoEvidenceCard — Apple Pay in a browser that is not Safari 
     );
   });
 
+  it('given generate pressed while the SDK is still loading, then the run records Apple Pay as not available, without waiting', async () => {
+    const { ran } = mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: () => new Promise(() => undefined) });
+
+    fireEvent.click(await screen.findByTestId('evidence-generate'));
+
+    await waitFor(() => expect(ran).toHaveLength(1));
+    expect(ran[0]?.wallets).toEqual([{ type: 'APPLE_PAY', token: null, brand: null, last4: null, failure: 'NOT_AVAILABLE' }]);
+  });
+
+  it("given the SDK's button, then it is drawn in the copy's language", async () => {
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdkApplePay().load });
+
+    const locale = (await screen.findByTestId('evidence-apple-pay-sdk')).querySelector('apple-pay-button')?.getAttribute('locale');
+    expect(locale).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayButtonLocale);
+    expect(locale).toBe('pt-BR');
+  });
+
   it('given the SDK is still loading, then neither a button nor the hint is drawn', async () => {
     mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: () => new Promise(() => undefined) });
 

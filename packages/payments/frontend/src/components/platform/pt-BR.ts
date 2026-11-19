@@ -153,6 +153,7 @@ const BASE: Omit<PlatformHomologacaoCopy, 'productionEvidence'> = {
       names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
       hint: 'Toque em cada carteira antes de gerar; sem isso, a seção dela fica pendente.',
       googlePayButtonLocale: 'pt',
+      applePayButtonLocale: 'pt-BR',
       applePayButton: 'Pagar com Apple Pay',
       applePaySheetTotal: 'Teste de homologação',
       applePayCannotStart: 'O Apple Pay não está configurado.',

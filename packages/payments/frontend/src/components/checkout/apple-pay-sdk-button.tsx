@@ -13,9 +13,11 @@ import { useEffect, useRef, type JSX } from "react";
  * Held, the element is marked disabled, described by the reason, and a press
  * does nothing.
  */
-export function ApplePaySdkButton({ label, onPress, testId, height, held = null, sx }: {
+export function ApplePaySdkButton({ label, locale, onPress, testId, height, held = null, sx }: {
   /** The accessible name — the element's own text is Apple's. */
   label: string;
+  /** The language Apple draws the label in (the host's copy); absent ⇒ Apple's default. */
+  locale?: string;
   onPress: () => void;
   testId: string;
   /** The button's height, in theme spacing units. */
@@ -33,7 +35,7 @@ export function ApplePaySdkButton({ label, onPress, testId, height, held = null,
     const button = document.createElement("apple-pay-button");
     button.setAttribute("buttonstyle", "black");
     button.setAttribute("type", "pay");
-    button.setAttribute("locale", document.documentElement.lang || "pt-BR");
+    if (locale) button.setAttribute("locale", locale);
     button.setAttribute("role", "button");
     button.setAttribute("tabindex", "0");
     const press = (): void => {
@@ -48,7 +50,7 @@ export function ApplePaySdkButton({ label, onPress, testId, height, held = null,
     button.addEventListener("keydown", key);
     element.replaceChildren(button);
     return () => element.replaceChildren();
-  }, []);
+  }, [locale]);
   useEffect(() => {
     const button = mount.current?.firstElementChild;
     if (!button) return;

@@ -176,6 +176,11 @@ export interface HomologacaoEvidenceWalletsCopy {
   hint: string;
   /** The language Google draws its own button's label in. */
   googlePayButtonLocale: string;
+  /**
+   * The language Apple's `<apple-pay-button>` draws its label in outside
+   * Safari (FUT-5372), a BCP-47 tag. Absent ⇒ Apple's own default.
+   */
+  applePayButtonLocale?: string;
   /** The Apple Pay button's accessible name. */
   applePayButton: string;
   /** The line Apple's sheet shows above the test amount. */

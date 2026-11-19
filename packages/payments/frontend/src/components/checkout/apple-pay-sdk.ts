@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { applePaySessionClass, type ApplePaySessionClass } from "./apple-pay-button";
 
@@ -65,11 +65,26 @@ function payable(Session: ApplePaySessionClass | null): ApplePaySessionClass | n
   }
 }
 
+/**
+ * Whether `Session` is Apple's SDK class rather than Safari's own. The SDK
+ * marks its class (`static isNotWebkit = true`, Apple Pay JS 1.3.x), which
+ * also covers an SDK that arrives AFTER its load was given up on: that one
+ * was never recorded in {@link loader}, and must still never be taken for
+ * Safari's.
+ */
+function isSdkClass(Session: ApplePaySessionClass): boolean {
+  return Session === loader.loaded || (Session as unknown as { isNotWebkit?: unknown }).isNotWebkit === true;
+}
+
+/** Append Apple's script; a load that fails or times out takes its tag away again, so a retry adds only one. */
 function appendScript(): Promise<ApplePaySessionClass | null> {
   return new Promise((resolve) => {
     const script = document.createElement("script");
     const settle = (Session: ApplePaySessionClass | null): void => {
       clearTimeout(timer);
+      script.onload = null;
+      script.onerror = null;
+      if (!Session) script.remove();
       resolve(Session);
     };
     const timer = setTimeout(() => settle(null), SDK_TIMEOUT_MS);
@@ -84,9 +99,11 @@ function appendScript(): Promise<ApplePaySessionClass | null> {
 }
 
 /**
- * Load Apple's SDK once per page and answer its `ApplePaySession` when this
- * device can pay with it. Never throws. A class already on the window (Safari's
- * own, or a harness's) is answered without a request.
+ * Load Apple's SDK once per page — concurrent callers share one load and one
+ * tag — and answer its `ApplePaySession` when this device can pay with it.
+ * Never throws. A class already on the window (Safari's own, a harness's, or
+ * an SDK that arrived late) is answered without a request; a failed load is
+ * tried again by the next caller.
  */
 const loadApplePaySdk: ApplePaySdkLoader = () => {
   const installed = applePaySessionClass();
@@ -97,7 +114,7 @@ const loadApplePaySdk: ApplePaySdkLoader = () => {
     loader.pending = null;
     loader.loaded = null;
   }
-  loader.pending ??=appendScript().then((Session) => {
+  loader.pending ??= appendScript().then((Session) => {
     loader.loaded = Session;
     // A failed load leaves the page free to try again on the next mount.
     if (!Session) loader.pending = null;
@@ -122,7 +139,7 @@ export interface ApplePaySessionState {
 /** The native class, when Safari (or a harness) has one this device can pay with — and it is not the SDK's. */
 function nativeSession(): ApplePaySessionClass | null {
   const Session = applePaySessionClass();
-  if (!Session || Session === loader.loaded) return null;
+  if (!Session || isSdkClass(Session)) return null;
   return payable(Session);
 }
 
@@ -133,15 +150,20 @@ const NONE: ApplePaySessionState = { Session: null, via: null, loading: false };
  * else, when `sdk` is on, Apple's SDK loaded on demand. `sdk` off (the
  * checkout's default) is exactly the page before FUT-5372 — no script, and
  * Apple Pay only where the browser has a native session.
+ *
+ * `load` is read through a ref: a caller passing a new function each render
+ * (an inline arrow) neither re-runs the load nor re-renders the page.
  */
 export function useApplePaySession(sdk: boolean, load: ApplePaySdkLoader = loadApplePaySdk): ApplePaySessionState {
   const native = nativeSession();
   const wantsSdk = sdk && native === null;
+  const loadRef = useRef(load);
+  loadRef.current = load;
   const [loaded, setLoaded] = useState<{ Session: ApplePaySessionClass | null; done: boolean }>({ Session: null, done: false });
   useEffect(() => {
     if (!wantsSdk) return undefined;
     const alive = { current: true };
-    void load()
+    void loadRef.current()
       .catch(() => null)
       .then((Session) => {
         if (alive.current) setLoaded({ Session, done: true });
@@ -149,7 +171,7 @@ export function useApplePaySession(sdk: boolean, load: ApplePaySdkLoader = loadA
     return () => {
       alive.current = false;
     };
-  }, [wantsSdk, load]);
+  }, [wantsSdk]);
   const Session = native ?? (wantsSdk ? loaded.Session : null);
   const via: ApplePayVia | null = native ? "native" : Session ? "sdk" : null;
   const loading = wantsSdk && !loaded.done;

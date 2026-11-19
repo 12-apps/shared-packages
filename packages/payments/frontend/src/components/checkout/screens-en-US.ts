@@ -140,6 +140,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
       cannotComplete: 'Could not start Apple Pay. Try again, or pay by card.',
       paymentFailed: 'Could not complete the payment with Apple Pay. Try again, or pay by card.',
       payAction: 'Pay with Apple Pay',
+      buttonLocale: 'en-US',
     },
     googlePay: {
       cannotComplete: 'Could not complete the payment with Google Pay. Try again, or pay by card.',

@@ -145,9 +145,11 @@ function AppleWalletButton({ label, onPress, held }: { label: string; onPress: (
  */
 function AppleSdkWalletButton({ label, onPress, held }: { label: string; onPress: () => void; held: Held }): JSX.Element {
   const isHeld = held.describedBy !== null;
+  const locale = useCheckoutCopy().screens.wallet.applePay.buttonLocale;
   return (
     <ApplePaySdkButton
       label={label}
+      locale={locale}
       onPress={onPress}
       held={held.describedBy}
       testId="list-apple-pay-sdk"
