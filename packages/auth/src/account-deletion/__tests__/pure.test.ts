@@ -6,7 +6,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const T0 = new Date("2026-11-19T15:00:00.000Z");
 const row = {
   userId: "u", sessionEpoch: 1, requestedAt: T0, purgeAt: new Date(T0.getTime() + 15 * DAY),
-  remindedWeekAt: null, remindedDayAt: null, mailOwed: null, mailPurgeAt: null, purgeClaimedAt: null, deletedAt: null,
+  remindedWeekAt: null, remindedDayAt: null, mailOwed: null, mailPurgeAt: null, mailClaimedAt: null, purgeClaimedAt: null, deletedAt: null,
 };
 
 describe("standingOf", () => {

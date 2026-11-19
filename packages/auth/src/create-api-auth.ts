@@ -379,7 +379,10 @@ async function answerSessionStanding(response: Response, deletion: AccountDeleti
   headers.delete("content-length");
   if (standing === null) {
     headers.delete("set-cookie");
-    headers.append("set-cookie", `${sessionCookieNameFor(authUrl)}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+    const name = sessionCookieNameFor(authUrl);
+    // A `__Secure-` cookie is only replaced by one that is itself Secure.
+    const secure = name.startsWith("__Secure-") ? "; Secure" : "";
+    headers.append("set-cookie", `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`);
     return new Response("{}", { status: 200, headers });
   }
   return new Response(JSON.stringify(standing), { status: 200, headers });

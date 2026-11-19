@@ -113,6 +113,7 @@ export interface AccountStateRow {
   readonly remindedDayAt: Date | null;
   readonly mailOwed: string | null;
   readonly mailPurgeAt: Date | null;
+  readonly mailClaimedAt: Date | null;
   readonly purgeClaimedAt: Date | null;
   readonly deletedAt: Date | null;
 }

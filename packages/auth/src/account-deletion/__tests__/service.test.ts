@@ -223,3 +223,68 @@ describe("the routes", () => {
     expect((await nobody.routes.GET(new Request("https://x.test/d"))).status).toBe(401);
   });
 });
+
+describe("round 2: the outbox never holds a purge, and never mails a stale slot", () => {
+  it("purges when it is due even though the mail is down and the e-mail unknown", async () => {
+    const { feature, erase } = world({ emailOf: async () => null });
+    await feature.schedule(PERSON, "right", T0);
+    expect((await feature.sweep(at(15))).purged).toBe(1);
+    expect(erase).toHaveBeenCalledTimes(1);
+  });
+
+  it("mails an owed slot once when two passes flush it at the same time", async () => {
+    let down = true;
+    const sent: string[] = [];
+    const { feature } = world({
+      mail: async (message) => {
+        if (down) throw new Error("driver down");
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        sent.push(message.kind);
+      },
+    });
+    await feature.schedule(PERSON, "right", T0);
+    down = false;
+    await Promise.all([feature.sweep(at(1)), feature.sweep(at(1))]);
+    expect(sent).toEqual(["scheduled"]);
+  });
+
+  it("mails nothing when the person cancels between the sweep's read and its send", async () => {
+    let down = true;
+    const sent: Array<[string, Date]> = [];
+    const { feature, db } = world({
+      mail: async (message) => {
+        if (down && message.kind === "week-before") throw new Error("driver down");
+        sent.push([message.kind, message.purgeAt]);
+      },
+    });
+    await feature.schedule(PERSON, "right", T0);
+    await feature.sweep(at(8, 60_000));
+    expect(db.rows.get("u1")?.mailOwed).toBe("week-before");
+    const original = db.authAccountState.findMany.bind(db.authAccountState);
+    db.authAccountState.findMany = async (args) => {
+      const rows = await original(args);
+      await feature.cancel(PERSON, at(9));
+      return rows;
+    };
+    down = false;
+    await feature.sweep(at(9, 1));
+    expect(sent.map(([kind]) => kind)).not.toContain("week-before");
+  });
+
+  it("still lets the person cancel past the date until a purge claims the account", async () => {
+    const { feature } = world();
+    await feature.schedule(PERSON, "right", T0);
+    expect(await feature.cancel(PERSON, at(15, 1))).toEqual({ ok: true });
+  });
+
+  it("pages past rows that stay selected", async () => {
+    const { feature, db, mails } = world({ emailOf: async (userId) => (userId.startsWith("stuck") ? null : PERSON.email) });
+    for (let index = 0; index < 60; index += 1) {
+      await db.authAccountState.create({ data: { userId: `stuck-${String(index).padStart(2, "0")}`, requestedAt: T0, purgeAt: at(20), mailOwed: "scheduled", mailPurgeAt: at(20) } });
+    }
+    await feature.schedule({ ...PERSON, userId: "u1" }, "right", T0);
+    mails.length = 0;
+    await feature.sweep(at(8, 60_000));
+    expect(mails.map((mail) => mail.kind)).toContain("week-before");
+  });
+});

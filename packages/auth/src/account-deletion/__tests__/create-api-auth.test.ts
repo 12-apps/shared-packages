@@ -69,4 +69,13 @@ describe("createApiAuth({ accountDeletion })", () => {
     const body = (await (await apiAuth.handlers.GET(request(fresh))).json()) as { deletion?: { purgeAt: string } };
     expect(body.deletion?.purgeAt).toMatch(/Z$/);
   });
+
+  it("clears a __Secure- cookie with a Secure clearing cookie on https", async () => {
+    const { apiAuth } = api();
+    const old = await minted({ uid: "u1", sv: "0" });
+    await apiAuth.accountDeletion?.schedule({ userId: "u1", email: IDENTITY.email }, "pw");
+    const cleared = (await apiAuth.handlers.GET(request(old))).headers.get("set-cookie") ?? "";
+    expect(COOKIE.startsWith("__Secure-")).toBe(true);
+    expect(cleared).toMatch(/^__Secure-[^=]+=;.*; Secure$/);
+  });
 });

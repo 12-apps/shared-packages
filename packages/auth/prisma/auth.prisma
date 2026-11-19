@@ -110,6 +110,8 @@ model AuthAccountState {
   /// cleared only once the mail left, so an outage retries it next pass.
   mailOwed        String?   @map("mail_owed")
   mailPurgeAt     DateTime? @map("mail_purge_at")
+  /// The send's lease: the one pass sending the owed mail, so two never do.
+  mailClaimedAt   DateTime? @map("mail_claimed_at")
   /// The purge's lease: set by the pass that runs it, until `deletedAt`.
   purgeClaimedAt  DateTime? @map("purge_claimed_at")
   deletedAt       DateTime? @map("deleted_at")

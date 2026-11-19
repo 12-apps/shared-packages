@@ -657,13 +657,22 @@ reminder; one of a single day sends neither reminder.
    (`defineJob({ ...job, queue })`): one hourly sweep flushes the mail outbox,
    sends the due reminders and runs the due purges, paged so no row starves
    another. `sweep(now)` is idempotent and callable directly. `erase` must be
-   idempotent: a failed purge keeps a 30-minute lease and runs again after it,
-   and a purge once claimed can no longer be cancelled. Failures go to
+   idempotent: a failed purge keeps a 30-minute lease and runs again after it
+   — and a purge slower than the lease may be run (erase and its audit) twice
+   by two passes — and a purge once claimed can no longer be cancelled. Until
+   it is claimed, the person may still cancel, even past the date. Failures go to
    `onError` (default `console.error`).
 4. **Mails.** Each one goes through a one-slot outbox on the row and is cleared
    only once it left, so an outage (or an e-mail the host cannot find yet) is
-   retried, never lost; `accountDeletionMail(kind, purgeAt, locale, timeZone)`
-   gives the subject, the line and the button for the host's own layout.
+   retried, never lost. Each send first takes the slot (a 5-minute lease keyed
+   on the kind and the purge date, re-checking that the window is still the one
+   the mail names), so two passes never both send, and a mail for a window
+   that was cancelled or re-scheduled is not sent. **One duplicate is
+   possible:** a process that dies after the mail left and before the slot was
+   cleared sends it again once the lease expires. A mail never holds the
+   purge: a due purge runs first, and a mail still owed to a purged account is
+   dropped. `accountDeletionMail(kind, purgeAt, locale, timeZone)` gives the
+   subject, the line and the button for the host's own layout.
 5. **Web.** `createWebAuth({ accountDeletion: { mount, facts, timeZone } })`
    gives `webAuth.accountDeletion.DeleteAccountPage` and
    `PendingDeletionScreen`; render the latter in place of everything while
