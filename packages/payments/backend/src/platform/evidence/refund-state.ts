@@ -10,6 +10,21 @@ import type { EvidenceRecord, EvidenceStep } from './types';
  */
 export type EvidenceRefundState = RefundRetryState;
 
+/**
+ * How the evidence words a refund that is still open, or that went back after
+ * refusals (FUT-5371) — part of the outcome copy (`EvidenceOutcomeCopy`).
+ */
+export interface EvidenceRefundOutcomeCopy {
+  /**
+   * PagBank has not taken the refund yet: what the last attempt answered, and
+   * whether the system still retries by itself or a person must press "Tentar o
+   * estorno de novo". The money is still out: "estorno pendente".
+   */
+  refundPending: (attempt: number, of: number, detail: string, exhausted: boolean) => string;
+  /** The note on a refund that went back after earlier refused attempts, kept in the step as context. */
+  refundAfterRetries: (refused: number) => string;
+}
+
 /** What a screen shows of it — the stored fields a person needs. */
 export interface EvidencePixRefundView {
   attempt: number;

@@ -157,21 +157,34 @@ async function closeCardSeries(
 }
 
 /**
- * "Tentar estornar o cartão de novo" (FUT-4740, C33): a new series for the
- * first card cancel whose attempts ran out, starting now. Its attempt reads
- * the charge back before it cancels, so a card refunded meanwhile in the
+ * "Tentar o estorno de novo" for the cards (FUT-4740, C33; FUT-5371): a new
+ * series for EVERY card cancel whose attempts ran out — the credit, the debit
+ * and both wallets — each starting now, one after the other. Each attempt
+ * reads the charge back before it cancels, so a card refunded meanwhile in the
  * PagBank panel is adopted (the step turns EXECUTED) and the new-run block
- * (C34) lifts. A no-op while no card's attempts ran out.
+ * (C34) lifts. A card whose series still runs, or whose attempt is in flight,
+ * is left alone: the press never sends a second cancel beside a live one. A
+ * no-op while no card's attempts ran out.
  */
 export async function pressRetryCardRefund(deps: EvidenceRunDeps, record: EvidenceRecord): Promise<EvidenceRecord> {
-  const now = clockOf(deps)();
-  const owed = CARD_CANCEL_KEYS.map((key) => cardRefundOf(record, key)).find(
-    (candidate) => candidate !== null && candidate.state.exhausted && !claimHeld(candidate.state, now),
-  );
-  if (!owed) return record;
+  let current = record;
+  for (const key of CARD_CANCEL_KEYS) {
+    const owed = cardRefundOf(current, key);
+    if (!owed || !owed.state.exhausted || claimHeld(owed.state, clockOf(deps)())) continue;
+    current = await pressOneCard(deps, current, owed);
+  }
+  return current;
+}
+
+/** One card's new series: claimed behind the record, then sent; the record as it then stands. */
+async function pressOneCard(
+  deps: EvidenceRunDeps,
+  record: EvidenceRecord,
+  owed: { state: EvidenceRefundState; target: RefundTarget },
+): Promise<EvidenceRecord> {
   const seller = await sandboxSeller(deps);
   if (typeof seller !== 'object') return record;
-  const state = { ...firstClaim(now, owed.state), reported: false };
+  const state = { ...firstClaim(clockOf(deps)(), owed.state), reported: false };
   const claimed = await claimAttempt(deps, record, state, record.steps, owed.target.key);
   if (!claimed) return (await deps.store.latest(PROVIDER, 'RUN')) ?? record;
   return runClaimedAttempt(deps, claimed, state, seller, false, owed.target);

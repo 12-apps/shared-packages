@@ -1,5 +1,6 @@
 import {
   afterRefusal,
+  attemptsOf,
   isNothingToRefund,
   pg1Schedule,
   refundRefusalOf,
@@ -13,7 +14,7 @@ import { recordTraffic, type RecordedOutcome } from './record';
 import { REFUND_ATTEMPT_DEADLINE_MS, type EvidenceRefundState } from './refund-state';
 import type { EvidenceRunDeps } from './run';
 import { usageStep } from './run';
-import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf, withStep } from './steps';
+import { answered, clockOf, errorDetail, failureOf, isSuccess, pendingStep, stepOf, withStep } from './steps';
 import type { EvidenceRecord, EvidenceStep, EvidenceStepKey } from './types';
 
 /**
@@ -149,12 +150,36 @@ export async function runClaimedAttempt(
       : afterRefusal(state, settled.refusal, now, pg1Schedule);
   const reportNow = next.exhausted && !next.reported;
   const final = reportNow ? { ...next, reported: true } : next;
-  let steps = withStep(claimed.steps, { ...settled.step, refund: final });
+  let steps = withStep(claimed.steps, { ...filedStep(deps, settled, final), refund: final });
   steps = withStep(steps, await usageStep(deps, steps, seller.token));
   const saved = await deps.store.saveIf({ ...claimed, steps, updatedAt: stampAfter(now, claimed.updatedAt) }, claimed.updatedAt);
   if (!saved) return (await deps.store.latest(PROVIDER, 'RUN')) ?? claimed;
   if (reportNow) reportStuckRefund(deps, target, settled);
   return saved;
+}
+
+/**
+ * The step as the file shows it (FUT-5371). A refund that went back after
+ * refused attempts says so in a note: the earlier answers stay in its calls as
+ * context, and the last call is the cancel that counted. A refund PagBank has
+ * not taken yet ("not yet", or no answer) reads "estorno pendente", saying
+ * whether the system still retries by itself; a refusal for good keeps the
+ * plain failure.
+ */
+function filedStep(deps: EvidenceRunDeps, settled: Settled, state: EvidenceRefundState): EvidenceStep {
+  const { step } = settled;
+  if (settled.refusal === null) {
+    const refused = refusedCancels(step.calls);
+    return refused > 0 ? { ...step, notes: [...step.notes, deps.copy.refundAfterRetries(refused)] } : step;
+  }
+  if (settled.refusal === 'REFUSED') return step;
+  const detail = errorDetail(settled.error ?? step.observed);
+  return { ...step, observed: deps.copy.refundPending(state.attempt, attemptsOf(state), detail, state.exhausted) };
+}
+
+/** The cancels in a step's calls that PagBank did not take (anything but a 2xx). */
+export function refusedCancels(calls: readonly RecordedHttpCall[]): number {
+  return calls.filter((call) => call.method === 'POST' && /\/cancel(?:$|\?)/u.test(call.url) && !isSuccess(call.status)).length;
 }
 
 /** Sentry hears of a stuck refund ONCE per charge, when its first series gives up (FUT-4360). */

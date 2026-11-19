@@ -259,6 +259,14 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     chargeStatus: (status) => `Charge with status ${status}.`,
     canceled: (status) => `Cancellation recorded with status ${status}.`,
+    refundPending: (attempt, of, detail, exhausted) =>
+      `Refund pending: PagBank did not take attempt ${attempt} of ${of} (${detail}). ` +
+      (exhausted
+        ? 'The automatic attempts ran out; the refund stays open until someone presses "Try the refund again".'
+        : 'The system tries again by itself, with no new charge.'),
+    refundAfterRetries: (refused) =>
+      `Refund completed after ${refused} ${refused === 1 ? 'attempt' : 'attempts'} PagBank refused ` +
+      '(cancellation not yet available right after the charge). The earlier requests stay above as context; the last one is the cancellation that counted.',
     threeDSSessionMinted: "3DS session minted with the seller's token.",
     threeDSSessionMissing: 'The 3DS session was not minted.',
     threeDSAuthenticated: (authenticated) =>
