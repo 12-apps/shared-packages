@@ -101,6 +101,8 @@ function everyProp(): { [K in keyof Required<CheckoutFlowProps>]: CheckoutFlowPr
     // Not the flow's own default (`true`).
     parkHostedOrders: false,
     shortPaymentRoutes: sentinel("shortPaymentRoutes"),
+    // Not the flow's own default (off).
+    applePayQrCode: true,
   };
 }
 

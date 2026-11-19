@@ -329,6 +329,8 @@ export interface PaymentFlows {
     components?: Partial<CheckoutComponents>;
     /** `CheckoutFlowProps.shortPaymentRoutes`; the bound client's `transport.shortPaymentRoutes` wins (FUT-612). */
     shortPaymentRoutes?: ShortPaymentRoutes;
+    /** `CheckoutFlowProps.applePayQrCode` — Apple Pay through Apple's SDK in other browsers, off by default (FUT-5372). */
+    applePayQrCode?: boolean;
   }>;
   /** Slots + transport + scope + the fetched config, for a nesting host. */
   Provider: ComponentType<{ children: ReactNode; config?: CheckoutProviderConfig | null }>;

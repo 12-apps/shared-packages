@@ -123,6 +123,8 @@ function mount(overrides: Partial<Parameters<typeof HomologacaoEvidenceCard>[0]>
     }),
     onDownload: vi.fn(async () => ({ executed: 1, failed: 0, pending: 0 })),
     googlePayApi: null,
+    // A browser where Apple's SDK cannot load: no Safari session means the hint.
+    loadApplePaySdk: async () => null,
     ...overrides,
   };
   render(<HomologacaoEvidenceCard {...props} />);
@@ -260,10 +262,10 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
     );
   });
 
-  it('given Apple Pay is configured but the browser has no ApplePaySession, then the card says to open it in Safari', () => {
+  it('given Apple Pay is configured, no ApplePaySession and Apple\'s SDK does not load, then the card says to open it in Safari', async () => {
     mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})) });
 
-    expect(screen.getByTestId('evidence-apple-pay-absent').textContent).toBe(
+    expect((await screen.findByTestId('evidence-apple-pay-absent')).textContent).toBe(
       PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayAbsent.NOT_AVAILABLE,
     );
   });
@@ -342,5 +344,132 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
     mount({ seller: { ...SELLER, wallets: undefined }, googlePayApi: fakeGooglePay().api });
 
     expect(document.querySelectorAll('[data-testid="evidence-wallets"]')).toHaveLength(0);
+  });
+});
+
+/** Apple's SDK in a browser that is not Safari: a session class the loader hands over, never on `window` here. */
+function sdkApplePay(canPay = true) {
+  const world = { requests: [] as ApplePayPaymentRequest[], sessions: [] as FakeSession[] };
+  class Session extends FakeSession {
+    static STATUS_SUCCESS = 0;
+    static STATUS_FAILURE = 1;
+    static canMakePayments(): boolean {
+      return canPay;
+    }
+    constructor(_version: number, request: ApplePayPaymentRequest) {
+      super();
+      world.requests.push(request);
+      world.sessions.push(this);
+    }
+  }
+  const load = vi.fn(async () => (canPay ? Session : null));
+  return { world, load };
+}
+
+describe('HomologacaoEvidenceCard — Apple Pay in a browser that is not Safari (FUT-5372)', () => {
+  it("given no ApplePaySession and Apple's SDK loads, then Apple's own button is drawn and no hint is shown", async () => {
+    const sdk = sdkApplePay();
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdk.load });
+
+    const mounted = await screen.findByTestId('evidence-apple-pay-sdk');
+    expect(mounted.querySelector('apple-pay-button')?.getAttribute('aria-label')).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayButton,
+    );
+    expect(sdk.load).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay-absent"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay"]')).toHaveLength(0);
+  });
+
+  it("given the SDK's button pressed, then the same session runs: the host validates the merchant and the token is sent", async () => {
+    const sdk = sdkApplePay();
+    const validate = vi.fn<(validationURL: string) => Promise<unknown>>(async () => ({ merchantSessionIdentifier: 'ms-qr' }));
+    const { ran } = mount({ seller: appleSeller(true), onValidateApplePayMerchant: validate, loadApplePaySdk: sdk.load });
+
+    const button = (await screen.findByTestId('evidence-apple-pay-sdk')).querySelector('apple-pay-button')!;
+    fireEvent.click(button);
+    const session = sdk.world.sessions[0]!;
+    expect(session.state.begun).toBe(true);
+    expect(sdk.world.requests[0]).toMatchObject({ total: { label: 'Teste de homologação', amount: '12.00' }, supportedNetworks: ['visa', 'masterCard'] });
+    await act(async () => session.onvalidatemerchant?.({ validationURL: 'https://apple-pay-gateway.apple.com/paymentservices/startSession' }));
+    expect(validate).toHaveBeenCalledWith('https://apple-pay-gateway.apple.com/paymentservices/startSession');
+    expect(session.merchantSessions).toEqual([{ merchantSessionIdentifier: 'ms-qr' }]);
+    await act(async () =>
+      session.onpaymentauthorized?.({
+        payment: { token: { paymentData: { data: 'qr-token' }, paymentMethod: { network: 'MasterCard', displayName: 'MasterCard 5454' } } },
+      }),
+    );
+
+    await screen.findByTestId('evidence-wallet-ready-APPLE_PAY');
+    expect(session.completions).toEqual([{ status: 0 }]);
+    fireEvent.click(screen.getByTestId('evidence-generate'));
+    await waitFor(() => expect(ran).toHaveLength(1));
+    expect(ran[0]?.wallets).toEqual([{ type: 'APPLE_PAY', token: '{"data":"qr-token"}', brand: 'MasterCard', last4: '5454' }]);
+  });
+
+  it("given the SDK loads but cannot pay on this device, then the hint is shown and the run says Apple Pay was not available", async () => {
+    const sdk = sdkApplePay(false);
+    const { ran } = mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdk.load });
+
+    expect((await screen.findByTestId('evidence-apple-pay-absent')).textContent).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayAbsent.NOT_AVAILABLE,
+    );
+    fireEvent.click(screen.getByTestId('evidence-generate'));
+    await waitFor(() => expect(ran).toHaveLength(1));
+    expect(ran[0]?.wallets).toEqual([{ type: 'APPLE_PAY', token: null, brand: null, last4: null, failure: 'NOT_AVAILABLE' }]);
+  });
+
+  it('given the SDK loader throws, then the hint is shown and nothing breaks', async () => {
+    mount({
+      seller: appleSeller(true),
+      onValidateApplePayMerchant: vi.fn(async () => ({})),
+      loadApplePaySdk: vi.fn(async () => Promise.reject(new Error('blocked'))),
+    });
+
+    expect((await screen.findByTestId('evidence-apple-pay-absent')).textContent).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayAbsent.NOT_AVAILABLE,
+    );
+  });
+
+  it('given generate pressed while the SDK is still loading, then the run records Apple Pay as not available, without waiting', async () => {
+    const { ran } = mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: () => new Promise(() => undefined) });
+
+    fireEvent.click(await screen.findByTestId('evidence-generate'));
+
+    await waitFor(() => expect(ran).toHaveLength(1));
+    expect(ran[0]?.wallets).toEqual([{ type: 'APPLE_PAY', token: null, brand: null, last4: null, failure: 'NOT_AVAILABLE' }]);
+  });
+
+  it("given the SDK's button, then it is drawn in the copy's language", async () => {
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdkApplePay().load });
+
+    const locale = (await screen.findByTestId('evidence-apple-pay-sdk')).querySelector('apple-pay-button')?.getAttribute('locale');
+    expect(locale).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayButtonLocale);
+    expect(locale).toBe('pt-BR');
+  });
+
+  it('given the SDK is still loading, then neither a button nor the hint is drawn', async () => {
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: () => new Promise(() => undefined) });
+
+    await screen.findByTestId('evidence-wallets');
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay-absent"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay-sdk"]')).toHaveLength(0);
+  });
+
+  it("given Safari's own ApplePaySession, then the SDK is never loaded and Safari's button is drawn as before", () => {
+    installApplePay();
+    const sdk = sdkApplePay();
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdk.load });
+
+    expect(screen.getByTestId('evidence-apple-pay')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay-sdk"]')).toHaveLength(0);
+    expect(sdk.load).not.toHaveBeenCalled();
+  });
+
+  it('given Apple Pay is not configured, then the SDK is never loaded', async () => {
+    const sdk = sdkApplePay();
+    mount({ seller: appleSeller(false), onValidateApplePayMerchant: vi.fn(async () => ({})), loadApplePaySdk: sdk.load });
+
+    await screen.findByTestId('evidence-apple-pay-absent');
+    expect(sdk.load).not.toHaveBeenCalled();
   });
 });

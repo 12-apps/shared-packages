@@ -44,6 +44,7 @@ export function PaymentPhase({
       saveBuyerContact={props.saveBuyerContact}
       consentLabel={props.copy.consent.saveProfile}
       validateApplePayMerchant={validateApplePayMerchant}
+      applePayQrCode={props.applePayQrCode === true}
     />
   );
 }

@@ -130,6 +130,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
       paymentFailed:
         'Não foi possível concluir o pagamento com o Apple Pay. Tente novamente ou pague com cartão.',
       payAction: 'Pagar com Apple Pay',
+      buttonLocale: 'pt-BR',
     },
     googlePay: {
       cannotComplete:

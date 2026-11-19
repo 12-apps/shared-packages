@@ -19,6 +19,7 @@ import { maskTestCard, PAGBANK_3DS_TEST_CARD, PAGBANK_TEST_CARDS } from '../../c
 import { authenticatePagBankDebit, type ThreeDSFailure } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
 import type { GooglePayApi } from '../checkout/google-pay-button';
+import type { ApplePaySdkLoader } from '../checkout/apple-pay-sdk';
 import { CARD_SX, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
@@ -97,6 +98,8 @@ export interface HomologacaoEvidenceCardProps {
   onValidateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Injectable `google.payments.api` for tests and harnesses; omit to load pay.js. */
   googlePayApi?: GooglePayApi | null;
+  /** Injectable Apple Pay SDK loader for tests; omit to load Apple's script where Safari's session is missing (FUT-5372). */
+  loadApplePaySdk?: ApplePaySdkLoader;
   /** Build and deliver the file; resolves to the counts it holds. */
   onDownload: () => Promise<EvidenceSummary>;
 }
@@ -306,6 +309,7 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
     config: seller?.connected ? (seller.wallets ?? null) : null,
     validateApplePayMerchant: props.onValidateApplePayMerchant,
     googlePayApi: props.googlePayApi,
+    loadApplePaySdk: props.loadApplePaySdk,
   });
   const { phase, section, scope, busy, summary, failed, run } = useEvidenceRun(props, wallets);
   return (

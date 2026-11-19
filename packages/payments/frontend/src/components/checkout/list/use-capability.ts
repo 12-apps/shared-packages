@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { onAppleDevice } from "../apple-device";
-import { applePaySessionClass, applePaySupported, type ApplePaySessionClass } from "../apple-pay-button";
+import type { ApplePaySessionClass } from "../apple-pay-button";
+import { useApplePaySession, type ApplePaySdkLoader, type ApplePaySessionState, type ApplePayVia } from "../apple-pay-sdk";
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
 import { applePayDeclared, cardHead, cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
 import { methodChosenAtProvider } from "../providers/registry";
@@ -22,6 +23,12 @@ export interface ListCapability extends OnlineCapability {
   googlePay: { client: GooglePaymentsClient; params: GooglePayGatewayParams } | null;
   /** Apple Pay, ready to start its session — `null` when it is not offered, or while the host re-prices. */
   applePay: ListApplePay | null;
+  /**
+   * Where Apple Pay's session comes from when it is drawn: Safari's own
+   * (`native`), or Apple's JS SDK in another browser (`sdk`, FUT-5372), whose
+   * own `<apple-pay-button>` is drawn. `null` when Apple Pay is not drawn.
+   */
+  applePayVia: ApplePayVia | null;
   /**
    * The wallets the "PAGAMENTO RÁPIDO" block draws, in the prototype's order.
    * A wallet drawn while the host re-prices has its button held
@@ -45,11 +52,10 @@ function useRepricing(totalCents: number | undefined): { priced: boolean; repric
   return { priced, repricing: totalCents === undefined && wasPriced };
 }
 
-/** Apple Pay's session class, when the chain head declares the wallet and this device can pay (R5). */
-function appleSession(config: CheckoutProviderConfig | null, port: ListApplePay["validateMerchant"] | undefined): ListApplePay | null {
-  if (!port || !applePayDeclared(config) || !applePaySupported()) return null;
-  const Session = applePaySessionClass();
-  return Session ? { Session, validateMerchant: port } : null;
+/** Apple Pay's session class, when the chain head declares the wallet and this browser can start a session (R5). */
+function appleSession(config: CheckoutProviderConfig | null, port: ListApplePay["validateMerchant"] | undefined, session: ApplePaySessionState): ListApplePay | null {
+  if (!port || !applePayDeclared(config) || !session.Session) return null;
+  return { Session: session.Session, validateMerchant: port };
 }
 
 /** Whether the card is offered and available on THIS page — what a wallet is another way of producing. */
@@ -87,13 +93,14 @@ function capabilityOf(
   price: { priced: boolean; repricing: boolean },
   port: ListApplePay["validateMerchant"] | undefined,
   hasBillingAddress: boolean,
+  session: ApplePaySessionState,
 ): ListCapability {
   const offered = offeredMethods(config);
   const cardUnavailable = !cardPathAvailable(config);
   const handOff = methodChosenAtProvider(config?.chain?.[0]?.checkoutScreen, config);
   const card = cardHere(handOff, offered, cardUnavailable);
   const google = googleSheet(config, client);
-  const apple = appleSession(config, port);
+  const apple = appleSession(config, port, session);
   const live = card && price.priced;
   return {
     handOff,
@@ -103,6 +110,7 @@ function capabilityOf(
     wallets: walletsShown(card && (price.priced || price.repricing), google, apple),
     googlePay: live ? google : null,
     applePay: live ? apple : null,
+    applePayVia: apple ? session.via : null,
   };
 }
 
@@ -115,6 +123,12 @@ function capabilityOf(
  * wallet is another way of producing the card (so a Pix-only store never shows
  * the block). Apple also needs the host's merchant-validation port: without it
  * the session could only abort.
+ *
+ * Apple's session is Safari's own. In another browser it is Apple's JS SDK
+ * (a QR code scanned with an iPhone, FUT-5372) only when the host turns
+ * `applePayQrCode` on — the storefront's beta flag — and the head declares
+ * Apple Pay and the host validates the merchant: only then is the script
+ * loaded. Off, the list is exactly what it was: no script, no button.
  *
  * Google Pay is never offered on an Apple device (iOS, iPadOS, Safari on
  * macOS), whether or not the store offers Apple Pay (FUT-4399).
@@ -130,6 +144,8 @@ export function useListCapability(
   validateApplePayMerchant?: ListApplePay["validateMerchant"],
   /** The host gave the billing address a debit card's 3-D Secure needs. */
   hasBillingAddress = false,
+  /** Apple Pay through Apple's SDK in other browsers (FUT-5372) — off unless the host turns it on. */
+  applePay: { qrCode?: boolean; loadSdk?: ApplePaySdkLoader } = {},
 ): ListCapability {
   const declared = googlePayConfig(config);
   // Google Pay is never offered on an Apple device (FUT-4399): decided here,
@@ -144,12 +160,13 @@ export function useListCapability(
   const port = useRef(validateApplePayMerchant);
   port.current = validateApplePayMerchant;
   const hasPort = validateApplePayMerchant !== undefined;
+  const session = useApplePaySession(applePay.qrCode === true && hasPort && applePayDeclared(config), applePay.loadSdk);
   const stablePort = useCallback((validationURL: string): Promise<unknown> => {
     const current = port.current;
     return current ? current(validationURL) : Promise.reject(new Error("no merchant validation port"));
   }, []);
   return useMemo(
-    () => capabilityOf(config, client, { priced, repricing }, hasPort ? stablePort : undefined, hasBillingAddress),
-    [config, client, priced, repricing, hasPort, stablePort, hasBillingAddress],
+    () => capabilityOf(config, client, { priced, repricing }, hasPort ? stablePort : undefined, hasBillingAddress, session),
+    [config, client, priced, repricing, hasPort, stablePort, hasBillingAddress, session],
   );
 }

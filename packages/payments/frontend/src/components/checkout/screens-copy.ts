@@ -260,6 +260,12 @@ export interface WalletCopy {
      */
     paymentFailed?: string;
     payAction: string;
+    /**
+     * The language Apple's `<apple-pay-button>` draws its label in, outside
+     * Safari (FUT-5372) — a BCP-47 tag such as `pt-BR`. Absent ⇒ Apple's own
+     * default. Both packs carry it.
+     */
+    buttonLocale?: string;
   };
   googlePay: {
     cannotComplete: string;

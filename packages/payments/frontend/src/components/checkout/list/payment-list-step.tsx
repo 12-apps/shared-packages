@@ -60,6 +60,8 @@ interface PaymentListStepProps {
    * Without it the list offers no Apple Pay: its session could only abort.
    */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** Apple Pay through Apple's SDK in other browsers (FUT-5372) — `CheckoutFlowProps.applePayQrCode`. */
+  applePayQrCode?: boolean;
 }
 
 /** The store's provider name, as its chain head published it — `null` when it did not. */
@@ -238,7 +240,9 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const config = props.providerConfig ?? null;
   const debitReady = useDebitReady(list);
   // The wallets' sheets open at the wallets' own price (FUT-4416), else the host's total, as before.
-  const cap = useListCapability(config, walletCents(list), props.validateApplePayMerchant, debitReady);
+  const cap = useListCapability(config, walletCents(list), props.validateApplePayMerchant, debitReady, {
+    qrCode: props.applePayQrCode === true,
+  });
   const reveal = useReveal(c, props.defaultBuyer);
   const { revealed } = reveal;
   const state = useListState({

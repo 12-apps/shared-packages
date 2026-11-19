@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography, type Theme } from '@mui/material';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type {
@@ -10,13 +10,9 @@ import type {
   EvidenceWalletsConfig,
 } from '@12-apps/payments-backend';
 
-import {
-  applePaySessionClass,
-  applePaySupported,
-  startApplePaySession,
-  type ApplePayPaymentMethod,
-  type ApplePaySessionClass,
-} from '../checkout/apple-pay-button';
+import { startApplePaySession, type ApplePayPaymentMethod, type ApplePaySessionClass } from '../checkout/apple-pay-button';
+import { ApplePaySdkButton } from '../checkout/apple-pay-sdk-button';
+import { useApplePaySession, type ApplePaySdkLoader, type ApplePaySessionState, type ApplePayVia } from '../checkout/apple-pay-sdk';
 import {
   paymentDataRequest,
   sheetDismissed,
@@ -40,9 +36,11 @@ import { usePlatformCopy } from './copy-context';
  * payment request (`google-pay-button.tsx`), the same `ApplePaySession`
  * (`apple-pay-button.tsx`). Google Pay runs in the environment the host's
  * seller view names (`TEST` for the sandbox evidence, `PRODUCTION` for the
- * production one, FUT-4198) and mints against the seller's PagBank account; Apple Pay is offered only where the device has an
- * `ApplePaySession`, the host has an Apple Pay identity, and the host validates
- * the merchant.
+ * production one, FUT-4198) and mints against the seller's PagBank account; Apple Pay is offered where the host has
+ * an Apple Pay identity and validates the merchant, and the browser can start
+ * a session: Safari's own, or — in any other browser — Apple's JS SDK, loaded
+ * here on demand, whose sheet is a QR code scanned with an iPhone (FUT-5372).
+ * Either way the tap runs the same session and the same validation.
  */
 
 /** The wallets, in the order the evidence file prints them. */
@@ -57,6 +55,8 @@ interface EvidenceWalletsInput {
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Injectable `google.payments.api` for tests; omit to load pay.js. */
   googlePayApi?: GooglePayApi | null;
+  /** Injectable Apple Pay SDK loader for tests; omit to load Apple's script where Safari's session is missing. */
+  loadApplePaySdk?: ApplePaySdkLoader;
 }
 
 const failed = (type: EvidenceWallet, failure: BrowserWalletFailure): BrowserWalletResult => ({
@@ -153,27 +153,42 @@ function runApplePay(
   });
 }
 
-/** Apple Pay, when this device can show the sheet, the host has an identity, and validates the merchant. */
-function appleOffer(input: EvidenceWalletsInput): { Session: ApplePaySessionClass; validate: (url: string) => Promise<unknown> } | null {
+/** Whether the screen offers Apple Pay at all — an identity, and a host that validates the merchant. */
+function appleWanted(input: EvidenceWalletsInput): boolean {
+  return Boolean(input.config?.applePay.configured && input.validateApplePayMerchant);
+}
+
+interface AppleOffer {
+  Session: ApplePaySessionClass;
+  validate: (url: string) => Promise<unknown>;
+  /** Safari's own session, or Apple's SDK in another browser (its own button element). */
+  via: ApplePayVia;
+}
+
+/** Apple Pay, when the screen offers it and this browser can start a session — Safari's, or the SDK's. */
+function appleOffer(input: EvidenceWalletsInput, session: ApplePaySessionState): AppleOffer | null {
   const validate = input.validateApplePayMerchant;
-  if (!input.config?.applePay.configured || !validate || !applePaySupported()) return null;
-  const Session = applePaySessionClass();
-  return Session ? { Session, validate } : null;
+  if (!appleWanted(input) || !validate || !session.Session || !session.via) return null;
+  return { Session: session.Session, validate, via: session.via };
 }
 
 /** Why a wallet with no press cannot run here — or undefined when it simply was not pressed. */
-function notOffered(wallet: EvidenceWallet, input: EvidenceWalletsInput, googleReady: boolean): BrowserWalletResult | undefined {
-  if (wallet === 'GOOGLE_PAY') return input.config?.googlePay && !googleReady ? failed(wallet, 'NOT_AVAILABLE') : undefined;
+function notOffered(wallet: EvidenceWallet, input: EvidenceWalletsInput, ready: { google: boolean; apple: boolean }): BrowserWalletResult | undefined {
+  if (wallet === 'GOOGLE_PAY') return input.config?.googlePay && !ready.google ? failed(wallet, 'NOT_AVAILABLE') : undefined;
   if (!input.config?.applePay.configured) return failed(wallet, 'NOT_CONFIGURED');
   // An identity with no host validation: the sheet could never be validated.
   if (!input.validateApplePayMerchant) return failed(wallet, 'MERCHANT_VALIDATION_FAILED');
-  return applePaySupported() ? undefined : failed(wallet, 'NOT_AVAILABLE');
+  return ready.apple ? undefined : failed(wallet, 'NOT_AVAILABLE');
 }
 
-/** Why Apple Pay has no button on a screen whose host carries wallets — null when it has one, or no wallets at all. */
-function appleAbsence(input: EvidenceWalletsInput, offered: boolean): AppleAbsence | null {
-  if (offered || !input.config) return null;
-  const failure = notOffered('APPLE_PAY', input, false)?.failure;
+/**
+ * Why Apple Pay has no button on a screen whose host carries wallets — null
+ * when it has one, no wallets at all, or while Apple's SDK is still loading
+ * (the button may yet come: no hint flashes before it).
+ */
+function appleAbsence(input: EvidenceWalletsInput, offered: boolean, loading: boolean): AppleAbsence | null {
+  if (offered || loading || !input.config) return null;
+  const failure = notOffered('APPLE_PAY', input, { google: false, apple: false })?.failure;
   return failure === 'NOT_CONFIGURED' || failure === 'NOT_AVAILABLE' || failure === 'MERCHANT_VALIDATION_FAILED' ? failure : null;
 }
 
@@ -189,21 +204,29 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
   const google = input.config?.googlePay ?? null;
   // `null` tells the client hook not to load pay.js at all.
   const client = useGooglePayClient(google ? input.googlePayApi : null, googleEnvironment(google));
-  const apple = appleOffer(input);
+  // Apple's SDK is loaded only where the screen offers Apple Pay and Safari's own session is missing.
+  const session = useApplePaySession(appleWanted(input), input.loadApplePaySdk);
+  const apple = appleOffer(input, session);
   const cents = input.config?.amountCents ?? 0;
   const record = (result: BrowserWalletResult): void => setResults((previous) => ({ ...previous, [result.type]: result }));
   return {
     results,
     google: client && google ? { client, press: () => runGooglePay(client, google, cents, record) } : null,
-    apple: apple ? { press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
+    apple: apple ? { via: apple.via, press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
     /** Why Apple Pay has no button here, or null when it has one. */
-    appleAbsent: appleAbsence(input, apple !== null),
+    appleAbsent: appleAbsence(input, apple !== null, session.loading),
     /** The host carries wallets but no Google Pay for this seller: say so, rather than draw nothing. */
     googleAbsent: input.config !== null && !google,
-    /** What phase 2 gets: each wallet's answer, or why it could not be offered here. */
+    /**
+     * What phase 2 gets: each wallet's answer, or why it could not be offered
+     * here. "Generate" pressed while Apple's SDK is still loading records
+     * Apple Pay as NOT_AVAILABLE, on purpose: there was no button to press at
+     * that moment, and the run never waits on a script (its section stays
+     * pending, and a later run with the button records it).
+     */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
-        const result = results[wallet] ?? notOffered(wallet, input, client !== null);
+        const result = results[wallet] ?? notOffered(wallet, input, { google: client !== null, apple: apple !== null });
         return result ? [result] : [];
       }),
     /** A token pays once: a run that used them clears them. */
@@ -306,7 +329,18 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
         {wallets.google ? (
           <GooglePayMount client={wallets.google.client} onPress={wallets.google.press} locale={copy.googlePayButtonLocale} />
         ) : null}
-        {wallets.apple ? <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} /> : null}
+        {wallets.apple?.via === 'sdk' ? (
+          <ApplePaySdkButton
+            label={copy.applePayButton}
+            locale={copy.applePayButtonLocale}
+            onPress={wallets.apple.press}
+            testId="evidence-apple-pay-sdk"
+            height={5}
+            sx={{ height: 40, width: { xs: '100%', sm: 240 }, '& > apple-pay-button': { '--apple-pay-button-border-radius': (t: Theme) => t.spacing(0.5) } }}
+          />
+        ) : wallets.apple ? (
+          <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} />
+        ) : null}
       </Stack>
       <AbsentLine testId="evidence-google-pay-absent" text={wallets.googleAbsent ? copy.googlePayAbsent : null} />
       <AbsentLine testId="evidence-apple-pay-absent" text={wallets.appleAbsent ? copy.applePayAbsent[wallets.appleAbsent] : null} />

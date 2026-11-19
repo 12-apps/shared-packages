@@ -219,6 +219,8 @@ interface ListHost {
   basket?: string;
   /** The host's Apple Pay merchant-validation port. */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** `CheckoutFlow`'s `applePayQrCode` (FUT-5372); absent ⇒ the prop is not passed at all. */
+  applePayQrCode?: boolean;
   /** The cart's lines and money rows, for the computer's summary column. */
   lines?: { key: string; quantity: number; name: string; totalLabel: string }[];
   discountLines?: ReactNode;
@@ -265,6 +267,7 @@ export function listFlow(host: ListHost): JSX.Element {
           components={host.components}
           settlement={host.settlement}
           {...(host.parkHostedOrders === undefined ? {} : { parkHostedOrders: host.parkHostedOrders })}
+          {...(host.applePayQrCode === undefined ? {} : { applePayQrCode: host.applePayQrCode })}
           {...host.flow}
         />
       </CheckoutNavigateProvider>
