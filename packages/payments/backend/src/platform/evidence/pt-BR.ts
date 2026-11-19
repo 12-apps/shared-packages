@@ -268,6 +268,14 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     chargeStatus: (status) => `Cobrança com status ${status}.`,
     canceled: (status) => `Cancelamento registrado com status ${status}.`,
+    refundPending: (attempt, of, detail, exhausted) =>
+      `Estorno pendente: a tentativa ${attempt} de ${of} não foi aceita pelo PagBank (${detail}). ` +
+      (exhausted
+        ? 'As tentativas automáticas acabaram; o estorno continua em aberto até alguém acionar "Tentar o estorno de novo".'
+        : 'O sistema tenta de novo sozinho, sem nova cobrança.'),
+    refundAfterRetries: (refused) =>
+      `Estorno concluído depois de ${refused} ${refused === 1 ? 'tentativa recusada' : 'tentativas recusadas'} pelo PagBank ` +
+      '(cancelamento ainda indisponível logo após a cobrança). As requisições anteriores ficam acima como contexto; a última é o cancelamento que valeu.',
     threeDSSessionMinted: 'Sessão 3DS gerada com o token do lojista.',
     threeDSSessionMissing: 'A sessão 3DS não foi gerada.',
     threeDSAuthenticated: (authenticated) =>

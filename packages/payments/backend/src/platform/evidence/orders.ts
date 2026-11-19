@@ -2,6 +2,7 @@ import type { CardDetails } from '../../core/card-details';
 import type { StoredCharge } from '../../core/ports';
 import {
   afterRefusal,
+  attemptsOf,
   firstClaim,
   isNothingToRefund,
   pg1Schedule,
@@ -350,10 +351,13 @@ export async function cancelCharge(
   const { done, refusal, observed } = cancelOutcome(deps, canceled);
   const now = clockOf(deps)();
   const refund = refusal === null ? null : afterRefusal({ ...firstClaim(now, null), reported: false }, refusal, now, pg1Schedule);
+  // Not taken yet (FUT-5371): the money is still out and the sweep owns it, so the file says "estorno pendente".
+  const pending = refund !== null && refusal !== 'REFUSED';
+  const detail = canceled.ok ? observed : errorDetail(canceled.error);
   return stepOf(key, done ? 'EXECUTED' : 'FAILED', now, {
     calls: canceled.calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),
-    observed,
+    observed: pending ? deps.copy.refundPending(refund.attempt, attemptsOf(refund), detail, refund.exhausted) : observed,
     ...(refund ? { refund } : {}),
   });
 }

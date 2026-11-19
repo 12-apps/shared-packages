@@ -1,6 +1,6 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
 import type { WalletType } from '../../core/wallet-types';
-import type { EvidenceRefundState } from './refund-state';
+import type { EvidenceRefundOutcomeCopy, EvidenceRefundState } from './refund-state';
 
 /**
  * The homologação EVIDENCE model (FUT-3696) — what was really executed against
@@ -330,7 +330,7 @@ export interface HomologacaoEvidenceCopy {
 }
 
 /** The observed/conclusion sentences the recording writes into each step. */
-export interface EvidenceOutcomeCopy {
+export interface EvidenceOutcomeCopy extends EvidenceRefundOutcomeCopy {
   notRun: string;
   asExpected: string;
   notAsExpected: string;

@@ -28,4 +28,4 @@ export { resolvePagbankNotification } from './pagbank-legacy-notifications';
 // nothing an adopter imports moves — and knip is what proves that, by going
 // red the moment a name stops being reachable from an entry point.
 export type { PagbankLegacyNotificationDetail } from './pagbank-legacy-notifications';
-export { legacyNotificationCode, pagbankLegacyResolver } from './pagbank-legacy-resolve';
+export { legacyNotificationCode, pagbankLegacyResolver, type UnresolvableLegacyNotification } from './pagbank-legacy-resolve';

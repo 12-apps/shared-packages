@@ -272,6 +272,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       },
       retryRefund: 'Tentar estornar o Pix de novo',
       retryCardRefund: 'Tentar estornar o cartão de novo',
+      retryEveryRefund: 'Tentar o estorno de novo',
     },
     charge: '3. Cobrar R$ 1,00 por cenário e estornar',
     confirm: {

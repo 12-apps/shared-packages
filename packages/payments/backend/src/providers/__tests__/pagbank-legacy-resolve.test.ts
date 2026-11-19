@@ -76,3 +76,22 @@ describe('resolving it', () => {
     expect(resolved).toEqual([{ eventId: 'resolved' }]);
   });
 });
+
+describe('a Connect seller (FUT-5371)', () => {
+  it('parks the code instead of failing the row: an OAuth access token cannot ask the legacy host', async () => {
+    const connect = { environment: 'PRODUCTION', fields: { token: 'oauth_access', refreshToken: 'r', legacyEmail: 'x@y.z' } };
+    const heard: unknown[] = [];
+    const resolve = pagbankLegacyResolver(store({ getCredentials: vi.fn().mockResolvedValue(connect) }), (notice) => heard.push(notice));
+
+    await expect(resolve(parked({ notificationCode: 'abc' }), TENANT)).resolves.toBeNull();
+    // Said, never silent: which field is missing, by name.
+    expect(heard).toEqual([{ notificationCode: 'abc', merchant: TENANT, reason: 'Connect seller: legacyEmail is set but legacyToken is not' }]);
+  });
+
+  it('still resolves for a Connect seller whose own account token was stored apart', async () => {
+    const connect = { environment: 'PRODUCTION', fields: { token: 'oauth_access', refreshToken: 'r', legacyToken: 'acct', legacyEmail: 'x@y.z' } };
+    const resolve = pagbankLegacyResolver(store({ getCredentials: vi.fn().mockResolvedValue(connect) }));
+
+    await expect(resolve(parked({ notificationCode: 'abc' }), TENANT)).resolves.toEqual([{ eventId: 'resolved' }]);
+  });
+});

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderRequestError } from '../core/errors';
 import { createMemoryChargeStore } from '../memory';
 import { pagbankProvider } from '../providers/pagbank';
+import { legacyNotificationKnown } from '../providers/pagbank-legacy-notifications';
 import { pagbankIdempotencyKey } from '../providers/pagbank-http';
 import { cardInput, pixInput } from './fixtures';
 import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
@@ -775,6 +776,114 @@ describe('pagbank adapter — webhooks', () => {
           { environment: 'PRODUCTION', fields: { token: 'acct_tok' } },
         ),
       ).resolves.toBe(true);
+    });
+  });
+
+  /**
+   * FUT-5371: production (2026-11-19) received every legacy notification
+   * WITHOUT `x-authenticity-token`, on the homologação seller's route and on a
+   * store's, and refused each at verify — so PagBank redelivered. An unsigned
+   * one is now let in only in its documented shape, and only once PagBank's
+   * legacy lookup knows the code; a Connect seller, who can never ask the
+   * lookup, has it acknowledged and nothing stored.
+   */
+  describe('an unsigned legacy notification (FUT-5371)', () => {
+    const CODE = '3F6E06-E39BE59BE515-000471CF9624-390FE5';
+    const delivery = (rawBody: string) => ({ provider: 'pagbank' as const, rawBody, headers: {} });
+    const legacy = delivery(`notificationCode=${CODE}&notificationType=transaction`);
+    const connect = { environment: 'PRODUCTION' as const, fields: { token: 'seller_tok', refreshToken: 'r', platformWebhookSecret: 'p', platformClientSecret: 'c' } };
+    const pasted = { environment: 'PRODUCTION' as const, fields: { token: 'acct_tok', email: 'loja@example.com' } };
+    const xml = '<?xml version="1.0"?><transaction><code>9E884542-81B3-4419-9A75-BCC6FB495EF1</code><status>7</status></transaction>';
+    const lookup = (status: number, body: string) => {
+      const spy = vi.fn(async () => new Response(body, { status, statusText: status === 200 ? 'OK' : 'Not Found' }));
+      vi.stubGlobal('fetch', spy);
+      return spy;
+    };
+
+    it('a Connect seller, unsigned: acknowledged with no call to PagBank, NOTHING stored, and each drop reported with its code', async () => {
+      const spy = lookup(200, xml);
+      const dropped: { notificationCode: string; reason: string }[] = [];
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY, { onUnresolvableLegacy: (notice) => dropped.push(notice) });
+      await expect(adapter.webhook.verify(legacy, connect)).resolves.toBe(true);
+      await expect(adapter.webhook.parse(legacy, connect)).resolves.toEqual([]);
+      await expect(adapter.webhook.parse(legacy, connect)).resolves.toEqual([]);
+      expect(adapter.webhook.signer?.(legacy, connect)).toBe('legacyAcknowledged');
+      expect(spy).not.toHaveBeenCalled();
+      expect(dropped.map((notice) => notice.notificationCode)).toEqual([CODE, CODE]);
+      expect(dropped[0]?.reason).toMatch(/legacyToken/u);
+    });
+
+    it('a Connect seller, SIGNED: stored as the parked UNKNOWN event exactly as before, never dropped', async () => {
+      const rawBody = `notificationCode=${CODE}&notificationType=transaction`;
+      const signed = { ...legacy, headers: { 'x-authenticity-token': createHash('sha256').update(`seller_tok-${rawBody}`).digest('hex') } };
+      const dropped: unknown[] = [];
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY, { onUnresolvableLegacy: (notice) => dropped.push(notice) });
+      await expect(adapter.webhook.verify(signed, connect)).resolves.toBe(true);
+      const events = await adapter.webhook.parse(signed, connect);
+      expect(events).toEqual([
+        expect.objectContaining({ type: 'UNKNOWN', raw: { notificationCode: CODE, notificationType: 'transaction' } }),
+      ]);
+      expect(dropped).toEqual([]);
+    });
+
+    it('a lookup that does not answer in time is a refusal, never a hung request', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+            }),
+        ),
+      );
+      await expect(legacyNotificationKnown(CODE, pasted, 20)).resolves.toBe(false);
+    });
+
+    it('a pasted token: accepted only when the legacy lookup knows the code, refused when it does not', async () => {
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const known = lookup(200, xml);
+      await expect(adapter.webhook.verify(legacy, pasted)).resolves.toBe(true);
+      expect(String((known.mock.calls as unknown[][])[0]?.[0])).toContain(`/v3/transactions/notifications/${CODE}`);
+      expect(adapter.webhook.signer?.(legacy, pasted)).toBe('legacyLookup');
+
+      lookup(404, '<errors><error><code>404</code></error></errors>');
+      await expect(adapter.webhook.verify(legacy, pasted)).resolves.toBe(false);
+      vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+      await expect(adapter.webhook.verify(legacy, pasted)).resolves.toBe(false);
+    });
+
+    it.each([
+      ['an extra key', `notificationCode=${CODE}&notificationType=transaction&x=1`],
+      ['the code twice', `notificationCode=${CODE}&notificationCode=${CODE}`],
+      ['a code not in PagBank\'s format', 'notificationCode=A1&notificationType=transaction'],
+      ['a code one digit short', `notificationCode=${CODE.slice(1)}`],
+      ['an odd type', `notificationCode=${CODE}&notificationType=${encodeURIComponent('<script>')}`],
+    ])('refuses %s at verify, asking nothing and storing nothing', async (_name, rawBody) => {
+      const spy = lookup(200, xml);
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      await expect(adapter.webhook.verify(delivery(rawBody), connect)).resolves.toBe(false);
+      await expect(adapter.webhook.verify(delivery(rawBody), pasted)).resolves.toBe(false);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('one code is one event: a redelivery, its keys reordered, or its code bare and lower-case', async () => {
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const ids = await Promise.all(
+        [
+          `notificationCode=${CODE}&notificationType=transaction`,
+          `notificationType=transaction&notificationCode=${CODE}`,
+          'notificationCode=3f6e06e39be59be515000471cf9624390fe5&notificationType=transaction',
+        ].map(async (rawBody) => (await adapter.webhook.parse(delivery(rawBody), pasted))[0]?.eventId),
+      );
+      expect(new Set(ids).size).toBe(1);
+      const other = await adapter.webhook.parse(delivery('notificationCode=093C100E7FA87FA8C0B664B79F8359773B96'), pasted);
+      expect(other[0]?.eventId).not.toBe(ids[0]);
+    });
+
+    it('never opens the door to an unsigned ORDER body', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 404 })));
+      const order = delivery(JSON.stringify({ id: 'ORDE_1', charges: [{ id: 'CHAR_1', status: 'PAID' }], notificationCode: CODE }));
+      await expect(pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(order, pasted)).resolves.toBe(false);
     });
   });
 

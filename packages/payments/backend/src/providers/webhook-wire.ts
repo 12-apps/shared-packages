@@ -29,6 +29,8 @@ export const pagbankChargeWireSchema = z.object({
   amount: free,
   payment_response: free,
   payment_method: free,
+  /** The Pix QR of the charge form (FUT-3928): what a Pix order's charge carries since then (FUT-5371). */
+  qr_code: free,
   recurring: free,
   sub_merchant: free,
   splits: free,

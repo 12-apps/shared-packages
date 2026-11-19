@@ -192,10 +192,35 @@ describe('ProductionScenarioList — the card refunds (PG3, C33)', () => {
     expect(onRetryRefund).toHaveBeenCalledTimes(1);
   });
 
-  it('C3 while the Pix refund is the one out of attempts, the press is the Pix one', () => {
+  // FUT-5371 changed C3's press: the server used to press only the Pix while it held money, so the
+  // card waited and the button named the Pix. One press now retries every open refund, and says so.
+  it('C3 while the Pix and a card are both out of attempts, ONE press retries both, named for both', () => {
     show({ ...RUN_1620, pix: { ...RUN_1620.pix, cards: [{ scenario: 'credit', attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' }] } as ProductionPixView });
 
-    expect(screen.getAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Tentar o estorno de novo' })).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(0);
     expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
+  });
+
+  it('C4 a wallet out of attempts is pressable while the Pix refund still retries by itself (FUT-5371)', () => {
+    const { onRetryRefund } = show({
+      ...RUN_1616,
+      pix: { ...RUN_1616.pix, cards: [{ scenario: 'googlePay', attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' }] } as ProductionPixView,
+    });
+
+    expect(text('googlePay')).toMatch(/^Google Pay · pago, não estornado — 3 de 3 tentativas recusadas pelo PagBank/u);
+    // A wallet is not "o cartão": the press names the refund.
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar o estorno de novo' }));
+    expect(onRetryRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it('C5 both wallets out of attempts while the Pix QR is still up: ONE press for both (FUT-5371)', () => {
+    const awaiting = { runId: 'run-3', state: 'AWAITING_PAYMENT', qrText: '000201', expiresAt: '2026-11-11T15:40:00.000Z', refund: null };
+    const out = (scenario: string) => ({ scenario, attempt: 3, of: 3, nextAt: null, exhausted: true, refusal: 'NOT_YET' });
+    show({ scenarios: RUN_1620.scenarios, pix: { ...awaiting, cards: [out('googlePay'), out('applePay')] } as ProductionPixView });
+
+    expect(text('applePay')).toMatch(/^Apple Pay · pago, não estornado/u);
+    expect(screen.getAllByRole('button', { name: 'Tentar o estorno de novo' })).toHaveLength(1);
   });
 });

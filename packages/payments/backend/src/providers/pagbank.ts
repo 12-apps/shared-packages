@@ -35,7 +35,7 @@ import {
   type PagBankOrderResponse,
   type PagBankPixResponse,
 } from './pagbank-snapshots';
-import { postTransactionEvents } from './pagbank-webhook';
+import { legacyEvents, unsignedSigner, verifyUnsignedLegacy } from './pagbank-legacy-webhook';
 import {
   consultedOrder,
   isConnectConnection,
@@ -156,15 +156,16 @@ function createChargeWith(
   };
 }
 
-const webhook: PaymentProviderAdapter['webhook'] = {
+const webhookWith = (options: PagbankOptions): PaymentProviderAdapter['webhook'] => ({
   async verify(delivery, credentials) {
     if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
     if (signerOf(delivery, credentials) !== null) return true;
+    const legacy = verifyUnsignedLegacy(delivery, credentials);
+    if (legacy) return legacy;
     return (await consultedOrder(delivery, credentials)) !== null;
   },
 
-  signer: (delivery, credentials) =>
-    signerOf(delivery, credentials) ?? (isConnectConnection(credentials) ? 'orderConsult' : null),
+  signer: (delivery, credentials) => signerOf(delivery, credentials) ?? unsignedSigner(delivery, credentials),
 
   refusalDetail(delivery, credentials) {
     const header = delivery.headers['x-authenticity-token'] ? 'present' : 'absent';
@@ -183,7 +184,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
    */
   async parse(delivery, credentials) {
     const eventId = sha256Hex(delivery.rawBody);
-    const postTransaction = postTransactionEvents(delivery.rawBody, eventId);
+    const postTransaction = legacyEvents(delivery, credentials, eventId, options.onUnresolvableLegacy);
     if (postTransaction) return postTransaction;
     const body = verifiedByConsult(delivery, credentials)
       ? await requireConsultedOrder(delivery, credentials)
@@ -227,7 +228,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
     }
     return events;
   },
-};
+});
 
 /**
  * The historical per-store webhook path this integration has always used —
@@ -346,7 +347,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>, options
     refund,
     captureCharge,
 
-    webhook,
+    webhook: webhookWith(options),
 
     // No walkthrough: homologação is the PLATFORM's, once. PagBank exempts
     // "clientes que usam plataformas de e-commerce ou módulos", so a store

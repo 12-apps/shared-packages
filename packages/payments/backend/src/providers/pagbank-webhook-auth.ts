@@ -72,6 +72,15 @@ export function isConnectConnection(credentials: ResolvedCredentials): boolean {
   return Boolean(credentials.fields['refreshToken'] && credentials.fields['token']);
 }
 
+/**
+ * A Connect seller with no account token stored apart (FUT-5371): its token is
+ * an OAuth access token, which the legacy host does not accept, so no legacy
+ * code can ever be resolved for it. Stub credentials resolve (to nothing).
+ */
+export function legacyUnresolvable(credentials: ResolvedCredentials): boolean {
+  return !credentials.stub && isConnectConnection(credentials) && !credentials.fields['legacyToken'];
+}
+
 /** The order id the delivery claims, or null when the body names none. */
 function claimedOrderId(rawBody: string): string | null {
   try {

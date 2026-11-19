@@ -27,13 +27,14 @@ export async function confirmEvidencePix(
 ): Promise<EvidenceRecord> {
   const record = await deps.store.latest(PROVIDER, 'RUN');
   if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
-  // Nothing to do once the Pix is refunded, or skipped and expired, or when it never ran — but a
-  // card whose refund ran out is pressed by the same action (FUT-4740, C33).
-  if (!pixHoldsMoney(record, deps.copy.pixSkipped, clockOf(deps)())) return pressCardOr(deps, record, action);
-  if (pixStateOf(record, deps.copy.pixSkipped) === 'REFUND_PENDING') {
-    return action === 'RETRY_REFUND' ? pressRetryRefund(deps, record) : record;
-  }
-  if (action === 'RETRY_REFUND') return record;
+  // "Tentar o estorno de novo" is ONE press for every refund still open (FUT-5371): the Pix's once
+  // its attempts ran out, and each card's (FUT-4740, C33) — whatever the Pix is doing meanwhile. A
+  // card's press used to be reachable only once the Pix held nothing, so a run whose Pix QR was
+  // still up (or whose Pix was still retrying) left the wallet charges with no way back.
+  if (action === 'RETRY_REFUND') return pressEveryRefund(deps, record);
+  // Nothing to do once the Pix is refunded, or skipped and expired, or when it never ran.
+  if (!pixHoldsMoney(record, deps.copy.pixSkipped, clockOf(deps)())) return record;
+  if (pixStateOf(record, deps.copy.pixSkipped) === 'REFUND_PENDING') return record;
   const seller = await sandboxSeller(deps);
   if (typeof seller !== 'object') return record;
   let steps = record.steps;
@@ -42,9 +43,12 @@ export async function confirmEvidencePix(
   return paidNow ? refundFirst(deps, record, steps, seller) : saveConsulted(deps, record, steps, seller);
 }
 
-/** RETRY_REFUND once the Pix holds nothing: a card whose refund ran out (C33); any other action is a no-op. */
-function pressCardOr(deps: EvidenceRunDeps, record: EvidenceRecord, action: PixConfirmAction): Promise<EvidenceRecord> {
-  return action === 'RETRY_REFUND' ? pressRetryCardRefund(deps, record) : Promise.resolve(record);
+/** The Pix's press while it is paid and unrefunded (a no-op mid-series), then every card's. */
+async function pressEveryRefund(deps: EvidenceRunDeps, record: EvidenceRecord): Promise<EvidenceRecord> {
+  const pixPending = pixStateOf(record, deps.copy.pixSkipped) === 'REFUND_PENDING';
+  const afterPix = pixPending ? await pressRetryRefund(deps, record) : record;
+  const latest = afterPix.id === record.id ? afterPix : record;
+  return pressRetryCardRefund(deps, latest);
 }
 
 /** The Pix was just read PAID: claim attempt 1 (with the paid steps) and send it. */

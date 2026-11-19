@@ -64,4 +64,10 @@ export interface PagbankOptions {
    * credentials alone, and the only build that declares `PIX_DINAMICO`.
    */
   fiscalSplitFields?: FiscalSplitFields;
+  /**
+   * Told of EACH unsigned legacy notification acknowledged and dropped because
+   * the seller (Connect, no account token apart) can never resolve its code
+   * (FUT-5371): the code, and why, by field name. A host forwards it to its log.
+   */
+  onUnresolvableLegacy?: (notice: { notificationCode: string; reason: string }) => void;
 }
