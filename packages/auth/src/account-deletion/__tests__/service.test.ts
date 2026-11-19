@@ -287,4 +287,18 @@ describe("round 2: the outbox never holds a purge, and never mails a stale slot"
     await feature.sweep(at(8, 60_000));
     expect(mails.map((mail) => mail.kind)).toContain("week-before");
   });
+
+  it("retakes a mail lease older than 5 minutes, and not a younger one", async () => {
+    const { feature, db, mails } = world();
+    await feature.schedule(PERSON, "right", T0);
+    mails.length = 0;
+    // A pass that took the slot and died: the lease is left behind.
+    db.rows.set("u1", { ...db.rows.get("u1")!, mailOwed: "scheduled", mailPurgeAt: at(15), mailClaimedAt: at(1) });
+    expect(await feature.sweep(at(1, 4 * 60_000))).toEqual({ mailed: 0, purged: 0, failed: 0 });
+    expect(mails).toEqual([]);
+    expect(await feature.sweep(at(1, 5 * 60_000))).toEqual({ mailed: 1, purged: 0, failed: 0 });
+    expect(mails.map((mail) => mail.kind)).toEqual(["scheduled"]);
+    expect(db.rows.get("u1")).toMatchObject({ mailOwed: null, mailClaimedAt: null });
+  });
 });
+

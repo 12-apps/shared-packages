@@ -46,6 +46,8 @@ export interface WebAccountDeletionConfig {
   readonly afterCancel?: string;
   readonly fetchImpl?: typeof fetch;
   readonly copy?: AccountDeletionScreenCopy;
+  /** Leave for another page (default `location.assign`); a test passes its own. */
+  readonly navigate?: (url: string) => void;
 }
 
 /** What the screens need of the web auth's session. */
@@ -121,6 +123,7 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
   const copy = config.copy ?? (locale === "en-US" ? EN_US_ACCOUNT_DELETION_SCREEN : PT_BR_ACCOUNT_DELETION_SCREEN);
   const fetchImpl: typeof fetch = config.fetchImpl ?? ((...args) => globalThis.fetch(...args));
   const dateOf = (iso: string): string => purgeDateWords(new Date(iso), locale, config.timeZone);
+  const navigate = config.navigate ?? ((url: string) => globalThis.location.assign(url));
 
   function DeleteAccountPage({ blockerAction = () => "", forfeitAction = "" }: { blockerAction?: (kind: string) => string; forfeitAction?: string }): JSX.Element {
     const { signIn, signOut } = hooks.useSession();
@@ -128,14 +131,15 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
     const [password, setPassword] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const field = useRef<HTMLInputElement>(null);
+    const alert = useRef<HTMLParagraphElement>(null);
     const load = useCallback(() => {
       setReport(null);
       call<DeletionReport>(fetchImpl, config.mount).then(setReport, () => setReport("failed"));
     }, []);
     useEffect(load, [load]);
+    // The refusal is announced and takes focus, so a keyboard or screen-reader user lands on it.
     useEffect(() => {
-      if (error) field.current?.focus();
+      if (error) alert.current?.focus();
     }, [error]);
     const heading = <Text as="h1" variant="heading">{copy.title}</Text>;
     if (report === null) return <Box sx={{ display: "grid", gap: 2 }}>{heading}<LoadingState dataTestId="delete-account-loading" /></Box>;
@@ -158,7 +162,7 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
       try {
         await call(fetchImpl, config.mount, google ? {} : { password });
         await signOut().catch(() => undefined);
-        globalThis.location.assign(config.afterSchedule ?? "/");
+        navigate(config.afterSchedule ?? "/");
       } catch (failure) {
         setError(sentenceOf(failure, copy.failed));
         setPending(false);
@@ -183,10 +187,14 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
           </Box>
         ) : (
           <Box sx={{ maxWidth: 360, width: "100%" }}>
-            <Input inputRef={field} label={copy.passwordLabel} type="password" fullWidth autoComplete="current-password" value={password} disabled={!report.canSchedule} error={error !== null} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} inputProps={{ "aria-describedby": error ? "delete-account-error" : undefined }} data-testid="delete-account-password" />
+            <Input label={copy.passwordLabel} type="password" fullWidth autoComplete="current-password" value={password} disabled={!report.canSchedule} error={error !== null} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} inputProps={{ "aria-describedby": error ? "delete-account-error" : undefined }} data-testid="delete-account-password" />
           </Box>
         )}
-        {error ? <Text as="p" size="sm" color="danger" role="alert" id="delete-account-error" data-testid="delete-account-error">{error}</Text> : null}
+        {error ? (
+          <Box component="p" ref={alert} tabIndex={-1} role="alert" id="delete-account-error" data-testid="delete-account-error" sx={{ m: 0, color: "error.main", outline: "none" }}>
+            {error}
+          </Box>
+        ) : null}
         <Box sx={{ display: "grid", gap: 0.5 }}>
           <Text as="p" size="sm" color="secondary">{copy.when(dateOf(new Date(Date.now() + report.graceDays * DAY_MS).toISOString()))}</Text>
           <Text as="p" size="sm" color="secondary">{copy.irreversible(report.graceDays)}</Text>
@@ -210,7 +218,7 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
         await call(fetchImpl, `${config.mount}/cancel`, {});
         // The cancel moved the session on (no token from the window outlives it): sign in again.
         await signOut().catch(() => undefined);
-        globalThis.location.assign(config.afterCancel ?? "/login");
+        navigate(config.afterCancel ?? "/login");
       } catch (failure) {
         setError(sentenceOf(failure, copy.failed));
         setBusy(false);
@@ -224,7 +232,7 @@ export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks
         {error ? <Text as="p" size="sm" color="danger" role="alert">{error}</Text> : null}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
           <Button ref={cancelButton} variant="solid" color="primary" size="md" loading={busy} disabled={busy} onClick={() => void cancel()} dataTestId="deletion-pending-cancel">{copy.pendingCancel}</Button>
-          <Button variant="outline" color="primary" size="md" disabled={busy} onClick={() => void signOut().then(() => globalThis.location.assign("/"))} dataTestId="deletion-pending-sign-out">{copy.pendingSignOut}</Button>
+          <Button variant="outline" color="primary" size="md" disabled={busy} onClick={() => void signOut().then(() => navigate("/"))} dataTestId="deletion-pending-sign-out">{copy.pendingSignOut}</Button>
         </Box>
       </Box>
     );
