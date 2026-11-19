@@ -12,7 +12,7 @@ import type { DeletionMailKind } from "./types";
 
 const MAIL_LEASE_MS = 5 * 60_000;
 
-export type FlushOutcome = "sent" | "skipped" | "failed";
+type FlushOutcome = "sent" | "skipped" | "failed";
 
 /** The state the window must still be in for this kind of mail to be owed. */
 function windowFor(kind: string, purgeAt: Date): Record<string, unknown> {
