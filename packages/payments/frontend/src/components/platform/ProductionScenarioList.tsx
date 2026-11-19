@@ -129,10 +129,24 @@ function countingDown(pix: ProductionPixView | null): boolean {
   return pix?.cards?.some((card) => card.nextAt !== null) ?? false;
 }
 
-/** Which press the list offers: the Pix's once its attempts ran out, else a card's (C33), else none. */
-function pressOf(pix: ProductionPixView | null): 'PIX' | 'CARD' | null {
-  if (pix?.state === 'REFUND_PENDING') return pix.refund?.exhausted === true ? 'PIX' : null;
-  return pix?.cards?.some((card) => card.exhausted) ? 'CARD' : null;
+/**
+ * Which press the list offers, for every refund whose attempts ran out (FUT-5371): the Pix's,
+ * the cards' (C33), or one press for all of them. A card's press no longer waits for the Pix:
+ * the server presses each open refund, whatever the Pix is doing.
+ */
+function pressOf(pix: ProductionPixView | null): 'PIX' | 'CARD' | 'EVERY' | null {
+  const pixOut = pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true ? 1 : 0;
+  const cardsOut = (pix?.cards ?? []).filter((card) => card.exhausted).length;
+  if (pixOut + cardsOut > 1) return 'EVERY';
+  if (pixOut) return 'PIX';
+  return cardsOut ? 'CARD' : null;
+}
+
+/** The press's label and test id. */
+function pressLabel(press: 'PIX' | 'CARD' | 'EVERY', copy: Copy): { label: string; testId: string } {
+  if (press === 'PIX') return { label: copy.retryRefund, testId: 'production-retry-refund' };
+  if (press === 'CARD') return { label: copy.retryCardRefund, testId: 'production-retry-card-refund' };
+  return { label: copy.retryEveryRefund, testId: 'production-retry-every-refund' };
 }
 
 /** The clock, redrawn every so often while a countdown is on screen. */
@@ -169,8 +183,7 @@ export function ProductionScenarioList({
   const rows = rowsOf(scenarios, pix, checking, copy, useNow(counting));
   if (rows.length === 0) return null;
   const press = pressOf(pix);
-  const exhausted = press === 'PIX';
-  const cardExhausted = press === 'CARD';
+  const button = press ? pressLabel(press, copy) : null;
   return (
     <Stack spacing={1} data-testid="production-scenarios">
       <Typography variant="body2" fontWeight={600}>
@@ -192,12 +205,12 @@ export function ProductionScenarioList({
           </Stack>
         ))}
       </Box>
-      {exhausted || cardExhausted ? (
+      {button ? (
         <Button
           variant="outlined"
           onClick={onRetryRefund}
           disabled={retrying}
-          data-testid={cardExhausted ? 'production-retry-card-refund' : 'production-retry-refund'}
+          data-testid={button.testId}
           sx={{
             ...TAP_SX,
             alignSelf: 'flex-start',
@@ -210,7 +223,7 @@ export function ProductionScenarioList({
             borderColor: 'text.primary',
           }}
         >
-          {cardExhausted ? copy.retryCardRefund : copy.retryRefund}
+          {button.label}
         </Button>
       ) : null}
     </Stack>

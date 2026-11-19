@@ -276,6 +276,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
     retryRefund: string;
     /** C33: a card whose refund attempts ran out. */
     retryCardRefund: string;
+    /** FUT-5371: more than one scenario's refund is open (the Pix and a card, or two cards): one press for all. */
+    retryEveryRefund: string;
   };
   /** The primary action: charge R$ 1,00 per scenario and refund it. */
   charge: string;

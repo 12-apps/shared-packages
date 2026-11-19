@@ -283,6 +283,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       },
       retryRefund: 'Try refunding the Pix again',
       retryCardRefund: 'Try refunding the card again',
+      retryEveryRefund: 'Try the refunds again',
     },
     charge: '3. Charge R$ 1.00 per scenario and refund',
     confirm: {
