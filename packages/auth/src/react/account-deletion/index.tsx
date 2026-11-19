@@ -13,11 +13,11 @@
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent, type JSX, type RefObject } from "react";
 
-import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
+import { alpha } from "@12-apps/ui/mui/styles";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { purgeDateWords } from "../../account-deletion/copy";
@@ -84,9 +84,9 @@ const sentenceOf = (failure: unknown, fallback: string): string =>
 function Facts({ items, mark }: { items: readonly string[]; mark: "×" | "✓" }): JSX.Element | null {
   if (items.length === 0) return null;
   return (
-    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}>
+    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
       {items.map((item) => (
-        <Box component="li" key={item} sx={{ display: "flex", gap: 1 }}>
+        <Box component="li" key={item} sx={FACT_ROW_SX}>
           <Text as="span" color="secondary" aria-hidden>{mark}</Text>
           <Text as="span">{item}</Text>
         </Box>
@@ -95,21 +95,76 @@ function Facts({ items, mark }: { items: readonly string[]; mark: "×" | "✓" }
   );
 }
 
-function Notice({ title, rows, testId }: { title: string; rows: ReadonlyArray<{ text: string; href: string; action: string }>; testId: string }): JSX.Element | null {
+/** One fact row, with a hairline under every row but the last (the prototype's). */
+const FACT_ROW_SX = {
+  display: "flex",
+  gap: 1,
+  py: 1,
+  borderBottom: 1,
+  borderColor: "divider",
+  "&:last-of-type": { borderBottom: 0 },
+} as const;
+
+/** The action inside a notice: inline, with a 40px tap target below `sm` that does not move the line. */
+const ACTION_SX = {
+  color: "inherit",
+  fontWeight: 600,
+  display: "inline-block",
+  py: { xs: 1.5, sm: 0 },
+  my: { xs: -1.5, sm: 0 },
+} as const;
+
+/** The flat, lightly tinted box of the prototype: static, so `status`, not `alert`. */
+const NOTICE_SX = {
+  bgcolor: (theme: { palette: { warning: { main: string } } }) => alpha(theme.palette.warning.main, 0.1),
+  color: "text.primary",
+  borderRadius: 1,
+  px: 2,
+  py: 1.5,
+} as const;
+
+interface NoticeRow {
+  readonly lead: string;
+  readonly text: string;
+  readonly href: string;
+  readonly action: string;
+}
+
+function Notice({ title, rows, testId }: { title: string; rows: readonly NoticeRow[]; testId: string }): JSX.Element | null {
   if (rows.length === 0) return null;
   return (
-    <Alert variant="warning" title={title} data-testid={testId}>
+    <Box role="status" data-testid={testId} sx={NOTICE_SX}>
+      <Text as="p" weight="semibold">{title}</Text>
       <Box component="ul" sx={{ m: 0, pl: 2.5, display: "grid", gap: 0.5 }}>
         {rows.map((row, index) => (
           <li key={`${row.href}-${index}`}>
+            {row.lead ? <strong>{row.lead}</strong> : null}
+            {row.lead ? " " : null}
             {row.text}{" "}
-            {row.action ? <Box component="a" href={row.href} sx={{ color: "inherit", fontWeight: 600 }}>{row.action}</Box> : null}
+            {row.action ? <Box component="a" href={row.href} sx={ACTION_SX}>{row.action}</Box> : null}
           </li>
         ))}
       </Box>
-    </Alert>
+    </Box>
   );
 }
+
+/** One error style on both screens: announced as it appears. */
+function ErrorLine({ message, id }: { message: string | null; id?: string }): JSX.Element | null {
+  if (!message) return null;
+  return <Text as="p" size="sm" color="danger" role="alert" id={id} data-testid={id ?? "deletion-error"}>{message}</Text>;
+}
+
+/** The bordered surface both screens sit on (the prototype's card), capped at the package's form measure. */
+const CARD_SX = {
+  boxSizing: "border-box",
+  maxWidth: 720,
+  mx: "auto",
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  p: { xs: 2, sm: 3 },
+} as const;
 
 export interface WebAccountDeletion {
   /** "Excluir minha conta": the whole screen, with its heading. */
@@ -119,8 +174,10 @@ export interface WebAccountDeletion {
 }
 
 interface PageProps {
+  /** The link's words for one blocker kind ("Ver pedido"). */
   readonly blockerAction?: (kind: string) => string;
-  readonly forfeitAction?: string;
+  /** The link's words for one forfeit kind ("Usar antes"): a vale cannot be refunded, credit can. */
+  readonly forfeitAction?: (kind: string) => string;
 }
 
 /** What both screens read: the config, resolved once. */
@@ -142,15 +199,18 @@ function useDeleteAccount(ctx: Ctx) {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const alert = useRef<HTMLParagraphElement>(null);
+  const field = useRef<HTMLDivElement>(null);
   const load = useCallback(() => {
     setReport(null);
     call<DeletionReport>(ctx.fetchImpl, ctx.config.mount).then(setReport, () => setReport("failed"));
   }, [ctx]);
   useEffect(load, [load]);
-  // The refusal is announced and takes focus, so a keyboard or screen-reader user lands on it.
+  // After a refusal the next act is typing again: focus (and select) the field; the message is announced on its own.
   useEffect(() => {
-    if (error) alert.current?.focus();
+    if (!error) return;
+    const input = field.current?.querySelector("input");
+    input?.focus();
+    input?.select();
   }, [error]);
   const submit = async (shown: DeletionReport): Promise<void> => {
     if (pending || !isReady(shown, password)) return;
@@ -165,7 +225,7 @@ function useDeleteAccount(ctx: Ctx) {
       setPending(false);
     }
   };
-  return { report, load, password, setPassword, pending, error, alert, submit };
+  return { report, load, password, setPassword, pending, error, field, submit };
 }
 
 /** The button may go: nothing blocks, and the person is confirmed (password typed, or a fresh sign-in). */
@@ -194,10 +254,11 @@ interface ConfirmationProps {
   readonly password: string;
   readonly setPassword: (value: string) => void;
   readonly error: string | null;
+  readonly field: RefObject<HTMLDivElement | null>;
 }
 
 /** How the person confirms: a fresh sign-in for an account with no password, else the password. */
-function Confirmation({ ctx, report, password, setPassword, error }: ConfirmationProps): JSX.Element {
+function Confirmation({ ctx, report, password, setPassword, error, field }: ConfirmationProps): JSX.Element {
   const { signIn } = ctx.hooks.useSession();
   if (report.confirm === "google") {
     return (
@@ -210,17 +271,8 @@ function Confirmation({ ctx, report, password, setPassword, error }: Confirmatio
     );
   }
   return (
-    <Box sx={{ maxWidth: 360, width: "100%" }}>
+    <Box ref={field} sx={{ maxWidth: 360, width: "100%" }}>
       <Input label={ctx.copy.passwordLabel} type="password" fullWidth autoComplete="current-password" value={password} disabled={!report.canSchedule} error={error !== null} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} inputProps={{ "aria-describedby": error ? "delete-account-error" : undefined }} data-testid="delete-account-password" />
-    </Box>
-  );
-}
-
-function RefusalLine({ error, alert }: { error: string | null; alert: RefObject<HTMLParagraphElement | null> }): JSX.Element | null {
-  if (!error) return null;
-  return (
-    <Box component="p" ref={alert} tabIndex={-1} role="alert" id="delete-account-error" data-testid="delete-account-error" sx={{ m: 0, color: "error.main", outline: "none" }}>
-      {error}
     </Box>
   );
 }
@@ -229,15 +281,15 @@ interface NoticesProps {
   readonly ctx: Ctx;
   readonly report: DeletionReport;
   readonly blockerAction: (kind: string) => string;
-  readonly forfeitAction: string;
+  readonly forfeitAction: (kind: string) => string;
 }
 
 function Notices({ ctx, report, blockerAction, forfeitAction }: NoticesProps): JSX.Element {
   return (
     <>
-      {report.state === "pending" ? <Alert variant="info" description={ctx.copy.alreadyPending} /> : null}
-      <Notice title={ctx.copy.settleFirst} testId="delete-account-blockers" rows={report.blockers.map((b) => ({ text: b.label, href: b.href, action: blockerAction(b.kind) }))} />
-      <Notice title={ctx.copy.forfeitTitle} testId="delete-account-forfeits" rows={report.forfeits.map((f) => ({ text: `${f.amount} — ${f.label}.`, href: f.href, action: forfeitAction }))} />
+      {report.state === "pending" ? <Text as="p" role="status" color="secondary">{ctx.copy.alreadyPending}</Text> : null}
+      <Notice title={ctx.copy.settleFirst} testId="delete-account-blockers" rows={report.blockers.map((b) => ({ lead: "", text: b.label, href: b.href, action: blockerAction(b.kind) }))} />
+      <Notice title={ctx.copy.forfeitTitle} testId="delete-account-forfeits" rows={report.forfeits.map((f) => ({ lead: f.amount, text: f.label, href: f.href, action: forfeitAction(f.kind) }))} />
     </>
   );
 }
@@ -261,15 +313,15 @@ function DeleteAccountPage({ ctx, actions }: { ctx: Ctx; actions: PageProps }): 
     void page.submit(report);
   };
   return (
-    <Box component="form" noValidate onSubmit={onSubmit} data-testid="delete-account-view" sx={{ display: "grid", gap: 2.5, containerType: "inline-size" }}>
+    <Box component="form" noValidate onSubmit={onSubmit} data-testid="delete-account-view" sx={{ ...CARD_SX, display: "grid", gap: 2.5, containerType: "inline-size" }}>
       <Heading ctx={ctx} />
-      <Box sx={{ display: "grid", gap: 1, "@container (min-width: 560px)": { gridTemplateColumns: "1fr 1fr", columnGap: 3 } }}>
+      <Box sx={{ display: "grid", gap: 1, "@container (min-width: 640px)": { gridTemplateColumns: "1fr 1fr", columnGap: 3 } }}>
         <Facts items={ctx.config.facts.goes} mark="×" />
         <Facts items={ctx.config.facts.stays} mark="✓" />
       </Box>
-      <Notices ctx={ctx} report={report} blockerAction={actions.blockerAction ?? (() => "")} forfeitAction={actions.forfeitAction ?? ""} />
-      <Confirmation ctx={ctx} report={report} password={page.password} setPassword={page.setPassword} error={page.error} />
-      <RefusalLine error={page.error} alert={page.alert} />
+      <Notices ctx={ctx} report={report} blockerAction={actions.blockerAction ?? (() => "")} forfeitAction={actions.forfeitAction ?? (() => "")} />
+      <Confirmation ctx={ctx} report={report} password={page.password} setPassword={page.setPassword} error={page.error} field={page.field} />
+      <ErrorLine message={page.error} id="delete-account-error" />
       <When ctx={ctx} report={report} />
       <Box>
         <Button type="submit" variant="solid" color="primary" size="md" loading={page.pending} disabled={!isReady(report, page.password) || page.pending} dataTestId="delete-account-submit">{ctx.copy.submit}</Button>
@@ -294,14 +346,17 @@ function PendingDeletionScreen({ ctx, purgeAt }: { ctx: Ctx; purgeAt: string }):
     } catch (failure) {
       setError(sentenceOf(failure, ctx.copy.failed));
       setBusy(false);
-      cancelButton.current?.focus();
     }
   };
+  // After the re-render that enables the button again: focus on a disabled button does nothing.
+  useEffect(() => {
+    if (error && !busy) cancelButton.current?.focus();
+  }, [error, busy]);
   return (
-    <Box data-testid="deletion-pending-view" sx={{ maxWidth: 480, mx: "auto", width: "100%", px: 2, py: 4, display: "grid", gap: 2 }}>
+    <Box data-testid="deletion-pending-view" sx={{ ...CARD_SX, maxWidth: 480, my: 4, display: "grid", gap: 2 }}>
       <Text as="h1" variant="heading">{ctx.copy.pendingTitle(ctx.dateOf(purgeAt))}</Text>
       <Text as="p" color="secondary">{ctx.copy.pendingBody}</Text>
-      {error ? <Text as="p" size="sm" color="danger" role="alert">{error}</Text> : null}
+      <ErrorLine message={error} />
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
         <Button ref={cancelButton} variant="solid" color="primary" size="md" loading={busy} disabled={busy} onClick={() => void cancel()} dataTestId="deletion-pending-cancel">{ctx.copy.pendingCancel}</Button>
         <Button variant="outline" color="primary" size="md" disabled={busy} onClick={() => void signOut().then(() => ctx.navigate("/"))} dataTestId="deletion-pending-sign-out">{ctx.copy.pendingSignOut}</Button>

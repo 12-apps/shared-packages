@@ -679,7 +679,10 @@ reminder; one of a single day sends neither reminder.
    `pendingDeletionOf(session)` is set. `facts.goes` / `facts.stays` say what
    the host erases and keeps: they are the host's promises, so the package
    ships none. A cancel moves the session epoch too, so the person signs in
-   again after it.
+   again after it. The page draws its own card (capped at 720px) and its own
+   `h1` ("Excluir conta"): mount it where the host's frame does not repeat that
+   title. `blockerAction(kind)` and `forfeitAction(kind)` give each link's words
+   per kind (a vale cannot be refunded; credit can).
 
 What stays in the host is configuration: its blockers, what is given up (and
 how the host zeroes it at the purge), and its erasure of every row that holds

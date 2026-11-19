@@ -72,14 +72,17 @@ describe("the Excluir minha conta page", () => {
       ...READY,
       forfeits: [{ kind: "credit", label: "Loja", amount: "R$ 18,50", href: "/creditos" }],
     });
-    render(<DeleteAccountPage forfeitAction="Usar antes" />);
+    render(<DeleteAccountPage forfeitAction={(kind) => (kind === "credit" ? "Usar ou pedir devolução" : "Usar antes")} />);
     const notice = await screen.findByTestId("delete-account-forfeits");
-    expect(notice.textContent).toContain("R$ 18,50 — Loja.");
+    expect(notice.textContent).toContain("R$ 18,50 Loja");
+    expect(notice.textContent).not.toContain("—");
+    expect(notice.getAttribute("role")).toBe("status");
+    expect(screen.getByRole("link", { name: "Usar ou pedir devolução" }).getAttribute("href")).toBe("/creditos");
     expect(notice.textContent).toContain("Você perde:");
     await waitFor(() => expect(screen.queryByTestId("delete-account-blockers")).toBeNull());
   });
 
-  it("answers a wrong password with an alert that takes focus, and keeps what was typed", async () => {
+  it("answers a wrong password with an alert and focuses the field again, keeping what was typed", async () => {
     const { DeleteAccountPage, navigate } = screens(READY, [json(403, { error: "Senha incorreta.", code: "wrong-password" })]);
     render(<DeleteAccountPage />);
     const input = (await screen.findByLabelText("Sua senha")) as HTMLInputElement;
@@ -87,7 +90,7 @@ describe("the Excluir minha conta page", () => {
     fireEvent.click(screen.getByTestId("delete-account-submit"));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Senha incorreta.");
-    await waitFor(() => expect(document.activeElement).toBe(alert));
+    await waitFor(() => expect(document.activeElement).toBe(input));
     expect(input.value).toBe("errada");
     expect(navigate).not.toHaveBeenCalled();
   });
