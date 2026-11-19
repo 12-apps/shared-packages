@@ -198,6 +198,7 @@ describe("what the bound mount must not lose against the hand mount (FUT-1241, r
       payDifference: () => Promise.resolve({ ok: false, error: { message: "unused", code: "UNUSED", field: null } }),
       requestShortRefund: () => Promise.resolve({ ok: false, error: "unused" }),
       shortPaymentRoutes: { refund: "/unused/:ref" },
+      applePayQrCode: false,
       confirmationExtra: null,
       confirmationHero: null,
       confirmationFooter: null,

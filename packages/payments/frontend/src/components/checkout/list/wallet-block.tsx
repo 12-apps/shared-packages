@@ -2,6 +2,7 @@ import { Box, Divider } from "@mui/material";
 import { useTheme, type Theme } from "@mui/material/styles";
 import { useEffect, useId, useRef, type JSX } from "react";
 
+import { ApplePaySdkButton } from "../apple-pay-sdk-button";
 import { ChargeFailure } from "../charge-states";
 import { useCheckoutCopy } from "../copy-context";
 import { UNRESOLVED_CODE } from "../failure-codes";
@@ -137,6 +138,27 @@ function AppleWalletButton({ label, onPress, held }: { label: string; onPress: (
   );
 }
 
+/**
+ * Apple's `<apple-pay-button>`, in a browser that is not Safari (FUT-5372):
+ * the element Apple's SDK defines, on the same pill — its press opens Apple's
+ * QR code, and the session behind it is Safari's.
+ */
+function AppleSdkWalletButton({ label, onPress, held }: { label: string; onPress: () => void; held: Held }): JSX.Element {
+  const isHeld = held.describedBy !== null;
+  return (
+    <ApplePaySdkButton
+      label={label}
+      onPress={onPress}
+      held={held.describedBy}
+      testId="list-apple-pay-sdk"
+      sx={{
+        ...pill(isHeld),
+        "& > apple-pay-button": { "--apple-pay-button-border-radius": (t: Theme) => t.spacing(WALLET_HEIGHT / 2) },
+      }}
+    />
+  );
+}
+
 /** One wallet's button, or a held pill while the host re-prices it. */
 function WalletButton({ wallet, cap, copy, onGoogle, onApple, held }: {
   wallet: ListWallet;
@@ -147,6 +169,7 @@ function WalletButton({ wallet, cap, copy, onGoogle, onApple, held }: {
   held: Held;
 }): JSX.Element {
   if (wallet === "GOOGLE_PAY" && cap.googlePay) return <GoogleWalletButton client={cap.googlePay.client} onPress={onGoogle} held={held} />;
+  if (wallet === "APPLE_PAY" && cap.applePayVia === "sdk") return <AppleSdkWalletButton label={copy.wallets.applePay} onPress={onApple} held={held} />;
   if (wallet === "APPLE_PAY") return <AppleWalletButton label={copy.wallets.applePay} onPress={onApple} held={held} />;
   // Google while the host re-prices: no sheet can open, so no Google button either — a plain held pill.
   return <HeldWalletButton label={copy.wallets.googlePay} held={held} />;

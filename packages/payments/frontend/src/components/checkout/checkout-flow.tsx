@@ -106,6 +106,8 @@ export interface CheckoutFlowProps extends CheckoutHostPorts, ShortPaymentPorts 
    * remains the way to pay (the one list then offers no Apple Pay at all).
  */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** Apple Pay in browsers with no native session, through Apple's SDK (a QR code, FUT-5372); off by default. See `useListCapability`. */
+  applePayQrCode?: boolean;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
   confirmationExtra?: ReactNode;
   /**

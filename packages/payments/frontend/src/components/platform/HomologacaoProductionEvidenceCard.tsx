@@ -14,6 +14,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { GooglePayApi } from '../checkout/google-pay-button';
+import type { ApplePaySdkLoader } from '../checkout/apple-pay-sdk';
 import { CARD_SX, TAP_SX } from './ConnectEnvironmentCard';
 import type { HomologacaoProductionEvidenceCopy, PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider } from './copy-context';
@@ -77,6 +78,8 @@ export interface HomologacaoProductionEvidenceCardProps {
   onDownload: () => Promise<EvidenceSummary>;
   onValidateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   googlePayApi?: GooglePayApi | null;
+  /** Injectable Apple Pay SDK loader for tests; omit to load Apple's script where Safari's session is missing (FUT-5372). */
+  loadApplePaySdk?: ApplePaySdkLoader;
   /** How often an open Pix is checked; tests pass a short one. */
   pixPollMs?: number;
   /** How long one Pix is checked on its own before "Verificar o Pix" takes over; tests pass a short one. */
@@ -282,6 +285,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
     config: walletsConfigOf(props.seller),
     validateApplePayMerchant: props.onValidateApplePayMerchant,
     googlePayApi: props.googlePayApi,
+    loadApplePaySdk: props.loadApplePaySdk,
   });
   const flow = useProductionRun(props, form, wallets);
   const connected = props.seller?.connected === true;
