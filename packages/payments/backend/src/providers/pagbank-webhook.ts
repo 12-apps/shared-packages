@@ -62,6 +62,27 @@ function postTransactionNotification(rawBody: string): PagBankNotification | nul
 }
 
 /**
+ * Whether a delivery is a legacy post-transaction notification (FUT-5371).
+ *
+ * PagBank posts these UNSIGNED: production showed it on 2026-11-19, every one
+ * of them without `x-authenticity-token`, on the homologação seller's route and
+ * on a store's (Sentry PALADIRA-BACKEND-46, -5F, -7C). They used to be refused
+ * at verification, before `parse` could park them, so PagBank redelivered each
+ * one and every refusal reached the error tracker — and the resolution FUT-477
+ * built for them was never reached in production.
+ *
+ * Accepting one unsigned is safe because nothing in it is believed. `parse`
+ * turns it into an UNKNOWN event that carries only the code; what the code
+ * MEANS is learned by the legacy lookup with the merchant's own credentials,
+ * which answers only for a transaction of that account. A forged code can at
+ * most make us ask PagBank about a transaction that does not exist — the same
+ * bound the order consult of an unsigned Connect delivery has (FUT-3722).
+ */
+export function isLegacyNotification(rawBody: string): boolean {
+  return postTransactionNotification(rawBody) !== null;
+}
+
+/**
  * The normalized events for a post-transaction delivery, or `null` when the
  * body is not one and the caller should fall through to the order JSON.
  *

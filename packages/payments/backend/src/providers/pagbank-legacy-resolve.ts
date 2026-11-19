@@ -73,6 +73,18 @@ export function pagbankLegacyResolver(
           `${merchant.kind}:${merchant.id}; cannot resolve`,
       );
     }
+    // A Connect seller's credentials are an OAuth access token, which the legacy host does not
+    // accept (FUT-5371): the code cannot be resolved, ever, so it stays parked as UNKNOWN on the
+    // inbox row instead of failing it — a failed row answers non-2xx and PagBank redelivers
+    // forever. What moved is still reported by the Orders API's own signed (or consulted) JSON.
+    if (!canResolveLegacy(resolved)) return null;
     return resolvePagbankNotification(code, resolved);
   };
+}
+
+/** The legacy lookup needs the account's own API token; a Connect connection holds none unless set apart. */
+function canResolveLegacy(credentials: ResolvedCredentials): boolean {
+  if (credentials.stub) return true;
+  const connect = Boolean(credentials.fields['refreshToken']);
+  return !connect || Boolean(credentials.fields['legacyToken']);
 }

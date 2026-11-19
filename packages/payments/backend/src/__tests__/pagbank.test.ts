@@ -778,6 +778,48 @@ describe('pagbank adapter — webhooks', () => {
     });
   });
 
+  /**
+   * FUT-5371: production (2026-11-19) received every legacy notification
+   * WITHOUT `x-authenticity-token`, on the homologação seller's route and on a
+   * store's, and refused each at verify — so the parse above was never reached
+   * and PagBank redelivered. Nothing in the body is believed: it parks as
+   * UNKNOWN and only the legacy lookup, with the merchant's credentials, says
+   * what happened.
+   */
+  describe('an unsigned legacy notification (FUT-5371)', () => {
+    const legacy = {
+      provider: 'pagbank' as const,
+      rawBody: 'notificationCode=3F6E06-E39BE59BE515-000471CF9624-390FE5&notificationType=transaction',
+      headers: {},
+    };
+    const connect = { environment: 'PRODUCTION' as const, fields: { token: 'seller_tok', refreshToken: 'r', platformWebhookSecret: 'p', platformClientSecret: 'c' } };
+    const pasted = { environment: 'PRODUCTION' as const, fields: { token: 'acct_tok' } };
+
+    it('is accepted for a Connect seller and a pasted token alike, with no call to PagBank', async () => {
+      const spy = vi.fn();
+      vi.stubGlobal('fetch', spy);
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      await expect(adapter.webhook.verify(legacy, connect)).resolves.toBe(true);
+      await expect(adapter.webhook.verify(legacy, pasted)).resolves.toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+      expect(adapter.webhook.signer?.(legacy, connect)).toBe('legacyLookup');
+    });
+
+    it('parks as UNKNOWN carrying only the code: nothing in it can settle money', async () => {
+      const events = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(legacy, connect);
+      expect(events).toEqual([
+        expect.objectContaining({ type: 'UNKNOWN', raw: { notificationCode: '3F6E06-E39BE59BE515-000471CF9624-390FE5', notificationType: 'transaction' } }),
+      ]);
+      expect(events[0]?.charge).toBeUndefined();
+    });
+
+    it('never opens the door to an unsigned ORDER body', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 404 })));
+      const order = { ...legacy, rawBody: JSON.stringify({ id: 'ORDE_1', charges: [{ id: 'CHAR_1', status: 'PAID' }], notificationCode: 'x' }) };
+      await expect(pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(order, pasted)).resolves.toBe(false);
+    });
+  });
+
   it('parses the order payload into a PAID charge event', async () => {
     const [event] = await pagbankProvider(PT_BR_PAGBANK_COPY).webhook.parse(
       { provider: 'pagbank', rawBody: body, headers: {} },

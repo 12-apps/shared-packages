@@ -76,3 +76,19 @@ describe('resolving it', () => {
     expect(resolved).toEqual([{ eventId: 'resolved' }]);
   });
 });
+
+describe('a Connect seller (FUT-5371)', () => {
+  it('parks the code instead of failing the row: an OAuth access token cannot ask the legacy host', async () => {
+    const connect = { environment: 'PRODUCTION', fields: { token: 'oauth_access', refreshToken: 'r', email: 'x@y.z' } };
+    const resolve = pagbankLegacyResolver(store({ getCredentials: vi.fn().mockResolvedValue(connect) }));
+
+    await expect(resolve(parked({ notificationCode: 'abc' }), TENANT)).resolves.toBeNull();
+  });
+
+  it('still resolves for a Connect seller whose own account token was stored apart', async () => {
+    const connect = { environment: 'PRODUCTION', fields: { token: 'oauth_access', refreshToken: 'r', legacyToken: 'acct', legacyEmail: 'x@y.z' } };
+    const resolve = pagbankLegacyResolver(store({ getCredentials: vi.fn().mockResolvedValue(connect) }));
+
+    await expect(resolve(parked({ notificationCode: 'abc' }), TENANT)).resolves.toEqual([{ eventId: 'resolved' }]);
+  });
+});

@@ -90,3 +90,9 @@ describe('webhook wire schemas', () => {
     expect(webhookWireSchema('nope', {})).toBeUndefined();
   });
 });
+
+describe('the Pix charge form on the wire (FUT-5371)', () => {
+  it('declares charges[].qr_code: a Pix order posts it since the charge form, and strict-inputs reported it undeclared', () => {
+    expect(Object.keys(pagbankChargeWireSchema.shape)).toContain('qr_code');
+  });
+});
