@@ -84,10 +84,13 @@ const DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS = [
 export function buildAuthorizationServerMetadata(
   input: AuthorizationServerMetadataInput,
 ): AuthorizationServerMetadata {
-  const origin = input.issuer;
+  // Endpoints live on the issuer's ORIGIN: an issuer with a path (RFC 8414
+  // §3.1, a second surface on one origin) names where its metadata is, not a
+  // prefix of every endpoint. With no path the two are the same string.
+  const origin = new URL(input.issuer).origin;
   const paths = { ...DEFAULT_PATHS, ...input.paths };
   return {
-    issuer: origin,
+    issuer: input.issuer,
     authorization_endpoint: `${origin}${paths.authorize}`,
     token_endpoint: `${origin}${paths.token}`,
     registration_endpoint: `${origin}${paths.register}`,

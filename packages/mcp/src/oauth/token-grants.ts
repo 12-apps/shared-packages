@@ -146,7 +146,7 @@ async function redeemCode(
   // Every code-level failure (expired, tampered, wrong-audience) is invalid_grant.
   let verified;
   try {
-    verified = await verifyCode(context.signingKey, code, { origin });
+    verified = await verifyCode(context.signingKey, code, { origin, issuerPath: context.issuerPath });
   } catch (error) {
     if (error instanceof AuthorizationCodeError) {
       return tokenError("invalid_grant", 400, "invalid or expired authorization code");
@@ -212,6 +212,7 @@ async function handleAuthorizationCode(
     scopes,
     origin,
     resourcePath: context.resourcePath,
+    issuerPath: context.issuerPath,
     ttlSeconds: context.accessTokenTtlSeconds,
   });
   if (!accessToken) {
@@ -248,6 +249,7 @@ async function prepareRefreshAccessToken(
     scopes: candidate.scopes,
     origin,
     resourcePath: context.resourcePath,
+    issuerPath: context.issuerPath,
     ttlSeconds: context.accessTokenTtlSeconds,
   });
   if (!accessToken) throw new RefreshSigningUnavailable();
@@ -323,6 +325,7 @@ async function handleRefreshToken(
       scopes: rotated.scopes,
       origin,
       resourcePath: context.resourcePath,
+      issuerPath: context.issuerPath,
       ttlSeconds: context.accessTokenTtlSeconds,
     });
   if (!accessToken) return tokenError("invalid_request", 400, "token issuance unavailable");

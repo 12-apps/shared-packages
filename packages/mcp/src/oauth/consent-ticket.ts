@@ -53,7 +53,7 @@ export async function mintConsentTicket(
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({ query, binding })
     .setProtectedHeader({ alg: SIGNING_ALG, kid: key.kid, typ: CONSENT_TYPE })
-    .setIssuer(issuer(origin))
+    .setIssuer(issuer(origin, context.issuerPath))
     .setAudience(CONSENT_AUDIENCE)
     .setIssuedAt(now)
     .setExpirationTime(now + CONSENT_TTL_SECONDS)
@@ -72,7 +72,7 @@ export async function readConsentTicket(
   try {
     const { payload } = await jwtVerify(ticket, await importJWK(key.publicJwk, SIGNING_ALG), {
       algorithms: [SIGNING_ALG],
-      issuer: issuer(origin),
+      issuer: issuer(origin, context.issuerPath),
       audience: CONSENT_AUDIENCE,
       typ: CONSENT_TYPE,
       requiredClaims: ["exp", "iat", "jti"],

@@ -126,7 +126,7 @@ function discoveryHandlers(
     authorizationServerMetadata: async (request) =>
       jsonResponse(
         buildAuthorizationServerMetadata({
-          issuer: issuer(context.originOf(request)),
+          issuer: issuer(context.originOf(request), context.issuerPath),
           scopesSupported: [...context.scopes],
           // The RESOLVED paths, so what a connector reads before its first request
           // is where the endpoints actually are.
@@ -139,7 +139,7 @@ function discoveryHandlers(
       return jsonResponse(
         buildProtectedResourceMetadata({
           resource: resourceAudience(origin, context.resourcePath),
-          authorizationServers: [issuer(origin)],
+          authorizationServers: [issuer(origin, context.issuerPath)],
           scopesSupported: [...context.scopes],
         }),
       );
@@ -250,6 +250,7 @@ export function createApiMcpOauth(config: McpOauthConfig): ApiMcpOauth {
         isActive: context.isAccessTokenActive ?? options?.isActive,
         origin: context.originOf(request),
         resourcePath: context.resourcePath,
+        issuerPath: context.issuerPath,
       }),
     context,
   };

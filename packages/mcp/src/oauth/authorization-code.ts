@@ -49,6 +49,8 @@ export interface MintCodeInput {
   scope: string;
   /** The deployment origin — derives the code's `iss`. */
   origin: string;
+  /** The surface's issuer path. Default none: `iss` is the origin. */
+  issuerPath?: string;
 }
 
 /** The bound fields a verified authorization code resolves to. */
@@ -156,7 +158,7 @@ export async function mintCode(
 
   return new SignJWT(claims)
     .setProtectedHeader({ alg: SIGNING_ALG, kid: key.kid })
-    .setIssuer(issuer(input.origin))
+    .setIssuer(issuer(input.origin, input.issuerPath))
     .setAudience(AUTHORIZATION_CODE_AUDIENCE)
     .setSubject(input.sub)
     .setIssuedAt(iat)
@@ -169,6 +171,8 @@ export async function mintCode(
 export interface VerifyCodeOptions extends ClockOption {
   /** The deployment origin — derives the expected `iss`. */
   origin: string;
+  /** The surface's issuer path. Default none: the expected `iss` is the origin. */
+  issuerPath?: string;
 }
 
 /**
@@ -199,7 +203,7 @@ export async function verifyCode(
   try {
     const result = await jwtVerify(code, publicKey, {
       algorithms: [SIGNING_ALG],
-      issuer: issuer(options.origin),
+      issuer: issuer(options.origin, options.issuerPath),
       audience: AUTHORIZATION_CODE_AUDIENCE,
       clockTolerance: CLOCK_TOLERANCE_SECONDS,
       currentDate: options.now === undefined ? undefined : new Date(options.now),

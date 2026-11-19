@@ -98,6 +98,8 @@ export interface SignAccessTokenInput {
   subject: string;
   scopes: readonly McpScope[] | readonly string[];
   origin: string;
+  /** The surface's issuer path (RFC 8414 §3.1). Default none: `iss` is the origin. */
+  issuerPath?: string;
   /** Where the MCP resource is mounted. Default `/api/mcp`. */
   resourcePath?: string;
   /** Token lifetime in seconds. Default 15 minutes. */
@@ -147,7 +149,7 @@ export async function signAccessToken(
     ...(input.refreshTokenHash ? { refresh_token_id: input.refreshTokenHash } : {}),
   } satisfies AccessTokenClaims)
     .setProtectedHeader({ alg: SIGNING_ALG, kid: key.kid })
-    .setIssuer(issuer(input.origin))
+    .setIssuer(issuer(input.origin, input.issuerPath))
     .setAudience(resourceAudience(input.origin, input.resourcePath ?? DEFAULT_MCP_RESOURCE_PATH))
     .setSubject(input.subject)
     .setIssuedAt(iat)
@@ -166,6 +168,8 @@ export interface VerifyAccessTokenOptions extends ClockOption {
   origin: string;
   /** Where the MCP resource is mounted. Default `/api/mcp`. */
   resourcePath?: string;
+  /** The surface's issuer path. Default none: the expected `iss` is the origin. */
+  issuerPath?: string;
   /** When set, the token must carry this scope or verification fails `insufficient_scope`. */
   requiredScope?: McpScope | string;
 }
@@ -225,7 +229,7 @@ async function verifiedPayload(
   try {
     const { payload } = await jwtVerify(token, await importJWK(key.publicJwk, SIGNING_ALG), {
       algorithms: [SIGNING_ALG],
-      issuer: issuer(options.origin),
+      issuer: issuer(options.origin, options.issuerPath),
       audience: resourceAudience(options.origin, options.resourcePath ?? DEFAULT_MCP_RESOURCE_PATH),
       clockTolerance: CLOCK_TOLERANCE_SECONDS,
       currentDate: options.now === undefined ? undefined : new Date(options.now),
