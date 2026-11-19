@@ -66,7 +66,7 @@ function postTransactionNotification(rawBody: string): PagBankNotification | nul
  *
  * PagBank posts these UNSIGNED: production showed it on 2026-11-19, every one
  * of them without `x-authenticity-token`, on the homologação seller's route and
- * on a store's (Sentry PALADIRA-BACKEND-46, -5F, -7C). They used to be refused
+ * on a store's. They used to be refused
  * at verification, before `parse` could park them, so PagBank redelivered each
  * one and every refusal reached the error tracker — and the resolution FUT-477
  * built for them was never reached in production.

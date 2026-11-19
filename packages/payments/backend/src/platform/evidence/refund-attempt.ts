@@ -178,7 +178,7 @@ function filedStep(deps: EvidenceRunDeps, settled: Settled, state: EvidenceRefun
 }
 
 /** The cancels in a step's calls that PagBank did not take (anything but a 2xx). */
-export function refusedCancels(calls: readonly RecordedHttpCall[]): number {
+function refusedCancels(calls: readonly RecordedHttpCall[]): number {
   return calls.filter((call) => call.method === 'POST' && /\/cancel(?:$|\?)/u.test(call.url) && !isSuccess(call.status)).length;
 }
 
