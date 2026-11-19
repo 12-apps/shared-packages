@@ -45,6 +45,11 @@ async function twoSurfaces(): Promise<{ store: ApiMcpOauth; staff: ApiMcpOauth }
 
 /** Authorize + token on one surface; answers the access token it minted. */
 async function connect(api: ApiMcpOauth): Promise<string> {
+  return (await connectFull(api)).accessToken;
+}
+
+/** Authorize + token on one surface; answers both tokens and the client. */
+async function connectFull(api: ApiMcpOauth): Promise<{ accessToken: string; refreshToken: string; clientId: string }> {
   const { clientId } = await registerTestClient(api);
   const { verifier, challenge } = await pkcePair();
   const code = codeFrom(
@@ -65,7 +70,12 @@ async function connect(api: ApiMcpOauth): Promise<string> {
     client_id: clientId,
   });
   expect(response.status).toBe(200);
-  return ((await response.json()) as { access_token: string }).access_token;
+  const body = (await response.json()) as { access_token: string; refresh_token: string };
+  return { accessToken: body.access_token, refreshToken: body.refresh_token, clientId };
+}
+
+function refresh(api: ApiMcpOauth, grant: { refreshToken: string; clientId: string }): Promise<Response> {
+  return token(api, { grant_type: "refresh_token", refresh_token: grant.refreshToken, client_id: grant.clientId });
 }
 
 /** A JWT's claims, read without verifying (the assertions verify separately). */
@@ -124,6 +134,21 @@ describe("an issuer path", () => {
       client_id: clientId,
     });
     expect(crossed.status).toBe(400);
+  });
+
+  it("keeps each surface's refresh tokens to its own token endpoint, both ways", async () => {
+    const { store, staff } = await twoSurfaces();
+    const staffGrant = await connectFull(staff);
+    const storeGrant = await connectFull(store);
+    expect((await refresh(store, staffGrant)).status).toBe(400);
+    expect((await refresh(staff, storeGrant)).status).toBe(400);
+    // Refused without consuming anything: each still refreshes at its own server.
+    const staffNext = await refresh(staff, staffGrant);
+    expect(staffNext.status).toBe(200);
+    expect(claimsOf(((await staffNext.json()) as { access_token: string }).access_token).iss).toBe(`${ORIGIN}${STAFF_ISSUER_PATH}`);
+    const storeNext = await refresh(store, storeGrant);
+    expect(storeNext.status).toBe(200);
+    expect(claimsOf(((await storeNext.json()) as { access_token: string }).access_token).iss).toBe(ORIGIN);
   });
 
   it("publishes each surface's own discovery: issuer, endpoints, resource", async () => {

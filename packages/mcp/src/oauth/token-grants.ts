@@ -7,7 +7,7 @@ import {
   RefreshTokenError,
   getRefreshTokenIdentity,
   issueRefreshToken,
-  hashToken,
+  hashTokenIn,
   rotateRefreshToken,
 } from "./refresh";
 import type { McpConnectionStore, NewRefreshToken } from "./stores";
@@ -195,7 +195,7 @@ async function handleAuthorizationCode(
   const scopes = verified.scope.split(/\s+/).filter(Boolean);
 
   const refresh = await issueRefreshToken(
-    { store: context.stores.refreshTokens, ttlMs: context.refreshTokenTtlMs },
+    { store: context.stores.refreshTokens, ttlMs: context.refreshTokenTtlMs, hashNamespace: context.issuerPath },
     {
       userEmail: verified.email,
       userSub: verified.sub,
@@ -208,7 +208,7 @@ async function handleAuthorizationCode(
     email: verified.email,
     subject: verified.sub,
     clientId: verified.clientId,
-    refreshTokenHash: hashToken(refresh.refreshToken),
+    refreshTokenHash: hashTokenIn(context.issuerPath, refresh.refreshToken),
     scopes,
     origin,
     resourcePath: context.resourcePath,
@@ -221,7 +221,7 @@ async function handleAuthorizationCode(
     return tokenError("invalid_request", 400, "token issuance unavailable");
   }
 
-  await recordHostConnection(context, verified.email, verified.clientId, hashToken(refresh.refreshToken));
+  await recordHostConnection(context, verified.email, verified.clientId, hashTokenIn(context.issuerPath, refresh.refreshToken));
 
   return tokenSuccess({
     access_token: accessToken,
@@ -291,6 +291,7 @@ async function handleRefreshToken(
   const prepared: { hash?: string; accessToken?: string } = {};
   const refreshContext = {
     store: context.stores.refreshTokens,
+    hashNamespace: context.issuerPath,
     ttlMs: context.refreshTokenTtlMs,
     graceMs: context.refreshRotationGraceMs,
     prepareSuccessor: async (candidate: Parameters<typeof prepareRefreshAccessToken>[2]) => {
@@ -315,13 +316,13 @@ async function handleRefreshToken(
   const identity = await getRefreshTokenIdentity(refreshContext, rotated.refreshToken);
   if (!identity) return tokenError("invalid_grant", 400, "refresh token binding not found");
 
-  const accessToken = prepared.hash === hashToken(rotated.refreshToken)
+  const accessToken = prepared.hash === hashTokenIn(context.issuerPath, rotated.refreshToken)
     ? prepared.accessToken
     : await signAccessToken(context.signingKey, {
       email: identity.userEmail,
       subject: identity.userSub,
       clientId,
-      refreshTokenHash: hashToken(rotated.refreshToken),
+      refreshTokenHash: hashTokenIn(context.issuerPath, rotated.refreshToken),
       scopes: rotated.scopes,
       origin,
       resourcePath: context.resourcePath,
@@ -330,7 +331,7 @@ async function handleRefreshToken(
     });
   if (!accessToken) return tokenError("invalid_request", 400, "token issuance unavailable");
 
-  await recordHostConnection(context, identity.userEmail, clientId, hashToken(rotated.refreshToken));
+  await recordHostConnection(context, identity.userEmail, clientId, hashTokenIn(context.issuerPath, rotated.refreshToken));
 
   return tokenSuccess({
     access_token: accessToken,

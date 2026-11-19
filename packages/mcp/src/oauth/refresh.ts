@@ -85,6 +85,20 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * The at-rest form of a refresh token issued by one authorization server.
+ *
+ * With no namespace it is {@link hashToken}, byte for byte. A surface with an
+ * `issuerPath` stores its refresh tokens under its issuer path, so the rows of
+ * two surfaces sharing one table never answer for each other: a token minted by
+ * one is an unknown token at the other's token endpoint (`invalid_grant`), and
+ * cannot be traded there for a token the person never consented to.
+ */
+export function hashTokenIn(namespace: string | undefined, token: string): string {
+  if (!namespace) return hashToken(token);
+  return createHash("sha256").update(`${namespace}\n${token}`).digest("hex");
+}
+
 /** Generate a fresh opaque refresh token (high-entropy hex). */
 function generateToken(): string {
   return randomBytes(REFRESH_TOKEN_BYTES).toString("hex");
@@ -92,6 +106,8 @@ function generateToken(): string {
 
 export interface RefreshTokenContext {
   store: RefreshTokenStore;
+  /** The issuing surface's issuer path, which namespaces its rows ({@link hashTokenIn}). */
+  hashNamespace?: string;
   /** Lifetime of a newly stored token. Default 30 days. */
   ttlMs?: number;
   /**
@@ -130,7 +146,7 @@ export async function issueRefreshToken(
 ): Promise<IssuedRefreshToken> {
   const refreshToken = generateToken();
   const row: NewRefreshToken = {
-    tokenHash: hashToken(refreshToken),
+    tokenHash: hashTokenIn(context.hashNamespace, refreshToken),
     userEmail: binding.userEmail,
     userSub: binding.userSub,
     clientId: binding.clientId,
@@ -288,7 +304,7 @@ export async function rotateRefreshToken(
   expectedClientId: string,
   newScopes?: string[],
 ): Promise<IssuedRefreshToken> {
-  const tokenHash = hashToken(plaintext);
+  const tokenHash = hashTokenIn(context.hashNamespace, plaintext);
   const current = await context.store.findByHash(tokenHash);
 
   if (!current) {
@@ -317,7 +333,7 @@ export async function rotateRefreshToken(
 
   const scopes = narrowedScopes(current, newScopes);
   const successorPlaintext = generateToken();
-  const candidate = await preparedCandidate(context, current, scopes, hashToken(successorPlaintext));
+  const candidate = await preparedCandidate(context, current, scopes, hashTokenIn(context.hashNamespace, successorPlaintext));
   // Start the lifetime and retry window at the claim, not before preparation.
   const grace = graceWindowMs(context);
   const claimed = await context.store.rotate(
@@ -389,6 +405,6 @@ export async function getRefreshTokenIdentity(
   context: RefreshTokenContext,
   plaintext: string,
 ): Promise<RefreshTokenIdentity | null> {
-  const row = await context.store.findByHash(hashToken(plaintext));
+  const row = await context.store.findByHash(hashTokenIn(context.hashNamespace, plaintext));
   return row ? { userEmail: row.userEmail, userSub: row.userSub } : null;
 }

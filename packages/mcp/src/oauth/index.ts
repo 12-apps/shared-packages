@@ -108,6 +108,7 @@ export {
   RefreshTokenError,
   getRefreshTokenIdentity,
   hashToken,
+  hashTokenIn,
   issueRefreshToken,
   rotateRefreshToken,
   type IssuedRefreshToken,
