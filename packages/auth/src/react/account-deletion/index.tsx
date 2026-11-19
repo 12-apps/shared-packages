@@ -105,13 +105,19 @@ const FACT_ROW_SX = {
   "&:last-of-type": { borderBottom: 0 },
 } as const;
 
-/** The action inside a notice: inline, with a 40px tap target below `sm` that does not move the line. */
+/**
+ * The action inside a notice: inline from `sm` up; below it, its own line at
+ * least 40px tall, so the tap target never overlaps the next row.
+ */
 const ACTION_SX = {
   color: "inherit",
   fontWeight: 600,
-  display: "inline-block",
-  py: { xs: 1.5, sm: 0 },
-  my: { xs: -1.5, sm: 0 },
+  display: { xs: "flex", sm: "inline" },
+  alignItems: "center",
+  width: { xs: "fit-content", sm: "auto" },
+  minHeight: { xs: 40, sm: 0 },
+  // Never broken across two lines: a wrapped link's box spans both and covers the row's start.
+  whiteSpace: "nowrap",
 } as const;
 
 /** The flat, lightly tinted box of the prototype: static, so `status`, not `alert`. */
@@ -353,7 +359,7 @@ function PendingDeletionScreen({ ctx, purgeAt }: { ctx: Ctx; purgeAt: string }):
     if (error && !busy) cancelButton.current?.focus();
   }, [error, busy]);
   return (
-    <Box data-testid="deletion-pending-view" sx={{ ...CARD_SX, maxWidth: 480, my: 4, display: "grid", gap: 2 }}>
+    <Box data-testid="deletion-pending-view" sx={{ ...CARD_SX, maxWidth: 480, my: 4, mx: { xs: 2, sm: "auto" }, display: "grid", gap: 2 }}>
       <Text as="h1" variant="heading">{ctx.copy.pendingTitle(ctx.dateOf(purgeAt))}</Text>
       <Text as="p" color="secondary">{ctx.copy.pendingBody}</Text>
       <ErrorLine message={error} />
