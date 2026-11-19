@@ -35,7 +35,7 @@ import {
   type PagBankOrderResponse,
   type PagBankPixResponse,
 } from './pagbank-snapshots';
-import { isLegacyNotification, postTransactionEvents } from './pagbank-webhook';
+import { legacyEvents, unsignedSigner, verifyUnsignedLegacy } from './pagbank-legacy-webhook';
 import {
   consultedOrder,
   isConnectConnection,
@@ -160,14 +160,12 @@ const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
     if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
     if (signerOf(delivery, credentials) !== null) return true;
-    // An unsigned legacy notification carries nothing to trust (FUT-5371): see `isLegacyNotification`.
-    if (isLegacyNotification(delivery.rawBody)) return true;
+    const legacy = verifyUnsignedLegacy(delivery, credentials);
+    if (legacy) return legacy;
     return (await consultedOrder(delivery, credentials)) !== null;
   },
 
-  signer: (delivery, credentials) =>
-    signerOf(delivery, credentials) ??
-    (isLegacyNotification(delivery.rawBody) ? 'legacyLookup' : isConnectConnection(credentials) ? 'orderConsult' : null),
+  signer: (delivery, credentials) => signerOf(delivery, credentials) ?? unsignedSigner(delivery, credentials),
 
   refusalDetail(delivery, credentials) {
     const header = delivery.headers['x-authenticity-token'] ? 'present' : 'absent';
@@ -186,7 +184,7 @@ const webhook: PaymentProviderAdapter['webhook'] = {
    */
   async parse(delivery, credentials) {
     const eventId = sha256Hex(delivery.rawBody);
-    const postTransaction = postTransactionEvents(delivery.rawBody, eventId);
+    const postTransaction = legacyEvents(delivery, credentials, eventId);
     if (postTransaction) return postTransaction;
     const body = verifiedByConsult(delivery, credentials)
       ? await requireConsultedOrder(delivery, credentials)

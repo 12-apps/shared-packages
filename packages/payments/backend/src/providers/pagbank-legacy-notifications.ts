@@ -118,6 +118,22 @@ function legacyCredentials(credentials: ResolvedCredentials): { email: string; t
   return { email, token };
 }
 
+/**
+ * Whether PagBank knows this code for this account (FUT-5371): the lookup
+ * answered a transaction. An unsigned legacy delivery is verified this way
+ * before anything is stored, the way an unsigned Connect order is confirmed by
+ * consult (FUT-3722). Never throws: an unknown code, an outage or a refusal is
+ * false, and the delivery is refused (PagBank redelivers a real one).
+ */
+export async function legacyNotificationKnown(notificationCode: string, credentials: ResolvedCredentials): Promise<boolean> {
+  try {
+    parseTransaction(await fetchNotificationXml(notificationCode, credentials), notificationCode);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** GET the notification's XML from the legacy host, error contract intact. */
 async function fetchNotificationXml(
   notificationCode: string,

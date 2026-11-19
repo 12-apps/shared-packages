@@ -1,5 +1,6 @@
 import type { NormalizedWebhookEvent } from '../core/types';
 import { NAME } from './pagbank-http';
+import { sha256Hex } from './shared';
 
 /**
  * PagBank's SECOND webhook format — post-transaction events (FUT-477).
@@ -62,24 +63,43 @@ function postTransactionNotification(rawBody: string): PagBankNotification | nul
 }
 
 /**
- * Whether a delivery is a legacy post-transaction notification (FUT-5371).
- *
- * PagBank posts these UNSIGNED: production showed it on 2026-11-19, every one
- * of them without `x-authenticity-token`, on the homologação seller's route and
- * on a store's. They used to be refused
- * at verification, before `parse` could park them, so PagBank redelivered each
- * one and every refusal reached the error tracker — and the resolution FUT-477
- * built for them was never reached in production.
- *
- * Accepting one unsigned is safe because nothing in it is believed. `parse`
- * turns it into an UNKNOWN event that carries only the code; what the code
- * MEANS is learned by the legacy lookup with the merchant's own credentials,
- * which answers only for a transaction of that account. A forged code can at
- * most make us ask PagBank about a transaction that does not exist — the same
- * bound the order consult of an unsigned Connect delivery has (FUT-3722).
+ * A legacy notification code as PagBank writes it: 36 hex digits, bare (its
+ * documentation's example) or in groups of 6-12-12-6 (every delivery production
+ * received on 2026-11-19, e.g. `3F6E06-E39BE59BE515-000471CF9624-390FE5`).
  */
-export function isLegacyNotification(rawBody: string): boolean {
-  return postTransactionNotification(rawBody) !== null;
+const LEGACY_CODE = /^(?:[0-9A-F]{36}|[0-9A-F]{6}-[0-9A-F]{12}-[0-9A-F]{12}-[0-9A-F]{6})$/iu;
+/** `notificationType`: documented as up to 41 characters, values unpublished (`transaction` seen). */
+const LEGACY_TYPE = /^[A-Za-z_]{1,41}$/u;
+const LEGACY_KEYS = new Set(['notificationCode', 'notificationType']);
+
+/**
+ * The legacy notification an UNSIGNED delivery may be taken as (FUT-5371), or
+ * null when it is anything else.
+ *
+ * PagBank posts these without `x-authenticity-token`: production showed it on
+ * 2026-11-19, every one of them, on the homologação seller's route and on a
+ * store's. Refused at verification, they never reached `parse`, and PagBank
+ * redelivered each one. So an unsigned delivery is let past verification only
+ * in exactly the documented shape: the two documented keys, each once, a code
+ * in PagBank's format and a plain type. Anything else (an extra key, a code of
+ * another shape) is refused as before. Its event id is derived from the code
+ * alone (`legacyEventId`), so a redelivery, or the same code re-posted with
+ * its keys in another order, is one inbox row. What the code MEANS is still
+ * only what the legacy lookup with the merchant's credentials answers; the
+ * adapter's `verify` asks it before anything is stored when it can.
+ */
+export function unsignedLegacyNotification(rawBody: string): PagBankNotification | null {
+  const notification = postTransactionNotification(rawBody);
+  if (!notification || !LEGACY_CODE.test(notification.notificationCode)) return null;
+  const keys = [...new URLSearchParams(rawBody).keys()];
+  if (keys.some((key) => !LEGACY_KEYS.has(key)) || new Set(keys).size !== keys.length) return null;
+  const type = notification.notificationType;
+  return type === null || LEGACY_TYPE.test(type) ? notification : null;
+}
+
+/** One event id per legacy code, whatever the body around it: dashes and case do not make a new one. */
+function legacyEventId(notificationCode: string): string {
+  return sha256Hex(`pagbank-legacy-delivery:${notificationCode.replace(/-/gu, '').toUpperCase()}`);
 }
 
 /**
@@ -100,5 +120,7 @@ export function postTransactionEvents(
 ): NormalizedWebhookEvent[] | null {
   const notification = postTransactionNotification(rawBody);
   if (!notification) return null;
-  return [{ provider: NAME, eventId, type: 'UNKNOWN', raw: notification }];
+  // A code in PagBank's format is keyed by the code itself (FUT-5371): redeliveries and variants dedupe.
+  const id = LEGACY_CODE.test(notification.notificationCode) ? legacyEventId(notification.notificationCode) : eventId;
+  return [{ provider: NAME, eventId: id, type: 'UNKNOWN', raw: notification }];
 }

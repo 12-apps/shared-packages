@@ -3,6 +3,7 @@ import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { NormalizedWebhookEvent } from '../core/webhook-event-types';
 
 import { resolvePagbankNotification } from './pagbank-legacy-notifications';
+import { legacyUnresolvable } from './pagbank-webhook-auth';
 
 /**
  * PagBank's LEGACY post-transaction notifications, resolved (FUT-477, FUT-764).
@@ -62,6 +63,7 @@ async function listeningCredentials(
  */
 export function pagbankLegacyResolver(
   credentials: CredentialStore,
+  onUnresolvable?: (notification: UnresolvableLegacyNotification) => void,
 ): (event: NormalizedWebhookEvent, merchant: MerchantRef) => Promise<NormalizedWebhookEvent[] | null> {
   return async (event, merchant) => {
     const code = legacyNotificationCode(event);
@@ -73,18 +75,27 @@ export function pagbankLegacyResolver(
           `${merchant.kind}:${merchant.id}; cannot resolve`,
       );
     }
-    // A Connect seller's credentials are an OAuth access token, which the legacy host does not
-    // accept (FUT-5371): the code cannot be resolved, ever, so it stays parked as UNKNOWN on the
-    // inbox row instead of failing it — a failed row answers non-2xx and PagBank redelivers
-    // forever. What moved is still reported by the Orders API's own signed (or consulted) JSON.
-    if (!canResolveLegacy(resolved)) return null;
+    // A Connect seller with no account token apart can never resolve the code (FUT-5371): it stays
+    // parked as UNKNOWN instead of failing the row, which would answer non-2xx and have PagBank
+    // redeliver forever. The host hears of it through `onUnresolvable`.
+    if (legacyUnresolvable(resolved)) {
+      onUnresolvable?.({ notificationCode: code, merchant, reason: unresolvableReason(resolved) });
+      return null;
+    }
     return resolvePagbankNotification(code, resolved);
   };
 }
 
-/** The legacy lookup needs the account's own API token; a Connect connection holds none unless set apart. */
-function canResolveLegacy(credentials: ResolvedCredentials): boolean {
-  if (credentials.stub) return true;
-  const connect = Boolean(credentials.fields['refreshToken']);
-  return !connect || Boolean(credentials.fields['legacyToken']);
+/** What a host hears of a legacy code these credentials cannot resolve. */
+export interface UnresolvableLegacyNotification {
+  notificationCode: string;
+  merchant: MerchantRef;
+  /** Which credential is missing, by field name; never a value. */
+  reason: string;
+}
+
+function unresolvableReason(credentials: ResolvedCredentials): string {
+  const { fields } = credentials;
+  if (fields['legacyEmail']) return 'Connect seller: legacyEmail is set but legacyToken is not';
+  return 'Connect seller with no legacyToken: an OAuth access token cannot ask the legacy host';
 }
