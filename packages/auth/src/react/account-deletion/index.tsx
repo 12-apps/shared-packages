@@ -1,15 +1,17 @@
 /**
- * "Excluir minha conta" and the grace-period screen (FUT-5322), the package's
- * half of `createApiAuth({ accountDeletion })`. The host mounts the page where
- * its account area puts it, and renders the pending screen in place of
- * everything else while the session carries `deletion`.
+ * "Excluir minha conta" and the grace-period screen, the web half of
+ * `createApiAuth({ accountDeletion })`, built by `createWebAuth({ accountDeletion })`
+ * from that web auth's own session (`signIn`, `signOut`).
  *
  * The page decides nothing: what blocks, what is lost and how to confirm is
- * the route's answer, checked again on the button. No dialog on top (ADR 0150
- * in Future Pay): the password is the confirmation, the grace window is the
- * undo, and what cannot be undone after it is said apart, under the button.
+ * the route's answer, checked again on the button. There is no dialog on top:
+ * the password is the confirmation, the grace window is the undo, and what
+ * cannot be undone after it is said apart, under the button.
+ *
+ * What goes and what stays (`facts`) is the host's to say: it is a promise
+ * about the host's own data, so the package ships none.
  */
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
@@ -20,7 +22,9 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import { purgeDateWords } from "../../account-deletion/copy";
 import type { DeletionReport } from "../../account-deletion/types";
-import { EN_US_ACCOUNT_DELETION_SCREEN, PT_BR_ACCOUNT_DELETION_SCREEN, type AccountDeletionScreenCopy } from "./copy";
+import type { AccountDeletionScreenCopy } from "./copy";
+import { EN_US_ACCOUNT_DELETION_SCREEN } from "./copy.en-US";
+import { PT_BR_ACCOUNT_DELETION_SCREEN } from "./copy.pt-BR";
 
 export { EN_US_ACCOUNT_DELETION_SCREEN, PT_BR_ACCOUNT_DELETION_SCREEN };
 export type { AccountDeletionScreenCopy };
@@ -28,16 +32,25 @@ export type { AccountDeletionScreenCopy };
 export interface WebAccountDeletionConfig {
   /** Where the host mounted the routes (`GET`, `POST`, `POST …/cancel`). */
   readonly mount: string;
+  /** What deleting erases, and what the host keeps (anonymised, by law…): the host's own promises. */
+  readonly facts: { readonly goes: readonly string[]; readonly stays: readonly string[] };
+  /** The IANA zone the purge date is worded in (the same as the API config's). */
+  readonly timeZone: string;
   readonly locale?: "pt-BR" | "en-US";
-  /** Start a Google sign-in that returns to the page (the host's `signIn`). */
-  readonly signInWithGoogle: () => void;
-  /** End this browser's session (the host's `signOut`), then leave. */
-  readonly signOut: () => Promise<void>;
-  /** Where to go after scheduling or cancelling (default `/`, `/account`). */
+  /** The provider whose fresh sign-in stands in for a password (default "google"). */
+  readonly freshProvider?: string;
+  /** Where to go after scheduling (default `/`), and the page to come back to after re-signing in. */
   readonly afterSchedule?: string;
+  readonly pagePath?: string;
+  /** After a cancel the session was moved on, so the person signs in again (default `/login`). */
   readonly afterCancel?: string;
   readonly fetchImpl?: typeof fetch;
   readonly copy?: AccountDeletionScreenCopy;
+}
+
+/** What the screens need of the web auth's session. */
+export interface AccountDeletionSessionHooks {
+  useSession: () => { signIn: (provider?: string, callbackUrl?: string) => Promise<void>; signOut: () => Promise<void> };
 }
 
 /** The pending deletion a session answer carries, if any. */
@@ -48,6 +61,8 @@ export function pendingDeletionOf(session: unknown): { purgeAt: string } | null 
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+class Refusal extends Error {}
+
 async function call<T>(fetchImpl: typeof fetch, url: string, body?: unknown): Promise<T> {
   const response = await fetchImpl(url, body === undefined ? { credentials: "same-origin" } : {
     method: "POST",
@@ -56,11 +71,16 @@ async function call<T>(fetchImpl: typeof fetch, url: string, body?: unknown): Pr
     body: JSON.stringify(body),
   });
   const payload = (await response.json().catch(() => ({}))) as { data?: T; error?: string };
-  if (!response.ok) throw new Error(payload.error ?? "");
+  // A server refusal says its own sentence; a network failure never reaches here as one.
+  if (!response.ok) throw new Refusal(payload.error ?? "");
   return payload.data as T;
 }
 
-function Facts({ items, mark }: { items: readonly string[]; mark: "×" | "✓" }): JSX.Element {
+const sentenceOf = (failure: unknown, fallback: string): string =>
+  failure instanceof Refusal && failure.message ? failure.message : fallback;
+
+function Facts({ items, mark }: { items: readonly string[]; mark: "×" | "✓" }): JSX.Element | null {
+  if (items.length === 0) return null;
   return (
     <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0, display: "grid", gap: 1 }}>
       {items.map((item) => (
@@ -81,7 +101,7 @@ function Notice({ title, rows, testId }: { title: string; rows: ReadonlyArray<{ 
         {rows.map((row, index) => (
           <li key={`${row.href}-${index}`}>
             {row.text}{" "}
-            <Box component="a" href={row.href} sx={{ color: "inherit", fontWeight: 600 }}>{row.action}</Box>
+            {row.action ? <Box component="a" href={row.href} sx={{ color: "inherit", fontWeight: 600 }}>{row.action}</Box> : null}
           </li>
         ))}
       </Box>
@@ -90,95 +110,121 @@ function Notice({ title, rows, testId }: { title: string; rows: ReadonlyArray<{ 
 }
 
 export interface WebAccountDeletion {
-  /** "Excluir minha conta": the whole screen. */
+  /** "Excluir minha conta": the whole screen, with its heading. */
   readonly DeleteAccountPage: (props: { blockerAction?: (kind: string) => string; forfeitAction?: string }) => JSX.Element;
   /** "Sua conta será excluída em <data>": the only screen while pending. */
   readonly PendingDeletionScreen: (props: { purgeAt: string }) => JSX.Element;
 }
 
-export function createWebAccountDeletion(config: WebAccountDeletionConfig): WebAccountDeletion {
+export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks: AccountDeletionSessionHooks): WebAccountDeletion {
   const locale = config.locale ?? "pt-BR";
   const copy = config.copy ?? (locale === "en-US" ? EN_US_ACCOUNT_DELETION_SCREEN : PT_BR_ACCOUNT_DELETION_SCREEN);
   const fetchImpl: typeof fetch = config.fetchImpl ?? ((...args) => globalThis.fetch(...args));
-  const dateOf = (iso: string): string => purgeDateWords(new Date(iso), locale);
+  const dateOf = (iso: string): string => purgeDateWords(new Date(iso), locale, config.timeZone);
 
-  function DeleteAccountPage({ blockerAction = () => copy.settleFirst, forfeitAction = "" }: { blockerAction?: (kind: string) => string; forfeitAction?: string }): JSX.Element {
+  function DeleteAccountPage({ blockerAction = () => "", forfeitAction = "" }: { blockerAction?: (kind: string) => string; forfeitAction?: string }): JSX.Element {
+    const { signIn, signOut } = hooks.useSession();
     const [report, setReport] = useState<DeletionReport | null | "failed">(null);
     const [password, setPassword] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const field = useRef<HTMLInputElement>(null);
     const load = useCallback(() => {
+      setReport(null);
       call<DeletionReport>(fetchImpl, config.mount).then(setReport, () => setReport("failed"));
     }, []);
     useEffect(load, [load]);
-    if (report === null) return <LoadingState dataTestId="delete-account-loading" />;
-    if (report === "failed") return <Alert variant="danger" description={copy.loadFailed} />;
+    useEffect(() => {
+      if (error) field.current?.focus();
+    }, [error]);
+    const heading = <Text as="h1" variant="heading">{copy.title}</Text>;
+    if (report === null) return <Box sx={{ display: "grid", gap: 2 }}>{heading}<LoadingState dataTestId="delete-account-loading" /></Box>;
+    if (report === "failed") {
+      return (
+        <Box sx={{ display: "grid", gap: 2, justifyItems: "start" }}>
+          {heading}
+          <Text as="p" role="alert">{copy.loadFailed}</Text>
+          <Button variant="outline" color="primary" size="md" onClick={load}>{copy.retry}</Button>
+        </Box>
+      );
+    }
     const google = report.confirm === "google";
     const ready = report.canSchedule && (google ? report.freshSignIn : password.length > 0);
-    const submit = async (): Promise<void> => {
+    const submit = async (event?: FormEvent): Promise<void> => {
+      event?.preventDefault();
+      if (!ready || pending) return;
       setPending(true);
       setError(null);
       try {
         await call(fetchImpl, config.mount, google ? {} : { password });
-        await config.signOut().catch(() => undefined);
+        await signOut().catch(() => undefined);
         globalThis.location.assign(config.afterSchedule ?? "/");
       } catch (failure) {
-        setError(failure instanceof Error && failure.message ? failure.message : copy.failed);
+        setError(sentenceOf(failure, copy.failed));
         setPending(false);
       }
     };
     return (
-      <Box data-testid="delete-account-view" sx={{ display: "grid", gap: 2.5, containerType: "inline-size" }}>
+      <Box component="form" noValidate onSubmit={(event: FormEvent) => void submit(event)} data-testid="delete-account-view" sx={{ display: "grid", gap: 2.5, containerType: "inline-size" }}>
+        {heading}
         <Box sx={{ display: "grid", gap: 1, "@container (min-width: 560px)": { gridTemplateColumns: "1fr 1fr", columnGap: 3 } }}>
-          <Facts items={copy.goes} mark="×" />
-          <Facts items={copy.stays} mark="✓" />
+          <Facts items={config.facts.goes} mark="×" />
+          <Facts items={config.facts.stays} mark="✓" />
         </Box>
+        {report.state === "pending" ? <Alert variant="info" description={copy.alreadyPending} /> : null}
         <Notice title={copy.settleFirst} testId="delete-account-blockers" rows={report.blockers.map((b) => ({ text: b.label, href: b.href, action: blockerAction(b.kind) }))} />
         <Notice title={copy.forfeitTitle} testId="delete-account-forfeits" rows={report.forfeits.map((f) => ({ text: `${f.amount} — ${f.label}.`, href: f.href, action: forfeitAction }))} />
         {google ? (
           <Box sx={{ display: "grid", gap: 1, justifyItems: "start" }}>
             <Text as="p" size="sm">{report.freshSignIn ? copy.googleFresh : copy.googleLead}</Text>
             {report.freshSignIn ? null : (
-              <Button variant="outline" color="primary" size="md" onClick={config.signInWithGoogle} dataTestId="delete-account-google">{copy.googleAction}</Button>
+              <Button variant="outline" color="primary" size="md" onClick={() => void signIn(config.freshProvider ?? "google", config.pagePath)} dataTestId="delete-account-google">{copy.googleAction}</Button>
             )}
           </Box>
         ) : (
           <Box sx={{ maxWidth: 360, width: "100%" }}>
-            <Input label={copy.passwordLabel} type="password" fullWidth autoComplete="current-password" value={password} disabled={!report.canSchedule} error={error !== null} helperText={error ?? undefined} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} data-testid="delete-account-password" />
+            <Input inputRef={field} label={copy.passwordLabel} type="password" fullWidth autoComplete="current-password" value={password} disabled={!report.canSchedule} error={error !== null} onChange={(event: { target: { value: string } }) => setPassword(event.target.value)} inputProps={{ "aria-describedby": error ? "delete-account-error" : undefined }} data-testid="delete-account-password" />
           </Box>
         )}
+        {error ? <Text as="p" size="sm" color="danger" role="alert" id="delete-account-error" data-testid="delete-account-error">{error}</Text> : null}
         <Box sx={{ display: "grid", gap: 0.5 }}>
           <Text as="p" size="sm" color="secondary">{copy.when(dateOf(new Date(Date.now() + report.graceDays * DAY_MS).toISOString()))}</Text>
           <Text as="p" size="sm" color="secondary">{copy.irreversible(report.graceDays)}</Text>
         </Box>
         <Box>
-          <Button variant="solid" color="primary" size="md" loading={pending} disabled={!ready || pending} onClick={() => void submit()} dataTestId="delete-account-submit">{copy.submit}</Button>
+          <Button type="submit" variant="solid" color="primary" size="md" loading={pending} disabled={!ready || pending} dataTestId="delete-account-submit">{copy.submit}</Button>
         </Box>
       </Box>
     );
   }
 
   function PendingDeletionScreen({ purgeAt }: { purgeAt: string }): JSX.Element {
+    const { signOut } = hooks.useSession();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const cancelButton = useRef<HTMLButtonElement>(null);
     const cancel = async (): Promise<void> => {
       setBusy(true);
+      setError(null);
       try {
         await call(fetchImpl, `${config.mount}/cancel`, {});
-        globalThis.location.assign(config.afterCancel ?? "/account");
+        // The cancel moved the session on (no token from the window outlives it): sign in again.
+        await signOut().catch(() => undefined);
+        globalThis.location.assign(config.afterCancel ?? "/login");
       } catch (failure) {
-        setError(failure instanceof Error && failure.message ? failure.message : copy.failed);
+        setError(sentenceOf(failure, copy.failed));
         setBusy(false);
+        cancelButton.current?.focus();
       }
     };
     return (
       <Box data-testid="deletion-pending-view" sx={{ maxWidth: 480, mx: "auto", width: "100%", px: 2, py: 4, display: "grid", gap: 2 }}>
         <Text as="h1" variant="heading">{copy.pendingTitle(dateOf(purgeAt))}</Text>
         <Text as="p" color="secondary">{copy.pendingBody}</Text>
-        {error ? <Text as="p" size="sm" color="danger">{error}</Text> : null}
+        {error ? <Text as="p" size="sm" color="danger" role="alert">{error}</Text> : null}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Button variant="solid" color="primary" size="md" loading={busy} disabled={busy} onClick={() => void cancel()} dataTestId="deletion-pending-cancel">{copy.pendingCancel}</Button>
-          <Button variant="outline" color="primary" size="md" disabled={busy} onClick={() => void config.signOut().then(() => globalThis.location.assign("/"))} dataTestId="deletion-pending-sign-out">{copy.pendingSignOut}</Button>
+          <Button ref={cancelButton} variant="solid" color="primary" size="md" loading={busy} disabled={busy} onClick={() => void cancel()} dataTestId="deletion-pending-cancel">{copy.pendingCancel}</Button>
+          <Button variant="outline" color="primary" size="md" disabled={busy} onClick={() => void signOut().then(() => globalThis.location.assign("/"))} dataTestId="deletion-pending-sign-out">{copy.pendingSignOut}</Button>
         </Box>
       </Box>
     );

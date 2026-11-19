@@ -2,6 +2,7 @@
   "packages/audit/prisma/migrations/20260813120000_add_audit_log/migration.sql": "06f18dc3f4ba5c975a3446ccd2332ce7cebf6299c31bc44803236327c3e72a73",
   "packages/auth/prisma/migrations/20260819230000_auth_email_password/migration.sql": "e0d2ee4a595f18307b00a19707d4253da78a03f8d0f823d38fa4c18b7250c977",
   "packages/auth/prisma/migrations/20261009200000_auth_sign_in_grant/migration.sql": "6145f2b1b7f5f04de668be1869c9d81f3345524a65573b40487c62fc02adb623",
+  "packages/auth/prisma/migrations/20261119180000_auth_account_deletion/migration.sql": "779074bb1184cea124321ac7ca86f455084af256f50ab4226e763e856f32c588",
   "packages/chat/prisma/migrations/20261002120000_add_chat/migration.sql": "e1dff2c462e51ba09b3006173d11ea908123fa44f843f393ee5ccb80d354de31",
   "packages/chat/prisma/migrations/20261003120000_add_chat_thread_activity_index/migration.sql": "4aa5d1f8b2470a52baabb422944e86a5ad9884b1fb540d59f855bd0c52b4cc8a",
   "packages/discounts/prisma/migrations/20260821140000_discounts_package_owned/migration.sql": "a10924dab134019fbeb62b772db79a36dc423d7581644c3a20e3105798abd5c1",

@@ -20,6 +20,7 @@ export type { AccountDeletionCopy, AccountDeletionRefusals } from "./copy";
 export { deletionReportSchema, scheduleDeletionBody, cancelDeletionBody } from "./routes";
 export type { AccountDeletionRoutes } from "./routes";
 export type { AccountDeletionJob } from "./jobs";
+export { assertDeletionConfig } from "./service";
 export type { AccountDeletionService, CancelOutcome, ScheduleOutcome, SweepSummary } from "./service";
 export { isOpenWhilePending, standingOf, SESSION_EPOCH_CLAIM, SIGNED_IN_AT_CLAIM } from "./standing";
 export type { SessionIdentity, SessionStanding } from "./standing";

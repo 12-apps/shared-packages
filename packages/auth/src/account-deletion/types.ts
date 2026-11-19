@@ -47,8 +47,16 @@ export interface DeletionMail {
 }
 
 export interface AccountDeletionConfig {
-  /** Days between scheduling and the purge (Future Pay: 15). */
+  /** Days between scheduling and the purge: a whole number, at least 1. */
   readonly graceDays: number;
+  /** The IANA zone a purge date is worded in ("America/Sao_Paulo", "UTC"). Required: no zone is assumed. */
+  readonly timeZone: string;
+  /**
+   * The host's user id for an e-mail, for a session token that carries no
+   * `uid` claim: the revocation check resolves it this way rather than
+   * admitting the token unchecked.
+   */
+  readonly userIdByEmail: (email: string) => Promise<string | null>;
   /** Resolve the caller of a route, or `null` when signed out. */
   readonly resolveCaller: (request: Request) => Promise<DeletionCaller | null>;
   /** What blocks this person's deletion right now. */
@@ -57,7 +65,11 @@ export interface AccountDeletionConfig {
   readonly forfeits?: (userId: string, now: Date) => Promise<readonly DeletionForfeit[]>;
   /** Whether the person has a password (else they confirm with a fresh Google sign-in). */
   readonly hasPassword: (userId: string) => Promise<boolean>;
-  /** Check the password; the host's sign-in check, rate limit included. */
+  /**
+   * Check the password: the host's own sign-in check, INCLUDING its attempt
+   * limit — the package adds none, so a host without one lets a stolen
+   * session guess the password here (ADOPTING.md).
+   */
   readonly checkPassword: (email: string, password: string) => Promise<"ok" | "wrong" | "rate-limited">;
   /** At scheduling, after the epoch moved: revoke what the host issued itself (app links, tokens). */
   readonly onScheduled?: (userId: string, email: string, now: Date) => Promise<void>;
@@ -71,8 +83,12 @@ export interface AccountDeletionConfig {
   readonly audit: (act: DeletionAuditAct, userId: string, at: Date) => Promise<void>;
   /** The database client, structurally (`authAccountState`). */
   readonly getDb: () => Promise<AccountStateDb> | AccountStateDb;
-  /** How recent a Google sign-in must be to stand in for the password (ms, default 10 min). */
+  /** How recent a sign-in must be to stand in for the password (ms, default 10 min). */
   readonly freshSignInMs?: number;
+  /** The sign-in providers whose fresh sign-in stands in for a password (default `["google"]`). */
+  readonly freshSignInProviders?: readonly string[];
+  /** Told of every failure the package keeps going past (a mail, a host hook, a purge). Default: `console.error`. */
+  readonly onError?: (error: unknown, context: { readonly act: string; readonly userId: string }) => void;
 }
 
 /** What the screen shows: the wire of `GET`. */
@@ -95,6 +111,9 @@ export interface AccountStateRow {
   readonly purgeAt: Date | null;
   readonly remindedWeekAt: Date | null;
   readonly remindedDayAt: Date | null;
+  readonly mailOwed: string | null;
+  readonly mailPurgeAt: Date | null;
+  readonly purgeClaimedAt: Date | null;
   readonly deletedAt: Date | null;
 }
 
@@ -103,11 +122,7 @@ export interface AccountStateDb {
   authAccountState: {
     findUnique(args: { where: { userId: string } }): Promise<AccountStateRow | null>;
     findMany(args: { where: Record<string, unknown>; orderBy?: Record<string, "asc" | "desc">; take?: number }): Promise<AccountStateRow[]>;
-    upsert(args: {
-      where: { userId: string };
-      create: Record<string, unknown> & { userId: string };
-      update: Record<string, unknown>;
-    }): Promise<AccountStateRow>;
+    create(args: { data: Record<string, unknown> & { userId: string } }): Promise<AccountStateRow>;
     updateMany(args: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<{ count: number }>;
   };
 }

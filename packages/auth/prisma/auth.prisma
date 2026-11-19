@@ -97,6 +97,7 @@ model AuthPlatformSetting {
 /// epoch it was signed in under (sign-in claim `sv`), and one whose epoch is
 /// not this row's is refused. `requestedAt` starts the grace window and
 /// `purgeAt` ends it; the two reminder stamps make each reminder go once;
+/// `mailOwed` is a one-slot outbox and `purgeClaimedAt` the purge's lease;
 /// `deletedAt` is stamped by the purge. No row means epoch 0, nothing asked.
 model AuthAccountState {
   userId          String    @id @map("user_id")
@@ -105,6 +106,12 @@ model AuthAccountState {
   purgeAt         DateTime? @map("purge_at")
   remindedWeekAt  DateTime? @map("reminded_week_at")
   remindedDayAt   DateTime? @map("reminded_day_at")
+  /// The one-slot mail outbox: the kind owed and the purge date it names,
+  /// cleared only once the mail left, so an outage retries it next pass.
+  mailOwed        String?   @map("mail_owed")
+  mailPurgeAt     DateTime? @map("mail_purge_at")
+  /// The purge's lease: set by the pass that runs it, until `deletedAt`.
+  purgeClaimedAt  DateTime? @map("purge_claimed_at")
   deletedAt       DateTime? @map("deleted_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
