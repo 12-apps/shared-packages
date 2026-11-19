@@ -30,7 +30,7 @@ function apply(row: AccountStateRow, data: Record<string, unknown>): AccountStat
   return next as unknown as AccountStateRow;
 }
 
-export function memoryDb(): AccountStateDb & { rows: Map<string, AccountStateRow> } {
+export function memoryDb(): AccountStateDb & { rows: Map<string, AccountStateRow>; place: (row: Partial<AccountStateRow> & { userId: string }) => void } {
   const rows = new Map<string, AccountStateRow>();
   const blank = (userId: string): AccountStateRow => ({
     userId, sessionEpoch: 0, requestedAt: null, purgeAt: null, remindedWeekAt: null, remindedDayAt: null,
@@ -38,6 +38,10 @@ export function memoryDb(): AccountStateDb & { rows: Map<string, AccountStateRow
   });
   return {
     rows,
+    /** A fixture row, as an earlier pass would have left it. */
+    place: (row) => {
+      rows.set(row.userId, { ...blank(row.userId), ...row });
+    },
     authAccountState: {
       findUnique: async ({ where }) => rows.get(where.userId) ?? null,
       findMany: async ({ where, orderBy, take }) => {
@@ -52,13 +56,9 @@ export function memoryDb(): AccountStateDb & { rows: Map<string, AccountStateRow
         return next;
       },
       updateMany: async ({ where, data }) => {
-        let count = 0;
-        for (const row of rows.values()) {
-          if (!matches(row, where)) continue;
-          rows.set(row.userId, apply(row, data));
-          count += 1;
-        }
-        return { count };
+        const matched = [...rows.values()].filter((row) => matches(row, where));
+        matched.forEach((row) => rows.set(row.userId, apply(row, data)));
+        return { count: matched.length };
       },
     },
   };

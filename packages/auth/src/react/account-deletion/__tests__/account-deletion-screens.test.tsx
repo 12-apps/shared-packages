@@ -76,7 +76,7 @@ describe("the Excluir minha conta page", () => {
     const notice = await screen.findByTestId("delete-account-forfeits");
     expect(notice.textContent).toContain("R$ 18,50 — Loja.");
     expect(notice.textContent).toContain("Você perde:");
-    expect(screen.queryByTestId("delete-account-blockers")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("delete-account-blockers")).toBeNull());
   });
 
   it("answers a wrong password with an alert that takes focus, and keeps what was typed", async () => {
@@ -108,7 +108,7 @@ describe("the Excluir minha conta page", () => {
     const view = render(<first.DeleteAccountPage />);
     fireEvent.click(await screen.findByTestId("delete-account-google"));
     expect(first.signIn).toHaveBeenCalledWith("google", undefined);
-    expect(screen.queryByLabelText("Sua senha")).toBeNull();
+    await waitFor(() => expect(screen.queryByLabelText("Sua senha")).toBeNull());
     expect((screen.getByTestId("delete-account-submit") as HTMLButtonElement).disabled).toBe(true);
     view.unmount();
 

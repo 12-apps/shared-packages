@@ -15,11 +15,20 @@ export function purgeDateOf(requestedAt: Date, graceDays: number): Date {
 export function dueReminder(row: AccountStateRow, now: Date): Exclude<DeletionMailKind, "scheduled" | "cancelled"> | null {
   if (!row.requestedAt || !row.purgeAt || row.deletedAt) return null;
   const left = row.purgeAt.getTime() - now.getTime();
-  if (left <= 0) return null;
   const lead = row.purgeAt.getTime() - row.requestedAt.getTime();
-  if (left <= DAY_MS && !row.remindedDayAt && lead > DAY_MS) return "day-before";
-  if (left <= 7 * DAY_MS && left > DAY_MS && !row.remindedWeekAt && lead > 7 * DAY_MS) return "week-before";
-  return null;
+  if (left <= 0) return null;
+  if (dayReminderDue(row, left, lead)) return "day-before";
+  return weekReminderDue(row, left, lead) ? "week-before" : null;
+}
+
+/** Within the last day, not yet sent, and the window was longer than a day. */
+function dayReminderDue(row: AccountStateRow, left: number, lead: number): boolean {
+  return left <= DAY_MS && !row.remindedDayAt && lead > DAY_MS;
+}
+
+/** Within the last week but not the last day, not yet sent, and the window was longer than a week. */
+function weekReminderDue(row: AccountStateRow, left: number, lead: number): boolean {
+  return left <= 7 * DAY_MS && left > DAY_MS && !row.remindedWeekAt && lead > 7 * DAY_MS;
 }
 
 /** Whether the purge is owed now. */

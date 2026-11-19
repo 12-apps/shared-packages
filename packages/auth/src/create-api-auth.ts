@@ -326,9 +326,7 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
     // Auth.js answers 200 `{}` — not 401 — when there is no valid session.
     const session = (await response.json()) as Partial<Session> | null;
     if (!session?.user) return null;
-    if (!deletion) return session as Session;
-    const standing = await withDeletionStanding(session as Session, deletion);
-    return standing && (read.allowPending || !("deletion" in standing)) ? standing : null;
+    return deletion ? readDeletionStanding(session as Session, deletion, read.allowPending === true) : (session as Session);
   };
 
   return {
@@ -366,6 +364,13 @@ async function withDeletionStanding(session: Session, deletion: AccountDeletion)
   if (standing.state === "revoked") return null;
   if (standing.state === "pending") return { ...session, deletion: { purgeAt: standing.purgeAt.toISOString() } } as Session;
   return session;
+}
+
+/** `auth()`'s answer with deletion on: revoked is none, and pending is none unless asked for. */
+async function readDeletionStanding(session: Session, deletion: AccountDeletion, allowPending: boolean): Promise<Session | null> {
+  const standing = await withDeletionStanding(session, deletion);
+  if (!standing) return null;
+  return allowPending || !("deletion" in standing) ? standing : null;
 }
 
 /** `GET <basePath>/session`, told the standing: `{}` and the cookie cleared for a revoked token. */

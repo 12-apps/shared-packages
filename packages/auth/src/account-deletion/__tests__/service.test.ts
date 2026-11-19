@@ -5,39 +5,37 @@ import type { AccountDeletionConfig, DeletionCaller, DeletionMail } from "../typ
 import { memoryDb } from "./memory-db";
 
 const DAY = 24 * 60 * 60 * 1000;
-const T0 = new Date("2026-11-19T15:00:00.000Z");
-const at = (days: number, ms = 0): Date => new Date(T0.getTime() + days * DAY + ms);
-const PERSON: DeletionCaller = { userId: "u1", email: "pessoa@example.com", signedInAt: String(T0.getTime()) };
+const T0_MS = Date.UTC(2026, 10, 19, 15);
+const at = (days: number, ms = 0): Date => new Date(T0_MS + days * DAY + ms);
+const PERSON: DeletionCaller = { userId: "u1", email: "pessoa@example.com", signedInAt: String(T0_MS) };
 
 function world(over: Partial<AccountDeletionConfig> = {}) {
-  const db = memoryDb();
-  const mails: DeletionMail[] = [];
-  const audits: Array<[string, string]> = [];
-  const errors: string[] = [];
-  const erase = vi.fn(async () => undefined);
-  const feature = createAccountDeletion({
+  const store = memoryDb();
+  const sink = { mails: [] as DeletionMail[], audits: [] as Array<[string, string]>, errors: [] as string[] };
+  const eraseSpy = vi.fn(async () => undefined);
+  const built = createAccountDeletion({
     graceDays: 15,
     timeZone: "UTC",
     userIdByEmail: async () => "u1",
     resolveCaller: async () => PERSON,
     hasPassword: async () => true,
     checkPassword: async (_email, password) => (password === "right" ? "ok" : password === "spam" ? "rate-limited" : "wrong"),
-    erase,
+    erase: eraseSpy,
     emailOf: async () => PERSON.email,
-    mail: async (message) => void mails.push(message),
-    audit: async (act, userId) => void audits.push([act, userId]),
-    onError: (_error, context) => void errors.push(context.act),
-    getDb: () => db,
+    mail: async (message) => void sink.mails.push(message),
+    audit: async (act, userId) => void sink.audits.push([act, userId]),
+    onError: (_error, context) => void sink.errors.push(context.act),
+    getDb: () => store,
     ...over,
   });
-  return { db, mails, audits, errors, erase, feature };
+  return { db: store, mails: sink.mails, audits: sink.audits, errors: sink.errors, erase: eraseSpy, feature: built };
 }
 
 describe("scheduling", () => {
   it("moves the epoch, stamps the window, audits and mails once; the old token is refused", async () => {
     const { feature, mails, audits, db } = world();
-    expect((await feature.signInClaims("u1", "google", T0)).sv).toBe("0");
-    expect(await feature.schedule(PERSON, "right", T0)).toEqual({ ok: true, purgeAt: at(15) });
+    expect((await feature.signInClaims("u1", "google", at(0))).sv).toBe("0");
+    expect(await feature.schedule(PERSON, "right", at(0))).toEqual({ ok: true, purgeAt: at(15) });
     expect(db.rows.get("u1")).toMatchObject({ sessionEpoch: 1, mailOwed: null });
     expect(await feature.standing("u1", { sv: "0" })).toEqual({ state: "revoked" });
     expect(await feature.standing("u1", { sv: "1" })).toEqual({ state: "pending", purgeAt: at(15) });
@@ -47,7 +45,7 @@ describe("scheduling", () => {
 
   it("schedules once on a double tap: one epoch move, one audit, one mail", async () => {
     const { feature, mails, audits, db } = world();
-    const both = await Promise.all([feature.schedule(PERSON, "right", T0), feature.schedule(PERSON, "right", T0)]);
+    const both = await Promise.all([feature.schedule(PERSON, "right", at(0)), feature.schedule(PERSON, "right", at(0))]);
     expect(both.filter((outcome) => outcome.ok)).toHaveLength(1);
     expect(both.find((outcome) => !outcome.ok)).toEqual({ ok: false, reason: "pending" });
     expect(db.rows.get("u1")?.sessionEpoch).toBe(1);
@@ -57,28 +55,28 @@ describe("scheduling", () => {
 
   it("refuses a wrong password, a rate limit, an impersonator and a blocker, writing nothing", async () => {
     const { feature, db } = world({ blockers: async (userId) => (userId === "blocked" ? [{ kind: "order", label: "Loja", href: "/p/1" }] : []) });
-    expect(await feature.schedule(PERSON, "wrong", T0)).toEqual({ ok: false, reason: "wrong-password" });
-    expect(await feature.schedule(PERSON, "spam", T0)).toEqual({ ok: false, reason: "rate-limited" });
-    expect(await feature.schedule({ ...PERSON, impersonated: true }, "right", T0)).toEqual({ ok: false, reason: "impersonating" });
-    expect(await feature.schedule({ ...PERSON, userId: "blocked" }, "right", T0)).toEqual({ ok: false, reason: "blocked" });
+    expect(await feature.schedule(PERSON, "wrong", at(0))).toEqual({ ok: false, reason: "wrong-password" });
+    expect(await feature.schedule(PERSON, "spam", at(0))).toEqual({ ok: false, reason: "rate-limited" });
+    expect(await feature.schedule({ ...PERSON, impersonated: true }, "right", at(0))).toEqual({ ok: false, reason: "impersonating" });
+    expect(await feature.schedule({ ...PERSON, userId: "blocked" }, "right", at(0))).toEqual({ ok: false, reason: "blocked" });
     expect(db.rows.size).toBe(0);
   });
 
   it("confirms a password-less account with a fresh sign-in only", async () => {
     const { feature } = world({ hasPassword: async () => false });
-    expect(await feature.schedule({ ...PERSON, signedInAt: String(T0.getTime() - 60 * 60_000) }, null, T0)).toEqual({ ok: false, reason: "sign-in-again" });
-    expect((await feature.schedule(PERSON, null, T0)).ok).toBe(true);
+    expect(await feature.schedule({ ...PERSON, signedInAt: String(T0_MS - 60 * 60_000) }, null, at(0))).toEqual({ ok: false, reason: "sign-in-again" });
+    expect((await feature.schedule(PERSON, null, at(0))).ok).toBe(true);
   });
 
   it("stamps the sign-in time only for a provider that may stand in for a password", async () => {
     const { feature } = world();
-    expect(await feature.signInClaims("u1", "google", T0)).toEqual({ sv: "0", at: String(T0.getTime()) });
-    expect(await feature.signInClaims("u1", "email-link", T0)).toEqual({ sv: "0" });
+    expect(await feature.signInClaims("u1", "google", at(0))).toEqual({ sv: "0", at: String(T0_MS) });
+    expect(await feature.signInClaims("u1", "email-link", at(0))).toEqual({ sv: "0" });
   });
 
   it("still audits and mails when the host's onScheduled hook fails, and says so", async () => {
     const { feature, audits, mails, errors } = world({ onScheduled: async () => Promise.reject(new Error("links")) });
-    expect((await feature.schedule(PERSON, "right", T0)).ok).toBe(true);
+    expect((await feature.schedule(PERSON, "right", at(0))).ok).toBe(true);
     expect(audits).toHaveLength(1);
     expect(mails).toHaveLength(1);
     expect(errors).toEqual(["onScheduled"]);
@@ -94,7 +92,7 @@ describe("scheduling", () => {
 describe("cancelling", () => {
   it("restores the account, moves the epoch again, audits and mails", async () => {
     const { feature, audits, mails } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(await feature.cancel(PERSON, at(1))).toEqual({ ok: true });
     expect(await feature.standing("u1", { sv: "1" })).toEqual({ state: "revoked" });
     expect(await feature.standing("u1", { sv: "2" })).toEqual({ state: "ok" });
@@ -106,14 +104,14 @@ describe("cancelling", () => {
   it("cannot cancel once the purge claimed the account", async () => {
     const erase = vi.fn().mockRejectedValue(new Error("half way"));
     const { feature } = world({ erase });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     await feature.sweep(at(15));
     expect(await feature.cancel(PERSON, at(15, 1))).toEqual({ ok: false, reason: "not-scheduled" });
   });
 
   it("leaves nothing for the sweep after a cancel, and a re-schedule never gets the old date", async () => {
     const { feature, mails } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     await feature.cancel(PERSON, at(5));
     expect(await feature.sweep(at(9))).toEqual({ mailed: 0, purged: 0, failed: 0 });
     await feature.schedule(PERSON, "right", at(6));
@@ -125,7 +123,7 @@ describe("cancelling", () => {
 describe("the sweep", () => {
   it("reminds 7 days and 1 day before, each once, then purges once at the boundary", async () => {
     const { feature, mails, erase, audits } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(await feature.sweep(at(2))).toEqual({ mailed: 0, purged: 0, failed: 0 });
     expect(await feature.sweep(at(8, 60_000))).toEqual({ mailed: 1, purged: 0, failed: 0 });
     expect(await feature.sweep(at(9))).toEqual({ mailed: 0, purged: 0, failed: 0 });
@@ -148,7 +146,7 @@ describe("the sweep", () => {
         sent.push(message.kind);
       },
     });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(await feature.sweep(at(8, 60_000))).toEqual({ mailed: 0, purged: 0, failed: 0 });
     expect(errors).toContain("mail:week-before");
     expect(await feature.sweep(at(9))).toEqual({ mailed: 0, purged: 0, failed: 1 });
@@ -161,7 +159,7 @@ describe("the sweep", () => {
   it("keeps the scheduled mail owed while the person's e-mail is unknown, and sends it later", async () => {
     let email: string | null = null;
     const { feature, mails } = world({ emailOf: async () => email });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(mails).toEqual([]);
     email = "pessoa@example.com";
     expect(await feature.sweep(at(1))).toEqual({ mailed: 1, purged: 0, failed: 0 });
@@ -171,7 +169,7 @@ describe("the sweep", () => {
   it("runs a purge whose erase failed again after its lease, and only then", async () => {
     const erase = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValue(undefined);
     const { feature } = world({ erase });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(await feature.sweep(at(15))).toEqual({ mailed: 0, purged: 0, failed: 1 });
     expect(await feature.sweep(at(15, 60_000))).toEqual({ mailed: 0, purged: 0, failed: 0 });
     expect(await feature.sweep(at(15, 31 * 60_000))).toEqual({ mailed: 0, purged: 1, failed: 0 });
@@ -180,7 +178,7 @@ describe("the sweep", () => {
 
   it("purges once when two sweeps run at the same time", async () => {
     const { feature, erase } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     const [a, b] = await Promise.all([feature.sweep(at(15)), feature.sweep(at(15))]);
     expect(a.purged + b.purged).toBe(1);
     expect(erase).toHaveBeenCalledTimes(1);
@@ -189,7 +187,7 @@ describe("the sweep", () => {
   it("is not starved by rows that need nothing", async () => {
     const { feature, db, mails } = world();
     for (let index = 0; index < 60; index += 1) {
-      await db.authAccountState.create({ data: { userId: `quiet-${index}`, requestedAt: T0, purgeAt: at(12), remindedWeekAt: T0 } });
+      db.place({ userId: `quiet-${index}`, requestedAt: at(0), purgeAt: at(12), remindedWeekAt: at(0) });
     }
     await feature.schedule(PERSON, "right", at(1));
     expect((await feature.sweep(at(9))).mailed).toBe(1);
@@ -227,7 +225,7 @@ describe("the routes", () => {
 describe("round 2: the outbox never holds a purge, and never mails a stale slot", () => {
   it("purges when it is due even though the mail is down and the e-mail unknown", async () => {
     const { feature, erase } = world({ emailOf: async () => null });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect((await feature.sweep(at(15))).purged).toBe(1);
     expect(erase).toHaveBeenCalledTimes(1);
   });
@@ -238,11 +236,11 @@ describe("round 2: the outbox never holds a purge, and never mails a stale slot"
     const { feature } = world({
       mail: async (message) => {
         if (down) throw new Error("driver down");
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        await Promise.resolve();
         sent.push(message.kind);
       },
     });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     down = false;
     await Promise.all([feature.sweep(at(1)), feature.sweep(at(1))]);
     expect(sent).toEqual(["scheduled"]);
@@ -257,7 +255,7 @@ describe("round 2: the outbox never holds a purge, and never mails a stale slot"
         sent.push([message.kind, message.purgeAt]);
       },
     });
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     await feature.sweep(at(8, 60_000));
     expect(db.rows.get("u1")?.mailOwed).toBe("week-before");
     const original = db.authAccountState.findMany.bind(db.authAccountState);
@@ -273,16 +271,16 @@ describe("round 2: the outbox never holds a purge, and never mails a stale slot"
 
   it("still lets the person cancel past the date until a purge claims the account", async () => {
     const { feature } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     expect(await feature.cancel(PERSON, at(15, 1))).toEqual({ ok: true });
   });
 
   it("pages past rows that stay selected", async () => {
     const { feature, db, mails } = world({ emailOf: async (userId) => (userId.startsWith("stuck") ? null : PERSON.email) });
     for (let index = 0; index < 60; index += 1) {
-      await db.authAccountState.create({ data: { userId: `stuck-${String(index).padStart(2, "0")}`, requestedAt: T0, purgeAt: at(20), mailOwed: "scheduled", mailPurgeAt: at(20) } });
+      db.place({ userId: `stuck-${String(index).padStart(2, "0")}`, requestedAt: at(0), purgeAt: at(20), mailOwed: "scheduled", mailPurgeAt: at(20) });
     }
-    await feature.schedule({ ...PERSON, userId: "u1" }, "right", T0);
+    await feature.schedule({ ...PERSON, userId: "u1" }, "right", at(0));
     mails.length = 0;
     await feature.sweep(at(8, 60_000));
     expect(mails.map((mail) => mail.kind)).toContain("week-before");
@@ -290,10 +288,10 @@ describe("round 2: the outbox never holds a purge, and never mails a stale slot"
 
   it("retakes a mail lease older than 5 minutes, and not a younger one", async () => {
     const { feature, db, mails } = world();
-    await feature.schedule(PERSON, "right", T0);
+    await feature.schedule(PERSON, "right", at(0));
     mails.length = 0;
     // A pass that took the slot and died: the lease is left behind.
-    db.rows.set("u1", { ...db.rows.get("u1")!, mailOwed: "scheduled", mailPurgeAt: at(15), mailClaimedAt: at(1) });
+    db.place({ ...db.rows.get("u1")!, mailOwed: "scheduled", mailPurgeAt: at(15), mailClaimedAt: at(1) });
     expect(await feature.sweep(at(1, 4 * 60_000))).toEqual({ mailed: 0, purged: 0, failed: 0 });
     expect(mails).toEqual([]);
     expect(await feature.sweep(at(1, 5 * 60_000))).toEqual({ mailed: 1, purged: 0, failed: 0 });

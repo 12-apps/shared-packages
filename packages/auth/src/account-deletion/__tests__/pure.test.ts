@@ -3,18 +3,19 @@ import { describe, expect, it } from "vitest";
 import { accountDeletionMail, dueReminder, isFreshSignIn, isOpenWhilePending, standingOf } from "..";
 
 const DAY = 24 * 60 * 60 * 1000;
-const T0 = new Date("2026-11-19T15:00:00.000Z");
-const row = {
-  userId: "u", sessionEpoch: 1, requestedAt: T0, purgeAt: new Date(T0.getTime() + 15 * DAY),
+const T0_MS = Date.UTC(2026, 10, 19, 15);
+const t0 = (): Date => new Date(T0_MS);
+const rowAt = () => ({
+  userId: "u", sessionEpoch: 1, requestedAt: t0(), purgeAt: new Date(T0_MS + 15 * DAY),
   remindedWeekAt: null, remindedDayAt: null, mailOwed: null, mailPurgeAt: null, mailClaimedAt: null, purgeClaimedAt: null, deletedAt: null,
-};
+});
 
 describe("standingOf", () => {
   it("admits epoch 0 with no row, and refuses a stale or purged token", () => {
     expect(standingOf({}, null)).toEqual({ state: "ok" });
-    expect(standingOf({ sv: "0" }, row)).toEqual({ state: "revoked" });
-    expect(standingOf({ sv: "1" }, { ...row, deletedAt: T0 })).toEqual({ state: "revoked" });
-    expect(standingOf({ bearer: true }, { ...row, requestedAt: null, purgeAt: null })).toEqual({ state: "ok" });
+    expect(standingOf({ sv: "0" }, rowAt())).toEqual({ state: "revoked" });
+    expect(standingOf({ sv: "1" }, { ...rowAt(), deletedAt: t0() })).toEqual({ state: "revoked" });
+    expect(standingOf({ bearer: true }, { ...rowAt(), requestedAt: null, purgeAt: null })).toEqual({ state: "ok" });
   });
   it("opens only the deletion's routes while pending", () => {
     expect(isOpenWhilePending("/api/d/cancel", "/api/d")).toBe(true);
@@ -24,14 +25,14 @@ describe("standingOf", () => {
 
 describe("dueReminder and freshness", () => {
   it("skips a reminder a short window never reaches", () => {
-    const short = { ...row, purgeAt: new Date(T0.getTime() + 3 * DAY) };
-    expect(dueReminder(short, new Date(T0.getTime() + DAY))).toBeNull();
-    expect(dueReminder(short, new Date(T0.getTime() + 2.5 * DAY))).toBe("day-before");
+    const short = { ...rowAt(), purgeAt: new Date(T0_MS + 3 * DAY) };
+    expect(dueReminder(short, new Date(T0_MS + DAY))).toBeNull();
+    expect(dueReminder(short, new Date(T0_MS + 2.5 * DAY))).toBe("day-before");
   });
   it("is not fresh with no claim, a garbled one, or one from the future", () => {
-    expect(isFreshSignIn(String(T0.getTime() - 60_000), T0.getTime(), 600_000)).toBe(true);
-    expect(isFreshSignIn("NaN", T0.getTime(), 600_000)).toBe(false);
-    expect(isFreshSignIn(String(T0.getTime() + 60_000), T0.getTime(), 600_000)).toBe(false);
+    expect(isFreshSignIn(String(T0_MS - 60_000), T0_MS, 600_000)).toBe(true);
+    expect(isFreshSignIn("NaN", T0_MS, 600_000)).toBe(false);
+    expect(isFreshSignIn(String(T0_MS + 60_000), T0_MS, 600_000)).toBe(false);
   });
 });
 

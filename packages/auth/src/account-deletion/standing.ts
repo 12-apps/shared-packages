@@ -27,11 +27,18 @@ export const SESSION_EPOCH_CLAIM = "sv";
 export const SIGNED_IN_AT_CLAIM = "at";
 
 export function standingOf(identity: SessionIdentity, row: Pick<AccountStateRow, "sessionEpoch" | "purgeAt" | "requestedAt" | "deletedAt"> | null): SessionStanding {
-  if (!row) return identity.bearer || Number(identity.sv ?? "0") === 0 ? { state: "ok" } : { state: "revoked" };
-  if (row.deletedAt) return { state: "revoked" };
-  if (!identity.bearer && Number(identity.sv ?? "0") !== row.sessionEpoch) return { state: "revoked" };
-  if (row.requestedAt && row.purgeAt) return { state: "pending", purgeAt: row.purgeAt };
-  return { state: "ok" };
+  const epoch = Number(identity.sv ?? "0");
+  if (!row) return identity.bearer || epoch === 0 ? OK : REVOKED;
+  if (row.deletedAt || !epochMatches(identity, epoch, row.sessionEpoch)) return REVOKED;
+  return row.requestedAt && row.purgeAt ? { state: "pending", purgeAt: row.purgeAt } : OK;
+}
+
+const OK: SessionStanding = { state: "ok" };
+const REVOKED: SessionStanding = { state: "revoked" };
+
+/** A bearer carries no epoch; a cookie session's must be the row's. */
+function epochMatches(identity: SessionIdentity, epoch: number, current: number): boolean {
+  return Boolean(identity.bearer) || epoch === current;
 }
 
 /** The path prefix whose routes a pending session still reaches. */

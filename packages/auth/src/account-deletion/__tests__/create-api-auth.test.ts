@@ -9,7 +9,7 @@ import { memoryDb } from "./memory-db";
 const ORIGIN = "https://app.example.com";
 const TOKEN = { secret: "synthetic-test-secret-at-least-32-characters", baseUrl: ORIGIN, maxAgeSeconds: 3600 };
 const IDENTITY = { id: "oauth-sub", email: "pessoa@example.com", name: "P", image: null, provider: "google", isSuperadmin: false };
-const COOKIE = sessionCookieName(TOKEN);
+const cookieName = (): string => sessionCookieName(TOKEN);
 
 function api() {
   const db = memoryDb();
@@ -26,11 +26,11 @@ function api() {
     audit: async () => undefined,
     getDb: () => db,
   };
-  const apiAuth = createApiAuth({ secret: TOKEN.secret, authUrl: ORIGIN, trustHost: true, providers: [], accountDeletion: deletion });
-  return { apiAuth, db };
+  const built = createApiAuth({ secret: TOKEN.secret, authUrl: ORIGIN, trustHost: true, providers: [], accountDeletion: deletion });
+  return { apiAuth: built, db };
 }
 
-const request = (cookie: string): Request => new Request(`${ORIGIN}/api/auth/session`, { headers: { cookie: `${COOKIE}=${cookie}` } });
+const sessionRequest = (cookie: string): Request => new Request(`${ORIGIN}/api/auth/session`, { headers: { cookie: `${cookieName()}=${cookie}` } });
 const minted = (claims: Record<string, string>) => encodeSessionToken(TOKEN, { ...IDENTITY, claims });
 
 describe("createApiAuth({ accountDeletion })", () => {
@@ -44,29 +44,29 @@ describe("createApiAuth({ accountDeletion })", () => {
   it("refuses a stale token from auth() AND the session endpoint, which clears the cookie", async () => {
     const { apiAuth } = api();
     const old = await minted({ uid: "u1", sv: "0" });
-    expect((await apiAuth.auth(request(old)))?.user?.email).toBe(IDENTITY.email);
+    expect((await apiAuth.auth(sessionRequest(old)))?.user?.email).toBe(IDENTITY.email);
     await apiAuth.accountDeletion?.schedule({ userId: "u1", email: IDENTITY.email }, "pw");
-    expect(await apiAuth.auth(request(old))).toBeNull();
-    const response = await apiAuth.handlers.GET(request(old));
+    expect(await apiAuth.auth(sessionRequest(old))).toBeNull();
+    const response = await apiAuth.handlers.GET(sessionRequest(old));
     expect(await response.json()).toEqual({});
-    expect(response.headers.get("set-cookie")).toContain(`${COOKIE}=;`);
+    expect(response.headers.get("set-cookie")).toContain(`${cookieName()}=;`);
   });
 
   it("places a token with no uid claim by its e-mail: never fail-open", async () => {
     const { apiAuth } = api();
     const claimless = await minted({});
     await apiAuth.accountDeletion?.schedule({ userId: "u1", email: IDENTITY.email }, "pw");
-    expect(await apiAuth.auth(request(claimless))).toBeNull();
+    expect(await apiAuth.auth(sessionRequest(claimless))).toBeNull();
   });
 
   it("is fail-closed for a pending session unless asked, and the session endpoint carries the date", async () => {
     const { apiAuth } = api();
     await apiAuth.accountDeletion?.schedule({ userId: "u1", email: IDENTITY.email }, "pw");
     const fresh = await minted({ uid: "u1", sv: "1" });
-    expect(await apiAuth.auth(request(fresh))).toBeNull();
-    const allowed = await apiAuth.auth(request(fresh), { allowPending: true });
+    expect(await apiAuth.auth(sessionRequest(fresh))).toBeNull();
+    const allowed = await apiAuth.auth(sessionRequest(fresh), { allowPending: true });
     expect((allowed as { deletion?: { purgeAt: string } } | null)?.deletion?.purgeAt).toMatch(/Z$/);
-    const body = (await (await apiAuth.handlers.GET(request(fresh))).json()) as { deletion?: { purgeAt: string } };
+    const body = (await (await apiAuth.handlers.GET(sessionRequest(fresh))).json()) as { deletion?: { purgeAt: string } };
     expect(body.deletion?.purgeAt).toMatch(/Z$/);
   });
 
@@ -74,8 +74,8 @@ describe("createApiAuth({ accountDeletion })", () => {
     const { apiAuth } = api();
     const old = await minted({ uid: "u1", sv: "0" });
     await apiAuth.accountDeletion?.schedule({ userId: "u1", email: IDENTITY.email }, "pw");
-    const cleared = (await apiAuth.handlers.GET(request(old))).headers.get("set-cookie") ?? "";
-    expect(COOKIE.startsWith("__Secure-")).toBe(true);
+    const cleared = (await apiAuth.handlers.GET(sessionRequest(old))).headers.get("set-cookie") ?? "";
+    expect(cookieName().startsWith("__Secure-")).toBe(true);
     expect(cleared).toMatch(/^__Secure-[^=]+=;.*; Secure$/);
   });
 });
