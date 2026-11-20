@@ -22,9 +22,18 @@ export type McpScope = (typeof MCP_SUPPORTED_SCOPES)[number];
 /** Path the MCP JSON-RPC endpoint is mounted at — the access token's audience. */
 export const DEFAULT_MCP_RESOURCE_PATH = "/api/mcp";
 
-/** The OAuth `iss` — the deployment origin, used verbatim. */
-export function issuer(origin: string): string {
-  return origin;
+/**
+ * The OAuth `iss` — the deployment origin, used verbatim, followed by the
+ * surface's `issuerPath` when it has one.
+ *
+ * A host that serves a SECOND MCP resource from the same origin needs a second
+ * authorization server a client can tell apart: RFC 8414 §3.1 locates an issuer
+ * with a path at `/.well-known/oauth-authorization-server<path>`, so its
+ * metadata, codes and tokens are its own. With no path (the default) this is
+ * the origin, byte for byte as before.
+ */
+export function issuer(origin: string, path = ""): string {
+  return `${origin}${path}`;
 }
 
 /** The access-token `aud` — the MCP resource URL (`${origin}${resourcePath}`). */

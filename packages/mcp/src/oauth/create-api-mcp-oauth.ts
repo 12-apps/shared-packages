@@ -1,5 +1,6 @@
 import { buildAuthorizationServerMetadata } from "../auth/authorization-server-metadata";
 import { buildProtectedResourceMetadata } from "../auth/resource-metadata";
+import { argumentEndpoints, type McpOauthArgumentEndpoints } from "./endpoint-arguments";
 
 import { authorizeEndpoint } from "./authorize";
 import { ClientMetadataUnavailableError } from "./client-metadata";
@@ -76,6 +77,12 @@ export interface ApiMcpOauth {
   /** The same handlers by name, for a host whose router is its file tree. */
   handlers: McpOauthHandlers;
   /**
+   * The endpoints that take input, given the input as ARGUMENTS the host has
+   * already validated against the engine's own closed schemas
+   * (`./endpoint-arguments.ts`). The same handlers run behind them.
+   */
+  endpoints: McpOauthArgumentEndpoints;
+  /**
    * Verify a bearer token the way THIS surface mints them — the resource server's
    * half. Bound to the same signing key, resource path and trusted-origin
    * resolution, which is what stops "minted for origin A, verified against origin
@@ -126,7 +133,7 @@ function discoveryHandlers(
     authorizationServerMetadata: async (request) =>
       jsonResponse(
         buildAuthorizationServerMetadata({
-          issuer: issuer(context.originOf(request)),
+          issuer: issuer(context.originOf(request), context.issuerPath),
           scopesSupported: [...context.scopes],
           // The RESOLVED paths, so what a connector reads before its first request
           // is where the endpoints actually are.
@@ -139,7 +146,7 @@ function discoveryHandlers(
       return jsonResponse(
         buildProtectedResourceMetadata({
           resource: resourceAudience(origin, context.resourcePath),
-          authorizationServers: [issuer(origin)],
+          authorizationServers: [issuer(origin, context.issuerPath)],
           scopesSupported: [...context.scopes],
         }),
       );
@@ -244,12 +251,14 @@ export function createApiMcpOauth(config: McpOauthConfig): ApiMcpOauth {
   return {
     routes: buildRoutes(context, handlers),
     handlers,
+    endpoints: argumentEndpoints(handlers),
     verifyBearer: (token, request, options) =>
       verifyAccessToken(context.signingKey, token, {
         ...options,
         isActive: context.isAccessTokenActive ?? options?.isActive,
         origin: context.originOf(request),
         resourcePath: context.resourcePath,
+        issuerPath: context.issuerPath,
       }),
     context,
   };

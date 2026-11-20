@@ -16,6 +16,19 @@ export {
   type McpOauthRoute,
 } from "./create-api-mcp-oauth";
 export {
+  authorizeArguments,
+  consentDecisionArguments,
+  consentDetailsArguments,
+  registerArguments,
+  tokenArguments,
+  type AuthorizeArguments,
+  type ConsentDecisionArguments,
+  type ConsentDetailsArguments,
+  type McpOauthArgumentEndpoints,
+  type RegisterArguments,
+  type TokenArguments,
+} from "./endpoint-arguments";
+export {
   DEFAULT_OAUTH_PATHS,
   resolveMcpOauthConfig,
   type McpConnectionRecording,
@@ -108,6 +121,7 @@ export {
   RefreshTokenError,
   getRefreshTokenIdentity,
   hashToken,
+  hashTokenIn,
   issueRefreshToken,
   rotateRefreshToken,
   type IssuedRefreshToken,

@@ -174,7 +174,7 @@ export async function validateAuthorization(
   const params = parseParams(url);
   const result = await validateClientAndRedirect(context, params);
   if (result instanceof Response) return result;
-  const callback: AuthorizeCallback = { redirectUri: result.redirectUri, state: params.state, issuer: issuer(origin) };
+  const callback: AuthorizeCallback = { redirectUri: result.redirectUri, state: params.state, issuer: issuer(origin, context.issuerPath) };
   const error = validateAuthorizeRequest(params, callback, result.client.scopes);
   if (error) return error;
   const resource = url.searchParams.get("resource");

@@ -20,6 +20,7 @@ export async function mintAuthorization(
     codeChallenge: validated.codeChallenge,
     scope: validated.scope,
     origin,
+    issuerPath: context.issuerPath,
   });
 
   if (!code) {

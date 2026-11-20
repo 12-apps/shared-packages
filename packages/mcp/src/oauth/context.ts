@@ -115,6 +115,14 @@ export interface McpOauthConfig {
   scopes?: readonly string[];
   /** Where the MCP resource is mounted — the token audience. Default `/api/mcp`. */
   resourcePath?: string;
+  /**
+   * A path appended to the origin to form this authorization server's issuer
+   * (RFC 8414 §3.1), e.g. `/api/super-admin`. Default none: the issuer is the
+   * origin. Set it, with its own `paths` (`authorizationServerMetadata` at
+   * `/.well-known/oauth-authorization-server<issuerPath>`), to run a second
+   * surface for a second resource on one origin without touching the first.
+   */
+  issuerPath?: string;
   /** Endpoint paths, if the host mounts them somewhere else. */
   paths?: Partial<McpOauthPaths>;
   /** Where an unauthenticated authorize request is sent. Default `/login`. */
@@ -216,6 +224,7 @@ export interface McpOauthContext {
   trustedOrigins: readonly string[];
   scopes: readonly string[];
   resourcePath: string;
+  issuerPath: string;
   paths: McpOauthPaths;
   loginPath: string;
   loginCallbackParam: string;
@@ -240,6 +249,15 @@ export interface McpOauthContext {
   originOf: (request: Request) => string;
 }
 
+/** An issuer path is empty, or `/segment[/segment…]` with no trailing slash. */
+function validIssuerPath(path: string | undefined): string {
+  if (!path) return "";
+  if (!/^(\/[A-Za-z0-9._~-]+)+$/.test(path)) {
+    throw new Error(`issuerPath must look like "/segment" with no trailing slash: ${JSON.stringify(path)}`);
+  }
+  return path;
+}
+
 /** The surface's own shape: what it advertises, where it lives, how long it lasts. */
 function resolveSurface(
   config: McpOauthConfig,
@@ -247,6 +265,7 @@ function resolveSurface(
   McpOauthContext,
   | "scopes"
   | "resourcePath"
+  | "issuerPath"
   | "paths"
   | "loginPath"
   | "loginCallbackParam"
@@ -257,6 +276,7 @@ function resolveSurface(
   return {
     scopes: config.scopes ?? [...MCP_SUPPORTED_SCOPES],
     resourcePath: config.resourcePath ?? DEFAULT_MCP_RESOURCE_PATH,
+    issuerPath: validIssuerPath(config.issuerPath),
     paths: { ...DEFAULT_OAUTH_PATHS, ...config.paths },
     loginPath: config.loginPath ?? "/login",
     loginCallbackParam: config.loginCallbackParam ?? "callbackUrl",
