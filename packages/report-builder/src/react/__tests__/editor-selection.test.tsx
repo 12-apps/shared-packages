@@ -2,8 +2,8 @@
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../../server/pt-BR';
 import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { createWebReportBuilder } from '../create-report-builder';
 import { TEST_SURFACE } from './surface-fixture';
@@ -383,20 +383,40 @@ describe('editor canvas — deselecting leaves the panel in its empty state', ()
     // The control: the dialog is up and aimed at the block being removed.
     expect(screen.getByTestId('report-block-bloco-2-remove-confirm')).toBeTruthy();
 
-    fireEvent.click(cancel);
+    // Fake timers from here, not earlier: RTL's `findBy`/`waitFor` above poll
+    // on real timers, and vitest's fakes would freeze them.
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(cancel);
 
-    // Read at once, never waited for (FUT-5308). `fireEvent` flushes React, so
-    // the click's handlers have all run: a cancel that deselected would show
-    // now. What has NOT finished is MUI's exit transition, and until it does
-    // the dialog keeps the rest of the page `aria-hidden` — hence `hidden`.
-    // Waiting for the transition instead raced its timer and the commit after
-    // it against `waitFor`'s 1 s window, and a loaded CI runner lost that.
-    // The dialog has let go of its target: it is closing, still mounted, since
-    // no timer can have run between the click and this line.
-    expect(screen.getByTestId('report-block-sem-selecao-remove-confirm')).toBeTruthy();
-    expect(selectedTitles({ hidden: true })).toEqual(['Receita por dia']);
-    expect(openPanels()).toEqual(['report-block-bloco-2-editor']);
-    expect(emptyPrompts()).toEqual([]);
+      // Read at once (FUT-5308). `fireEvent` flushes React, so the click's
+      // handlers have all run: a cancel that deselected in them shows now.
+      // What has NOT finished is MUI's exit transition, and until it does the
+      // dialog keeps the rest of the page `aria-hidden`, hence `hidden`.
+      // The dialog has let go of its target: it is closing, still mounted,
+      // since no timer can have run between the click and this line.
+      expect(screen.getByTestId('report-block-sem-selecao-remove-confirm')).toBeTruthy();
+      expect(selectedTitles({ hidden: true })).toEqual(['Receita por dia']);
+      expect(openPanels()).toEqual(['report-block-bloco-2-editor']);
+      expect(emptyPrompts()).toEqual([]);
+
+      // Then run the exit to its end on the fake clock and read the SETTLED
+      // canvas, so a deselect that lands later (a timer, the exit path) fails
+      // too. Never a wall-clock wait: the old `waitFor` raced the transition's
+      // timer and the commit after it against its 1 s window, and a loaded CI
+      // runner lost that race.
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      // The dialog is gone (the exit ran on the fake clock inside `act`, so no
+      // wait is involved), and the canvas is no longer `aria-hidden`.
+      expect(screen.queryAllByTestId('report-block-sem-selecao-remove-confirm')).toEqual([]);
+      expect(selectedTitles()).toEqual(['Receita por dia']);
+      expect(openPanels()).toEqual(['report-block-bloco-2-editor']);
+      expect(emptyPrompts()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('empties the panel on Escape', async () => {
