@@ -180,10 +180,15 @@ function blockNamed(title: string): HTMLElement {
   return within(canvas()).getByRole('group', { name: title });
 }
 
-/** Which block wears the selected ring, by title. */
-function selectedTitles(): string[] {
+/**
+ * Which block wears the selected ring, by title.
+ *
+ * `hidden` also reads blocks a modal has marked `aria-hidden`: the selection is
+ * a fact about the canvas, and a dialog on its way out does not change it.
+ */
+function selectedTitles({ hidden = false }: { hidden?: boolean } = {}): string[] {
   return within(canvas())
-    .getAllByRole('group')
+    .getAllByRole('group', { hidden })
     .filter((block) => block.getAttribute('data-selected') === 'true')
     .map((block) => block.getAttribute('aria-label') ?? '');
 }
@@ -374,13 +379,22 @@ describe('editor canvas — deselecting leaves the panel in its empty state', ()
     await withPanelOpen();
 
     fireEvent.click(screen.getByTestId('report-block-bloco-2-remove'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    const cancel = await screen.findByRole('button', { name: 'Cancelar' });
+    // The control: the dialog is up and aimed at the block being removed.
+    expect(screen.getByTestId('report-block-bloco-2-remove-confirm')).toBeTruthy();
 
-    // Inside the wait: the dialog marks the rest of the page `aria-hidden`
-    // while it is up, so the canvas has no queryable roles until it is gone.
-    await waitFor(() => {
-      expect(selectedTitles()).toEqual(['Receita por dia']);
-    });
+    fireEvent.click(cancel);
+
+    // Read at once, never waited for (FUT-5308). `fireEvent` flushes React, so
+    // the click's handlers have all run: a cancel that deselected would show
+    // now. What has NOT finished is MUI's exit transition, and until it does
+    // the dialog keeps the rest of the page `aria-hidden` — hence `hidden`.
+    // Waiting for the transition instead raced its timer and the commit after
+    // it against `waitFor`'s 1 s window, and a loaded CI runner lost that.
+    // The dialog has let go of its target: it is closing, still mounted, since
+    // no timer can have run between the click and this line.
+    expect(screen.getByTestId('report-block-sem-selecao-remove-confirm')).toBeTruthy();
+    expect(selectedTitles({ hidden: true })).toEqual(['Receita por dia']);
     expect(openPanels()).toEqual(['report-block-bloco-2-editor']);
     expect(emptyPrompts()).toEqual([]);
   });
