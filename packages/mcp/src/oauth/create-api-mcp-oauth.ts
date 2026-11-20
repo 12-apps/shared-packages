@@ -1,5 +1,6 @@
 import { buildAuthorizationServerMetadata } from "../auth/authorization-server-metadata";
 import { buildProtectedResourceMetadata } from "../auth/resource-metadata";
+import { argumentEndpoints, type McpOauthArgumentEndpoints } from "./endpoint-arguments";
 
 import { authorizeEndpoint } from "./authorize";
 import { ClientMetadataUnavailableError } from "./client-metadata";
@@ -75,6 +76,12 @@ export interface ApiMcpOauth {
   routes: McpOauthRoute[];
   /** The same handlers by name, for a host whose router is its file tree. */
   handlers: McpOauthHandlers;
+  /**
+   * The endpoints that take input, given the input as ARGUMENTS the host has
+   * already validated against the engine's own closed schemas
+   * (`./endpoint-arguments.ts`). The same handlers run behind them.
+   */
+  endpoints: McpOauthArgumentEndpoints;
   /**
    * Verify a bearer token the way THIS surface mints them — the resource server's
    * half. Bound to the same signing key, resource path and trusted-origin
@@ -244,6 +251,7 @@ export function createApiMcpOauth(config: McpOauthConfig): ApiMcpOauth {
   return {
     routes: buildRoutes(context, handlers),
     handlers,
+    endpoints: argumentEndpoints(handlers),
     verifyBearer: (token, request, options) =>
       verifyAccessToken(context.signingKey, token, {
         ...options,

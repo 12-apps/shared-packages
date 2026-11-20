@@ -30,7 +30,7 @@ const STAFF_PATHS = {
 /** Both surfaces over ONE set of stores and ONE signing key, as a host runs them. */
 async function twoSurfaces(): Promise<{ store: ApiMcpOauth; staff: ApiMcpOauth }> {
   const harness = await asHarness();
-  const staff = createApiMcpOauth({
+  const staffSurface = createApiMcpOauth({
     stores: harness.stores,
     resolveSession: () => harness.session.current,
     signingKey: harness.api.context.signingKey,
@@ -40,7 +40,7 @@ async function twoSurfaces(): Promise<{ store: ApiMcpOauth; staff: ApiMcpOauth }
     resourcePath: STAFF_RESOURCE_PATH,
     paths: STAFF_PATHS,
   });
-  return { store: harness.api, staff };
+  return { store: harness.api, staff: staffSurface };
 }
 
 /** Authorize + token on one surface; answers the access token it minted. */
@@ -92,12 +92,11 @@ describe("an issuer path", () => {
   });
 
   it("mints the second surface's codes and tokens under its own issuer and audience", async () => {
-    const { staff } = await twoSurfaces();
-    const accessToken = await connect(staff);
+    const surfaces = await twoSurfaces();
+    const accessToken = await connect(surfaces.staff);
     expect(claimsOf(accessToken)).toMatchObject({ iss: `${ORIGIN}${STAFF_ISSUER_PATH}`, aud: `${ORIGIN}${STAFF_RESOURCE_PATH}` });
-    await expect(staff.verifyBearer(accessToken, new Request(`${ORIGIN}${STAFF_RESOURCE_PATH}`))).resolves.toMatchObject({
-      email: "owner@example.com",
-    });
+    const verified = await surfaces.staff.verifyBearer(accessToken, new Request(`${ORIGIN}${STAFF_RESOURCE_PATH}`));
+    expect(verified).toMatchObject({ email: "owner@example.com" });
   });
 
   it("keeps the two surfaces' tokens apart, both ways", async () => {

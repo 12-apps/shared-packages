@@ -1,4 +1,8 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
+
+import { hashTokenIn } from "./token-hash";
+
+export { hashToken, hashTokenIn } from "./token-hash";
 
 import {
   DEFAULT_ROTATION_GRACE_MS,
@@ -78,25 +82,6 @@ export interface IssuedRefreshToken {
   /** The opaque plaintext refresh token — returned once, never persisted. */
   refreshToken: string;
   scopes: string[];
-}
-
-/** SHA-256 hex digest — the at-rest form of an opaque refresh token. */
-export function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-/**
- * The at-rest form of a refresh token issued by one authorization server.
- *
- * With no namespace it is {@link hashToken}, byte for byte. A surface with an
- * `issuerPath` stores its refresh tokens under its issuer path, so the rows of
- * two surfaces sharing one table never answer for each other: a token minted by
- * one is an unknown token at the other's token endpoint (`invalid_grant`), and
- * cannot be traded there for a token the person never consented to.
- */
-export function hashTokenIn(namespace: string | undefined, token: string): string {
-  if (!namespace) return hashToken(token);
-  return createHash("sha256").update(`${namespace}\n${token}`).digest("hex");
 }
 
 /** Generate a fresh opaque refresh token (high-entropy hex). */
