@@ -37,7 +37,7 @@ import {
 import { AttentionDock, type AttentionDockRest } from './attention-dock';
 import { AttentionOthersList } from './attention-others-list';
 import { useDockSpot } from './use-dock-spot';
-import { iconOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
+import { actionsOf, iconOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
 import type { AttentionMessages } from './messages';
 import {
   useAttentionPreferences,
@@ -161,6 +161,21 @@ function useListAnchor(
   return [anchor, setAnchor];
 }
 
+const noop = (): void => undefined;
+
+/**
+ * What the list holds. A head whose kind draws row actions joins it: the dock
+ * button is one target and cannot hold controls (`AttentionKindView.renderActions`).
+ */
+function listedEntries(
+  entries: readonly AttentionEntry[],
+  views: AttentionViews,
+): { readonly headInList: boolean; readonly listed: readonly AttentionEntry[] } {
+  const head = entries[0];
+  const headInList = head !== undefined && actionsOf(views[head.kind.id], head.item, noop) !== null;
+  return { headInList, listed: headInList ? entries : entries.slice(1) };
+}
+
 export function AttentionHost({
   registry,
   views,
@@ -181,7 +196,8 @@ export function AttentionHost({
   // News rings and buzzes whether the button is folded or not.
   useAttentionAlerts(entries, preferences, sounds, ready);
   const fold = useCollapse(entries.length);
-  const [listAnchor, setListAnchor] = useListAnchor(entries.length > 1, collapsed === undefined || fold.open);
+  const { headInList, listed } = listedEntries(entries, views);
+  const [listAnchor, setListAnchor] = useListAnchor(listed.length > 0, collapsed === undefined || fold.open);
   const { open, sheet } = useOpenEntry(entries, views, () => setListAnchor(null));
   const dock = useDockSpot(store, preferences, collapsed !== undefined);
 
@@ -215,12 +231,13 @@ export function AttentionHost({
               onCollapse={fold.collapse}
               onOthers={setListAnchor}
               onOpen={open}
+              headInList={headInList}
             />
           </AttentionDock>
           <AttentionOthersList
             anchor={listAnchor}
             side={dock.side}
-            entries={entries.slice(1)}
+            entries={listed}
             views={views}
             messages={messages}
             onClose={() => setListAnchor(null)}
@@ -285,6 +302,7 @@ function DockContents({
   onCollapse,
   onOthers,
   onOpen,
+  headInList,
 }: {
   readonly entries: readonly AttentionEntry[];
   readonly views: AttentionViews;
@@ -295,11 +313,18 @@ function DockContents({
   readonly onCollapse: () => void;
   readonly onOthers: (anchor: HTMLElement) => void;
   readonly onOpen: (entry: AttentionEntry) => void;
+  readonly headInList: boolean;
 }): JSX.Element {
   const [head, ...others] = entries;
   const othersSeverity = worstSeverity(others.map((entry) => entry.severity)) ?? 'calm';
   const button = head && (
-    <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
+    <HeadButton
+      head={head}
+      others={others.length}
+      views={views}
+      messages={messages}
+      onOpen={headInList ? (button) => onOthers(button.closest<HTMLElement>('[data-testid="attention-dock"]') ?? button) : () => onOpen(head)}
+    />
   );
   return (
     <>
@@ -340,7 +365,7 @@ function HeadButton({
   readonly others: number;
   readonly views: AttentionViews;
   readonly messages: AttentionMessages;
-  readonly onOpen: (entry: AttentionEntry) => void;
+  readonly onOpen: (button: HTMLElement) => void;
 }): JSX.Element {
   const headView = views[head.kind.id] as AttentionKindView;
   const waited = messages.waited(minutesOf(head.waitedMs), head.waitedMs);
@@ -350,7 +375,7 @@ function HeadButton({
       icon={iconOf(headView, head.item)}
       waited={waited}
       label={buttonLabel(messages, headView, head, waited, others)}
-      onOpen={() => onOpen(head)}
+      onOpen={onOpen}
     />
   );
 }

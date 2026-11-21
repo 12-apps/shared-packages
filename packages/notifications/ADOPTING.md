@@ -717,6 +717,41 @@ createWebNotifications({
   keep hooks in the component it names, and do not throw. The words on the
   controls are yours.
 
+### The attention list
+
+The same slot exists on the attention button's list (the "+N" popover): set
+`renderActions` on a kind's view.
+
+```tsx
+attentionView<SeatRequest>({
+  // icon, describe, renderSheet ...
+  renderActions: ({ item, close }) => (
+    <>
+      <Button onClick={() => { decline(item); close(); }}>{copy.decline}</Button>
+      <Button onClick={() => { accept(item); close(); }}>{copy.accept}</Button>
+    </>
+  ),
+});
+```
+
+- Same contract as the inbox slot: `null`, `undefined` or a boolean draws the
+  row exactly as it was, and `renderSheet` / `onOpen` stay the row's own.
+- The controls are drawn under the row's own button, never inside it, after it
+  in tab order; an action never opens the row. `close` shuts the list.
+- The layout rules are the same container queries (left start, each across the
+  row under 15rem, a 40 px floor under 600 px of row width).
+- **The head item.** The dock button is one target and cannot hold controls, so
+  while the head's kind returns actions the list also holds the head as its
+  first row, and tapping the dock button opens that list instead of the item
+  (the head's own row, in the list, opens it). That is the one-tap path for a
+  lone pending item, and an item keeps its actions when it becomes the head,
+  because the answer is read for the head on every render. A head whose kind
+  returns nothing behaves exactly as before: the button opens the item and the
+  list holds only the others. `renderActions` is therefore called once more per
+  render for the head to ask this, so keep it pure.
+- Optional `messages.pendingTitle` words the list's heading while it holds the
+  head ("Waiting" rather than "Also waiting"); omitted, `othersTitle` is used.
+
 ## What does NOT come with it
 
 - **The events.** Generators are host code (see rule 6).

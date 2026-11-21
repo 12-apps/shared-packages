@@ -15,7 +15,8 @@ import type { AttentionEntry } from '../core';
 import { severityFill } from './attention-button';
 import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionMessages } from './messages';
-import { minutesOf, type AttentionKindView, type AttentionViews } from './views';
+import { RowActionsSlot } from '../../row-actions-slot';
+import { actionsOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
 
 /**
  * The minutes' ink on a row's soft tint. The light theme's dark tones read on
@@ -69,17 +70,21 @@ function OtherRow({
   view,
   messages,
   onPick,
+  onClose,
 }: {
   readonly entry: AttentionEntry;
   readonly view: AttentionKindView;
   readonly messages: AttentionMessages;
   readonly onPick: (entry: AttentionEntry) => void;
+  readonly onClose: () => void;
 }): JSX.Element {
   const { title, what, spoken } = view.describe(entry.item);
   const waited = messages.waited(minutesOf(entry.waitedMs), entry.waitedMs);
   const calm = entry.severity === 'calm';
+  const actions = actionsOf(view, entry.item, onClose);
+  const withActions = actions !== null;
   return (
-    <Box component="li">
+    <Box component="li" {...(withActions ? { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 } } : {})}>
       <Box
         component="button"
         type="button"
@@ -122,6 +127,11 @@ function OtherRow({
           {waited}
         </Box>
       </Box>
+      {withActions ? (
+        <RowActionsSlot label={title} testId={`attention-actions-${entry.item.id}`}>
+          {actions}
+        </RowActionsSlot>
+      ) : null}
     </Box>
   );
 }
@@ -181,18 +191,25 @@ export function AttentionOthersList({
         }}
       >
         <Box component="strong" sx={{ fontSize: 14, p: '4px 6px 6px' }}>
-          {messages.othersTitle}
+          {messages.pendingTitle ?? messages.othersTitle}
         </Box>
         <Box
           component="ul"
-          aria-label={messages.othersTitle}
+          aria-label={messages.pendingTitle ?? messages.othersTitle}
           sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}
         >
           {entries.map((entry) => {
             const view = views[entry.kind.id];
             if (view === undefined) return null;
             return (
-              <OtherRow key={entry.item.id} entry={entry} view={view} messages={messages} onPick={onPick} />
+              <OtherRow
+                key={entry.item.id}
+                entry={entry}
+                view={view}
+                messages={messages}
+                onPick={onPick}
+                onClose={onClose}
+              />
             );
           })}
         </Box>
