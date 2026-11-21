@@ -17,7 +17,8 @@ final class DocumentSchemaTest extends TestCase
     {
         DocumentSchema::assertValid(Fixtures::document('nfce-simples'));
         DocumentSchema::assertValid(Fixtures::document('nfe-normal-company-buyer'));
-        $this->addToAssertionCount(2);
+        DocumentSchema::assertValid(Fixtures::document('nfce-2027-tax-inside'));
+        $this->addToAssertionCount(3);
     }
 
     /** @return iterable<string, array{callable(array<string, mixed>): array<string, mixed>, string}> */
@@ -36,6 +37,10 @@ final class DocumentSchemaTest extends TestCase
             $d['payments'][0]['method'] = 'CRYPTO';
             return $d;
         }, 'payments[0].method'];
+        yield 'a negative net value' => [static function (array $d): array {
+            $d['lines'][0]['netValueCents'] = -1;
+            return $d;
+        }, 'lines[0].netValueCents'];
         yield 'a version from the future' => [static fn (array $d): array => ['version' => 2] + $d, 'version'];
         yield 'an offset-less issue time' => [static function (array $d): array {
             $d['issuedAt'] = '2026-11-20T12:30:00';

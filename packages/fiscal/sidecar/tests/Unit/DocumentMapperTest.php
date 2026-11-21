@@ -103,6 +103,70 @@ final class DocumentMapperTest extends TestCase
         self::assertSame('', $x('//n:gPgtoVinc/n:gPgto/@nPag'));
     }
 
+    public function testA2027NfceCarriesTheEnginesNetValuesOfNt2026008(): void
+    {
+        $xml = $this->signed('nfce-2027-tax-inside', Model::NFCE);
+        $x = self::xpath($xml);
+
+        self::assertXsdValid($xml);
+        // vProd is the tax-inclusive price; vProdLiq the engine's figure, as given.
+        self::assertSame('108.80', $x('//n:det[@nItem="1"]/n:prod/n:vProd'));
+        self::assertSame('100.00', $x('//n:det[@nItem="1"]/n:prod/n:vProdLiq'));
+        self::assertSame('100.0000000000', $x('//n:det[@nItem="1"]/n:prod/n:vUnComLiq'));
+        self::assertSame('18.98', $x('//n:det[@nItem="2"]/n:prod/n:vProdLiq'));
+        self::assertSame('6.3266666667', $x('//n:det[@nItem="2"]/n:prod/n:vUnComLiq'));
+        self::assertSame('118.98', $x('//n:total/n:vProdLiqTot'));
+        foreach ([1, 2] as $item) {
+            $prod = "//n:det[@nItem=\"$item\"]/n:prod";
+            $drift = abs((float) $x("$prod/n:vUnComLiq") * (float) $x("$prod/n:qCom") - (float) $x("$prod/n:vProdLiq"));
+            self::assertLessThanOrEqual(0.01, $drift, "item $item: vUnComLiq x qCom within 0.01 of vProdLiq (I11c-20)");
+        }
+        // The Pix it was paid with is linked by its txid (NT 2026.006).
+        self::assertSame('17', $x('//n:detPag[1]/n:tPag'));
+        self::assertSame('7f3c2a91e04b4c1d9a0b11c2d3e4f5a6', $x('//n:gPgtoVinc/n:gPgto[@nPag="1"]/@idTransacao'));
+    }
+
+    public function testANetValueOnSomeLinesOnlyIsInvalid(): void
+    {
+        $document = Fixtures::document('nfce-2027-tax-inside');
+        $document['lines'][1]['netValueCents'] = null;
+
+        try {
+            (new DocumentMapper())->build($document, Model::NFCE, 2);
+            self::fail('built');
+        } catch (ServiceError $error) {
+            self::assertSame('INVALID', $error->class->value);
+            self::assertStringContainsString('netValueCents on every line or on none', implode("\n", $error->details));
+        }
+    }
+
+    public function testANetValueAboveTheValueIsInvalid(): void
+    {
+        $document = Fixtures::document('nfce-2027-tax-inside');
+        $document['lines'][0]['netValueCents'] = 10881;
+
+        try {
+            (new DocumentMapper())->build($document, Model::NFCE, 2);
+            self::fail('built');
+        } catch (ServiceError $error) {
+            self::assertSame(['lines[0].netValueCents: at most valueCents (vProdLiq is vProd without the IBS/CBS)'], $error->details);
+        }
+    }
+
+    public function testANullNetValueWritesNoneOfTheNt2026008Tags(): void
+    {
+        $document = Fixtures::document('nfce-simples');
+        $stated = $document;
+        foreach (array_keys($stated['lines']) as $index) {
+            $stated['lines'][$index]['netValueCents'] = null;
+        }
+
+        $xml = (new DocumentMapper())->build($stated, Model::NFCE, 2)['xml'];
+
+        self::assertSame((string) file_get_contents(__DIR__ . '/../fixtures/golden/nfce-simples.xml'), $xml);
+        self::assertStringNotContainsString('vProdLiq', $xml);
+    }
+
     public function testAnNfeWithACompanyBuyerAndAnIntermediary(): void
     {
         $xml = $this->signed('nfe-normal-company-buyer', Model::NFE);

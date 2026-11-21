@@ -71,13 +71,12 @@ final class DocumentMapper
      * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source: NT
      * 2026.008 v1.00 itself: from 2027 the IBS, CBS and IS values "deverão ser
      * acrescidos ao valor do produto ou serviço, compondo o valor informado no
-     * campo vProd"). sped-nfe 5.2.9 cannot write those fields, and document
-     * version 1 does not carry them, so a document issued on or after this day
-     * is refused rather than emitted wrong. Lifted by the sped-nfe bump that
-     * brings NT 2026.008, with document version 2.
+     * campo vProd"). A line's `netValueCents` is the engine's `vProdLiq`,
+     * written as given; `vUnComLiq` is derived from it as `vUnCom` is from
+     * `vProd`, and sped-nfe (5.2.11) sums `vProdLiqTot` from the items. Whether
+     * a period puts the tax inside the price is the engine's rate table's
+     * call, never a date here.
      */
-    public const LAYOUT_LIMIT = '2027-01-01';
-    public const LAYOUT_LIMIT_CODE = 'NT_2026_008_NOT_SUPPORTED';
 
     /** A return (`finNFe` 4) quotes the document it returns (`NFref`); one without a reference is refused. */
     public const RETURN_NEEDS_REFERENCE_CODE = 'RETURN_NEEDS_REFERENCE';
@@ -127,20 +126,23 @@ final class DocumentMapper
     /** @param array<string, mixed> $document */
     private static function refuseWhatThisLayoutCannotSay(array $document): void
     {
-        if (substr((string) $document['issuedAt'], 0, 10) >= self::LAYOUT_LIMIT) {
-            throw new ServiceError(
-                \Fiscal\Sidecar\ErrorClass::INVALID,
-                'A document issued on or after ' . self::LAYOUT_LIMIT . ' needs NT 2026.008 (vProdLiq), '
-                . 'which this service\'s sped-nfe does not write yet.',
-                self::LAYOUT_LIMIT_CODE,
-            );
-        }
         $details = [];
+        $withNetValue = 0;
         foreach (array_values($document['lines']) as $index => $line) {
             $quantity = (float) $line['quantity'];
             if (abs(round($quantity, 4) - $quantity) > 1e-9) {
                 $details[] = "lines[$index].quantity: at most four decimals (qCom)";
             }
+            $net = $line['netValueCents'] ?? null;
+            if ($net !== null) {
+                $withNetValue++;
+                if ($net > $line['valueCents']) {
+                    $details[] = "lines[$index].netValueCents: at most valueCents (vProdLiq is vProd without the IBS/CBS)";
+                }
+            }
+        }
+        if ($withNetValue !== 0 && $withNetValue !== count($document['lines'])) {
+            $details[] = 'lines: netValueCents on every line or on none (vProdLiqTot sums them all)';
         }
         if ($details !== []) {
             throw ServiceError::invalid('The document does not fit the NF-e layout.', $details);
@@ -267,6 +269,7 @@ final class DocumentMapper
     private function line(Make $make, int $item, array $line): void
     {
         $gtin = $line['gtin'] ?? 'SEM GTIN';
+        $net = $line['netValueCents'] ?? null;
         $make->tagprod((object) [
             'item' => $item,
             'cProd' => $line['code'],
@@ -283,6 +286,8 @@ final class DocumentMapper
             'uTrib' => $line['unit'],
             'qTrib' => self::quantity($line['quantity']),
             'vUnTrib' => self::unitValue($line['valueCents'], $line['quantity']),
+            'vUnComLiq' => $net === null ? null : self::unitValue($net, $line['quantity']),
+            'vProdLiq' => $net === null ? null : self::reais($net),
             'vDesc' => $line['discountCents'] > 0 ? self::reais($line['discountCents']) : null,
             'indTot' => 1,
         ]);

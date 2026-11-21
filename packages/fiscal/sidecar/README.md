@@ -52,10 +52,16 @@ reach SEFAZ either does an NFC-e being issued answer `CONTINGENCY` (with
 `outcomeUnknown: true`); everywhere else it is `RETRYABLE`. A blind
 contingency could put a second document on the same sale.
 
-**Layout limit.** A document issued on or after 2027-01-01 is refused as
-`INVALID` with code `NT_2026_008_NOT_SUPPORTED`: from 2027 the IBS/CBS go
-inside `vProd` and the net price travels in NT 2026.008's `vProdLiq`, which
-sped-nfe 5.2.9 cannot write.
+**The net value (NT 2026.008).** From 2027 the IBS/CBS go inside `vProd` and
+the price without them travels in `vProdLiq`. A line's optional
+`netValueCents` is that figure (the engine's `LineTax.netValueCents`), written
+as given; `vUnComLiq` is derived from it over `quantity` with ten decimals, as
+`vUnCom` is, and `vProdLiqTot` is their sum. Absent or `null` writes none of
+the three, byte for byte the document it was before. It is `INVALID` to carry
+it on some lines only, or above the line's `valueCents`. Whether a period puts
+the tax inside the price is the engine's rate table's call; the service
+refuses no date (the `NT_2026_008_NOT_SUPPORTED` refusal of sped-nfe 5.2.9 is
+gone with the bump to 5.2.11).
 
 **A return document.** `operation` maps to `tpNF` (`OUT` 1, `IN` 0) and
 `referencedDocuments[].accessKey` to `NFref/refNFe`, in order. Both are
@@ -208,7 +214,6 @@ SEFAZ directly.
 
 ## Versions
 
-sped-nfe `5.2.9`, schema package `PL_010_V1.30` (Pacote de Liberação 010f: NT
-2025.002 v1.50 and NT 2026.007 v1.00). NT 2026.008's `vProdLiq` and
-`vProdLiqTot`, needed when the IBS/CBS move inside `vProd` in 2027, are on
-sped-nfe's `master` after 5.2.9 and arrive with its next release.
+sped-nfe `5.2.11`, schema package `PL_010_V1.30` (Pacote de Liberação 010f: NT
+2025.002 v1.50 and NT 2026.007 v1.00), which carries NT 2026.008's
+`vUnComLiq`/`vProdLiq`/`vProdLiqTot` and NT 2026.006's `gPgtoVinc`.
