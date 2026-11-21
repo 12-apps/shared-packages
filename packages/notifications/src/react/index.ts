@@ -17,6 +17,7 @@ export {
 export { BellIcon } from './bell-icon';
 export type { BellButtonProps } from './bell-button';
 export type { NotificationsPanelProps } from './panel';
+export type { NotificationActionsRenderer } from './row-actions';
 export type { PreferencesScreenProps } from './preferences-screen';
 export type { WebPushPlatformHint, WebPushSetupConfig } from './web-push-setup';
 

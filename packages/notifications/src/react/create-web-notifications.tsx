@@ -17,6 +17,7 @@ import { lazyNotificationsPanel } from './panel-lazy';
 import type { NotificationsPanelProps } from './panel';
 import { lazyPreferencesPage } from './page-lazy';
 import type { PreferencesScreenProps } from './preferences-screen';
+import type { NotificationActionsRenderer } from './row-actions';
 import { httpNotificationsTransport, type NotificationsTransport } from './transport';
 import type { WebPushSetupConfig } from './web-push-setup';
 
@@ -67,6 +68,15 @@ export interface NotificationsWebConfig {
    * from, and what the section says) and `../live` for what one IS.
    */
   liveActivities?: LiveActivitiesConfig;
+  /**
+   * The host's own CONTROLS on an inbox row (accept / decline, snooze, ...), or
+   * `null`/`undefined` from the renderer for a row that has none.
+   *
+   * Absent means absent: a host that passes nothing gets exactly the rows it
+   * had. The controls are drawn beside the row's link, never inside it. See
+   * `./row-actions` for the contract and `ADOPTING.md` > *Actions on a row*.
+   */
+  renderActions?: NotificationActionsRenderer;
 }
 
 export interface WebNotifications {
@@ -206,6 +216,7 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
     store,
     messages,
     ...(live ? { live, liveSeen } : {}),
+    ...(config.renderActions ? { renderActions: config.renderActions } : {}),
   });
 
   const badgeHooks = bindBadgeHooks(store, subscribeOption, liveSeen, live);

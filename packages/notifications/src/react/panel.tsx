@@ -28,6 +28,7 @@ import type { LiveActivitiesConfig } from './live-config';
 import type { LiveSeenStore } from './live-seen';
 import { LiveSection } from './live-section';
 import { NotificationRow } from './row';
+import type { NotificationActionsRenderer } from './row-actions';
 
 interface PanelBodyProps {
   state: InboxState;
@@ -36,6 +37,7 @@ interface PanelBodyProps {
   onLoadMore: () => void;
   onOpen: (notification: InboxNotification) => void;
   onDelete: (id: string) => void;
+  renderActions?: NotificationActionsRenderer;
   /**
    * Whether the live section above has anything in it.
    *
@@ -54,6 +56,7 @@ function PanelBody({
   onLoadMore,
   onOpen,
   onDelete,
+  renderActions,
   hasLive,
 }: PanelBodyProps): JSX.Element {
   if (state.status === 'pending' || state.status === 'idle') {
@@ -103,6 +106,7 @@ function PanelBody({
           messages={messages}
           onOpen={onOpen}
           onDelete={onDelete}
+          {...(renderActions ? { renderActions } : {})}
         />
       ))}
       {state.nextCursor ? (
@@ -181,12 +185,14 @@ function PanelInbox({
   messages,
   store,
   onOpen,
+  renderActions,
   hasLive,
 }: {
   state: InboxState;
   messages: NotificationMessages;
   store: InboxStore;
   onOpen: (notification: InboxNotification) => void;
+  renderActions?: NotificationActionsRenderer;
   hasLive: boolean;
 }): JSX.Element {
   const hasUnread = state.items.some((item) => item.readAt === null);
@@ -212,6 +218,7 @@ function PanelInbox({
         onLoadMore={() => store.loadMore()}
         onOpen={onOpen}
         onDelete={(id) => store.remove(id)}
+        {...(renderActions ? { renderActions } : {})}
         hasLive={hasLive}
       />
     </>
@@ -226,11 +233,14 @@ export function NotificationsPanel({
   messages,
   live,
   liveSeen,
+  renderActions,
 }: NotificationsPanelProps & {
   store: InboxStore;
   messages: NotificationMessages;
   live?: LiveActivitiesConfig;
   liveSeen?: LiveSeenStore;
+  /** The host's controls on each row — see `./row-actions`. */
+  renderActions?: NotificationActionsRenderer;
 }): JSX.Element {
   // `useTheme` from @mui/material/styles falls back to the DEFAULT theme when
   // no provider is mounted, where the callback form of `useMediaQuery` would
@@ -251,6 +261,7 @@ export function NotificationsPanel({
       messages={messages}
       store={store}
       onOpen={openNotification}
+      {...(renderActions ? { renderActions } : {})}
       hasLive={liveCount > 0}
     />
   );
