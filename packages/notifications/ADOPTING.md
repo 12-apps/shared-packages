@@ -717,6 +717,32 @@ createWebNotifications({
   keep hooks in the component it names, and do not throw. The words on the
   controls are yours.
 
+### The attention list
+
+The same slot exists on the attention button's list (the "+N" popover): set
+`renderActions` on a kind's view.
+
+```tsx
+attentionView<SeatRequest>({
+  // icon, describe, renderSheet ...
+  renderActions: ({ item, close }) => (
+    <>
+      <Button onClick={() => { decline(item); close(); }}>{copy.decline}</Button>
+      <Button onClick={() => { accept(item); close(); }}>{copy.accept}</Button>
+    </>
+  ),
+});
+```
+
+- Same contract as the inbox slot: `null`, `undefined` or a boolean draws the
+  row exactly as it was, and `renderSheet` / `onOpen` stay the row's own.
+- The controls are drawn under the row's own button, never inside it, after it
+  in tab order; an action never opens the row. `close` shuts the list.
+- The layout rules are the same container queries (left start, each across the
+  row under 15rem, a 40 px floor under 600 px of row width).
+- Only the list's rows carry actions. The head item is the dock button itself,
+  which stays one target.
+
 ## What does NOT come with it
 
 - **The events.** Generators are host code (see rule 6).

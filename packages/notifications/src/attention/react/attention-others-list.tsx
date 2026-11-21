@@ -15,6 +15,7 @@ import type { AttentionEntry } from '../core';
 import { severityFill } from './attention-button';
 import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionMessages } from './messages';
+import { hasActions, RowActionsSlot } from '../../row-actions-slot';
 import { minutesOf, type AttentionKindView, type AttentionViews } from './views';
 
 /**
@@ -69,17 +70,21 @@ function OtherRow({
   view,
   messages,
   onPick,
+  onClose,
 }: {
   readonly entry: AttentionEntry;
   readonly view: AttentionKindView;
   readonly messages: AttentionMessages;
   readonly onPick: (entry: AttentionEntry) => void;
+  readonly onClose: () => void;
 }): JSX.Element {
   const { title, what, spoken } = view.describe(entry.item);
   const waited = messages.waited(minutesOf(entry.waitedMs), entry.waitedMs);
   const calm = entry.severity === 'calm';
+  const actions = view.renderActions?.({ item: entry.item, close: onClose });
+  const withActions = hasActions(actions);
   return (
-    <Box component="li">
+    <Box component="li" {...(withActions ? { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 } } : {})}>
       <Box
         component="button"
         type="button"
@@ -122,6 +127,11 @@ function OtherRow({
           {waited}
         </Box>
       </Box>
+      {withActions ? (
+        <RowActionsSlot label={title} testId={`attention-actions-${entry.item.id}`}>
+          {actions}
+        </RowActionsSlot>
+      ) : null}
     </Box>
   );
 }
@@ -192,7 +202,14 @@ export function AttentionOthersList({
             const view = views[entry.kind.id];
             if (view === undefined) return null;
             return (
-              <OtherRow key={entry.item.id} entry={entry} view={view} messages={messages} onPick={onPick} />
+              <OtherRow
+                key={entry.item.id}
+                entry={entry}
+                view={view}
+                messages={messages}
+                onPick={onPick}
+                onClose={onClose}
+              />
             );
           })}
         </Box>

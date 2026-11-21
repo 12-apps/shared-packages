@@ -23,6 +23,22 @@ export interface AttentionKindView<I extends AttentionItem = AttentionItem> {
   readonly renderSheet?: (props: { readonly item: I; readonly close: () => void }) => ReactNode;
   /** Or anything else the host does itself — called instead of drawing a sheet. */
   readonly onOpen?: (item: I) => void;
+  /**
+   * Controls of the host's own on this kind's row in the attention LIST (the
+   * "+N" popover), or `null`/`undefined`/a boolean for the row as it is.
+   *
+   * Drawn BESIDE the row's own button, never inside it, in the tab order right
+   * after it, so unlike `icon` they may be interactive (accept, decline). A
+   * click on one never opens the row: `renderSheet` and `onOpen` stay the row's
+   * own and are not called. `close` shuts the list. Called during render, once
+   * per row per render: keep it cheap and hook-free, and return an ELEMENT.
+   *
+   * Layout is the package's: controls start from the left, side by side when
+   * they fit and each across the row when they do not (a container query), with
+   * a 40 px floor below 600 px of row width. The head item is the dock button
+   * itself and has no row, so it carries no actions.
+   */
+  readonly renderActions?: (props: { readonly item: I; readonly close: () => void }) => ReactNode;
 }
 
 /** Views keyed by kind id. */
