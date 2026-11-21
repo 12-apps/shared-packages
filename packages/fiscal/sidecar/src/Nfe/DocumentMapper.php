@@ -66,18 +66,6 @@ final class DocumentMapper
 
     public const PROCESS_VERSION = 'fiscal-sidecar-1';
 
-    /**
-     * From 2027 the IBS/CBS go INSIDE `vProd`, and the price without tax
-     * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source: NT
-     * 2026.008 v1.00 itself: from 2027 the IBS, CBS and IS values "deverão ser
-     * acrescidos ao valor do produto ou serviço, compondo o valor informado no
-     * campo vProd"). A line's `netValueCents` is the engine's `vProdLiq`,
-     * written as given; `vUnComLiq` is derived from it as `vUnCom` is from
-     * `vProd`, and sped-nfe (5.2.11) sums `vProdLiqTot` from the items. Whether
-     * a period puts the tax inside the price is the engine's rate table's
-     * call, never a date here.
-     */
-
     /** A return (`finNFe` 4) quotes the document it returns (`NFref`); one without a reference is refused. */
     public const RETURN_NEEDS_REFERENCE_CODE = 'RETURN_NEEDS_REFERENCE';
 
@@ -265,7 +253,19 @@ final class DocumentMapper
         ];
     }
 
-    /** @param array<string, mixed> $line */
+    /**
+     * From 2027 the IBS/CBS go INSIDE `vProd`, and the price without tax
+     * travels in NT 2026.008's `vProdLiq`/`vUnComLiq`/`vProdLiqTot` (source: NT
+     * 2026.008 v1.00 itself: from 2027 the IBS, CBS and IS values "deverão ser
+     * acrescidos ao valor do produto ou serviço, compondo o valor informado no
+     * campo vProd"). A line's `netValueCents` is the engine's `vProdLiq`,
+     * written as given; `vUnComLiq` is derived from it as `vUnCom` is from
+     * `vProd`, and sped-nfe (5.2.11) sums `vProdLiqTot` from the items. Whether
+     * a period puts the tax inside the price is the engine's rate table's
+     * call, never a date here.
+     *
+     * @param array<string, mixed> $line
+     */
     private function line(Make $make, int $item, array $line): void
     {
         $gtin = $line['gtin'] ?? 'SEM GTIN';
