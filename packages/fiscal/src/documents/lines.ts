@@ -11,7 +11,10 @@
  *   taxed item under the class the host passed;
  * - the IBS/CBS group from the line's figures (`vBC`, the nominal rates, the
  *   reduction, the amounts), or no group at all where the engine answered
- *   `NONE` (MEI, não contribuinte).
+ *   `NONE` (MEI, não contribuinte);
+ * - the net value (`vProdLiq`, NT 2026.008) where the period puts the tax
+ *   inside the price (from 2027), and no key at all where it does not, so a
+ *   2026 document is the one it was before the field existed.
  *
  * What the engine does not know — the product code, NCM, CFOP, unit, the
  * ICMS, PIS and COFINS — arrives per line id from the host. A breakdown line
@@ -23,7 +26,7 @@ import type { LineIbsCbs, SaleLine } from "../sale/types";
 import { FiscalDocumentError } from "./errors";
 
 /** Everything a document line needs that the breakdown does not carry. */
-export type LineDetails = Omit<SaleLine, "id" | "quantity" | "valueCents" | "ibsCbs">;
+export type LineDetails = Omit<SaleLine, "id" | "quantity" | "valueCents" | "netValueCents" | "ibsCbs">;
 
 const SEGREGATED = new Set<LineTax["source"]>(["GORJETA_EXCLUDED", "INTERMEDIATION_EXCLUDED"]);
 
@@ -57,6 +60,7 @@ export function documentLines(breakdown: TaxBreakdown, details: Readonly<Record<
       id: line.lineId,
       quantity: line.quantity,
       valueCents: line.valueCents,
+      ...(line.netValueCents === null ? {} : { netValueCents: line.netValueCents }),
       ibsCbs: ibsCbsOf(line, breakdown),
     };
   });

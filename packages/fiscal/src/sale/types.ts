@@ -5,10 +5,14 @@
  * Money is integer CENTS, rates integer BASIS POINTS (1 bp = 0.01%) — the
  * engine's conventions (`@12-apps/fiscal/engine`) — and quantities carry at
  * most four decimals. Every field is required; an absent value is `null`,
- * never a missing key, so a host cannot forget one silently. The two
- * exceptions came with the return document (FUT-2238), `operation` and
- * `referencedDocuments`: they are optional so that a document built before
- * them stays valid and yields the same XML, byte for byte.
+ * never a missing key, so a host cannot forget one silently. The exceptions
+ * are the fields added after version 1 shipped — `operation` and
+ * `referencedDocuments` (the return document, FUT-2238), a payment's
+ * `linkedTransaction` (NT 2026.006, FUT-2239) and a line's `netValueCents`
+ * (NT 2026.008, FUT-4924): they are optional so that a document built before
+ * them stays valid and yields the same XML, byte for byte, and `version`
+ * stays 1 so that a service image older than a field still reads every
+ * document that does not use it.
  *
  * The JSON schema the service validates against is
  * `@12-apps/fiscal/sidecar/schema/sale-for-document.schema.json`; a test keeps
@@ -167,6 +171,15 @@ export interface SaleLine {
   readonly valueCents: number;
   /** `vDesc`. */
   readonly discountCents: number;
+  /**
+   * `vProdLiq` (NT 2026.008 v1.00): the line's value WITHOUT the IBS/CBS, in a
+   * period whose IBS/CBS sit inside `vProd` (from 2027) — the engine's
+   * `LineTax.netValueCents`, written as given, at most `valueCents`. The
+   * service derives `vUnComLiq` (this over `quantity`, ten decimals) and
+   * `vProdLiqTot` (the sum over the lines). Absent or `null`: neither is
+   * written, as before 2027. Every line carries it or none does.
+   */
+  readonly netValueCents?: number | null;
   /** `vTotTrib` (the approximate tax of the transparency law), or `null`. */
   readonly approximateTaxCents: number | null;
   /** `infAdProd`. */

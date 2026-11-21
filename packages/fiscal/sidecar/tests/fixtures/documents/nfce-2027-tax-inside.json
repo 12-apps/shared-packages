@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "series": 1,
+  "number": 1201,
+  "keyCode": "48213907",
+  "issuedAt": "2027-01-02T10:00:00-03:00",
+  "operationNature": "VENDA",
+  "purpose": "NORMAL",
+  "destination": "INTERNAL",
+  "presence": "IN_PERSON",
+  "finalConsumer": true,
+  "intermediary": null,
+  "issuer": {
+    "cnpj": "11222333000181",
+    "stateRegistration": "123456789012",
+    "legalName": "EXAMPLE FOODS LTDA",
+    "tradeName": "Example Foods",
+    "taxRegime": "NORMAL",
+    "address": {
+      "street": "Rua das Flores",
+      "number": "100",
+      "complement": null,
+      "district": "Centro",
+      "municipalityIbge": "3550308",
+      "municipalityName": "Sao Paulo",
+      "uf": "SP",
+      "postalCode": "01001000",
+      "phone": "1133334444"
+    }
+  },
+  "buyer": null,
+  "lines": [
+    {
+      "id": "line-1",
+      "code": "SKU-1",
+      "gtin": null,
+      "description": "Kitchen towel",
+      "ncm": "48182000",
+      "cest": null,
+      "cfop": "5102",
+      "unit": "UN",
+      "quantity": 1,
+      "valueCents": 10880,
+      "discountCents": 0,
+      "netValueCents": 10000,
+      "approximateTaxCents": null,
+      "additionalInfo": null,
+      "icms": {
+        "regime": "NORMAL",
+        "origin": 0,
+        "cst": "40"
+      },
+      "pis": {
+        "cst": "49",
+        "baseCents": 0,
+        "rateBp": 0,
+        "amountCents": 0
+      },
+      "cofins": {
+        "cst": "49",
+        "baseCents": 0,
+        "rateBp": 0,
+        "amountCents": 0
+      },
+      "ibsCbs": {
+        "cst": "000",
+        "classCode": "000001",
+        "figures": {
+          "baseCents": 10000,
+          "reductionBp": 0,
+          "cbsRateBp": 870,
+          "cbsCents": 870,
+          "ibsUfRateBp": 5,
+          "ibsUfCents": 5,
+          "ibsMunRateBp": 5,
+          "ibsMunCents": 5
+        }
+      }
+    },
+    {
+      "id": "line-2",
+      "code": "SKU-2",
+      "gtin": null,
+      "description": "Sandwich",
+      "ncm": "21069090",
+      "cest": null,
+      "cfop": "5102",
+      "unit": "UN",
+      "quantity": 3,
+      "valueCents": 1999,
+      "discountCents": 0,
+      "netValueCents": 1898,
+      "approximateTaxCents": null,
+      "additionalInfo": null,
+      "icms": {
+        "regime": "NORMAL",
+        "origin": 0,
+        "cst": "40"
+      },
+      "pis": {
+        "cst": "49",
+        "baseCents": 0,
+        "rateBp": 0,
+        "amountCents": 0
+      },
+      "cofins": {
+        "cst": "49",
+        "baseCents": 0,
+        "rateBp": 0,
+        "amountCents": 0
+      },
+      "ibsCbs": {
+        "cst": "200",
+        "classCode": "200047",
+        "figures": {
+          "baseCents": 1898,
+          "reductionBp": 4000,
+          "cbsRateBp": 870,
+          "cbsCents": 99,
+          "ibsUfRateBp": 5,
+          "ibsUfCents": 1,
+          "ibsMunRateBp": 5,
+          "ibsMunCents": 1
+        }
+      }
+    }
+  ],
+  "freight": "NONE",
+  "payments": [
+    {
+      "method": "PIX_DYNAMIC",
+      "amountCents": 12879,
+      "card": {
+        "integrated": false,
+        "acquirerCnpj": null,
+        "brand": null,
+        "authorizationCode": null
+      },
+      "description": null,
+      "linkedTransaction": {
+        "transactionId": "7f3c2a91e04b4c1d9a0b11c2d3e4f5a6",
+        "meansCode": "17",
+        "pspCnpjBase": "08561701",
+        "receiverCnpj": "11222333000181"
+      }
+    }
+  ],
+  "changeCents": 0,
+  "additionalInfo": {
+    "forTaxpayer": "Thank you",
+    "forTaxAuthority": null
+  },
+  "technicalResponsible": {
+    "cnpj": "11222333000181",
+    "contactName": "Support Desk",
+    "email": "support@example.com",
+    "phone": "1133334444"
+  }
+}

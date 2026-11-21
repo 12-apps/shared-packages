@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeTax } from "../../engine/compute";
 import type { TaxInput } from "../../engine/types";
-import { CLASSES, RESTAURANT_SELLER, SAO_PAULO, TABLES } from "../../engine/__tests__/fixtures/baskets";
+import { CLASSES, GOLDEN_DATES, RESTAURANT_SELLER, SAO_PAULO, TABLES } from "../../engine/__tests__/fixtures/baskets";
 import { documentLines, type LineDetails } from "../lines";
 import { SALE } from "./fixtures";
 
@@ -65,5 +65,15 @@ describe("the document lines from the engine's breakdown", () => {
     const mei = computeTax({ ...sale(0), seller: { ...RESTAURANT_SELLER, regime: "MEI" } });
     expect(documentLines(mei, DETAILS).every((line) => line.ibsCbs === null)).toBe(true);
     expect(() => documentLines(computeTax(sale(0)), { burger: DETAILS.burger })).toThrow(/juice has no document details/);
+  });
+
+  it("writes the engine's vProdLiq on every line from 2027, and no key at all in 2026 (NT 2026.008)", () => {
+    const breakdown = computeTax({ ...sale(1500), supplyDate: GOLDEN_DATES[2027] });
+    const lines = documentLines(breakdown, DETAILS);
+    expect(lines.map((line) => line.netValueCents)).toEqual(breakdown.lines.map((line) => line.netValueCents));
+    expect(lines.every((line) => typeof line.netValueCents === "number")).toBe(true);
+    expect(lines.find((line) => line.id === "service")?.netValueCents).toBe(1500);
+
+    expect(documentLines(computeTax(sale(1500)), DETAILS).some((line) => "netValueCents" in line)).toBe(false);
   });
 });

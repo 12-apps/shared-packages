@@ -21,17 +21,18 @@ use PHPUnit\Framework\TestCase;
 /** The edges of the contract: what the service refuses, reports and ships. */
 final class ContractTest extends TestCase
 {
-    public function testADocumentFrom2027IsRefusedByName(): void
+    public function testADocumentFrom2027IsIssuedWithItsNetValues(): void
     {
-        [$kernel] = Fixtures::kernel($transport = new RecordedTransport());
-        $body = Fixtures::issueBody('nfce-simples', ThrowawayCertificate::create(), true);
-        $body['document']['issuedAt'] = '2027-01-01T00:00:00-03:00';
+        [$kernel] = Fixtures::kernel($transport = new RecordedTransport('authorization-100-authorized'));
+        $body = Fixtures::issueBody('nfce-2027-tax-inside', ThrowawayCertificate::create(), true);
 
         $response = Fixtures::call($kernel, 'POST', '/nfce/issue', $body);
 
-        self::assertSame(400, $response->status);
-        self::assertSame(['INVALID', DocumentMapper::LAYOUT_LIMIT_CODE], [$response->body['error']['class'], $response->body['error']['code']]);
-        self::assertSame([], $transport->sent);
+        self::assertSame(200, $response->status, json_encode($response->body) ?: '');
+        self::assertSame('AUTHORIZED', $response->body['status']);
+        self::assertStringContainsString('<vProdLiq>100.00</vProdLiq>', $response->body['authorizedXml']);
+        self::assertStringContainsString('<vProdLiqTot>118.98</vProdLiqTot>', $response->body['authorizedXml']);
+        self::assertCount(1, $transport->sent);
     }
 
     public function testTheLastDayOf2026IsStillIssued(): void

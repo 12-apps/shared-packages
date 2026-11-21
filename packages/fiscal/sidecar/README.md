@@ -52,10 +52,20 @@ reach SEFAZ either does an NFC-e being issued answer `CONTINGENCY` (with
 `outcomeUnknown: true`); everywhere else it is `RETRYABLE`. A blind
 contingency could put a second document on the same sale.
 
-**Layout limit.** A document issued on or after 2027-01-01 is refused as
-`INVALID` with code `NT_2026_008_NOT_SUPPORTED`: from 2027 the IBS/CBS go
-inside `vProd` and the net price travels in NT 2026.008's `vProdLiq`, which
-sped-nfe 5.2.9 cannot write.
+**The net value (NT 2026.008).** From 2027 the IBS/CBS go inside `vProd` and
+the price without them travels in `vProdLiq`. A line's optional
+`netValueCents` is that figure (the engine's `LineTax.netValueCents`), written
+as given; `vUnComLiq` is derived from it over `quantity` with ten decimals, as
+`vUnCom` is, and `vProdLiqTot` is their sum. The service derives the unit
+value itself (half-up to ten decimals) rather than taking the engine's
+`netUnitValue` string (exact, half-even), so the two may differ in the tenth
+decimal only: `vUnComLiq × qCom` stays far inside I11c-20's ±0,01 of
+`vProdLiq`. Absent or `null` writes none of
+the three, byte for byte the document it was before. It is `INVALID` to carry
+it on some lines only, or above the line's `valueCents`. Whether a period puts
+the tax inside the price is the engine's rate table's call; the service
+refuses no date (the `NT_2026_008_NOT_SUPPORTED` refusal of sped-nfe 5.2.9 is
+gone with the bump to 5.2.11).
 
 **A return document.** `operation` maps to `tpNF` (`OUT` 1, `IN` 0) and
 `referencedDocuments[].accessKey` to `NFref/refNFe`, in order. Both are
@@ -80,7 +90,7 @@ Every failure is `{ error: { class, code, message, details, accessKey, signedXml
 | `RETRYABLE` | 503 | try again: nothing reached SEFAZ outside NFC-e issuing, a receipt with no protocol yet (103, 105), SEFAZ unable to reach a revocation list (286, 296), rate limiting (656), 999, SEFAZ stopped (108, 109) outside issuing, a reply with no status, a 4xx that is not SEFAZ's. With `outcomeUnknown: true`, look the key up before sending again. |
 | `CONTINGENCY` | 503 | issuing an NFC-e: nothing reached SEFAZ, or SEFAZ is stopped (108, 109), or a request with no answer could not be settled by a lookup. Go offline through `/nfce/sign-contingency`. **On an NF-e (model 55)** there is no offline path in this service (no SVC, no EPEC): only 108/109 answer `CONTINGENCY` there, and the host treats it as "retry later". |
 | `AUTH` | 401 | the `.pfx` does not open (wrong password, not PKCS#12), the certificate expired, the client certificate was refused at the TLS handshake or by an HTTP 403 from a verified SEFAZ host, or by code (213, 280–285, 290–295). Codes from sped-nfe's `storage/cstat.json`. An HTTP refusal's message names the IIS substatus (403.6 is an IP block, 403.7 a missing client certificate) or quotes the start of SEFAZ's page. |
-| `INVALID` | 400 | the request is malformed: the schema, a missing CSC, an XML the layout's XSD refuses, a quantity with more than four decimals, a document past the layout limit. Never retry it as is. |
+| `INVALID` | 400 | the request is malformed: the schema, a missing CSC, an XML the layout's XSD refuses, a quantity with more than four decimals, a net value (`netValueCents`) on some lines only or above the line's `valueCents`. Never retry it as is. |
 | `INTERNAL` | 500 | a defect of the service, or a 4xx other than 403/408/429 from the verified SEFAZ host (a wrong web-service address); a retry would repeat it. |
 
 When the call got as far as signing, `accessKey` and `signedXml` come back
@@ -208,7 +218,6 @@ SEFAZ directly.
 
 ## Versions
 
-sped-nfe `5.2.9`, schema package `PL_010_V1.30` (Pacote de Liberação 010f: NT
-2025.002 v1.50 and NT 2026.007 v1.00). NT 2026.008's `vProdLiq` and
-`vProdLiqTot`, needed when the IBS/CBS move inside `vProd` in 2027, are on
-sped-nfe's `master` after 5.2.9 and arrive with its next release.
+sped-nfe `5.2.11`, schema package `PL_010_V1.30` (Pacote de Liberação 010f: NT
+2025.002 v1.50 and NT 2026.007 v1.00), which carries NT 2026.008's
+`vUnComLiq`/`vProdLiq`/`vProdLiqTot` and NT 2026.006's `gPgtoVinc`.

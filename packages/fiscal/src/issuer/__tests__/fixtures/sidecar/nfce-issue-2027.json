@@ -19,7 +19,7 @@
                 "stateRegistration": "123456789012",
                 "legalName": "EXAMPLE FOODS LTDA",
                 "tradeName": "Example Foods",
-                "taxRegime": "SIMPLES",
+                "taxRegime": "NORMAL",
                 "address": {
                     "street": "Rua das Flores",
                     "number": "100",
@@ -38,20 +38,21 @@
                     "id": "line-1",
                     "code": "SKU-1",
                     "gtin": null,
-                    "description": "Sandwich",
-                    "ncm": "21069090",
+                    "description": "Kitchen towel",
+                    "ncm": "48182000",
                     "cest": null,
                     "cfop": "5102",
                     "unit": "UN",
-                    "quantity": 2,
-                    "valueCents": 3990,
+                    "quantity": 1,
+                    "valueCents": 10880,
                     "discountCents": 0,
-                    "approximateTaxCents": 523,
+                    "netValueCents": 10000,
+                    "approximateTaxCents": null,
                     "additionalInfo": null,
                     "icms": {
-                        "regime": "SIMPLES",
+                        "regime": "NORMAL",
                         "origin": 0,
-                        "csosn": "102"
+                        "cst": "40"
                     },
                     "pis": {
                         "cst": "49",
@@ -69,14 +70,14 @@
                         "cst": "000",
                         "classCode": "000001",
                         "figures": {
-                            "baseCents": 3990,
+                            "baseCents": 10000,
                             "reductionBp": 0,
-                            "cbsRateBp": 90,
-                            "cbsCents": 36,
-                            "ibsUfRateBp": 10,
-                            "ibsUfCents": 4,
-                            "ibsMunRateBp": 0,
-                            "ibsMunCents": 0
+                            "cbsRateBp": 870,
+                            "cbsCents": 870,
+                            "ibsUfRateBp": 5,
+                            "ibsUfCents": 5,
+                            "ibsMunRateBp": 5,
+                            "ibsMunCents": 5
                         }
                     }
                 },
@@ -84,20 +85,21 @@
                     "id": "line-2",
                     "code": "SKU-2",
                     "gtin": null,
-                    "description": "Orange juice",
-                    "ncm": "20091200",
+                    "description": "Sandwich",
+                    "ncm": "21069090",
                     "cest": null,
                     "cfop": "5102",
                     "unit": "UN",
-                    "quantity": 1,
-                    "valueCents": 1200,
-                    "discountCents": 100,
+                    "quantity": 3,
+                    "valueCents": 1999,
+                    "discountCents": 0,
+                    "netValueCents": 1898,
                     "approximateTaxCents": null,
-                    "additionalInfo": "Fresh",
+                    "additionalInfo": null,
                     "icms": {
-                        "regime": "SIMPLES",
+                        "regime": "NORMAL",
                         "origin": 0,
-                        "csosn": "102"
+                        "cst": "40"
                     },
                     "pis": {
                         "cst": "49",
@@ -115,14 +117,14 @@
                         "cst": "200",
                         "classCode": "200047",
                         "figures": {
-                            "baseCents": 1100,
+                            "baseCents": 1898,
                             "reductionBp": 4000,
-                            "cbsRateBp": 90,
-                            "cbsCents": 6,
-                            "ibsUfRateBp": 10,
+                            "cbsRateBp": 870,
+                            "cbsCents": 99,
+                            "ibsUfRateBp": 5,
                             "ibsUfCents": 1,
-                            "ibsMunRateBp": 0,
-                            "ibsMunCents": 0
+                            "ibsMunRateBp": 5,
+                            "ibsMunCents": 1
                         }
                     }
                 }
@@ -130,24 +132,24 @@
             "freight": "NONE",
             "payments": [
                 {
-                    "method": "CREDIT_CARD",
-                    "amountCents": 4000,
+                    "method": "PIX_DYNAMIC",
+                    "amountCents": 12879,
                     "card": {
                         "integrated": false,
                         "acquirerCnpj": null,
-                        "brand": "01",
-                        "authorizationCode": "A1B2C3"
+                        "brand": null,
+                        "authorizationCode": null
                     },
-                    "description": null
-                },
-                {
-                    "method": "CASH",
-                    "amountCents": 1500,
-                    "card": null,
-                    "description": null
+                    "description": null,
+                    "linkedTransaction": {
+                        "transactionId": "7f3c2a91e04b4c1d9a0b11c2d3e4f5a6",
+                        "meansCode": "17",
+                        "pspCnpjBase": "08561701",
+                        "receiverCnpj": "11222333000181"
+                    }
                 }
             ],
-            "changeCents": 410,
+            "changeCents": 0,
             "additionalInfo": {
                 "forTaxpayer": "Thank you",
                 "forTaxAuthority": null
@@ -160,17 +162,16 @@
             }
         }
     },
-    "status": 400,
+    "status": 200,
     "body": {
-        "error": {
-            "class": "INVALID",
-            "code": "NT_2026_008_NOT_SUPPORTED",
-            "message": "A document issued on or after 2027-01-01 needs NT 2026.008 (vProdLiq), which this service's sped-nfe does not write yet.",
-            "details": [],
-            "accessKey": null,
-            "signedXml": null,
-            "sefazReply": null,
-            "outcomeUnknown": false
-        }
+        "statusCode": "100",
+        "statusReason": "Autorizado o uso da NF-e",
+        "sefazReply": "<?xml version=\"1.0\" encoding=\"utf-8\"?><soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><soap:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4\"><retEnviNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><cStat>104</cStat><xMotivo>Lote processado</xMotivo><cUF>35</cUF><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><chNFe>35270111222333000181650010000012011482139075</chNFe><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><nProt>135260000123456</nProt><digVal>XMmoyDBaFZyYfrqe/xPtgvcqdrA=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe></nfeResultMsg></soap:Body></soap:Envelope>",
+        "status": "AUTHORIZED",
+        "accessKey": "35270111222333000181650010000012011482139075",
+        "protocol": "135260000123456",
+        "authorizedAt": "2026-11-20T12:30:05-03:00",
+        "signedXml": "<?xml version=\"1.0\"?><NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infNFe Id=\"NFe35270111222333000181650010000012011482139075\" versao=\"4.00\"><ide><cUF>35</cUF><cNF>48213907</cNF><natOp>VENDA</natOp><mod>65</mod><serie>1</serie><nNF>1201</nNF><dhEmi>2027-01-02T10:00:00-03:00</dhEmi><tpNF>1</tpNF><idDest>1</idDest><cMunFG>3550308</cMunFG><tpImp>4</tpImp><tpEmis>1</tpEmis><cDV>5</cDV><tpAmb>2</tpAmb><finNFe>1</finNFe><indFinal>1</indFinal><indPres>1</indPres><procEmi>0</procEmi><verProc>fiscal-sidecar-1</verProc></ide><emit><CNPJ>11222333000181</CNPJ><xNome>EXAMPLE FOODS LTDA</xNome><xFant>Example Foods</xFant><enderEmit><xLgr>Rua das Flores</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>Sao Paulo</xMun><UF>SP</UF><CEP>01001000</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>1133334444</fone></enderEmit><IE>123456789012</IE><CRT>3</CRT></emit><det nItem=\"1\"><prod><cProd>SKU-1</cProd><cEAN>SEM GTIN</cEAN><xProd>NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</xProd><NCM>48182000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>1.0000</qCom><vUnCom>108.8000000000</vUnCom><vProd>108.80</vProd><vUnComLiq>100.0000000000</vUnComLiq><vProdLiq>100.00</vProdLiq><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>1.0000</qTrib><vUnTrib>108.8000000000</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>40</CST></ICMS40></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>100.00</vBC><gIBSUF><pIBSUF>0.0500</pIBSUF><vIBSUF>0.05</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.05</pIBSMun><vIBSMun>0.05</vIBSMun></gIBSMun><vIBS>0.10</vIBS><gCBS><pCBS>8.7000</pCBS><vCBS>8.70</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>108.80</vItem></det><det nItem=\"2\"><prod><cProd>SKU-2</cProd><cEAN>SEM GTIN</cEAN><xProd>Sandwich</xProd><NCM>21069090</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>3.0000</qCom><vUnCom>6.6633333333</vUnCom><vProd>19.99</vProd><vUnComLiq>6.3266666667</vUnComLiq><vProdLiq>18.98</vProdLiq><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>3.0000</qTrib><vUnTrib>6.6633333333</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>40</CST></ICMS40></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>200</CST><cClassTrib>200047</cClassTrib><gIBSCBS><vBC>18.98</vBC><gIBSUF><pIBSUF>0.0500</pIBSUF><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0300</pAliqEfet></gRed><vIBSUF>0.01</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.05</pIBSMun><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0300</pAliqEfet></gRed><vIBSMun>0.01</vIBSMun></gIBSMun><vIBS>0.02</vIBS><gCBS><pCBS>8.7000</pCBS><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>5.2200</pAliqEfet></gRed><vCBS>0.99</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>19.99</vItem></det><total><vProdLiqTot>118.98</vProdLiqTot><ICMSTot><vBC>0.00</vBC><vICMS>0.00</vICMS><vICMSDeson>0.00</vICMSDeson><vFCP>0.00</vFCP><vBCST>0.00</vBCST><vST>0.00</vST><vFCPST>0.00</vFCPST><vFCPSTRet>0.00</vFCPSTRet><vProd>128.79</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>0.00</vDesc><vII>0.00</vII><vIPI>0.00</vIPI><vIPIDevol>0.00</vIPIDevol><vPIS>0.00</vPIS><vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>128.79</vNF></ICMSTot><IBSCBSTot><vBCIBSCBS>118.98</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>0.06</vIBSUF></gIBSUF><gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.06</vIBSMun></gIBSMun><vIBS>0.12</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS><gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>9.69</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS><gMono><vIBSMono>0.00</vIBSMono><vCBSMono>0.00</vCBSMono><vIBSMonoReten>0.00</vIBSMonoReten><vCBSMonoReten>0.00</vCBSMonoReten><vIBSMonoRet>0.00</vIBSMonoRet><vCBSMonoRet>0.00</vCBSMonoRet></gMono></IBSCBSTot><vNFTot>128.79</vNFTot></total><transp><modFrete>9</modFrete></transp><pag><detPag><tPag>17</tPag><vPag>128.79</vPag><card><tpIntegra>2</tpIntegra></card></detPag></pag><gPgtoVinc><gPgto nPag=\"1\" idTransacao=\"7f3c2a91e04b4c1d9a0b11c2d3e4f5a6\"><tpMeioPgto>17</tpMeioPgto><CNPJReceb>11222333000181</CNPJReceb><CNPJBasePSP>08561701</CNPJBasePSP></gPgto></gPgtoVinc><infAdic><infCpl>Thank you</infCpl></infAdic><infRespTec><CNPJ>11222333000181</CNPJ><xContato>Support Desk</xContato><email>support@example.com</email><fone>1133334444</fone></infRespTec></infNFe><infNFeSupl><qrCode>https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode?p=35270111222333000181650010000012011482139075|3|2</qrCode><urlChave>https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica</urlChave></infNFeSupl><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/><SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/><Reference URI=\"#NFe35270111222333000181650010000012011482139075\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/><DigestValue>XMmoyDBaFZyYfrqe/xPtgvcqdrA=</DigestValue></Reference></SignedInfo><SignatureValue>NY7YKIhYHZXGoFgjDQxcdZwMHQrs4F3iyySr4lFxhsQyBZFwIb0xDTqlN4OIlBpozgbBwI95oxYTz5mk9JjJeg7ECLSQMes7KlAKDemDVPhv+QoSjr2RYSAW0iWspDJQI4sDi32HLfAUHgzulCMZkH0thKoPE0N/vWrX1ix/MFBDt6AL7kL99YQET97h9WOEYP+LLnqK/7ntwXlVzZMz1kAO2cHGAUDZDtekKAi7kgRR9KcTzxtfFSeUwRCANnRgEyI+0chKzv5U/4J4vry75OEJswcNpw6yRwGG6tcJyc/T7dU5dvEugHdJujDrPJpHjBPoBlIN/JnBdaxRU6ID5w==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDKDCCAhCgAwIBAgIIDDSt3vOOGpgwDQYJKoZIhvcNAQELBQAwMzEkMCIGA1UEAwwbVEVTVCBDT01QQU5ZOjExMjIyMzMzMDAwMTgxMQswCQYDVQQGEwJCUjAeFw0yNjExMjEwNDM3MDBaFw0yNjEyMjEwNDM3MDBaMDMxJDAiBgNVBAMMG1RFU1QgQ09NUEFOWToxMTIyMjMzMzAwMDE4MTELMAkGA1UEBhMCQlIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQD1lnvgpy7Cr3GXgaN0WPLkAezlzdp/uU3rR3I6UH3gGs4/raVRVaBQwcr7BG8TZvdsoTB77KtxlguY1jCbqUwClZf003g/BxoqYNkyikrZDYh3QkW8dm41ncVClftUuOdupd4mtWmWPtrDQ66QG78uB6Ow/J3YPaXxJs2Mjx3naSFM75mVj/JejDLhMzu8UYa6Bp3ZOB9NxJY6fJf47cZDH1AD0irpapC55CUDj/ljcBQCdQWg4m84iRXI2RNM+Xv3nu8fVldCfBWyGhB25k0mflKP15wV1O4rFbriXMCkEUnJwEn7ZV/rMpEH3LmwcwVnFtSXmAzlqaR14SEcrss9AgMBAAGjQDA+MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMCQGA1UdEQQdMBugGQYFYEwBAwOgEBMOMTEyMjIzMzMwMDAxODEwDQYJKoZIhvcNAQELBQADggEBAHs4BeMDb13CKUf7v7wU1DjNOU0aJ943AmjIlHogeqRuq/NsvGcjHlznpUklYksWGtsCcKjoWtST7yfJhQyUx3olnEWO04ypLReXIb0CLiKocZOhMfUdsHRxhsQYNl7IXHH3jvloavINLqKyvBO35XM7WSozEM374YnbRMJEnj2c3F2BO4VIQtnMUQx8pTi5sNUFlWcGf6bgcUrqE6p7ItZY6DbK2nWh6LIJK6YWo2m/nqPu20bAw0OR2pfRGFjQIZu6+e89D4CXrtwEATtMLSH2ZVxTUhFudSiF3jeY9PfbMIsfQyQ2IKmy0Lp+LTmetvPsBh3ojffspjhTRArRjQI=</X509Certificate></X509Data></KeyInfo></Signature></NFe>",
+        "authorizedXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><nfeProc versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infNFe Id=\"NFe35270111222333000181650010000012011482139075\" versao=\"4.00\"><ide><cUF>35</cUF><cNF>48213907</cNF><natOp>VENDA</natOp><mod>65</mod><serie>1</serie><nNF>1201</nNF><dhEmi>2027-01-02T10:00:00-03:00</dhEmi><tpNF>1</tpNF><idDest>1</idDest><cMunFG>3550308</cMunFG><tpImp>4</tpImp><tpEmis>1</tpEmis><cDV>5</cDV><tpAmb>2</tpAmb><finNFe>1</finNFe><indFinal>1</indFinal><indPres>1</indPres><procEmi>0</procEmi><verProc>fiscal-sidecar-1</verProc></ide><emit><CNPJ>11222333000181</CNPJ><xNome>EXAMPLE FOODS LTDA</xNome><xFant>Example Foods</xFant><enderEmit><xLgr>Rua das Flores</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>Sao Paulo</xMun><UF>SP</UF><CEP>01001000</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>1133334444</fone></enderEmit><IE>123456789012</IE><CRT>3</CRT></emit><det nItem=\"1\"><prod><cProd>SKU-1</cProd><cEAN>SEM GTIN</cEAN><xProd>NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL</xProd><NCM>48182000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>1.0000</qCom><vUnCom>108.8000000000</vUnCom><vProd>108.80</vProd><vUnComLiq>100.0000000000</vUnComLiq><vProdLiq>100.00</vProdLiq><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>1.0000</qTrib><vUnTrib>108.8000000000</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>40</CST></ICMS40></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>100.00</vBC><gIBSUF><pIBSUF>0.0500</pIBSUF><vIBSUF>0.05</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.05</pIBSMun><vIBSMun>0.05</vIBSMun></gIBSMun><vIBS>0.10</vIBS><gCBS><pCBS>8.7000</pCBS><vCBS>8.70</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>108.80</vItem></det><det nItem=\"2\"><prod><cProd>SKU-2</cProd><cEAN>SEM GTIN</cEAN><xProd>Sandwich</xProd><NCM>21069090</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>3.0000</qCom><vUnCom>6.6633333333</vUnCom><vProd>19.99</vProd><vUnComLiq>6.3266666667</vUnComLiq><vProdLiq>18.98</vProdLiq><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>3.0000</qTrib><vUnTrib>6.6633333333</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>40</CST></ICMS40></ICMS><PIS><PISOutr><CST>49</CST><vBC>0.00</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr></PIS><COFINS><COFINSOutr><CST>49</CST><vBC>0.00</vBC><pCOFINS>0.0000</pCOFINS><vCOFINS>0.00</vCOFINS></COFINSOutr></COFINS><IBSCBS><CST>200</CST><cClassTrib>200047</cClassTrib><gIBSCBS><vBC>18.98</vBC><gIBSUF><pIBSUF>0.0500</pIBSUF><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0300</pAliqEfet></gRed><vIBSUF>0.01</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.05</pIBSMun><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>0.0300</pAliqEfet></gRed><vIBSMun>0.01</vIBSMun></gIBSMun><vIBS>0.02</vIBS><gCBS><pCBS>8.7000</pCBS><gRed><pRedAliq>40.0000</pRedAliq><pAliqEfet>5.2200</pAliqEfet></gRed><vCBS>0.99</vCBS></gCBS></gIBSCBS></IBSCBS></imposto><vItem>19.99</vItem></det><total><vProdLiqTot>118.98</vProdLiqTot><ICMSTot><vBC>0.00</vBC><vICMS>0.00</vICMS><vICMSDeson>0.00</vICMSDeson><vFCP>0.00</vFCP><vBCST>0.00</vBCST><vST>0.00</vST><vFCPST>0.00</vFCPST><vFCPSTRet>0.00</vFCPSTRet><vProd>128.79</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>0.00</vDesc><vII>0.00</vII><vIPI>0.00</vIPI><vIPIDevol>0.00</vIPIDevol><vPIS>0.00</vPIS><vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>128.79</vNF></ICMSTot><IBSCBSTot><vBCIBSCBS>118.98</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>0.06</vIBSUF></gIBSUF><gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.06</vIBSMun></gIBSMun><vIBS>0.12</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS><gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>9.69</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS><gMono><vIBSMono>0.00</vIBSMono><vCBSMono>0.00</vCBSMono><vIBSMonoReten>0.00</vIBSMonoReten><vCBSMonoReten>0.00</vCBSMonoReten><vIBSMonoRet>0.00</vIBSMonoRet><vCBSMonoRet>0.00</vCBSMonoRet></gMono></IBSCBSTot><vNFTot>128.79</vNFTot></total><transp><modFrete>9</modFrete></transp><pag><detPag><tPag>17</tPag><vPag>128.79</vPag><card><tpIntegra>2</tpIntegra></card></detPag></pag><gPgtoVinc><gPgto nPag=\"1\" idTransacao=\"7f3c2a91e04b4c1d9a0b11c2d3e4f5a6\"><tpMeioPgto>17</tpMeioPgto><CNPJReceb>11222333000181</CNPJReceb><CNPJBasePSP>08561701</CNPJBasePSP></gPgto></gPgtoVinc><infAdic><infCpl>Thank you</infCpl></infAdic><infRespTec><CNPJ>11222333000181</CNPJ><xContato>Support Desk</xContato><email>support@example.com</email><fone>1133334444</fone></infRespTec></infNFe><infNFeSupl><qrCode>https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode?p=35270111222333000181650010000012011482139075|3|2</qrCode><urlChave>https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica</urlChave></infNFeSupl><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/><SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/><Reference URI=\"#NFe35270111222333000181650010000012011482139075\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/><DigestValue>XMmoyDBaFZyYfrqe/xPtgvcqdrA=</DigestValue></Reference></SignedInfo><SignatureValue>NY7YKIhYHZXGoFgjDQxcdZwMHQrs4F3iyySr4lFxhsQyBZFwIb0xDTqlN4OIlBpozgbBwI95oxYTz5mk9JjJeg7ECLSQMes7KlAKDemDVPhv+QoSjr2RYSAW0iWspDJQI4sDi32HLfAUHgzulCMZkH0thKoPE0N/vWrX1ix/MFBDt6AL7kL99YQET97h9WOEYP+LLnqK/7ntwXlVzZMz1kAO2cHGAUDZDtekKAi7kgRR9KcTzxtfFSeUwRCANnRgEyI+0chKzv5U/4J4vry75OEJswcNpw6yRwGG6tcJyc/T7dU5dvEugHdJujDrPJpHjBPoBlIN/JnBdaxRU6ID5w==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDKDCCAhCgAwIBAgIIDDSt3vOOGpgwDQYJKoZIhvcNAQELBQAwMzEkMCIGA1UEAwwbVEVTVCBDT01QQU5ZOjExMjIyMzMzMDAwMTgxMQswCQYDVQQGEwJCUjAeFw0yNjExMjEwNDM3MDBaFw0yNjEyMjEwNDM3MDBaMDMxJDAiBgNVBAMMG1RFU1QgQ09NUEFOWToxMTIyMjMzMzAwMDE4MTELMAkGA1UEBhMCQlIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQD1lnvgpy7Cr3GXgaN0WPLkAezlzdp/uU3rR3I6UH3gGs4/raVRVaBQwcr7BG8TZvdsoTB77KtxlguY1jCbqUwClZf003g/BxoqYNkyikrZDYh3QkW8dm41ncVClftUuOdupd4mtWmWPtrDQ66QG78uB6Ow/J3YPaXxJs2Mjx3naSFM75mVj/JejDLhMzu8UYa6Bp3ZOB9NxJY6fJf47cZDH1AD0irpapC55CUDj/ljcBQCdQWg4m84iRXI2RNM+Xv3nu8fVldCfBWyGhB25k0mflKP15wV1O4rFbriXMCkEUnJwEn7ZV/rMpEH3LmwcwVnFtSXmAzlqaR14SEcrss9AgMBAAGjQDA+MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMCQGA1UdEQQdMBugGQYFYEwBAwOgEBMOMTEyMjIzMzMwMDAxODEwDQYJKoZIhvcNAQELBQADggEBAHs4BeMDb13CKUf7v7wU1DjNOU0aJ943AmjIlHogeqRuq/NsvGcjHlznpUklYksWGtsCcKjoWtST7yfJhQyUx3olnEWO04ypLReXIb0CLiKocZOhMfUdsHRxhsQYNl7IXHH3jvloavINLqKyvBO35XM7WSozEM374YnbRMJEnj2c3F2BO4VIQtnMUQx8pTi5sNUFlWcGf6bgcUrqE6p7ItZY6DbK2nWh6LIJK6YWo2m/nqPu20bAw0OR2pfRGFjQIZu6+e89D4CXrtwEATtMLSH2ZVxTUhFudSiF3jeY9PfbMIsfQyQ2IKmy0Lp+LTmetvPsBh3ojffspjhTRArRjQI=</X509Certificate></X509Data></KeyInfo></Signature></NFe><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFE_PL009_V4</verAplic><chNFe>35270111222333000181650010000012011482139075</chNFe><dhRecbto>2026-11-20T12:30:05-03:00</dhRecbto><nProt>135260000123456</nProt><digVal>XMmoyDBaFZyYfrqe/xPtgvcqdrA=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>"
     }
 }

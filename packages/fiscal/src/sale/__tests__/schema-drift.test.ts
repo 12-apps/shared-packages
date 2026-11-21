@@ -75,6 +75,7 @@ function describedKeys(node: JsonSchemaNode): { required: string[]; properties: 
 const OPTIONAL: Readonly<Record<string, readonly string[]>> = {
   SaleForDocument: optional<SaleForDocument>({ operation: true, referencedDocuments: true }),
   SalePayment: optional<SalePayment>({ linkedTransaction: true }),
+  SaleLine: optional<SaleLine>({ netValueCents: true }),
 };
 
 const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
@@ -164,6 +165,7 @@ const cases: ReadonlyArray<readonly [string, JsonSchemaNode, string[]]> = [
       quantity: true,
       valueCents: true,
       discountCents: true,
+      netValueCents: true,
       approximateTaxCents: true,
       additionalInfo: true,
       icms: true,
