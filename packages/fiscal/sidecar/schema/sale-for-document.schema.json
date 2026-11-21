@@ -362,6 +362,10 @@
           "minimum": 1
         },
         "discountCents": { "$ref": "#/definitions/cents" },
+        "netValueCents": {
+          "description": "vProdLiq (NT 2026.008 v1.00): the line's value without the IBS/CBS, where they sit inside vProd (from 2027); at most valueCents. vUnComLiq and vProdLiqTot are derived from it. Absent or null: none of the three is written. Every line carries it or none does.",
+          "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/cents" }]
+        },
         "approximateTaxCents": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/cents" }] },
         "additionalInfo": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 500 }] },
         "icms": { "$ref": "#/definitions/icms" },
