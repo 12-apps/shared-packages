@@ -21,7 +21,7 @@ interface Seen {
 
 type Actions = (item: AttentionItem, close: () => void, seen: Seen) => ReactNode;
 
-function mount(actions?: Actions): Seen {
+function mount(actions?: Actions, items: readonly AttentionItem[] = [sample('7', 25), bell('12', 7), bell('3', 1)]): Seen {
   const seen: Seen = { closed: 0, acted: [], opened: [] };
   const views = {
     bell: attentionView({
@@ -36,7 +36,7 @@ function mount(actions?: Actions): Seen {
     <AttentionHost
       registry={registry}
       views={views}
-      items={[sample('7', 25), bell('12', 7), bell('3', 1)]}
+      items={items}
       now={NOW}
       messages={MESSAGES}
       preferences={createAttentionPreferences({
@@ -44,7 +44,9 @@ function mount(actions?: Actions): Seen {
       })}
     />,
   );
-  fireEvent.click(screen.getByTestId('attention-others'));
+  if (screen.queryAllByTestId('attention-others').length > 0 && items.length > 1) {
+    fireEvent.click(screen.getByTestId('attention-others'));
+  }
   return seen;
 }
 
@@ -110,5 +112,72 @@ describe('attention renderActions', () => {
     await screen.findByTestId('attention-others-12');
     expect(screen.getByTestId('attention-actions-12')).toBeTruthy();
     expect(screen.queryAllByTestId('attention-actions-3')).toHaveLength(0);
+  });
+
+  describe('the head item', () => {
+    const accept = (item: AttentionItem): ReactNode => <button type="button">{`Accept ${item.id}`}</button>;
+
+    it('shows a lone pending item its actions, one tap from the dock button', async () => {
+      const seen = mount(accept, [bell('12', 7)]);
+      expect(screen.queryAllByTestId('attention-actions-12')).toHaveLength(0);
+      fireEvent.click(screen.getByTestId('attention-button'));
+      expect(await screen.findByRole('button', { name: 'Accept 12' })).toBeTruthy();
+      expect(seen.opened).toEqual([]);
+      expect(screen.queryAllByTestId('attention-others')).toHaveLength(0);
+    });
+
+    it('lists the head first, with the others after it, from the +N too', async () => {
+      mount(accept, [bell('12', 7), bell('3', 1)]);
+      fireEvent.click(screen.getByTestId('attention-others'));
+      await screen.findByTestId('attention-others-12');
+      const rows = screen.getAllByTestId(/^attention-others-\d+$/).map((el) => el.getAttribute('data-testid'));
+      expect(rows).toEqual(['attention-others-12', 'attention-others-3']);
+      expect(screen.getByTestId('attention-actions-12')).toBeTruthy();
+      expect(screen.getByTestId('attention-actions-3')).toBeTruthy();
+    });
+
+    it('keeps an item its actions when it becomes the head', async () => {
+      const first = [bell('12', 7), bell('3', 1)];
+      const view = render(
+        <AttentionHost
+          registry={registry}
+          views={{ bell: attentionView({ ...baseViews.bell, renderActions: ({ item }) => accept(item) }), sample: baseViews.sample }}
+          items={first}
+          now={NOW}
+          messages={MESSAGES}
+          preferences={createAttentionPreferences({ storageKey: 'attention-actions:become-head' })}
+        />,
+      );
+      fireEvent.click(screen.getByTestId('attention-others'));
+      await screen.findByTestId('attention-actions-3');
+      view.rerender(
+        <AttentionHost
+          registry={registry}
+          views={{ bell: attentionView({ ...baseViews.bell, renderActions: ({ item }) => accept(item) }), sample: baseViews.sample }}
+          items={[first[1] as AttentionItem]}
+          now={NOW}
+          messages={MESSAGES}
+          preferences={createAttentionPreferences({ storageKey: 'attention-actions:become-head' })}
+        />,
+      );
+      fireEvent.click(await screen.findByTestId('attention-button'));
+      expect(await screen.findByRole('button', { name: 'Accept 3' })).toBeTruthy();
+    });
+
+    it('opens the head from its own list row, and never from an action', async () => {
+      const seen = mount(accept, [bell('12', 7)]);
+      fireEvent.click(screen.getByTestId('attention-button'));
+      fireEvent.click(await screen.findByRole('button', { name: 'Accept 12' }));
+      expect(seen.opened).toEqual([]);
+      fireEvent.click(screen.getByTestId('attention-others-12'));
+      expect(seen.opened).toEqual(['12']);
+    });
+
+    it('opens the head item directly, as before, when its kind draws no actions', () => {
+      const seen = mount(undefined, [bell('12', 7)]);
+      fireEvent.click(screen.getByTestId('attention-button'));
+      expect(seen.opened).toEqual(['12']);
+      expect(screen.queryAllByTestId('attention-others-list')).toHaveLength(0);
+    });
   });
 });

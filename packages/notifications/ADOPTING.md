@@ -740,8 +740,17 @@ attentionView<SeatRequest>({
   in tab order; an action never opens the row. `close` shuts the list.
 - The layout rules are the same container queries (left start, each across the
   row under 15rem, a 40 px floor under 600 px of row width).
-- Only the list's rows carry actions. The head item is the dock button itself,
-  which stays one target.
+- **The head item.** The dock button is one target and cannot hold controls, so
+  while the head's kind returns actions the list also holds the head as its
+  first row, and tapping the dock button opens that list instead of the item
+  (the head's own row, in the list, opens it). That is the one-tap path for a
+  lone pending item, and an item keeps its actions when it becomes the head,
+  because the answer is read for the head on every render. A head whose kind
+  returns nothing behaves exactly as before: the button opens the item and the
+  list holds only the others. `renderActions` is therefore called once more per
+  render for the head to ask this, so keep it pure.
+- Optional `messages.pendingTitle` words the list's heading while it holds the
+  head ("Waiting" rather than "Also waiting"); omitted, `othersTitle` is used.
 
 ## What does NOT come with it
 

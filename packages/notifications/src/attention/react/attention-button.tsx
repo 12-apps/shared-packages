@@ -123,7 +123,8 @@ export interface AttentionButtonProps {
   readonly waited: string;
   /** The whole thing read aloud. */
   readonly label: string;
-  readonly onOpen: () => void;
+  /** Given the button itself, so a host can hang something off it. */
+  readonly onOpen: (button: HTMLElement) => void;
   readonly dataTestId?: string;
 }
 
@@ -235,7 +236,7 @@ export function AttentionButton({
       type="button"
       aria-haspopup="dialog"
       aria-label={label}
-      onClick={onOpen}
+      onClick={(event: MouseEvent<HTMLElement>) => onOpen(event.currentTarget)}
       data-testid={dataTestId}
       data-severity={entry.severity}
       data-pulse={pulse}

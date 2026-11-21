@@ -15,8 +15,8 @@ import type { AttentionEntry } from '../core';
 import { severityFill } from './attention-button';
 import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionMessages } from './messages';
-import { hasActions, RowActionsSlot } from '../../row-actions-slot';
-import { minutesOf, type AttentionKindView, type AttentionViews } from './views';
+import { RowActionsSlot } from '../../row-actions-slot';
+import { actionsOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
 
 /**
  * The minutes' ink on a row's soft tint. The light theme's dark tones read on
@@ -81,8 +81,8 @@ function OtherRow({
   const { title, what, spoken } = view.describe(entry.item);
   const waited = messages.waited(minutesOf(entry.waitedMs), entry.waitedMs);
   const calm = entry.severity === 'calm';
-  const actions = view.renderActions?.({ item: entry.item, close: onClose });
-  const withActions = hasActions(actions);
+  const actions = actionsOf(view, entry.item, onClose);
+  const withActions = actions !== null;
   return (
     <Box component="li" {...(withActions ? { sx: { display: 'flex', flexDirection: 'column', gap: 0.5 } } : {})}>
       <Box
@@ -191,11 +191,11 @@ export function AttentionOthersList({
         }}
       >
         <Box component="strong" sx={{ fontSize: 14, p: '4px 6px 6px' }}>
-          {messages.othersTitle}
+          {messages.pendingTitle ?? messages.othersTitle}
         </Box>
         <Box
           component="ul"
-          aria-label={messages.othersTitle}
+          aria-label={messages.pendingTitle ?? messages.othersTitle}
           sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}
         >
           {entries.map((entry) => {

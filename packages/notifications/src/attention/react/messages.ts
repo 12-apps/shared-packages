@@ -28,6 +28,11 @@ export interface AttentionMessages {
   readonly severity: Readonly<Record<AttentionSeverity, string>>;
   /** The list it opens. */
   readonly othersTitle: string;
+  /**
+   * The list's heading while it also holds the head item (a kind with row
+   * actions): "Waiting" rather than "Also waiting". Omitted, `othersTitle`.
+   */
+  readonly pendingTitle?: string;
   readonly preferences: AttentionPreferencesMessages;
 }
 
