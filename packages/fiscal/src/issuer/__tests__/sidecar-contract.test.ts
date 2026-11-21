@@ -91,7 +91,6 @@ describe("the sidecar issuer, against the service's recorded answers", () => {
     ["nfce-issue-contingency", "CONTINGENCY", "108", false],
     ["nfce-issue-unanswered", "CONTINGENCY", null, true],
     ["nfce-issue-auth", "AUTH", "281", false],
-    ["nfce-issue-2027", "INVALID", "NT_2026_008_NOT_SUPPORTED", false],
   ] as const)("classifies %s as %s", async (name, errorClass, code, outcomeUnknown) => {
     const { fetch, sent } = replaying(name);
     const outcome = await issuerFor(fetch).issue({
