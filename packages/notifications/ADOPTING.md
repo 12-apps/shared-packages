@@ -682,6 +682,41 @@ passes `tag` to `showNotification` and the tray keeps ONE entry per subject
 instead of one per stage. The worker is still yours (rule 12) — a worker that
 ignores `tag` behaves exactly as it does today.
 
+## Actions on a row (optional)
+
+A row is one stretched link: tapping it opens the notification's target. When a
+notification asks for a decision, pass `renderActions` and the host's own
+controls are drawn on the row:
+
+```tsx
+createWebNotifications({
+  // ...
+  renderActions: (notification) =>
+    notification.type === 'request.pending' ? (
+      <>
+        <Button onClick={() => accept(notification)}>{copy.accept}</Button>
+        <Button onClick={() => decline(notification)}>{copy.decline}</Button>
+      </>
+    ) : null,
+});
+```
+
+- `null` or `undefined` (or a boolean) for a notification draws the row exactly
+  as it was; with no `renderActions` at all, nothing changes in the DOM.
+- The controls sit BESIDE the link, never inside it: they are real controls, in
+  the tab order after the link and the delete control, unlike `renderCard`'s
+  body, which must be presentational. A click on one never opens the link.
+- An action does not mark the row read (opening it does). Call `store.markRead`
+  from your handler if it should.
+- Layout is ours: the controls start from the left, side by side when they fit
+  and each across the row when the row is narrower than 15rem (a container
+  query, never the viewport), and a control is held to a 40 px floor below 600 px
+  of row width. Pass the controls as direct children of one fragment (or an
+  array) so each is one flex item.
+- Called during the row's render, once per row per render: return an element,
+  keep hooks in the component it names, and do not throw. The words on the
+  controls are yours.
+
 ## What does NOT come with it
 
 - **The events.** Generators are host code (see rule 6).
