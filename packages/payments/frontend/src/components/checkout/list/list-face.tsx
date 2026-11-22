@@ -355,7 +355,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
     <Box ref={root} data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
         <TopAndRows rowsShown={rowsShown} drawn={state.settled}>
-          <ChoiceList copy={list.copy} prices={list.prices} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
+          <ChoiceList copy={list.copy} prices={list.prices} state={state} door={list.door ?? []} ungrouped={list.ungrouped} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
         </TopAndRows>
       ) : null}
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />

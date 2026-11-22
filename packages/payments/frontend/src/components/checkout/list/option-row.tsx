@@ -40,8 +40,29 @@ const FIELDS_ON_SURFACE = {
 /** The small radio (20px) centred on the title's 24px line. */
 const RADIO_ON_TITLE = 0.25;
 
+/** The host's short pill under a row's hint ("Chama o garçom"): a warning tone, on the row's own surface. */
+function RowTag({ children }: { children: string }): JSX.Element {
+  return (
+    <Box
+      component="span"
+      sx={{
+        typography: "body2",
+        alignSelf: "flex-start",
+        mt: 0.75,
+        px: 1.25,
+        py: 0.25,
+        borderRadius: 999,
+        bgcolor: (t: Theme) => alpha(t.palette.warning.main, 0.16),
+        color: (t: Theme) => (t.palette.mode === "dark" ? t.palette.warning.light : t.palette.warning.dark),
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
 /** The row's label and its muted hint, beside the radio. */
-function RowWords({ label, hint }: { label: string; hint?: string }): JSX.Element {
+function RowWords({ label, hint, tag }: { label: string; hint?: string; tag?: string }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
@@ -53,6 +74,7 @@ function RowWords({ label, hint }: { label: string; hint?: string }): JSX.Elemen
           {hint}
         </Text>
       ) : null}
+      {tag ? <RowTag>{tag}</RowTag> : null}
     </Box>
   );
 }
@@ -85,7 +107,7 @@ const FIGURE = { flex: "none", flexShrink: 0, ml: "auto", whiteSpace: "nowrap", 
  * the label and the hint never stack one word a line (ADR 0074 U1), and
  * nothing is drawn over them, whatever the host's width.
  */
-function PricedWords({ label, hint, amount, testId }: { label: string; hint?: string; amount: RowAmountText; testId: string }): JSX.Element {
+function PricedWords({ label, hint, tag, amount, testId }: { label: string; hint?: string; tag?: string; amount: RowAmountText; testId: string }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
@@ -119,6 +141,7 @@ function PricedWords({ label, hint, amount, testId }: { label: string; hint?: st
           ) : null}
         </Box>
       ) : null}
+      {tag ? <RowTag>{tag}</RowTag> : null}
     </Box>
   );
 }
@@ -181,6 +204,7 @@ export function OptionRow({
   disabled = false,
   label,
   hint,
+  tag,
   onChoose,
   onChooseAgain,
   testId,
@@ -195,6 +219,8 @@ export function OptionRow({
   disabled?: boolean;
   label: string;
   hint?: string;
+  /** A pill under the hint (`CheckoutDoorOption.tag`). */
+  tag?: string;
   onChoose: () => void;
   /**
    * The row was tapped while already chosen — a click a radio answers with no
@@ -241,7 +267,7 @@ export function OptionRow({
           inputProps={{ "data-testid": `${testId}-radio` } as Record<string, string>}
         />
         {/* A row the host did not price keeps today's words exactly. */}
-        {amount ? <PricedWords label={label} hint={hint} amount={amount} testId={`${testId}-amount`} /> : <RowWords label={label} hint={hint} />}
+        {amount ? <PricedWords label={label} hint={hint} tag={tag} amount={amount} testId={`${testId}-amount`} /> : <RowWords label={label} hint={hint} tag={tag} />}
       </Box>
       {/* Only a row with something to open draws the box for it — no empty band. */}
       {(chosen || open) && children ? <RowContent testId={testId}>{children}</RowContent> : null}
