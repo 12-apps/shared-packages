@@ -1,5 +1,5 @@
 import { Box, Radio, type SxProps } from "@mui/material";
-import { alpha, type Theme } from "@mui/material/styles";
+import { alpha, lighten, type Theme } from "@mui/material/styles";
 import { useEffect, useRef, type JSX, type ReactNode, type RefObject } from "react";
 
 import { useCheckoutComponents } from "../ui";
@@ -54,7 +54,7 @@ function RowTag({ children }: { children: string }): JSX.Element {
         px: 1.25,
         py: 0.25,
         borderRadius: 999,
-        bgcolor: (t: Theme) => alpha(t.palette.warning.light, t.palette.mode === "dark" ? 0.24 : 0.2),
+        bgcolor: (t: Theme) => (t.palette.mode === "dark" ? alpha(t.palette.warning.light, 0.24) : lighten(t.palette.warning.light, 0.85)),
         color: (t: Theme) => (t.palette.mode === "dark" ? t.palette.warning.light : t.palette.warning.dark),
       }}
     >
