@@ -40,6 +40,16 @@ const FIELDS_ON_SURFACE = {
 /** The small radio (20px) centred on the title's 24px line. */
 const RADIO_ON_TITLE = 0.25;
 
+/**
+ * The pill's fill: the theme's soft warning signal when it carries one
+ * (`uiSoftSignal.warning`), else a light tint of the warning tone; at night a
+ * translucent warning.light.
+ */
+export function tagFill(t: Theme): string {
+  if (t.palette.mode === "dark") return alpha(t.palette.warning.light, 0.24);
+  return (t as { uiSoftSignal?: { warning?: string } }).uiSoftSignal?.warning ?? lighten(t.palette.warning.light, 0.85);
+}
+
 /** The host's short pill under a row's hint ("Chama o garçom"): a warning tone, on the row's own surface. */
 function RowTag({ children }: { children: string }): JSX.Element {
   return (
@@ -49,12 +59,13 @@ function RowTag({ children }: { children: string }): JSX.Element {
         typography: "caption",
         lineHeight: 1.25,
         fontStyle: "italic",
+        letterSpacing: 0,
         alignSelf: "flex-start",
         mt: 0.75,
         px: 1.25,
         py: 0.25,
         borderRadius: 999,
-        bgcolor: (t: Theme) => (t.palette.mode === "dark" ? alpha(t.palette.warning.light, 0.24) : lighten(t.palette.warning.light, 0.85)),
+        bgcolor: tagFill,
         color: (t: Theme) => (t.palette.mode === "dark" ? t.palette.warning.light : t.palette.warning.dark),
       }}
     >
