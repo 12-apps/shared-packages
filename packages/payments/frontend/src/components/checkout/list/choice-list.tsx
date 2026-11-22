@@ -136,6 +136,7 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
       chosen={chosen}
       label={option.label}
       hint={chosen && option.hideHintWhileChosen ? undefined : option.hint}
+      tag={option.tag}
       onChoose={choose}
       testId={`list-door-${option.id}`}
       open={option.showContentWhileIdle === true}
@@ -174,9 +175,12 @@ export function ChoiceList({
   door,
   locked,
   top,
+  ungrouped = false,
   ...rest
 }: Omit<RowProps, "name" | "onChosenOnline"> & {
   door: readonly CheckoutDoorOption[];
+  /** One list under no heading (`CheckoutPaymentList.ungrouped`). */
+  ungrouped?: boolean;
   /** A charge or a send is under way: the list is inert. */
   locked: boolean;
   /** The CPF and the wallets, above the rows (FUT-3685) — inert with them. */
@@ -219,17 +223,26 @@ export function ChoiceList({
         {copy.title}
       </Box>
       {top}
-      {/* Each heading only over a group that has rows (a door-only store shows the door one alone). */}
-      {state.rows.length > 0 ? (
-        <Group id={`${base}-online`} heading={copy.onlineHeading}>
+      {ungrouped ? (
+        <Box role="radiogroup" aria-labelledby={`${base}-title`} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
           {state.rows.map((row) => <OnlineOptionRow key={rowKey(row)} row={row} props={props} />)}
-        </Group>
-      ) : null}
-      {door.length > 0 ? (
-        <Group id={`${base}-door`} heading={copy.doorHeading}>
           {door.map((option) => <DoorOptionRow key={option.id} option={option} props={props} />)}
-        </Group>
-      ) : null}
+        </Box>
+      ) : (
+        <>
+          {/* Each heading only over a group that has rows (a door-only store shows the door one alone). */}
+          {state.rows.length > 0 ? (
+            <Group id={`${base}-online`} heading={copy.onlineHeading}>
+              {state.rows.map((row) => <OnlineOptionRow key={rowKey(row)} row={row} props={props} />)}
+            </Group>
+          ) : null}
+          {door.length > 0 ? (
+            <Group id={`${base}-door`} heading={copy.doorHeading}>
+              {door.map((option) => <DoorOptionRow key={option.id} option={option} props={props} />)}
+            </Group>
+          ) : null}
+        </>
+      )}
     </Box>
   );
 }
