@@ -224,7 +224,7 @@ export function ChoiceList({
       </Box>
       {top}
       {ungrouped ? (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+        <Box role="radiogroup" aria-labelledby={`${base}-title`} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
           {state.rows.map((row) => <OnlineOptionRow key={rowKey(row)} row={row} props={props} />)}
           {door.map((option) => <DoorOptionRow key={option.id} option={option} props={props} />)}
         </Box>

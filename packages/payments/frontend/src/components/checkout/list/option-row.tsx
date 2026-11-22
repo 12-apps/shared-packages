@@ -46,13 +46,15 @@ function RowTag({ children }: { children: string }): JSX.Element {
     <Box
       component="span"
       sx={{
-        typography: "body2",
+        typography: "caption",
+        lineHeight: 1.25,
+        fontStyle: "italic",
         alignSelf: "flex-start",
         mt: 0.75,
         px: 1.25,
         py: 0.25,
         borderRadius: 999,
-        bgcolor: (t: Theme) => alpha(t.palette.warning.main, 0.16),
+        bgcolor: (t: Theme) => alpha(t.palette.warning.light, t.palette.mode === "dark" ? 0.24 : 0.2),
         color: (t: Theme) => (t.palette.mode === "dark" ? t.palette.warning.light : t.palette.warning.dark),
       }}
     >

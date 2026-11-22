@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 import type { CheckoutDoorOption } from "../list/types";
 import { onPageStore, renderList, stubClient } from "./list-harness";
@@ -35,6 +35,9 @@ describe("an ungrouped list", () => {
     await waitFor(() => expect(screen.getByTestId("list-door-cash")).toBeTruthy());
     expect(rows()).toEqual(["PIX", "CARD", "door:cash", "door:reader"]);
     expect(screen.queryAllByRole("group")).toHaveLength(0);
+    // One radio group, named by the list's title, so a screen reader still announces it.
+    expect(screen.getAllByRole("radiogroup")).toHaveLength(1);
+    expect(screen.getByRole("radiogroup", { name: "Como você quer pagar?" })).toBeTruthy();
     expect(screen.queryAllByText("Pagar agora, pelo app")).toHaveLength(0);
     expect(screen.queryAllByText("Pagar na entrega")).toHaveLength(0);
   });
@@ -50,6 +53,32 @@ describe("an ungrouped list", () => {
   it("draws a door option's tag, chosen or not", async () => {
     renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), list: { door, ungrouped: true } });
     await waitFor(() => expect(screen.getAllByText("Chama o garçom")).toHaveLength(2));
+  });
+});
+
+describe("a door option's tag", () => {
+  const tagged = (): CheckoutDoorOption[] => [doorRow("cash", "Dinheiro", "Chama o garçom"), doorRow("plain", "Outro")];
+
+  it("is still drawn once its row is chosen", async () => {
+    renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), list: { door: tagged(), ungrouped: true } });
+    await waitFor(() => expect(screen.getByTestId("list-door-cash")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    await waitFor(() => expect(screen.getByTestId("list-door-cash").getAttribute("data-chosen")).toBe("true"));
+    expect(within(screen.getByTestId("list-door-cash")).getAllByText("Chama o garçom")).toHaveLength(1);
+  });
+
+  it("is drawn only on the row that carries one", async () => {
+    renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), list: { door: tagged(), ungrouped: true } });
+    await waitFor(() => expect(screen.getByTestId("list-door-plain")).toBeTruthy());
+    expect(within(screen.getByTestId("list-door-plain")).queryAllByText("Chama o garçom")).toHaveLength(0);
+    expect(screen.getAllByText("Chama o garçom")).toHaveLength(1);
+  });
+
+  it("is drawn on a priced row too", async () => {
+    const priced: CheckoutDoorOption = { ...doorRow("cash", "Dinheiro", "Chama o garçom"), price: { amountLabel: "R$ 10,00" } };
+    renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), list: { door: [priced], ungrouped: true } });
+    await waitFor(() => expect(screen.getByTestId("list-door-cash")).toBeTruthy());
+    expect(within(screen.getByTestId("list-door-cash")).getAllByText("Chama o garçom")).toHaveLength(1);
   });
 });
 
