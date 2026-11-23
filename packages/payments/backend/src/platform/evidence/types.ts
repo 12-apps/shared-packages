@@ -124,7 +124,7 @@ export interface EvidenceStep {
 }
 
 /** Why a scenario failed, when PagBank said so in a form a program can read. */
-export type EvidenceFailureReason = 'EMAIL_EQUALS_MERCHANT' | 'ISSUER_DECLINED';
+export type EvidenceFailureReason = 'EMAIL_EQUALS_MERCHANT' | 'ISSUER_DECLINED' | 'ANTIFRAUD_DECLINED';
 
 /** CONNECT holds the seller's authorization; RUN holds one evidence run. */
 export type EvidenceRecordKind = 'CONNECT' | 'RUN';

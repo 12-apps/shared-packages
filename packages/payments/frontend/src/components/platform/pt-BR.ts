@@ -256,6 +256,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
           debit: 'o banco recusou o cartão de débito',
           wallet: 'o banco recusou o cartão',
         },
+        antifraudDeclined: 'o antifraude do PagBank recusou o pagamento (não foi o banco do cartão)',
       },
       pix: {
         AWAITING_PAYMENT: 'aguardando pagamento',

@@ -265,7 +265,7 @@ export async function raiseCardOrder(deps: EvidenceRunDeps, order: CardOrder): P
       notes,
       ids: idsOf(raised.value, reference, orderId),
       observed: deps.copy.chargeStatus(status),
-      reason: executed ? undefined : reasonOfStatus(status, expected),
+      reason: executed ? undefined : reasonOfStatus(status, expected, raised.calls),
     }),
     charge: raised.value,
     orderId,

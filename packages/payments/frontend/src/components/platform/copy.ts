@@ -259,6 +259,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
     reasons: {
       emailEqualsMerchant: string;
       issuerDeclined: { credit: string; debit: string; wallet: string };
+      /** PagBank's own antifraud refused the charge (FUT-5512): not the card's bank. */
+      antifraudDeclined: string;
     };
     pix: {
       AWAITING_PAYMENT: string;
