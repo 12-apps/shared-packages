@@ -223,8 +223,9 @@ export function useProductionRun(
   // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
   const [answered, setAnswered] = useState<{ scenarios: readonly ProductionScenarioOutcome[] | null } | null>(null);
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  // A reload shows the server's outcomes only while its Pix is open, as it does the Pix itself.
-  const scenarios = answered ? answered.scenarios : (isPixOpen(props.seller?.pix) ? (props.seller?.scenarios ?? null) : null);
+  // A reload shows the latest run's outcomes whenever the server has them, settled or not (FUT-5519):
+  // hiding them once the Pix closed lost what the run had shown.
+  const scenarios = answered ? answered.scenarios : (props.seller?.scenarios ?? null);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
   const run = async (): Promise<void> => {
