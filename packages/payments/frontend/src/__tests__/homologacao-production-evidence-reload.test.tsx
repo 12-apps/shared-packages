@@ -120,7 +120,13 @@ describe('a reloaded production evidence card (FUT-5519)', () => {
     await waitFor(() => expect(screen.queryAllByTestId('production-scenario-credit')).toHaveLength(0));
   });
 
-  it('shows no list for a run saved before it charged anything', async () => {
+  it('shows the run\'s date with its outcomes', async () => {
+    mount({ ...SELLER, pix: REFUNDED, scenarios: SCENARIOS, lastRunAt: '2026-11-23T21:36:34.000Z' });
+
+    expect((await screen.findByTestId('production-scenarios-ran-at')).textContent).toBe('Executada em 23/11/2026, 18:36');
+  });
+
+  it('shows a run saved before it charged anything, every row pending', async () => {
     const pending = (['credit', 'debit', 'pix', 'googlePay', 'applePay'] as const).map((scenario) => ({
       scenario,
       status: 'PENDING' as const,
@@ -128,7 +134,16 @@ describe('a reloaded production evidence card (FUT-5519)', () => {
     }));
     mount({ ...SELLER, pix: null, scenarios: pending });
 
-    await screen.findByTestId('production-charge');
-    expect(screen.queryAllByTestId('production-scenario-credit')).toHaveLength(0);
+    await waitFor(() => expect(screen.getByTestId('production-scenario-credit')).toBeTruthy());
+    expect(text('credit')).toContain('pendente');
+  });
+
+  it('asks the host to read the seller again once a run ends, failed or not', async () => {
+    const onRunEnded = vi.fn();
+    mount({ ...SELLER, pix: REFUNDED, scenarios: SCENARIOS }, { onRun: vi.fn(async () => Promise.reject(new Error('lost'))), onRunEnded });
+
+    charge();
+
+    await waitFor(() => expect(onRunEnded).toHaveBeenCalledTimes(1));
   });
 });

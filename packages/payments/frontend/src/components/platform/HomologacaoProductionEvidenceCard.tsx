@@ -43,8 +43,10 @@ import { useProductionForm, useProductionRun } from './use-production-run';
 export interface HomologacaoProductionSellerView extends HomologacaoSellerView {
   /** The latest run's Pix, so a reloaded screen shows an open QR again. */
   pix?: ProductionPixView | null;
-  /** The latest run's outcomes (FUT-4322), shown again after a reload until this tab charges (FUT-5519). */
+  /** The latest run's outcomes (FUT-4322), always shown, a reload included (FUT-5519). */
   scenarios?: readonly ProductionScenarioOutcome[] | null;
+  /** When the latest run started (ISO-8601), shown with its outcomes (FUT-5519). */
+  lastRunAt?: string | null;
 }
 
 /** What the run answers: the Pix it raised and, from a host that reads them, each scenario's outcome. */
@@ -62,6 +64,11 @@ export interface HomologacaoProductionEvidenceCardProps {
     threeDSSession?: ThreeDSecureSession | null;
     debitTest?: DebitTestData;
   }>;
+  /**
+   * Called once a run ends, answered or not, so the host reads the seller view
+   * again and the list shows the run that just happened (FUT-5519).
+   */
+  onRunEnded?: () => void;
   /** Phase 2: raise the orders; answers the run's Pix and its scenarios' outcomes. */
   onRun: (
     runId: string,
@@ -245,6 +252,7 @@ function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: Homol
       {flow.phase === 'idle' || flow.phase === 'downloading' ? (
         <ProductionScenarioList
           scenarios={flow.scenarios}
+          ranAt={flow.ranAt}
           pix={flow.pix}
           checking={flow.check === null}
           copy={copy.scenarios}

@@ -246,6 +246,8 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     cardBlocksChargeRefund: 'Estorne o cartão antes de cobrar de novo.',
     scenarios: {
       label: 'Cenários desta cobrança',
+      ranAt: (when) =>
+        `Executada em ${new Date(when).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}`,
       names: { credit: 'Crédito', debit: 'Débito (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
       status: { executed: 'executado', failed: 'falhou', pending: 'pendente' },
       marks: { retrying: 'aguardando', checking: 'verificando' },

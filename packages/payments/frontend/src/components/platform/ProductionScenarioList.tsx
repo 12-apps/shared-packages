@@ -169,6 +169,7 @@ function useNow(running: boolean): number {
 
 export function ProductionScenarioList({
   scenarios,
+  ranAt = null,
   pix,
   checking,
   copy,
@@ -177,6 +178,8 @@ export function ProductionScenarioList({
 }: {
   /** The run's outcomes; null while only the Pix is known (a reload before the run answered). */
   scenarios: readonly ProductionScenarioOutcome[] | null;
+  /** When the run shown started (ISO-8601), shown under the label; null when unknown. */
+  ranAt?: string | null;
   pix: ProductionPixView | null;
   /** False once the card stopped checking the Pix on its own. */
   checking: boolean;
@@ -196,6 +199,11 @@ export function ProductionScenarioList({
       <Typography variant="body2" fontWeight={600}>
         {copy.label}
       </Typography>
+      {ranAt ? (
+        <Typography variant="caption" color="text.secondary" sx={{ mt: '0 !important' }} data-testid="production-scenarios-ran-at">
+          {copy.ranAt(ranAt)}
+        </Typography>
+      ) : null}
       <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 1 }}>
         {rows.map((row) => (
           // The mark stays on the first line when a long reason wraps.

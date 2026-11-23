@@ -136,6 +136,11 @@ export interface HomologacaoSellerConnection {
    * before any production run.
    */
   scenarios: EvidenceScenarioOutcome[] | null;
+  /**
+   * PRODUCTION (FUT-5519): when the latest run started (ISO-8601), so a screen
+   * shows its outcomes with their date. Null in sandbox and before any run.
+   */
+  lastRunAt: string | null;
 }
 
 export interface HomologacaoEvidenceService {
@@ -209,6 +214,7 @@ function sellerView(
     wallets,
     pix: run ? pixViewOf(run, skippedNote) : null,
     scenarios: run ? evidenceScenarioOutcomes(run) : null,
+    lastRunAt: run?.createdAt ?? null,
   };
 }
 
