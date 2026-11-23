@@ -43,7 +43,7 @@ import { useProductionForm, useProductionRun } from './use-production-run';
 export interface HomologacaoProductionSellerView extends HomologacaoSellerView {
   /** The latest run's Pix, so a reloaded screen shows an open QR again. */
   pix?: ProductionPixView | null;
-  /** The latest run's outcomes (FUT-4322), shown again with an open Pix after a reload. */
+  /** The latest run's outcomes (FUT-4322), shown again after a reload until this tab charges (FUT-5519). */
   scenarios?: readonly ProductionScenarioOutcome[] | null;
 }
 

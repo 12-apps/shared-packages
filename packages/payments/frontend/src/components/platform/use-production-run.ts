@@ -210,6 +210,18 @@ function useDownload(
   };
 }
 
+/**
+ * The server's outcomes for a reload, or none when the latest run never got
+ * to charge: a run saved at phase 1 answers every scenario PENDING, and five
+ * "pendente" rows would describe a charge that never happened.
+ */
+function serverScenarios(
+  scenarios: readonly ProductionScenarioOutcome[] | null | undefined,
+): readonly ProductionScenarioOutcome[] | null {
+  if (!scenarios || scenarios.every((outcome) => outcome.status === 'PENDING')) return null;
+  return scenarios;
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -222,16 +234,20 @@ export function useProductionRun(
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
   const [answered, setAnswered] = useState<{ scenarios: readonly ProductionScenarioOutcome[] | null } | null>(null);
+  // Set once a run starts in this tab: from then on the server's outcomes are an earlier run's.
+  const [started, setStarted] = useState(false);
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
   // A reload shows the latest run's outcomes whenever the server has them, settled or not (FUT-5519):
-  // hiding them once the Pix closed lost what the run had shown.
-  const scenarios = answered ? answered.scenarios : (props.seller?.scenarios ?? null);
+  // hiding them once the Pix closed lost what the run had shown. Only until this tab charges again,
+  // so a failed charge never lists the earlier run's rows as its own.
+  const scenarios = answered ? answered.scenarios : started ? null : serverScenarios(props.seller?.scenarios);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
   const run = async (): Promise<void> => {
     const buyer = buyerOf(form.buyer);
     if (!buyer || inFlight.current) return;
     inFlight.current = true;
+    setStarted(true);
     setConfirming(false);
     setFailed(null);
     setSummary(null);
