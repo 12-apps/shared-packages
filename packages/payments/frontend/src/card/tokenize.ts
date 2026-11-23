@@ -66,7 +66,7 @@ declare global {
 }
 
 /** How long one load of the SDK script may take before it counts as failed. */
-export const PAGBANK_SDK_TIMEOUT_MS = 15_000;
+const PAGBANK_SDK_TIMEOUT_MS = 15_000;
 
 /**
  * Inject the PagBank SDK script and resolve when it is usable. Resolves
