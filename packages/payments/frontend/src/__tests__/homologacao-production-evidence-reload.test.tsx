@@ -24,7 +24,7 @@ const SCENARIOS = [
   { scenario: 'pix', status: 'EXECUTED', reason: null },
   { scenario: 'googlePay', status: 'FAILED', reason: 'ANTIFRAUD_DECLINED' },
   { scenario: 'applePay', status: 'EXECUTED', reason: null },
-];
+] as const;
 
 const REFUNDED = { runId: 'run-1', state: 'REFUNDED', qrText: null, expiresAt: null, refund: null } as unknown as ProductionPixView;
 
