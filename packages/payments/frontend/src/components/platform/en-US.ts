@@ -268,6 +268,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
           debit: 'the bank declined the debit card',
           wallet: 'the bank declined the card',
         },
+        antifraudDeclined: "PagBank's antifraud declined the payment (not the card's bank)",
       },
       pix: {
         AWAITING_PAYMENT: 'awaiting payment',

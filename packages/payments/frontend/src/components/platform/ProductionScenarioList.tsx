@@ -26,7 +26,7 @@ type Scenario = 'credit' | 'debit' | 'pix' | 'googlePay' | 'applePay';
 export interface ProductionScenarioOutcome {
   scenario: Scenario;
   status: 'EXECUTED' | 'FAILED' | 'PENDING';
-  reason: 'EMAIL_EQUALS_MERCHANT' | 'ISSUER_DECLINED' | null;
+  reason: 'EMAIL_EQUALS_MERCHANT' | 'ISSUER_DECLINED' | 'ANTIFRAUD_DECLINED' | null;
 }
 
 type Copy = HomologacaoProductionEvidenceCopy['scenarios'];
@@ -56,6 +56,7 @@ function outcomeRow(outcome: ProductionScenarioOutcome, copy: Copy): Row {
 
 function reasonOf(outcome: ProductionScenarioOutcome, copy: Copy): string | null {
   if (outcome.reason === 'EMAIL_EQUALS_MERCHANT') return copy.reasons.emailEqualsMerchant;
+  if (outcome.reason === 'ANTIFRAUD_DECLINED') return copy.reasons.antifraudDeclined;
   if (outcome.reason !== 'ISSUER_DECLINED') return null;
   const declined = copy.reasons.issuerDeclined;
   return outcome.scenario === 'credit' ? declined.credit : outcome.scenario === 'debit' ? declined.debit : declined.wallet;
