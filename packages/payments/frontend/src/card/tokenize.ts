@@ -79,13 +79,18 @@ let sdkLoad: Promise<boolean> | null = null;
 export function ensurePagBankSdk(timeoutMs: number = PAGBANK_SDK_TIMEOUT_MS): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (window.PagSeguro?.encryptCard) return Promise.resolve(true);
-  sdkLoad ??= new Promise<boolean>((resolve) => {
+  if (sdkLoad) return sdkLoad;
+  const load = new Promise<boolean>((resolve) => {
     const script = document.createElement("script");
     const settle = (ok: boolean): void => {
       clearTimeout(timer);
+      // A late answer of this script (it fires after a timeout) settles nothing.
+      script.onload = null;
+      script.onerror = null;
       if (!ok) {
         script.remove();
-        sdkLoad = null;
+        // Only this load's own cache: a newer load may already be in flight.
+        if (sdkLoad === load) sdkLoad = null;
       }
       resolve(ok);
     };
@@ -96,7 +101,8 @@ export function ensurePagBankSdk(timeoutMs: number = PAGBANK_SDK_TIMEOUT_MS): Pr
     script.onerror = () => settle(false);
     document.head.appendChild(script);
   });
-  return sdkLoad;
+  sdkLoad = load;
+  return load;
 }
 
 /** Local card-field validation. Returns an error message, or `null` when valid. */

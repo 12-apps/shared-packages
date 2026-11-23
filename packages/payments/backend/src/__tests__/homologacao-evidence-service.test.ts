@@ -111,6 +111,7 @@ describe('createHomologacaoEvidence', () => {
       pix: null,
       scenarios: null,
       lastRunAt: null,
+      lastRunId: null,
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
@@ -235,11 +236,18 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
     const { svc } = productionService();
     expect((await svc.seller()).lastRunAt).toBeNull();
 
-    await svc.prepare(BUYER);
-    const view = await svc.seller();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-23T21:36:34.000Z'));
+    try {
+      const { runId } = await svc.prepare(BUYER);
+      const view = await svc.seller();
 
-    expect(view.scenarios).not.toBeNull();
-    expect(Number.isNaN(Date.parse(view.lastRunAt ?? ''))).toBe(false);
+      expect(view.scenarios).not.toBeNull();
+      expect(view.lastRunId).toBe(runId);
+      expect(view.lastRunAt).toBe('2026-11-23T21:36:34.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('given no run, then confirming a Pix is refused', async () => {

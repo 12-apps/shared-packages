@@ -210,12 +210,40 @@ function useDownload(
   };
 }
 
-/** A minute's margin for the clock between this browser and the server. */
-const CLOCK_SKEW_MS = 60_000;
+type Answered = { scenarios: readonly ProductionScenarioOutcome[] | null } | null;
 
-/** Whether the server's latest run is the one this tab started (or a later one). */
-const isSameRunOrLater = (serverRunAt: string, startedAt: string): boolean =>
-  Date.parse(serverRunAt) >= Date.parse(startedAt) - CLOCK_SKEW_MS;
+/**
+ * The latest run's outcomes are always on screen, a reload included (FUT-5519),
+ * with the date that run started: the answer of the run this tab made, else the
+ * server's latest run. The host reads the server again once a run ends, so a
+ * run that failed after it was saved shows its own rows once the server names
+ * it; until then the earlier run's rows are not shown as its own. A run that
+ * failed before it was saved leaves the earlier run on screen, still the latest.
+ */
+function useShownOutcomes(
+  seller: HomologacaoProductionEvidenceCardProps['seller'],
+  answered: Answered,
+  ownRunId: string | null,
+): { scenarios: readonly ProductionScenarioOutcome[] | null; ranAt: string | null } {
+  const serverIsCurrent = ownRunId === null || seller?.lastRunId === ownRunId;
+  const ranAt = serverIsCurrent ? (seller?.lastRunAt ?? null) : null;
+  if (answered) return { scenarios: answered.scenarios, ranAt };
+  return { scenarios: serverIsCurrent ? (seller?.scenarios ?? null) : null, ranAt };
+}
+
+/** The run this tab made — its id once saved, and its answer — and the outcomes the card shows. */
+function useLatestRun(seller: HomologacaoProductionEvidenceCardProps['seller']) {
+  // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
+  const [answered, setAnswered] = useState<Answered>(null);
+  // The run this tab saved last: from then on only its own outcomes are shown.
+  const [ownRunId, setOwnRunId] = useState<string | null>(null);
+  const saved = (runId: string): void => {
+    setOwnRunId(runId);
+    // The previous run's answer is not this one's.
+    setAnswered(null);
+  };
+  return { answered, setAnswered, saved, ...useShownOutcomes(seller, answered, ownRunId) };
+}
 
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
@@ -227,27 +255,14 @@ export function useProductionRun(
   const [section, setSection] = useState<EvidenceRunSection | null>(null);
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
-  // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
-  const [answered, setAnswered] = useState<{ scenarios: readonly ProductionScenarioOutcome[] | null } | null>(null);
-  // When the run this tab started began, until the host's seller view reads it back.
-  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const { answered, setAnswered, saved, scenarios, ranAt } = useLatestRun(props.seller);
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  // The latest run's outcomes are always on screen, a reload included (FUT-5519): the answer of the
-  // run this tab made, else the server's latest run — which the host reads again once a run ends, so
-  // a failed charge shows its own rows, never the earlier run's.
-  const serverRunAt = props.seller?.lastRunAt ?? null;
-  const serverIsCurrent = startedAt === null || (serverRunAt !== null && isSameRunOrLater(serverRunAt, startedAt));
-  const scenarios = answered ? answered.scenarios : serverIsCurrent ? (props.seller?.scenarios ?? null) : null;
-  const ranAt = serverIsCurrent ? serverRunAt : startedAt;
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
   const run = async (): Promise<void> => {
     const buyer = buyerOf(form.buyer);
     if (!buyer || inFlight.current) return;
     inFlight.current = true;
-    setStartedAt(new Date().toISOString());
-    // The previous run's answer is not this one's.
-    setAnswered(null);
     setConfirming(false);
     setFailed(null);
     setSummary(null);
@@ -264,6 +279,7 @@ export function useProductionRun(
       const walletResults = wallets.collect();
       const prepared = await props.onPrepare(buyer);
       runId = prepared.runId;
+      saved(prepared.runId);
       // The wallets' tokens are spent only once a run exists to spend them on.
       wallets.reset();
       enter('encrypting');

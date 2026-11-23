@@ -47,6 +47,8 @@ export interface HomologacaoProductionSellerView extends HomologacaoSellerView {
   scenarios?: readonly ProductionScenarioOutcome[] | null;
   /** When the latest run started (ISO-8601), shown with its outcomes (FUT-5519). */
   lastRunAt?: string | null;
+  /** The latest run's id, so the card knows whether these outcomes are the run it just made (FUT-5519). */
+  lastRunId?: string | null;
 }
 
 /** What the run answers: the Pix it raised and, from a host that reads them, each scenario's outcome. */

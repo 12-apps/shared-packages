@@ -59,8 +59,11 @@ function mount(seller: HomologacaoProductionSellerView, overrides: Record<string
     pixPollMs: 10,
     ...overrides,
   };
-  render(<HomologacaoProductionEvidenceCard {...(props as unknown as Parameters<typeof HomologacaoProductionEvidenceCard>[0])} />);
-  return props;
+  type CardProps = Parameters<typeof HomologacaoProductionEvidenceCard>[0];
+  const view = render(<HomologacaoProductionEvidenceCard {...(props as unknown as CardProps)} />);
+  const reread = (next: HomologacaoProductionSellerView): void =>
+    view.rerender(<HomologacaoProductionEvidenceCard {...({ ...props, seller: next } as unknown as CardProps)} />);
+  return { ...props, reread };
 }
 
 const type = (testId: string, value: string): void => {
@@ -145,5 +148,35 @@ describe('a reloaded production evidence card (FUT-5519)', () => {
     charge();
 
     await waitFor(() => expect(onRunEnded).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows the failed run\'s own rows and date once the host reads the server again', async () => {
+    const card = mount(
+      { ...SELLER, pix: REFUNDED, scenarios: SCENARIOS, lastRunId: 'run-1', lastRunAt: '2026-11-23T20:00:00.000Z' },
+      { onRun: vi.fn(async () => Promise.reject(new Error('lost'))) },
+    );
+    charge();
+    await waitFor(() => expect(screen.queryAllByTestId('production-scenario-credit')).toHaveLength(0));
+
+    const pending = (['credit', 'debit', 'pix', 'googlePay', 'applePay'] as const).map((scenario) => ({
+      scenario,
+      status: 'PENDING' as const,
+      reason: null,
+    }));
+    card.reread({ ...SELLER, pix: null, scenarios: pending, lastRunId: 'run-2', lastRunAt: '2026-11-23T21:36:34.000Z' });
+
+    await waitFor(() => expect(text('credit')).toContain('pendente'));
+    expect(screen.getByTestId('production-scenarios-ran-at').textContent).toBe('Executada em 23/11/2026, 18:36');
+  });
+
+  it('keeps the latest run on screen when a charge fails before the server saved it', async () => {
+    mount(
+      { ...SELLER, pix: REFUNDED, scenarios: SCENARIOS, lastRunId: 'run-1', lastRunAt: '2026-11-23T20:00:00.000Z' },
+      { onPrepare: vi.fn(async () => Promise.reject(new Error('offline'))) },
+    );
+    charge();
+
+    await waitFor(() => expect(screen.getByTestId('production-charge')).toBeTruthy());
+    await waitFor(() => expect(text('googlePay')).toContain('o antifraude do PagBank recusou o pagamento'));
   });
 });
