@@ -65,24 +65,44 @@ declare global {
   }
 }
 
+/** How long one load of the SDK script may take before it counts as failed. */
+const PAGBANK_SDK_TIMEOUT_MS = 15_000;
+
 /**
- * Inject the PagBank SDK script once and resolve when it is usable. Resolves
+ * Inject the PagBank SDK script and resolve when it is usable. Resolves
  * `false` (never rejects) when the script fails or times out — the caller
- * surfaces a friendly retry message.
+ * surfaces a friendly retry message. Only a success is remembered: a failed
+ * load (a flaky network, a blocker that let go) is tried afresh on the next
+ * call, instead of failing every card until the page is reloaded (FUT-5519).
  */
 let sdkLoad: Promise<boolean> | null = null;
-export function ensurePagBankSdk(): Promise<boolean> {
+export function ensurePagBankSdk(timeoutMs: number = PAGBANK_SDK_TIMEOUT_MS): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (window.PagSeguro?.encryptCard) return Promise.resolve(true);
-  sdkLoad ??= new Promise<boolean>((resolve) => {
+  if (sdkLoad) return sdkLoad;
+  const load = new Promise<boolean>((resolve) => {
     const script = document.createElement("script");
+    const settle = (ok: boolean): void => {
+      clearTimeout(timer);
+      // A late answer of this script (it fires after a timeout) settles nothing.
+      script.onload = null;
+      script.onerror = null;
+      if (!ok) {
+        script.remove();
+        // Only this load's own cache: a newer load may already be in flight.
+        if (sdkLoad === load) sdkLoad = null;
+      }
+      resolve(ok);
+    };
+    const timer = setTimeout(() => settle(false), timeoutMs);
     script.src = PAGBANK_SDK_URL;
     script.async = true;
-    script.onload = () => resolve(Boolean(window.PagSeguro?.encryptCard));
-    script.onerror = () => resolve(false);
+    script.onload = () => settle(Boolean(window.PagSeguro?.encryptCard));
+    script.onerror = () => settle(false);
     document.head.appendChild(script);
   });
-  return sdkLoad;
+  sdkLoad = load;
+  return load;
 }
 
 /** Local card-field validation. Returns an error message, or `null` when valid. */

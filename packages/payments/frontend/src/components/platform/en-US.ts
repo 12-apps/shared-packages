@@ -258,6 +258,8 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     cardBlocksChargeRefund: 'Refund the card before charging again.',
     scenarios: {
       label: 'Scenarios in this charge',
+      ranAt: (when) =>
+        `Run on ${new Date(when).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}`,
       names: { credit: 'Credit', debit: 'Debit (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
       status: { executed: 'executed', failed: 'failed', pending: 'pending' },
       marks: { retrying: 'waiting', checking: 'checking' },

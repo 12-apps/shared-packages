@@ -110,6 +110,8 @@ describe('createHomologacaoEvidence', () => {
       // Sandbox has no Pix a person pays (FUT-4198).
       pix: null,
       scenarios: null,
+      lastRunAt: null,
+      lastRunId: null,
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
@@ -228,6 +230,24 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
 
   it('given no production run yet, then the seller view has no Pix to show', async () => {
     expect((await productionService(await connectedConfig('PRODUCTION')).svc.seller()).pix).toBeNull();
+  });
+
+  it('given a production run, then the seller view dates its outcomes with when the run started (FUT-5519)', async () => {
+    const { svc } = productionService();
+    expect((await svc.seller()).lastRunAt).toBeNull();
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-23T21:36:34.000Z'));
+    try {
+      const { runId } = await svc.prepare(BUYER);
+      const view = await svc.seller();
+
+      expect(view.scenarios).not.toBeNull();
+      expect(view.lastRunId).toBe(runId);
+      expect(view.lastRunAt).toBe('2026-11-23T21:36:34.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('given no run, then confirming a Pix is refused', async () => {

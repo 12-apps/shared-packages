@@ -210,6 +210,41 @@ function useDownload(
   };
 }
 
+type Answered = { scenarios: readonly ProductionScenarioOutcome[] | null } | null;
+
+/**
+ * The latest run's outcomes are always on screen, a reload included (FUT-5519),
+ * with the date that run started: the answer of the run this tab made, else the
+ * server's latest run. The host reads the server again once a run ends, so a
+ * run that failed after it was saved shows its own rows once the server names
+ * it; until then the earlier run's rows are not shown as its own. A run that
+ * failed before it was saved leaves the earlier run on screen, still the latest.
+ */
+function useShownOutcomes(
+  seller: HomologacaoProductionEvidenceCardProps['seller'],
+  answered: Answered,
+  ownRunId: string | null,
+): { scenarios: readonly ProductionScenarioOutcome[] | null; ranAt: string | null } {
+  const serverIsCurrent = ownRunId === null || seller?.lastRunId === ownRunId;
+  const ranAt = serverIsCurrent ? (seller?.lastRunAt ?? null) : null;
+  if (answered) return { scenarios: answered.scenarios, ranAt };
+  return { scenarios: serverIsCurrent ? (seller?.scenarios ?? null) : null, ranAt };
+}
+
+/** The run this tab made — its id once saved, and its answer — and the outcomes the card shows. */
+function useLatestRun(seller: HomologacaoProductionEvidenceCardProps['seller']) {
+  // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
+  const [answered, setAnswered] = useState<Answered>(null);
+  // The run this tab saved last: from then on only its own outcomes are shown.
+  const [ownRunId, setOwnRunId] = useState<string | null>(null);
+  const saved = (runId: string): void => {
+    setOwnRunId(runId);
+    // The previous run's answer is not this one's.
+    setAnswered(null);
+  };
+  return { answered, setAnswered, saved, ...useShownOutcomes(seller, answered, ownRunId) };
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -220,11 +255,8 @@ export function useProductionRun(
   const [section, setSection] = useState<EvidenceRunSection | null>(null);
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
-  // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
-  const [answered, setAnswered] = useState<{ scenarios: readonly ProductionScenarioOutcome[] | null } | null>(null);
+  const { answered, setAnswered, saved, scenarios, ranAt } = useLatestRun(props.seller);
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  // A reload shows the server's outcomes only while its Pix is open, as it does the Pix itself.
-  const scenarios = answered ? answered.scenarios : (isPixOpen(props.seller?.pix) ? (props.seller?.scenarios ?? null) : null);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
   const run = async (): Promise<void> => {
@@ -247,6 +279,7 @@ export function useProductionRun(
       const walletResults = wallets.collect();
       const prepared = await props.onPrepare(buyer);
       runId = prepared.runId;
+      saved(prepared.runId);
       // The wallets' tokens are spent only once a run exists to spend them on.
       wallets.reset();
       enter('encrypting');
@@ -263,6 +296,7 @@ export function useProductionRun(
     } finally {
       setPhase('idle');
       inFlight.current = false;
+      props.onRunEnded?.();
     }
   };
 
@@ -281,6 +315,7 @@ export function useProductionRun(
     busy: phase !== 'idle',
     pixOpen,
     scenarios,
+    ranAt,
     ran: answered !== null,
     charged: answered !== null && !pixOpen,
     run,

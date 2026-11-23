@@ -136,6 +136,13 @@ export interface HomologacaoSellerConnection {
    * before any production run.
    */
   scenarios: EvidenceScenarioOutcome[] | null;
+  /**
+   * PRODUCTION (FUT-5519): when the latest run started (ISO-8601), so a screen
+   * shows its outcomes with their date. Null in sandbox and before any run.
+   */
+  lastRunAt: string | null;
+  /** PRODUCTION (FUT-5519): the latest run's id, so a screen knows whose outcomes these are. */
+  lastRunId: string | null;
 }
 
 export interface HomologacaoEvidenceService {
@@ -207,9 +214,17 @@ function sellerView(
     accountId: field('accountId'),
     lastConnectProblem: connectProblem(connect),
     wallets,
-    pix: run ? pixViewOf(run, skippedNote) : null,
-    scenarios: run ? evidenceScenarioOutcomes(run) : null,
+    ...latestRunView(run, skippedNote),
   };
+}
+
+/** The latest production run as a screen shows it: its Pix, outcomes, date and id; all null before any run. */
+function latestRunView(
+  run: EvidenceRecord | null,
+  skippedNote: string,
+): Pick<HomologacaoSellerConnection, 'pix' | 'scenarios' | 'lastRunAt' | 'lastRunId'> {
+  if (!run) return { pix: null, scenarios: null, lastRunAt: null, lastRunId: null };
+  return { pix: pixViewOf(run, skippedNote), scenarios: evidenceScenarioOutcomes(run), lastRunAt: run.createdAt, lastRunId: run.id };
 }
 
 /** Google Pay mints against the seller's PagBank account in the evidence's own environment. */

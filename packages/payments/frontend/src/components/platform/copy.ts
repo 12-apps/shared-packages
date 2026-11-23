@@ -250,6 +250,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
    */
   scenarios: {
     label: string;
+    /** When the run shown started; `when` is ISO-8601 and the pack formats it in its own locale (FUT-5519). */
+    ranAt: (when: string) => string;
     names: { credit: string; debit: string; pix: string; googlePay: string; applePay: string };
     /** The status word of a row, and the name of its mark for a screen reader. */
     status: { executed: string; failed: string; pending: string };
