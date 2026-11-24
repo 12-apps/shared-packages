@@ -271,14 +271,14 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       },
       pix: {
         AWAITING_PAYMENT: 'aguardando pagamento',
-        REFUND_PENDING: 'pago, estornando',
+        REFUND_PENDING: 'pago, aguardando o estorno',
         REFUNDED: 'pago e estornado',
         SKIPPED: 'pulado, pendente',
         paid: 'pago',
         paidNotRefunded: 'pago, não estornado',
-        refunding: 'estornando',
+        refunding: 'pago, aguardando o estorno',
         notYet: (attempt, of, minutes) =>
-          `o PagBank ainda não liberou o estorno — tentativa ${attempt} de ${of}, a próxima em ${minutes} min`,
+          `o PagBank só libera o estorno alguns minutos depois da cobrança — nova tentativa em ${minutes} min (${attempt} de ${of})`,
         exhausted: (of) =>
           `${of} de ${of} tentativas recusadas pelo PagBank; tente de novo ou estorne no painel do PagBank`,
         refused: 'o PagBank recusou o estorno; tente de novo ou estorne no painel do PagBank',

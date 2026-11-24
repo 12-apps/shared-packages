@@ -121,7 +121,7 @@ describe('the production evidence card shows the server’s outcomes (PG1)', () 
 
     await waitFor(() => expect(props.onConfirmPix).toHaveBeenCalledWith('run-1', 'RETRY_REFUND'));
     expect(props.onConfirmPix.mock.calls.filter(([, action]) => action === 'RETRY_REFUND')).toHaveLength(1);
-    await waitFor(() => expect(text('pix')).toContain('tentativa 1 de 3'));
+    await waitFor(() => expect(text('pix')).toContain('(1 de 3)'));
   });
 
   it('C3 given a reload, then the outcomes come back from the seller view', async () => {

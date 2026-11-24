@@ -31,8 +31,17 @@ const SCENARIOS: readonly { scenario: EvidenceScenario; charge: EvidenceStepKey;
   { scenario: 'applePay', charge: 'apay.approved', keys: ['apay.approved', 'apay.consult', 'apay.cancel'] },
 ];
 
+/**
+ * A refund PagBank has not taken YET (40008, retried by the sweep) is not a
+ * failure of the scenario: the charge went through and the money is on its
+ * way back (FUT-5519). Only a refund whose attempts ran out, or one PagBank
+ * refused, fails it.
+ */
+const isRefundStillRetrying = (step: EvidenceStep): boolean =>
+  step.refund !== undefined && !step.refund.exhausted && step.refund.refusal !== 'REFUSED';
+
 function statusOf(steps: readonly EvidenceStep[], charge: EvidenceStepKey): EvidenceStatus {
-  if (steps.some((step) => step.status === 'FAILED')) return 'FAILED';
+  if (steps.some((step) => step.status === 'FAILED' && !isRefundStillRetrying(step))) return 'FAILED';
   // A scenario the run never reached has nothing recorded, or its charge PENDING.
   const charged = steps.find((step) => step.key === charge);
   return !charged || charged.status === 'PENDING' ? 'PENDING' : 'EXECUTED';

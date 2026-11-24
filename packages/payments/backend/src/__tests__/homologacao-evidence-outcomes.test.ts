@@ -127,6 +127,21 @@ describe('each production scenario’s real outcome (PG1, FUT-4322)', () => {
     expect(outcomesOf(broken).find((o) => o.scenario === 'credit')).toEqual({ scenario: 'credit', status: 'FAILED', reason: null });
   });
 
+  it('A6 given a charged card whose refund PagBank has not taken yet, then the scenario is EXECUTED, not FAILED (FUT-5519)', async () => {
+    const r = ownersRun({ credit: 'OK', debit: 'OK' });
+    const record = await run(r);
+    const retrying = { series: 1, attempt: 1, of: 3, nextAt: '2026-11-24T03:11:06.803Z', exhausted: false, refusal: 'NOT_YET' as 'NOT_YET' | 'REFUSED', claimedAt: null, reported: false };
+    const withRefund = (refund: typeof retrying) => ({
+      ...record,
+      steps: record.steps.map((step) => (step.key === 'card.cancel' ? { ...step, status: 'FAILED' as const, refund } : step)),
+    });
+
+    expect(outcomesOf(withRefund(retrying)).find((o) => o.scenario === 'credit')).toEqual({ scenario: 'credit', status: 'EXECUTED', reason: null });
+    // Out of attempts, or refused for good: the refund did fail, and so does the scenario.
+    expect(outcomesOf(withRefund({ ...retrying, exhausted: true })).find((o) => o.scenario === 'credit')?.status).toBe('FAILED');
+    expect(outcomesOf(withRefund({ ...retrying, refusal: 'REFUSED' })).find((o) => o.scenario === 'credit')?.status).toBe('FAILED');
+  });
+
   it('A5 given the outcomes are exposed, then the evidence FILE is byte-for-byte what it was (no reason code is printed)', async () => {
     const r = ownersRun({ credit: 'EMAIL', debit: 'DECLINED' });
     await run(r);
