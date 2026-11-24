@@ -70,7 +70,7 @@ export function useButtonPress({ progress, loading, disabled, type, onClick }: P
   return {
     disabled: nativelyDisabled,
     ariaDisabled: held ? true : undefined,
-    ariaBusy: loading ? true : undefined,
+    ariaBusy: undefined,
     onClick: held ? swallowPress : onClick,
     held,
   };

@@ -163,8 +163,9 @@ export const LoadingKeepsFocus: Story = {
       await expect(canvasElement.ownerDocument.activeElement).toBe(button);
     });
 
-    await step('A second Enter does nothing', async () => {
+    await step('A second Enter, or Space, does nothing', async () => {
       await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
       await expect(submitted).toHaveBeenCalledTimes(1);
       await expect(button).toHaveFocus();
     });
