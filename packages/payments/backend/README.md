@@ -69,7 +69,7 @@ These are the seams hosts most often re-implement by accident:
 | `gateway.captureCharge` | takes the money an AUTHORIZED charge only holds, and persists the PAID it answers (FUT-4082); `UnsupportedOperationError` where the provider cannot |
 | `gateway.quoteInstallments` | the provider's own price for a card charge in 2..12, the buyer paying the interest (FUT-4382) — what to show before paying; a typed `refusal` where the provider quotes none |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
-| `createCaptureRecompose({ stores })`, `judgeCapture` | a Pix sale whose lines were written off after the charge was raised at a frozen total (FUT-1262), run AFTER the payment settled: rewrites the total to the live one (predicated on the frozen one), records and alerts a partial over-capture (never refunded here), and refunds the whole capture when nothing is left to pay for, under the one claim per charge a short capture's refund takes; a refund that does not happen is recorded whole. The host binds its order, composition, record, alert and claim as stores |
+| `createCaptureRecompose({ stores })`, `judgeCapture` | a Pix sale with lines written off after its charge was raised (FUT-1262), after the payment: the total rewritten to the live one, a partial over-capture recorded and alerted, a full write-off refunded whole (recorded when it cannot be) |
 
 ### Cycle collection in instalments (FUT-4382)
 
