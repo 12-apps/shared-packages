@@ -48,3 +48,28 @@ export {
   type CaptureRefundOutcome,
   type CaptureRefundRequest,
 } from './core/refund-on-request';
+/** A sale recomposed after its Pix landed: the verdict, the over-capture facts, the whole refund (FUT-1262). */
+export {
+  RECOMPOSED_METHOD,
+  allocateExcess,
+  judgeCapture,
+  type CaptureJudgementInput,
+  type CaptureShare,
+  type CaptureVerdict,
+} from './core/capture-judgement';
+export {
+  createCaptureRecompose,
+  overCaptureKey,
+  type CaptureRecompose,
+  type CaptureRecomposeLogger,
+  type CaptureRecomposeOptions,
+  type CaptureRecomposeRef,
+  type CaptureRecomposeResult,
+  type CaptureRecomposeStores,
+  type CaptureRefundStep,
+  type OverCaptureCause,
+  type OverCaptureFacts,
+  type OverCaptureRefusal,
+  type RecomposeCapture,
+  type RecomposeSettlement,
+} from './core/capture-recompose';
