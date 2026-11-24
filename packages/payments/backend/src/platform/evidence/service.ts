@@ -24,6 +24,7 @@ import {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
+import { chargeApplePayInSheet } from './apple-in-sheet';
 import { evidenceScenarioOutcomes, type EvidenceRunProgress, type EvidenceScenarioOutcome } from './outcomes';
 import { pixViewOf, type EvidencePixView } from './orders-pix-production';
 import { retryDueEvidenceRefund } from './refund-sweep';
@@ -162,6 +163,12 @@ export interface HomologacaoEvidenceService {
     buyer?: EvidenceBuyer,
   ): Promise<EvidenceRecord>;
   /**
+   * Apple Pay, charged while its sheet is still open (FUT-5519): the prepared
+   * run's Apple Pay order, consult and cancel, raised at once because Apple's
+   * token expires within minutes. `run` then leaves that section alone.
+   */
+  chargeApplePay(runId: string, wallet: BrowserWalletResult, buyer?: EvidenceBuyer): Promise<{ paid: boolean }>;
+  /**
    * PRODUCTION phase 3 (FUT-4198): check the Pix a person paid, or record that
    * it was skipped; answers where it stands now.
    */
@@ -287,6 +294,8 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     },
     run: (runId, cards, wallets, onSection, buyer) =>
       completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection),
+    chargeApplePay: (runId, wallet, buyer) =>
+      chargeApplePayInSheet({ ...runDeps, customer: customerFor(environment, buyer) }, runId, wallet),
     confirmPix: async (runId, action) =>
       pixViewOf(await confirmEvidencePix(runDeps, runId, action), cfg.copy.outcome.pixSkipped),
     retryDueRefund: async () => {

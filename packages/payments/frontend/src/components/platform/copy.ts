@@ -191,6 +191,8 @@ export interface HomologacaoEvidenceWalletsCopy {
   applePayCannotStart: string;
   /** Apple Pay started and failed. */
   applePayCannotComplete: string;
+  /** Apple Pay included in the charge: its sheet opens on the confirm (FUT-5519). */
+  applePayIncluded: string;
   /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
   applePayAbsent: Record<AppleAbsence, string>;
   /** Why Google Pay has no button: the host carries no Google Pay configuration for this seller. */

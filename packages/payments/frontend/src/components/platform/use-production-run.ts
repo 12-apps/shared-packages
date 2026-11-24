@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { BrowserCardResult, EvidenceSummary } from '@12-apps/payments-backend';
+import type { BrowserCardResult, BrowserWalletResult, EvidenceBuyer, EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
+import type { EvidenceAppleSheet } from './evidence-apple-sheet';
 import type { HomologacaoProductionEvidenceCardProps } from './HomologacaoProductionEvidenceCard';
 import type { ProductionPixView } from './ProductionPixPanel';
 import type { ProductionScenarioOutcome } from './ProductionScenarioList';
@@ -246,6 +247,38 @@ function useLatestRun(seller: HomologacaoProductionEvidenceCardProps['seller']) 
   return { answered, setAnswered, saved, ...useShownOutcomes(seller, answered, ownRunId) };
 }
 
+/**
+ * Apple Pay, charged while its sheet is open (FUT-5519): wait for the person
+ * to authorize, raise its order on the prepared run, and close the sheet with
+ * PagBank's answer. Answers what phase 2 still owes for Apple Pay: nothing
+ * once the sheet charged it, else why it was not charged.
+ */
+async function chargeAppleInSheet(
+  sheet: EvidenceAppleSheet | null,
+  charge: HomologacaoProductionEvidenceCardProps['onChargeApplePay'],
+  runId: string,
+  buyer: EvidenceBuyer,
+): Promise<BrowserWalletResult[]> {
+  if (!sheet) return [];
+  const result = await sheet.result;
+  if (!result.token || !charge) {
+    sheet.complete(false);
+    return [result.token ? { ...result, token: null, failure: 'TOKEN_ERROR' } : result];
+  }
+  const paid = await charge(runId, result, buyer).then(
+    (answer) => answer.paid,
+    () => null,
+  );
+  sheet.complete(paid === true);
+  // Not raised at all (the call failed): phase 2 records why, never a pressless pending.
+  return paid === null ? [{ ...result, token: null, failure: 'TOKEN_ERROR' }] : [];
+}
+
+/** A sheet the run will not charge is closed as unpaid, once the person answers it. */
+function closeUnpaid(sheet: EvidenceAppleSheet | null): void {
+  if (sheet) void sheet.result.then(() => sheet.complete(false));
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -258,9 +291,9 @@ export function useProductionRun(
   const { answered, setAnswered, saved, scenarios, ranAt } = useLatestRun(props.seller);
   const progress = useRunProgress();
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  const run = async (): Promise<void> => {
+  const run = async (appleSheet: EvidenceAppleSheet | null = null): Promise<void> => {
     const buyer = buyerOf(form.buyer);
-    if (!buyer || !progress.begin()) return;
+    if (!buyer || !progress.begin()) return closeUnpaid(appleSheet);
     setConfirming(false);
     setFailed(null);
     setSummary(null);
@@ -277,6 +310,7 @@ export function useProductionRun(
       const prepared = await props.onPrepare(buyer);
       runId = prepared.runId;
       saved(prepared.runId);
+      walletResults.push(...(await chargeAppleInSheet(appleSheet, props.onChargeApplePay, prepared.runId, buyer)));
       // The wallets' tokens are spent only once a run exists to spend them on.
       wallets.reset();
       enter('encrypting');
@@ -288,6 +322,8 @@ export function useProductionRun(
       setPix('pix' in answer ? answer.pix : answer);
       form.clearCards();
     } catch {
+      // A sheet still open when the run broke is closed as not charged.
+      closeUnpaid(appleSheet);
       setFailed(current);
       // The run may have raised its Pix before its answer was lost: ask.
       if (runId) await props.onConfirmPix(runId, 'CHECK').then(setPix, () => undefined);

@@ -82,6 +82,12 @@ export interface HomologacaoProductionEvidenceCardProps {
     buyer: EvidenceBuyer,
   ) => Promise<ProductionRunAnswer>;
   /**
+   * Apple Pay, charged while its sheet is open (FUT-5519): the prepared run's
+   * Apple Pay order, raised at once because Apple's token lives minutes.
+   * Present, the Apple Pay press includes it and the sheet opens on confirm.
+   */
+  onChargeApplePay?: (runId: string, wallet: BrowserWalletResult, buyer: EvidenceBuyer) => Promise<{ paid: boolean }>;
+  /**
    * Phase 3: check the Pix, skip it, or — once the refund's attempts ran out —
    * try refunding it again; answers where it stands.
    */
@@ -318,6 +324,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
     validateApplePayMerchant: props.onValidateApplePayMerchant,
     googlePayApi: props.googlePayApi,
     loadApplePaySdk: props.loadApplePaySdk,
+    appleInSheet: props.onChargeApplePay !== undefined,
   });
   const flow = useProductionRun(props, form, wallets);
   const connected = props.seller?.connected === true;
@@ -354,7 +361,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
         </Stack>
         <ProductionSidePanel flow={flow} copy={copy} />
       </Box>
-      <ConfirmDialog open={flow.confirming} copy={copy.confirm} onCancel={() => flow.setConfirming(false)} onConfirm={() => void flow.run()} />
+      <ConfirmDialog open={flow.confirming} copy={copy.confirm} onCancel={() => flow.setConfirming(false)} onConfirm={() => void flow.run(wallets.openApple())} />
     </Stack>
   );
 }
