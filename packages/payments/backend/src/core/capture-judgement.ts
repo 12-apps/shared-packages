@@ -73,14 +73,24 @@ export interface CaptureShare {
   capturedCents: number;
   /** What of it already went back, or is going back under a held refund claim, in cents. */
   refundedCents: number;
+  /**
+   * What ANOTHER lane already recorded as over-paid against this charge, in
+   * cents: the host fills it from the sale's over-payment records for this
+   * charge, EXCLUDING the recompose's own (those keyed by `overCaptureKey`).
+   * Which capture is "the excess" depends on that lane — a second capture of
+   * the same code is the later one, a parked short capture is the earlier one —
+   * so no capture order can tell; this field does. Absent means 0.
+   */
+  excessRecordedCents?: number;
 }
 
 /**
  * Which capture holds how much of an excess. Only the captures that FUND the
  * frozen total can hold it: walked in capture order, each funds what it still
- * holds until the frozen total is reached, and whatever is captured beyond that
- * (a second capture of the same code, FUT-714) is another lane's, already
- * recorded as wholly excess there. The excess is then taken from the LAST
+ * holds less what another lane already recorded against it
+ * ({@link CaptureShare.excessRecordedCents}: a second capture of the same code,
+ * FUT-714, or a parked short capture whose excess refund was refused, FUT-612),
+ * until the frozen total is reached. The excess is then taken from the LAST
  * funding capture backwards, each giving at most the part of it that funds the
  * frozen total. Captures holding nothing of it are left out.
  */
@@ -92,7 +102,8 @@ export function allocateExcess<T extends CaptureShare>(
   const funding: { capture: T; fundsCents: number }[] = [];
   let unfunded = frozenTotalCents;
   for (const capture of captures) {
-    const fundsCents = Math.min(Math.max(0, capture.capturedCents - capture.refundedCents), unfunded);
+    const free = capture.capturedCents - capture.refundedCents - (capture.excessRecordedCents ?? 0);
+    const fundsCents = Math.min(Math.max(0, free), unfunded);
     if (fundsCents > 0) funding.push({ capture, fundsCents });
     unfunded -= fundsCents;
   }

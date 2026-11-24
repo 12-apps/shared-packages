@@ -89,6 +89,24 @@ describe('allocateExcess', () => {
     ]);
   });
 
+  it('R2-1: beside a FUT-612 excess whose refund was refused, the whole excess lands on the capture FUT-612 did not record', () => {
+    // FUT-612 parked S short, the old full code F settled, `payment.over` {S, 5000} was written and its
+    // refund refused: S still holds 5000, all of it already recorded. Live 3520 after a write-off.
+    const captures = [
+      { providerChargeId: 'S', capturedCents: 5000, refundedCents: 0, excessRecordedCents: 5000 },
+      { providerChargeId: 'F', capturedCents: 7040, refundedCents: 0 },
+    ];
+    const verdict = judgeCapture({ method: 'PIX', capturedCents: 12040, refundedCents: 0, liveTotalCents: 3520, frozenTotalCents: 7040 });
+    expect(verdict).toEqual({ kind: 'OVER', excessCents: 3520 });
+    const shares = allocateExcess(captures, 3520, 7040).map((share) => [share.capture.providerChargeId, share.excessCents]);
+    expect(shares).toEqual([['F', 3520]]);
+  });
+
+  it('B1 whatever the order: a FUT-714 second capture recorded as excess funds nothing, even listed first', () => {
+    const captures = [{ ...capture('C2', 7040), excessRecordedCents: 7040 }, capture('C1', 7040)];
+    expect(allocateExcess(captures, 3520, FROZEN)).toEqual([{ capture: captures[1], excessCents: 3520 }]);
+  });
+
   it('a short capture refunded first, then the full code (C14): the full code funds it all', () => {
     const captures = [capture('SHORT', 5000, 5000), capture('FULL', 7040)];
     expect(allocateExcess(captures, 3520, FROZEN)).toEqual([{ capture: captures[1], excessCents: 3520 }]);
@@ -260,6 +278,20 @@ describe('createCaptureRecompose — one line written off (decision 5: recorded,
 
     expect([...host.state.records.values()].map((f) => [f.providerChargeId, f.excessCents, f.capturedCents])).toEqual([['C1', FROZEN - LIVE, FROZEN]]);
     expect(host.state.alerts.map((f) => f.providerChargeId)).toEqual(['C1']);
+  });
+
+  it('R2-1: beside a FUT-612 excess whose refund was refused, the record names the full code, never the parked capture', async () => {
+    const host = fakeHost({
+      live: LIVE,
+      captures: [
+        { provider: 'pagbank', providerChargeId: 'S', capturedCents: 5000, refundedCents: 0, excessRecordedCents: 5000 },
+        { provider: 'pagbank', providerChargeId: 'F', capturedCents: FROZEN, refundedCents: 0 },
+      ],
+    });
+    await createCaptureRecompose({ stores: host.stores }).recompose(REF);
+
+    expect([...host.state.records.values()].map((f) => [f.providerChargeId, f.excessCents])).toEqual([['F', FROZEN - LIVE]]);
+    expect(host.state.alerts.map((f) => f.providerChargeId)).toEqual(['F']);
   });
 
   it('a Pix sale whose difference was paid by card (ADR 0352): the excess sits on the funding captures, newest first', async () => {
