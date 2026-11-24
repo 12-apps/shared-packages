@@ -29,6 +29,11 @@ export interface ButtonPressState {
   onClick: React.MouseEventHandler<HTMLElement> | undefined;
   /** A submit held by its form: `aria-disabled`, focusable, a press does nothing. */
   held: boolean;
+  /**
+   * Loading (FUT-5466): looks disabled (`Mui-disabled`), never ripples, and
+   * draws the keyboard ring, since it keeps focus instead of losing it.
+   */
+  busy: boolean;
 }
 
 /** A press that does nothing — not even submit the form the button sits in. */
@@ -57,14 +62,14 @@ interface PressInput {
  */
 export function useButtonPress({ progress, loading, disabled, type, onClick }: PressInput): ButtonPressState {
   const busy = useFormBusy();
-  if (progress) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false };
+  if (progress) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false, busy: false };
   // Loading is the answer to this button's own press (FUT-5466): a native
   // `disabled` here moved keyboard focus to <body> the moment it began, so a
   // person who pressed Enter had to Tab again from the top of the page. It is
   // `aria-disabled` + `aria-busy` instead, keeps its place in the tab order and
   // ignores a press — and wins over the host's own `disabled`, which the usual
   // `disabled={busy} loading={busy}` pair sets at the same moment.
-  if (loading) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false };
+  if (loading) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false, busy: true };
   const nativelyDisabled = Boolean(disabled);
   const held = type === 'submit' && busy && !nativelyDisabled;
   return {
@@ -73,6 +78,7 @@ export function useButtonPress({ progress, loading, disabled, type, onClick }: P
     ariaBusy: undefined,
     onClick: held ? swallowPress : onClick,
     held,
+    busy: false,
   };
 }
 

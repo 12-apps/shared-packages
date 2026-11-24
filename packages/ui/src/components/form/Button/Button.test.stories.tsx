@@ -150,7 +150,7 @@ export const LoadingKeepsFocus: Story = {
 
     await step('Tab to the button and press Enter', async () => {
       await userEvent.tab();
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
       await userEvent.keyboard('{Enter}');
       await expect(submitted).toHaveBeenCalledTimes(1);
     });
@@ -159,7 +159,7 @@ export const LoadingKeepsFocus: Story = {
       await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
       await expect(button).toHaveAttribute('aria-disabled', 'true');
       await expect(button).not.toBeDisabled();
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
       await expect(canvasElement.ownerDocument.activeElement).toBe(button);
     });
 
@@ -167,7 +167,7 @@ export const LoadingKeepsFocus: Story = {
       await userEvent.keyboard('{Enter}');
       await userEvent.keyboard(' ');
       await expect(submitted).toHaveBeenCalledTimes(1);
-      await expect(button).toHaveFocus();
+      await waitFor(() => expect(button).toHaveFocus());
     });
   },
 };
