@@ -112,6 +112,14 @@ exists because `ghost` renders as MUI's `contained` and `gradient`, `glass` and
 A `data-variant` you pass yourself wins over the mark. The attribute is stable
 API: it is never renamed or dropped without a major.
 
+## Keyboard focus ring
+
+An `outline`, `text` or `ghost` button paints no surface of its own, so when it
+is reached with the keyboard (`:focus-visible`, never a mouse click) it draws
+the same two-tone ring a held button does: an ink ring 2 px out, in a halo of
+the page surface, so it reads on any background and brand colour, with or
+without `ripple`. The filled variants keep their own look.
+
 ## Press ripple and focus pulsate
 
 The press ripple and the focus pulsate (an outline or text button's only

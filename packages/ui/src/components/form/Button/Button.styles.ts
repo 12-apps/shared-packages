@@ -1,6 +1,7 @@
 import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { heldFocusRing } from './Button.held';
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral, inkPair } from '../../../tokens/ink';
@@ -313,12 +314,28 @@ export const buttonInk = (
   color: string,
 ): string | undefined => VARIANT_STYLES[variant ?? '']?.(theme, palette, color).color as string | undefined;
 
+/**
+ * THE VARIANTS THAT PAINT NO SURFACE OF THEIR OWN DRAW A KEYBOARD RING (FUT-5521).
+ *
+ * MUI's ButtonBase sets `outline: 0`, and an `outline`, `text` or `ghost` button
+ * has no fill whose change could say where focus is: all it had was the faint
+ * focus pulsate, which is no cue at all with `ripple={false}`. They take the
+ * same two-tone ring a held button draws (an ink ring in a halo of the page
+ * surface), so it reads on any ground, light or dark, and on any brand colour.
+ * `:focus-visible` only, so a mouse click leaves nothing behind. The filled
+ * variants keep their own look: their fill is the cue.
+ */
+const RINGED_VARIANTS: ReadonlySet<string> = new Set(['outline', 'text', 'ghost']);
+
 export const buttonVariantStyles = (
   theme: Theme,
   variant: string | undefined,
   palette: ColorPalette,
   color: string,
-): CSSObject => VARIANT_STYLES[variant ?? '']?.(theme, palette, color) ?? {};
+): CSSObject => ({
+  ...(VARIANT_STYLES[variant ?? '']?.(theme, palette, color) ?? {}),
+  ...(RINGED_VARIANTS.has(variant ?? '') ? heldFocusRing(theme) : {}),
+});
 
 // Glow effect - applied with !important to override variant shadows
 const glowStyles = (theme: Theme, palette: ColorPalette): CSSObject => ({
