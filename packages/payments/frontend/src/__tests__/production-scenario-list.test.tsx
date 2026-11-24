@@ -90,7 +90,7 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
   it('R2 given the Pix refund refused "not yet" on attempt 2 of 3, then the Pix row is the amber clock with the attempt and the countdown', () => {
     show(RUN_1616);
 
-    expect(text('pix')).toBe('Pix · pago — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min');
+    expect(text('pix')).toBe('Pix · pago, aguardando o estorno — o PagBank só libera o estorno alguns minutos depois da cobrança — nova tentativa em 5 min (2 de 3)');
     expect(mark('pix')).toBe('aguardando');
     expect(screen.queryAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(0);
   });
@@ -150,7 +150,7 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
   it('R8 given the next attempt less than a minute away (or overdue), then the countdown never reads 0 or negative: "a próxima em 1 min"', () => {
     show({ ...RUN_1616, pix: pixPending({ attempt: 1, of: 3, nextAt: '2026-11-11T15:09:30.000Z', exhausted: false, refusal: 'NOT_YET' }) });
 
-    expect(text('pix')).toBe('Pix · pago — o PagBank ainda não liberou o estorno — tentativa 1 de 3, a próxima em 1 min');
+    expect(text('pix')).toBe('Pix · pago, aguardando o estorno — o PagBank só libera o estorno alguns minutos depois da cobrança — nova tentativa em 1 min (1 de 3)');
   });
 
   it('R9 given the Pix refunded, then ✓ "pago e estornado" and no button', () => {
@@ -175,10 +175,10 @@ describe('ProductionScenarioList — the card refunds (PG3, C33)', () => {
     pix: pixRefunded(cards),
   });
 
-  it('C1 a card retrying reads T-18: "Crédito · estornando — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min"', () => {
+  it('C1 a card retrying reads as paid and awaiting its refund, never as a failure (T-18, FUT-5519)', () => {
     show(run([{ scenario: 'credit', attempt: 2, of: 3, nextAt: '2026-11-11T15:15:00.000Z', exhausted: false, refusal: 'NOT_YET' }]));
 
-    expect(text('credit')).toBe('Crédito · estornando — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min');
+    expect(text('credit')).toBe('Crédito · pago, aguardando o estorno — o PagBank só libera o estorno alguns minutos depois da cobrança — nova tentativa em 5 min (2 de 3)');
     expect(screen.queryAllByRole('button', { name: 'Tentar estornar o cartão de novo' })).toHaveLength(0);
   });
 

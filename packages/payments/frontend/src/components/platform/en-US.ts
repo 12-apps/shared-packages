@@ -283,14 +283,14 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       },
       pix: {
         AWAITING_PAYMENT: 'awaiting payment',
-        REFUND_PENDING: 'paid, refunding',
+        REFUND_PENDING: 'paid, awaiting the refund',
         REFUNDED: 'paid and refunded',
         SKIPPED: 'skipped, pending',
         paid: 'paid',
         paidNotRefunded: 'paid, not refunded',
-        refunding: 'refunding',
+        refunding: 'paid, awaiting the refund',
         notYet: (attempt, of, minutes) =>
-          `PagBank has not released the refund yet — attempt ${attempt} of ${of}, the next in ${minutes} min`,
+          `PagBank releases the refund a few minutes after the charge — next attempt in ${minutes} min (${attempt} of ${of})`,
         exhausted: (of) => `${of} of ${of} attempts refused by PagBank; try again or refund in the PagBank panel`,
         refused: "PagBank refused the refund; try again or refund in the PagBank panel",
       },

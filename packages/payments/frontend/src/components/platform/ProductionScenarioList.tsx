@@ -77,7 +77,7 @@ function refundRow(pix: ProductionPixView, copy: Copy, now: number): Row {
     return { key, mark: 'checking', markLabel: copy.marks.checking, status: copy.pix.REFUND_PENDING, reason: null };
   }
   const reason = copy.pix.notYet(refund.attempt, refund.of, minutesUntil(refund.nextAt, now));
-  return { key, mark: 'retrying', markLabel: copy.marks.retrying, status: copy.pix.paid, reason };
+  return { key, mark: 'retrying', markLabel: copy.marks.retrying, status: copy.pix.refunding, reason };
 }
 
 /** A card's row while its refund is not done (T-18): retrying with the next attempt, or out of attempts. */
