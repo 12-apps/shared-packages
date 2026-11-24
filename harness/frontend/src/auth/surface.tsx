@@ -4,8 +4,12 @@ import { createWebAuth } from '@12-apps/auth/react';
 import { PT_BR, PT_BR_PAGES } from '@12-apps/auth/react';
 import type { createWebEmailAuth } from '@12-apps/auth/react';
 import { createEmailAuthSettingsClient, PT_BR_SETTINGS } from '@12-apps/auth/react';
-import { authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
-import { authPlatformWebManifest, authWebManifest } from '@12-apps/auth/manifest/web';
+import { authAccountDeletionManifest, authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
+import {
+  authAccountDeletionWebManifest,
+  authPlatformWebManifest,
+  authWebManifest,
+} from '@12-apps/auth/manifest/web';
 
 import { webWiringHost } from '../wiring-web';
 
@@ -157,6 +161,26 @@ const { surface: settingsSurface } = webWiringHost.adoptWeb({
  * invisible: the one adopter never asked the manifest what it said.
  */
 export const AuthSettingsScreen = settingsSurface.page;
+
+/**
+ * "Excluir minha conta" and the pending screen (FUT-5322), adopted like the
+ * other two: one config, the session hook inside it. Built here so the harness
+ * proves the manifest binds and reports it; no route mounts the screens.
+ */
+webWiringHost.adoptWeb({
+  manifest: authAccountDeletionManifest,
+  web: authAccountDeletionWebManifest,
+  bindings: {
+    surface: {
+      config: {
+        mount: `${AUTH_BASE}/account-deletion`,
+        facts: { goes: [], stays: [] },
+        timeZone: 'America/Sao_Paulo',
+        useSession: webAuth.useSession,
+      },
+    },
+  },
+});
 
 
 /** Go to one of them. A plain assignment: the shell routes on `hashchange`. */
