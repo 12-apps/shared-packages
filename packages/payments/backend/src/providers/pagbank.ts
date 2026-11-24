@@ -245,11 +245,14 @@ const webhookPath = (tenantSlug: string): string =>
 function credentialSchemaFor(copy: PagbankCopy): readonly CredentialFieldSpec[] {
   return [
     { key: 'token', label: copy.fields.token, secret: true, required: true },
-    { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: false },
+    // Optional (FUT-5167): left blank, the card key is minted from the store's
+    // own token (`browserKey` below). A key pasted from another account is what
+    // makes PagBank refuse the card with 40002.
+    { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: false, optional: true },
     // Optional since FUT-678: webhook verification defaults to the account
     // token (PagBank's documented signing secret); this field is only an
     // explicit override for deployments that configured a dedicated one.
-    { key: 'webhookToken', label: copy.fields.webhookToken, secret: true, required: false, role: 'webhookSecret' },
+    { key: 'webhookToken', label: copy.fields.webhookToken, secret: true, required: false, optional: true, role: 'webhookSecret' },
     // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
     // (FUT-471). Optional and NOT secret — it is baked into every integrating
     // page. PagBank answered the Connect question (FUT-3756): it is the
@@ -260,6 +263,7 @@ function credentialSchemaFor(copy: PagbankCopy): readonly CredentialFieldSpec[] 
       label: copy.fields.googlePayMerchantId,
       secret: false,
       required: false,
+      optional: true,
     },
   ];
 }
