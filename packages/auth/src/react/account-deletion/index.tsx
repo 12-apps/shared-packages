@@ -371,19 +371,6 @@ function PendingDeletionScreen({ ctx, purgeAt }: { ctx: Ctx; purgeAt: string }):
   );
 }
 
-/** The one-argument config the wiring surface takes: the screens' config and the session hook it reads. */
-export type WebAccountDeletionSurfaceConfig = WebAccountDeletionConfig & AccountDeletionSessionHooks;
-
-/**
- * {@link createWebAccountDeletion} as `authAccountDeletionWebManifest`'s
- * surface: a wiring surface factory takes ONE config, so the session hook
- * rides inside it.
- */
-export function createWebAccountDeletionSurface(config: WebAccountDeletionSurfaceConfig): WebAccountDeletion {
-  const { useSession, ...screens } = config;
-  return createWebAccountDeletion(screens, { useSession });
-}
-
 export function createWebAccountDeletion(config: WebAccountDeletionConfig, hooks: AccountDeletionSessionHooks): WebAccountDeletion {
   const locale = config.locale ?? "pt-BR";
   const ctx: Ctx = {

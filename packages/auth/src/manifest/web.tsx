@@ -1,6 +1,6 @@
 import type { AnyWebManifest } from "@12-apps/wiring";
 
-import { createWebAccountDeletionSurface } from "../react/account-deletion";
+import { createWebAccountDeletionSurface } from "../react/account-deletion/surface";
 import { createWebEmailAuth } from "../react/create-web-email-auth";
 import { createWebAuthSettings } from "../react/settings";
 

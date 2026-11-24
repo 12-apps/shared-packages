@@ -52,3 +52,4 @@ export type { WebEmailAuth, WebEmailAuthConfig } from "./create-web-email-auth";
 
 /** "Excluir minha conta" and the grace-period screen (FUT-5322). */
 export * from "./account-deletion";
+export * from "./account-deletion/surface";
