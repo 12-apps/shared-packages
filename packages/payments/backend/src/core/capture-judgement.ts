@@ -76,18 +76,32 @@ export interface CaptureShare {
 }
 
 /**
- * Which capture holds how much of an excess: taken from the LAST capture
- * backwards (the one that paid last is the one that paid too much), each giving
- * at most what it still holds. Captures holding nothing of it are left out.
+ * Which capture holds how much of an excess. Only the captures that FUND the
+ * frozen total can hold it: walked in capture order, each funds what it still
+ * holds until the frozen total is reached, and whatever is captured beyond that
+ * (a second capture of the same code, FUT-714) is another lane's, already
+ * recorded as wholly excess there. The excess is then taken from the LAST
+ * funding capture backwards, each giving at most the part of it that funds the
+ * frozen total. Captures holding nothing of it are left out.
  */
-export function allocateExcess<T extends CaptureShare>(captures: readonly T[], excessCents: number): { capture: T; excessCents: number }[] {
+export function allocateExcess<T extends CaptureShare>(
+  captures: readonly T[],
+  excessCents: number,
+  frozenTotalCents: number,
+): { capture: T; excessCents: number }[] {
+  const funding: { capture: T; fundsCents: number }[] = [];
+  let unfunded = frozenTotalCents;
+  for (const capture of captures) {
+    const fundsCents = Math.min(Math.max(0, capture.capturedCents - capture.refundedCents), unfunded);
+    if (fundsCents > 0) funding.push({ capture, fundsCents });
+    unfunded -= fundsCents;
+  }
   const shares: { capture: T; excessCents: number }[] = [];
   let left = excessCents;
-  for (let index = captures.length - 1; index >= 0 && left > 0; index -= 1) {
-    const capture = captures[index] as T;
-    const held = Math.max(0, capture.capturedCents - capture.refundedCents);
-    const taken = Math.min(held, left);
-    if (taken > 0) shares.unshift({ capture, excessCents: taken });
+  for (let index = funding.length - 1; index >= 0 && left > 0; index -= 1) {
+    const { capture, fundsCents } = funding[index] as { capture: T; fundsCents: number };
+    const taken = Math.min(fundsCents, left);
+    shares.unshift({ capture, excessCents: taken });
     left -= taken;
   }
   return shares;

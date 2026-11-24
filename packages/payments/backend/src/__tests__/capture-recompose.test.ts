@@ -64,7 +64,7 @@ describe('allocateExcess', () => {
 
   it('takes the excess from the last capture backwards, each giving at most what it holds', () => {
     const captures = [capture('A', 3000), capture('B', 2000)];
-    expect(allocateExcess(captures, 2500)).toEqual([
+    expect(allocateExcess(captures, 2500, 5000)).toEqual([
       { capture: captures[0], excessCents: 500 },
       { capture: captures[1], excessCents: 2000 },
     ]);
@@ -72,7 +72,26 @@ describe('allocateExcess', () => {
 
   it('leaves out a capture that holds nothing (refunded already)', () => {
     const captures = [capture('A', 7040), capture('B', 5000, 5000)];
-    expect(allocateExcess(captures, 3520)).toEqual([{ capture: captures[0], excessCents: 3520 }]);
+    expect(allocateExcess(captures, 3520, FROZEN)).toEqual([{ capture: captures[0], excessCents: 3520 }]);
+  });
+
+  it('B1: a Pix paid twice (FUT-714) puts the excess on the capture that FUNDS the frozen total, never on the second', () => {
+    const captures = [capture('C1', 7040), capture('C2', 7040)];
+    expect(allocateExcess(captures, 3520, FROZEN)).toEqual([{ capture: captures[0], excessCents: 3520 }]);
+  });
+
+  it('a capture funding the frozen total only in part gives at most that part', () => {
+    const captures = [capture('A', 5000), capture('B', 5000)];
+    // Frozen 7040: A funds 5000, B funds 2040 and holds 2960 beyond it.
+    expect(allocateExcess(captures, 3520, FROZEN)).toEqual([
+      { capture: captures[0], excessCents: 1480 },
+      { capture: captures[1], excessCents: 2040 },
+    ]);
+  });
+
+  it('a short capture refunded first, then the full code (C14): the full code funds it all', () => {
+    const captures = [capture('SHORT', 5000, 5000), capture('FULL', 7040)];
+    expect(allocateExcess(captures, 3520, FROZEN)).toEqual([{ capture: captures[1], excessCents: 3520 }]);
   });
 });
 
@@ -100,7 +119,13 @@ const refunded = (chargeId: string, cents: number, status: RefundSnapshot['statu
   snapshot: { provider: 'pagbank', providerChargeId: chargeId, providerRefundId: `RE_${chargeId}`, status, amount: { amountCents: cents, currency: 'BRL' } },
 });
 
-function fakeHost(options: { live: number; captures?: RecomposeCapture[]; answer?: (key: RefundSeriesKey) => Promise<FirstAttemptResult> }): FakeHost {
+function fakeHost(options: {
+  live: number;
+  captures?: RecomposeCapture[];
+  answer?: (key: RefundSeriesKey) => Promise<FirstAttemptResult>;
+  /** Read a capture whose claim is held (or refunded) as refunded, as the host's binding does (H3). */
+  heldClaimIsRefunded?: boolean;
+}): FakeHost {
   const state: FakeHost['state'] = {
     totalCents: FROZEN,
     liveCents: options.live,
@@ -128,7 +153,16 @@ function fakeHost(options: { live: number; captures?: RecomposeCapture[]; answer
     },
   });
   const stores: CaptureRecomposeStores = {
-    readSettlement: async () => ({ method: state.method, paid: state.paid, totalCents: state.totalCents, captures: state.captures.map((c) => ({ ...c })) }),
+    readSettlement: async () => ({
+      method: state.method,
+      paid: state.paid,
+      totalCents: state.totalCents,
+      captures: state.captures.map((c) => {
+        const claim = state.claims.get(c.providerChargeId);
+        const going = options.heldClaimIsRefunded === true && (claim?.held === true || claim?.refunded === true);
+        return { ...c, refundedCents: going ? c.capturedCents : c.refundedCents };
+      }),
+    }),
     composeLiveTotal: async () => state.liveCents,
     rewriteTotal: async ({ fromTotalCents, toTotalCents }) => {
       if (state.totalCents !== fromTotalCents) return false;
@@ -214,11 +248,43 @@ describe('createCaptureRecompose — one line written off (decision 5: recorded,
     expect(host.state.alerts).toHaveLength(1);
   });
 
-  it('a total somebody else moved is left alone: no rewrite, no record', async () => {
+  it('B1: a Pix paid twice (FUT-714): the record names the capture that funds the frozen total', async () => {
+    const host = fakeHost({
+      live: LIVE,
+      captures: [
+        { provider: 'pagbank', providerChargeId: 'C1', capturedCents: FROZEN, refundedCents: 0 },
+        { provider: 'pagbank', providerChargeId: 'C2', capturedCents: FROZEN, refundedCents: 0 },
+      ],
+    });
+    await createCaptureRecompose({ stores: host.stores }).recompose(REF);
+
+    expect([...host.state.records.values()].map((f) => [f.providerChargeId, f.excessCents, f.capturedCents])).toEqual([['C1', FROZEN - LIVE, FROZEN]]);
+    expect(host.state.alerts.map((f) => f.providerChargeId)).toEqual(['C1']);
+  });
+
+  it('a Pix sale whose difference was paid by card (ADR 0352): the excess sits on the funding captures, newest first', async () => {
+    const host = fakeHost({
+      live: LIVE,
+      captures: [
+        { provider: 'pagbank', providerChargeId: 'PIX_SHORT', capturedCents: 5000, refundedCents: 0 },
+        { provider: 'pagbank', providerChargeId: 'CARD_DIFF', capturedCents: 2040, refundedCents: 0 },
+      ],
+    });
+    await createCaptureRecompose({ stores: host.stores }).recompose(REF);
+
+    expect([...host.state.records.values()].map((f) => [f.providerChargeId, f.excessCents])).toEqual([
+      ['PIX_SHORT', 1480],
+      ['CARD_DIFF', 2040],
+    ]);
+  });
+
+  it('a total somebody else moved is left alone: no rewrite, no record, a warning', async () => {
     const host = fakeHost({ live: LIVE });
     host.state.totalCents = 5000;
-    const result = await createCaptureRecompose({ stores: host.stores }).recompose(REF);
+    const log = { warn: vi.fn(), error: vi.fn() };
+    const result = await createCaptureRecompose({ stores: host.stores, log }).recompose(REF);
 
+    expect(log.warn).toHaveBeenCalledWith(expect.stringMatching(/ord_1: the total moved \(5000, frozen 7040, live 3520\)/));
     expect(result.skipped).toBe('TOTAL_MOVED');
     expect(host.state.rewrites).toEqual([]);
     expect(host.state.records.size).toBe(0);
@@ -396,6 +462,65 @@ describe('createCaptureRecompose — every line written off (decision 3: refunde
       { providerChargeId: CHARGE, outcome: { kind: 'REFUNDED', refundedCents: FROZEN } },
     ]);
     expect(host.state.records.size).toBe(0);
+  });
+
+  it('a Pix sale whose difference was paid by card (ADR 0352): each capture goes back once, under its own claim', async () => {
+    const host = fakeHost({
+      live: 0,
+      captures: [
+        { provider: 'pagbank', providerChargeId: 'PIX_SHORT', capturedCents: 5000, refundedCents: 0 },
+        { provider: 'pagbank', providerChargeId: 'CARD_DIFF', capturedCents: 2040, refundedCents: 0 },
+      ],
+    });
+    const recompose = createCaptureRecompose({ stores: host.stores });
+    await recompose.recompose(REF);
+    await recompose.recompose(REF);
+
+    expect(host.firstAttempt.mock.calls.map(([key]) => key.providerChargeId)).toEqual(['PIX_SHORT', 'CARD_DIFF']);
+    expect(host.state.records.size).toBe(0);
+  });
+
+  it('a held claim read as refunded (the host binding, H3): two runs at once send one refund, and a retry judges NONE', async () => {
+    const opened: { release: () => void } = { release: () => undefined };
+    const gate = new Promise<void>((resolve) => {
+      opened.release = resolve;
+    });
+    const host = fakeHost({
+      live: 0,
+      heldClaimIsRefunded: true,
+      answer: async (key) => {
+        await gate;
+        return refunded(key.providerChargeId, FROZEN);
+      },
+    });
+    const recompose = createCaptureRecompose({ stores: host.stores });
+    const first = recompose.recompose(REF);
+    await vi.waitFor(() => expect(host.firstAttempt).toHaveBeenCalledTimes(1));
+    // The second run reads the claim held: the capture is going back, nothing is owed.
+    const second = await recompose.recompose(REF);
+    opened.release();
+    await first;
+    const third = await recompose.recompose(REF);
+
+    expect(second.verdict).toEqual({ kind: 'NONE' });
+    expect(third.verdict).toEqual({ kind: 'NONE' });
+    expect(host.firstAttempt).toHaveBeenCalledTimes(1);
+    expect(host.state.records.size).toBe(0);
+  });
+
+  it('a record that fails after a refused refund propagates; the retry re-claims and sends attempt 2, then records once', async () => {
+    const host = fakeHost({ live: 0, answer: async () => ({ kind: 'REFUSED', error: new Error('no') }) });
+    const write = host.stores.recordOverCapture;
+    host.stores.recordOverCapture = vi.fn(async () => Promise.reject(new Error('db down')));
+    const recompose = createCaptureRecompose({ stores: host.stores });
+    await expect(recompose.recompose(REF)).rejects.toThrow('db down');
+    host.stores.recordOverCapture = write;
+    await recompose.recompose(REF);
+
+    // Accepted: the first attempt moved no money, and the claim it released is the store's to take as well.
+    expect(host.firstAttempt).toHaveBeenCalledTimes(2);
+    expect(host.state.records.size).toBe(1);
+    expect(host.state.alerts).toHaveLength(1);
   });
 
   it('C14: a capture already refunded by the other lane is not sent again', async () => {

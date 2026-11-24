@@ -15,8 +15,9 @@ import type { MerchantRef } from './types';
  *  2. `OVER` or `REFUND_ALL`: it asks the host to rewrite the sale's total from
  *     the frozen amount to the live one, PREDICATED on the frozen amount, so a
  *     retry finds it rewritten and a total somebody else moved is left alone.
- *  3. `OVER`: the excess is recorded, once per capture holding part of it, and
- *     the operator alerted for each record this run wrote. Never refunded here.
+ *  3. `OVER`: the excess is recorded, once per capture holding part of it (only
+ *     the captures that fund the frozen total: {@link allocateExcess}), and the
+ *     operator alerted for each record this run wrote. Never refunded here.
  *  4. `REFUND_ALL`: every capture still holding money goes back WHOLE through
  *     {@link refundCaptureOnRequest}: the host's one claim per provider charge
  *     (the same claim a short capture's refund takes, so the two lanes never
@@ -195,12 +196,18 @@ async function recompose(options: CaptureRecomposeOptions, ref: CaptureRecompose
     frozenTotalCents: ref.frozenTotalCents,
   });
   if (verdict.kind === 'NONE') return skippedResult(null, verdict, liveTotalCents);
+  const log = options.log ?? SILENT;
   const rewrite = await rewriteToLive(stores, ref, settlement.totalCents, liveTotalCents);
-  if (rewrite === 'MOVED') return skippedResult('TOTAL_MOVED', verdict, liveTotalCents);
-  const run: Run = { options, log: options.log ?? SILENT, ref, liveTotalCents };
+  if (rewrite === 'MOVED') {
+    log.warn(
+      `capture recompose ${ref.reference}: the total moved (${settlement.totalCents}, frozen ${ref.frozenTotalCents}, live ${liveTotalCents}): left alone, nothing recorded`,
+    );
+    return skippedResult('TOTAL_MOVED', verdict, liveTotalCents);
+  }
+  const run: Run = { options, log, ref, liveTotalCents };
   const result: CaptureRecomposeResult = { skipped: null, verdict, liveTotalCents, rewritten: rewrite === 'REWRITTEN', recorded: [], refunds: [] };
   if (verdict.kind === 'OVER') {
-    for (const share of allocateExcess(settlement.captures, verdict.excessCents)) {
+    for (const share of allocateExcess(settlement.captures, verdict.excessCents, ref.frozenTotalCents)) {
       await record(run, result, share.capture, share.excessCents, null);
     }
   } else {
