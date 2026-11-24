@@ -104,3 +104,17 @@ export const authPlatformManifest = {
   server: ["http"],
   web: ["surface", "areas"],
 } as const satisfies PackageManifest;
+
+/**
+ * Deleting one's own account (FUT-5322): the page and the pending screen, a
+ * web surface of its own because it binds a config (the mount, the facts, the
+ * session hooks) the sign-in surface has no business carrying. Its server half
+ * is `createApiAuth({ accountDeletion })`, already inside the main manifest's
+ * `http`, so this declares no server capability.
+ */
+export const authAccountDeletionManifest = {
+  name: "@12-apps/auth-account-deletion",
+  contract: 1,
+  observability: { namespace: "auth-account-deletion" },
+  web: ["surface", "areas"],
+} as const satisfies PackageManifest;

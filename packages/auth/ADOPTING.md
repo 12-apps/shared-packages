@@ -683,6 +683,12 @@ reminder; one of a single day sends neither reminder.
    `h1` ("Excluir conta"): mount it where the host's frame does not repeat that
    title. `blockerAction(kind)` and `forfeitAction(kind)` give each link's words
    per kind (a vale cannot be refunded; credit can).
+   A host that adopts through a wiring host (`createWiringHost().adoptWeb`)
+   rather than building `createWebAuth` itself adopts
+   `authAccountDeletionWebManifest` (`@12-apps/auth/manifest/web`) with
+   `{ manifest: authAccountDeletionManifest, web: authAccountDeletionWebManifest }`:
+   its surface takes the same config plus `useSession`, in one object
+   (`createWebAccountDeletionSurface`).
 
 What stays in the host is configuration: its blockers, what is given up (and
 how the host zeroes it at the purge), and its erasure of every row that holds

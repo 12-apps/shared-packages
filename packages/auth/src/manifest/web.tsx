@@ -1,5 +1,6 @@
 import type { AnyWebManifest } from "@12-apps/wiring";
 
+import { createWebAccountDeletionSurface } from "../react/account-deletion";
 import { createWebEmailAuth } from "../react/create-web-email-auth";
 import { createWebAuthSettings } from "../react/settings";
 
@@ -78,6 +79,26 @@ export const authPlatformWebManifest = {
       area: "super-admin",
       routes: [{ path: "auth-settings", screen: "page" }],
       nav: [{ testId: "auth-settings", path: "auth-settings" }],
+    },
+  ],
+} as const satisfies AnyWebManifest;
+
+/**
+ * "Excluir minha conta" and the pending screen (FUT-5322), adopted through the
+ * wiring host like the other two rather than by calling the factory by hand.
+ *
+ * Its config carries the session hook beside the rest
+ * (`createWebAccountDeletionSurface`), so one argument builds it. The one area
+ * row is a suggestion: the shopper's account area, where a buyer manages
+ * their own account.
+ */
+export const authAccountDeletionWebManifest = {
+  name: "@12-apps/auth-account-deletion",
+  surface: { create: createWebAccountDeletionSurface },
+  areas: [
+    {
+      area: "client",
+      routes: [{ path: "account/excluir", screen: "DeleteAccountPage" }],
     },
   ],
 } as const satisfies AnyWebManifest;

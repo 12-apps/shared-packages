@@ -17,9 +17,9 @@ import {
   createApiEmailAuth,
   createApiEmailAuthSettings,
 } from "../../server/create-api-email-auth";
-import { authManifest, authPlatformManifest } from "../index";
+import { authAccountDeletionManifest, authManifest, authPlatformManifest } from "../index";
 import { authPlatformServerManifest, authServerManifest } from "../server";
-import { authPlatformWebManifest, authWebManifest } from "../web";
+import { authAccountDeletionWebManifest, authPlatformWebManifest, authWebManifest } from "../web";
 
 /**
  * The manifests are `as const` literals now that the contract is a type-only
@@ -69,6 +69,30 @@ describe("the producer assertions", () => {
     expect(defineWebManifest(authPlatformManifest, authPlatformWebManifest)).toBe(
       authPlatformWebManifest,
     );
+    expect(defineManifest(authAccountDeletionManifest)).toBe(authAccountDeletionManifest);
+    expect(defineWebManifest(authAccountDeletionManifest, authAccountDeletionWebManifest)).toBe(
+      authAccountDeletionWebManifest,
+    );
+  });
+});
+
+describe("authAccountDeletionWebManifest", () => {
+  it("builds both screens from ONE config, the session hook inside it", () => {
+    const useSession = () => ({ signIn: async () => undefined, signOut: async () => undefined });
+    const surface = authAccountDeletionWebManifest.surface.create({
+      mount: "/api/account-deletion",
+      facts: { goes: [], stays: [] },
+      timeZone: "America/Sao_Paulo",
+      useSession,
+    });
+    expect(typeof surface.DeleteAccountPage).toBe("function");
+    expect(typeof surface.PendingDeletionScreen).toBe("function");
+  });
+
+  it("suggests the one route, on a screen the surface really has", () => {
+    const [area] = authAccountDeletionWebManifest.areas;
+    expect(area.area).toBe("client");
+    expect(area.routes.map((route) => route.screen)).toEqual(["DeleteAccountPage"]);
   });
 });
 
