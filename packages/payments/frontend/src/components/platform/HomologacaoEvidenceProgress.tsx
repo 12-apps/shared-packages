@@ -58,6 +58,12 @@ interface EvidenceProgressProps {
   results?: Partial<Record<EvidenceRunStep, EvidenceStepResult>>;
   /** The run is over: every step shows its result, and nothing is going. */
   finished?: boolean;
+  /**
+   * Everything runs at once (FUT-5519): the Pix and the wallets from the
+   * moment the run is prepared, the cards once encrypted. Each step spins
+   * until its own result arrives, in the order the run depends on.
+   */
+  parallel?: { cardsReady: boolean };
 }
 
 // Material Symbols' check_circle and radio_button_unchecked, inline: the
@@ -109,6 +115,46 @@ function stateOf(index: number, at: number, result: EvidenceStepResult | undefin
   return result ? MARK_OF_RESULT[result.kind] : 'done';
 }
 
+/** The order a parallel run depends on: what needs no card first, then the cards. */
+const PARALLEL_RUN: readonly EvidenceRunStep[] = ['prepare', 'PIX', 'GOOGLE_PAY', 'APPLE_PAY', 'encrypt', 'CARD', 'DEBIT', 'file'];
+
+/** A parallel run's step: its own result once known, spinning while it runs, else waiting. */
+function parallelState(
+  step: EvidenceRunStep,
+  phase: EvidencePhase,
+  result: EvidenceStepResult | undefined,
+  cardsReady: boolean,
+): MarkState {
+  if (step === 'prepare') return phase === 'preparing' ? 'current' : 'done';
+  if (phase === 'preparing' || step === 'file') return 'pending';
+  if (result) return MARK_OF_RESULT[result.kind];
+  return runningState(step, cardsReady);
+}
+
+/** A step of a parallel run with no result yet: the cards wait for their encryption. */
+function runningState(step: EvidenceRunStep, cardsReady: boolean): MarkState {
+  if (step === 'encrypt') return cardsReady ? 'done' : 'current';
+  if (step === 'CARD' || step === 'DEBIT') return cardsReady ? 'current' : 'pending';
+  return 'current';
+}
+
+/** A step's result, shown only once it has one: never on a step still going or waiting. */
+const shownResult = (state: MarkState, result: EvidenceStepResult | undefined): EvidenceStepResult | undefined =>
+  state === 'current' || state === 'pending' ? undefined : result;
+
+/** Each step's mark, and how far the bar is. */
+function marksOf(props: EvidenceProgressProps): { steps: readonly EvidenceRunStep[]; states: MarkState[]; done: number } {
+  const { phase, section, full, results, finished = false, parallel } = props;
+  if (parallel && full && !finished) {
+    const states = PARALLEL_RUN.map((step) => parallelState(step, phase, results?.[step], parallel.cardsReady));
+    return { steps: PARALLEL_RUN, states, done: states.filter((state) => state !== 'current' && state !== 'pending').length };
+  }
+  const steps = full ? (parallel ? PARALLEL_RUN : FULL_RUN) : DOWNLOAD_ONLY;
+  const at = finished ? steps.length : steps.indexOf(currentEvidenceStep(phase, section));
+  const states = steps.map((step, index) => stateOf(index, at, index < at ? results?.[step] : undefined));
+  return { steps, states, done: at };
+}
+
 /** Which wallets this run carries a token for, and which stay pending. */
 function WalletsLine({ results }: { results: BrowserWalletResult[] }): ReactNode {
   const copy = usePlatformCopy().evidence;
@@ -127,16 +173,16 @@ function WalletsLine({ results }: { results: BrowserWalletResult[] }): ReactNode
   );
 }
 
-export function EvidenceProgress({ phase, section, full, walletResults, results, finished = false }: EvidenceProgressProps): ReactNode {
+export function EvidenceProgress(props: EvidenceProgressProps): ReactNode {
+  const { phase, full, walletResults, results, finished = false } = props;
   const copy = usePlatformCopy().evidence;
-  const steps = full ? FULL_RUN : DOWNLOAD_ONLY;
-  const at = finished ? steps.length : steps.indexOf(currentEvidenceStep(phase, section));
+  const { steps, states, done } = marksOf(props);
   return (
     <Stack spacing={1} role="status" aria-busy={!finished} data-testid="evidence-phase">
       {finished ? null : <Typography variant="body2">{copy.phases[phase]}</Typography>}
       <LinearProgress
         variant="determinate"
-        value={(at / steps.length) * 100}
+        value={(done / steps.length) * 100}
         aria-label={copy.steps.label}
         color="inherit"
         sx={{ color: 'text.primary' }}
@@ -144,8 +190,8 @@ export function EvidenceProgress({ phase, section, full, walletResults, results,
       {full ? (
         <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 0.5 }} data-testid="evidence-steps">
           {steps.map((step, index) => {
-            const result = index < at ? results?.[step] : undefined;
-            const state = stateOf(index, at, result);
+            const state = states[index]!;
+            const result = shownResult(state, results?.[step]);
             return (
               <Stack
                 key={step}

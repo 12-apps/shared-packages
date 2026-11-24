@@ -212,15 +212,15 @@ describe('homologação evidence — the wallet sections', () => {
     expect(prepared.wallets.googlePay).toBeNull();
     expect(walletOrders(w, 'GOOGLE_PAY')).toHaveLength(0);
   });
-  it('given a run, then it reports each section as it starts, in the order the file numbers them', async () => {
+  it('given a run, then it reports every section once, as each finishes, all of them raised together (FUT-5519)', async () => {
     const w = world();
     await connected(w);
     const prepared = await prepareEvidenceRun(w.runDeps);
     const sections: string[] = [];
     await completeEvidenceRun(w.runDeps, prepared.runId, cards(), wallets(), (section) => sections.push(section));
-    expect(sections).toEqual(['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY']);
+    expect([...sections].sort()).toEqual(['APPLE_PAY', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'PIX']);
   });
-  it('given a run, then each section starts with the outcomes of the sections already done (FUT-5519)', async () => {
+  it('given a run, then each finished section is told with every section finished so far, itself included (FUT-5519)', async () => {
     const w = world();
     await connected(w);
     const prepared = await prepareEvidenceRun(w.runDeps);
@@ -231,14 +231,12 @@ describe('homologação evidence — the wallet sections', () => {
       reported.push([...done]);
     });
 
-    expect(seen).toEqual([
-      { section: 'PIX', done: [] },
-      { section: 'CARD', done: ['pix'] },
-      { section: 'DEBIT', done: ['pix', 'credit'] },
-      { section: 'GOOGLE_PAY', done: ['pix', 'credit', 'debit'] },
-      { section: 'APPLE_PAY', done: ['pix', 'credit', 'debit', 'googlePay'] },
-    ]);
-    // What the last section was told of the four before it is what the run's record says of them.
+    const scenario = { PIX: 'pix', CARD: 'credit', DEBIT: 'debit', GOOGLE_PAY: 'googlePay', APPLE_PAY: 'applePay' } as const;
+    seen.forEach((entry, index) => {
+      expect(entry.done).toHaveLength(index + 1);
+      expect(entry.done.at(-1)).toBe(scenario[entry.section as keyof typeof scenario]);
+    });
+    // What the last report says of every section is what the run's record says of them.
     const final = evidenceScenarioOutcomes(record);
     expect(reported.at(-1)).toEqual(
       reported.at(-1)!.map((outcome) => final.find((fromRecord) => fromRecord.scenario === outcome.scenario)),

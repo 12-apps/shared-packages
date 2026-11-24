@@ -80,7 +80,19 @@ export interface HomologacaoProductionEvidenceCardProps {
     /** Told each part as it starts, with the outcomes of the parts already done (FUT-5519). */
     onSection: (section: EvidenceRunSection, done?: readonly ProductionScenarioOutcome[]) => void,
     buyer: EvidenceBuyer,
+    /** Only these sections (FUT-5519): the ones not fired at once through `onChargeNow`. Absent: all. */
+    sections?: readonly EvidenceRunSection[],
   ) => Promise<ProductionRunAnswer>;
+  /**
+   * The sections that need no card encryption, fired as soon as the run is
+   * prepared (FUT-5519): the Pix and Google Pay at once, Apple Pay while its
+   * sheet is open. Present, the run raises everything it can in parallel.
+   */
+  onChargeNow?: (
+    runId: string,
+    input: { pix: boolean; wallets: BrowserWalletResult[] },
+    buyer: EvidenceBuyer,
+  ) => Promise<{ paid: Partial<Record<'GOOGLE_PAY' | 'APPLE_PAY', boolean>>; outcomes: readonly ProductionScenarioOutcome[] }>;
   /**
    * Apple Pay, charged while its sheet is open (FUT-5519): the prepared run's
    * Apple Pay order, raised at once because Apple's token lives minutes.
@@ -259,7 +271,7 @@ function RunProgress({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoPr
   if (phase === 'downloading') return <EvidenceProgress phase={phase} section={progress.section} full={false} walletResults={null} />;
   const running = phase !== 'idle';
   if (!running && !progress.finished) return null;
-  const outcomes = progress.finished && flow.scenarios ? flow.scenarios : progress.told;
+  const outcomes = progress.finished && flow.scenarios ? flow.scenarios : progress.outcomes;
   return (
     <EvidenceProgress
       phase={running ? phase : 'running'}
@@ -268,6 +280,7 @@ function RunProgress({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoPr
       walletResults={null}
       results={stepResultsOf(outcomes, progress.cardFailure, copy.scenarios)}
       finished={!running}
+      parallel={flow.parallel ? { cardsReady: progress.cardsReady } : undefined}
     />
   );
 }
@@ -324,7 +337,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
     validateApplePayMerchant: props.onValidateApplePayMerchant,
     googlePayApi: props.googlePayApi,
     loadApplePaySdk: props.loadApplePaySdk,
-    appleInSheet: props.onChargeApplePay !== undefined,
+    appleInSheet: props.onChargeApplePay !== undefined || props.onChargeNow !== undefined,
   });
   const flow = useProductionRun(props, form, wallets);
   const connected = props.seller?.connected === true;

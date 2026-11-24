@@ -24,7 +24,7 @@ import {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
-import { chargeApplePayInSheet } from './apple-in-sheet';
+import { chargeApplePayInSheet, chargeImmediateSections, type ImmediateCharge } from './apple-in-sheet';
 import { evidenceScenarioOutcomes, type EvidenceRunProgress, type EvidenceScenarioOutcome } from './outcomes';
 import { pixViewOf, type EvidencePixView } from './orders-pix-production';
 import { retryDueEvidenceRefund } from './refund-sweep';
@@ -35,6 +35,7 @@ import type {
   EvidenceBuyer,
   EvidenceEnvironment,
   EvidenceRecord,
+  EvidenceRunSection,
   EvidenceWalletsConfig,
   HomologacaoEvidenceCopy,
 } from './types';
@@ -161,7 +162,18 @@ export interface HomologacaoEvidenceService {
     wallets?: readonly BrowserWalletResult[],
     onSection?: EvidenceRunProgress,
     buyer?: EvidenceBuyer,
+    /** Only these sections (FUT-5519): the ones the browser did not fire at once. Default: all. */
+    sections?: readonly EvidenceRunSection[],
   ): Promise<EvidenceRecord>;
+  /**
+   * The sections that need no card encryption — the Pix and each wallet with a
+   * token — fired as soon as the run is prepared, all at once (FUT-5519).
+   */
+  chargeNow(
+    runId: string,
+    input: { pix: boolean; wallets: readonly BrowserWalletResult[] },
+    buyer?: EvidenceBuyer,
+  ): Promise<ImmediateCharge>;
   /**
    * Apple Pay, charged while its sheet is still open (FUT-5519): the prepared
    * run's Apple Pay order, consult and cancel, raised at once because Apple's
@@ -292,8 +304,10 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
         buyer && environment === 'PRODUCTION' ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
       );
     },
-    run: (runId, cards, wallets, onSection, buyer) =>
-      completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection),
+    run: (runId, cards, wallets, onSection, buyer, sections) =>
+      completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection, sections),
+    chargeNow: (runId, input, buyer) =>
+      chargeImmediateSections({ ...runDeps, customer: customerFor(environment, buyer) }, runId, input),
     chargeApplePay: (runId, wallet, buyer) =>
       chargeApplePayInSheet({ ...runDeps, customer: customerFor(environment, buyer) }, runId, wallet),
     confirmPix: async (runId, action) =>

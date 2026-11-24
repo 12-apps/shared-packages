@@ -136,18 +136,6 @@ async function walletsConfigured(deps: EvidenceRunDeps): Promise<Readonly<Record
   };
 }
 
-/** The Apple Pay section's step keys: charged in the sheet, ahead of the rest of phase 2 (FUT-5519). */
-export const APPLE_PAY_KEYS: readonly EvidenceStepKey[] = Object.values(keysOf('APPLE_PAY'));
-
-/**
- * The Apple Pay section, raised while Apple's sheet is still open (FUT-5519):
- * Apple's token is only good for minutes and the sheet waits at most 30 s, so
- * the order goes to PagBank at once, before the rest of the run.
- */
-export async function applePaySteps(deps: EvidenceRunDeps, runId: string, result: BrowserWalletResult): Promise<EvidenceStep[]> {
-  return walletSteps(deps, runId, 'APPLE_PAY', [result], await walletsConfigured(deps));
-}
-
 /** Phase 2: the wallets' sections, Google Pay first — minus any already raised in its sheet. */
 export async function walletSectionSteps(
   deps: EvidenceRunDeps,
