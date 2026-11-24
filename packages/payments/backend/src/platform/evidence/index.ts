@@ -28,6 +28,7 @@ export {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
+export { chargeApplePayInSheet } from './apple-in-sheet';
 export { buildHomologacaoEvidenceFile, formatEvidenceTime, type EvidenceFile, type EvidenceFileDeps } from './file';
 export { buildHomologacaoEvidenceJson } from './json';
 export { createMemoryHomologacaoEvidenceStore } from './memory';

@@ -16,6 +16,8 @@ export async function raiseOrderSections(
   cards: readonly BrowserCardResult[],
   wallets: readonly BrowserWalletResult[],
   onSection: EvidenceRunProgress,
+  /** Apple Pay was already charged in its sheet (FUT-5519): its section is not raised again. */
+  appleDone = false,
 ): Promise<EvidenceStep[]> {
   onSection('PIX', []);
   const pix = await pixSteps(deps, runId);
@@ -32,6 +34,7 @@ export async function raiseOrderSections(
         ...sofar,
       ]),
     ),
+    appleDone ? ['GOOGLE_PAY'] : ['GOOGLE_PAY', 'APPLE_PAY'],
   );
   return [...before, ...walletSteps];
 }

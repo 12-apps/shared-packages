@@ -7,7 +7,7 @@ import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, threeDSSessionStep } from './orders-debit';
-import { WALLET_ORDER_KEYS, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
+import { APPLE_PAY_KEYS, WALLET_ORDER_KEYS, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
 import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
@@ -338,15 +338,22 @@ export class EvidenceRunNotFoundError extends Error {
   }
 }
 
-/** The latest run, provided it is this one and its orders were never raised. */
-function openRun(record: EvidenceRecord | null, runId: string): EvidenceRecord {
+/**
+ * The latest run, provided it is this one and its orders were never raised —
+ * Apple Pay's aside, which its sheet may have raised first (FUT-5519).
+ */
+export function openRun(record: EvidenceRecord | null, runId: string): EvidenceRecord {
   if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
-  if (record.steps.some((step) => ORDER_KEYS.includes(step.key))) throw new EvidenceRunNotFoundError(runId);
+  const raised = (key: EvidenceStepKey): boolean => ORDER_KEYS.includes(key) && !APPLE_PAY_KEYS.includes(key);
+  if (record.steps.some((step) => raised(step.key))) throw new EvidenceRunNotFoundError(runId);
   return record;
 }
 
+/** Whether the run's Apple Pay order was already raised, in its sheet. */
+export const appleRaised = (record: EvidenceRecord): boolean => record.steps.some((step) => APPLE_PAY_KEYS.includes(step.key));
+
 /** Why phase 2 may not raise orders for this run, or null when it may. */
-function blockedBecause(
+export function blockedBecause(
   deps: EvidenceRunDeps,
   record: EvidenceRecord,
   seller: Awaited<ReturnType<typeof sandboxSeller>>,
@@ -380,7 +387,7 @@ export async function completeEvidenceRun(
     // Recorded with the reason, so the file says WHY nothing was raised.
     for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
   } else {
-    const raised = await raiseOrderSections(deps, runId, cards, wallets, onSection);
+    const raised = await raiseOrderSections(deps, runId, cards, wallets, onSection, appleRaised(record));
     for (const step of raised) {
       steps = withStep(steps, step);
     }

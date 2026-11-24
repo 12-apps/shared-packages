@@ -10,7 +10,7 @@ import type {
   EvidenceWalletsConfig,
 } from '@12-apps/payments-backend';
 
-import { startApplePaySession, type ApplePayPaymentMethod, type ApplePaySessionClass } from '../checkout/apple-pay-button';
+import type { ApplePaySessionClass } from '../checkout/apple-pay-button';
 import { ApplePaySdkButton } from '../checkout/apple-pay-sdk-button';
 import { useApplePaySession, type ApplePaySdkLoader, type ApplePaySessionState, type ApplePayVia } from '../checkout/apple-pay-sdk';
 import {
@@ -23,6 +23,7 @@ import {
 } from '../checkout/google-pay-button';
 import type { AppleAbsence, HomologacaoEvidenceWalletsCopy } from './copy';
 import { usePlatformCopy } from './copy-context';
+import { lastFour, openAppleSheet, type EvidenceAppleSheet } from './evidence-apple-sheet';
 
 /**
  * The wallet step of the evidence card (FUT-3755): Google Pay's and Apple
@@ -57,6 +58,11 @@ interface EvidenceWalletsInput {
   googlePayApi?: GooglePayApi | null;
   /** Injectable Apple Pay SDK loader for tests; omit to load Apple's script where Safari's session is missing. */
   loadApplePaySdk?: ApplePaySdkLoader;
+  /**
+   * Apple Pay is charged while its sheet is open (FUT-5519): the press only
+   * includes it, and the sheet opens on the charge's own confirm.
+   */
+  appleInSheet?: boolean;
 }
 
 const failed = (type: EvidenceWallet, failure: BrowserWalletFailure): BrowserWalletResult => ({
@@ -67,11 +73,6 @@ const failed = (type: EvidenceWallet, failure: BrowserWalletFailure): BrowserWal
   failure,
 });
 
-/** Four trailing digits, or null — the only part of the number a wallet shows. */
-function lastFour(text: string | undefined): string | null {
-  return /(\d{4})\s*$/.exec(text ?? '')?.[1] ?? null;
-}
-
 function googleResult(data: GooglePaymentData): BrowserWalletResult {
   const info = data.paymentMethodData.info;
   return {
@@ -80,10 +81,6 @@ function googleResult(data: GooglePaymentData): BrowserWalletResult {
     brand: info?.cardNetwork ?? null,
     last4: lastFour(info?.cardDetails),
   };
-}
-
-function appleResult(token: string, method: ApplePayPaymentMethod | null): BrowserWalletResult {
-  return { type: 'APPLE_PAY', token, brand: method?.network ?? null, last4: lastFour(method?.displayName) };
 }
 
 /** Open Google's sheet — synchronously, inside the tap — and keep what it answers. */
@@ -107,49 +104,13 @@ function runGooglePay(
 }
 
 /**
- * Start Apple's session — synchronously, inside the tap — and keep its token.
- * The order is raised later, at "generate", so the sheet is closed as soon as
- * it authorizes: Apple's sheet would otherwise time out waiting for it.
+ * Start Apple's session in the tap and keep its token for "generate", closing
+ * the sheet as soon as it authorizes — the screens with no in-sheet charge.
  */
-function runApplePay(
-  Session: ApplePaySessionClass,
-  cents: number,
-  input: { copy: HomologacaoEvidenceWalletsCopy; validate: (validationURL: string) => Promise<unknown> },
-  record: (result: BrowserWalletResult) => void,
-): void {
-  const seen: { failure: BrowserWalletFailure | null; method: ApplePayPaymentMethod | null } = { failure: null, method: null };
-  const { copy } = input;
-  let sheet: ReturnType<typeof startApplePaySession>;
-  try {
-    sheet = startApplePaySession({
-      Session,
-      cents,
-      copy: {
-        orderTotal: copy.applePaySheetTotal,
-        cannotStart: copy.applePayCannotStart,
-        cannotComplete: copy.applePayCannotComplete,
-        payAction: copy.applePayButton,
-      },
-      validateMerchant: (url) =>
-        input.validate(url).catch((error: unknown) => {
-          seen.failure = 'MERCHANT_VALIDATION_FAILED';
-          throw error;
-        }),
-      onError: () => {
-        seen.failure ??= 'TOKEN_ERROR';
-      },
-      onPaymentMethod: (method) => {
-        seen.method = method;
-      },
-    });
-  } catch {
-    record(failed('APPLE_PAY', 'TOKEN_ERROR'));
-    return;
-  }
-  void sheet.answer.then((key) => {
-    if (key === null) return record(failed('APPLE_PAY', seen.failure ?? 'DISMISSED'));
-    sheet.complete(true);
-    record(appleResult(key, seen.method));
+function runApplePay(sheet: EvidenceAppleSheet, record: (result: BrowserWalletResult) => void): void {
+  void sheet.result.then((result) => {
+    if (result.token) sheet.complete(true);
+    record(result);
   });
 }
 
@@ -198,6 +159,40 @@ function googleEnvironment(google: EvidenceWalletsConfig['googlePay'] | null): '
   return google?.environment ?? 'TEST';
 }
 
+/**
+ * Apple Pay's press (FUT-5519). Charged in its sheet, the press only includes
+ * it and the confirm opens the sheet; otherwise the press opens it and keeps
+ * the token for "generate".
+ */
+function useAppleInSheet(
+  inSheet: boolean,
+  apple: AppleOffer | null,
+  cents: number,
+  copy: HomologacaoEvidenceWalletsCopy,
+  record: (result: BrowserWalletResult) => void,
+  setResults: (update: (previous: Results) => Results) => void,
+) {
+  const [included, setIncluded] = useState(false);
+  const open = (offer: AppleOffer): EvidenceAppleSheet => openAppleSheet(offer.Session, cents, { copy, validate: offer.validate });
+  return {
+    /** Apple Pay waits for the charge's confirm to open its sheet. */
+    included: included && apple !== null,
+    press: (): void => {
+      if (!apple) return;
+      if (!inSheet) return runApplePay(open(apple), record);
+      setResults((previous) => {
+        const next = { ...previous };
+        delete next.APPLE_PAY;
+        return next;
+      });
+      setIncluded(true);
+    },
+    /** Open Apple's sheet now, synchronously inside the confirm's tap; null when Apple Pay was not included. */
+    open: (): EvidenceAppleSheet | null => (included && apple ? open(apple) : null),
+    reset: () => setIncluded(false),
+  };
+}
+
 export function useEvidenceWallets(input: EvidenceWalletsInput) {
   const copy = usePlatformCopy().evidence.wallets;
   const [results, setResults] = useState<Results>({});
@@ -209,10 +204,13 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
   const apple = appleOffer(input, session);
   const cents = input.config?.amountCents ?? 0;
   const record = (result: BrowserWalletResult): void => setResults((previous) => ({ ...previous, [result.type]: result }));
+  const inSheet = useAppleInSheet(input.appleInSheet === true, apple, cents, copy, record, setResults);
   return {
     results,
+    appleIncluded: inSheet.included,
+    openApple: inSheet.open,
     google: client && google ? { client, press: () => runGooglePay(client, google, cents, record) } : null,
-    apple: apple ? { via: apple.via, press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
+    apple: apple ? { via: apple.via, press: inSheet.press } : null,
     /** Why Apple Pay has no button here, or null when it has one. */
     appleAbsent: appleAbsence(input, apple !== null, session.loading),
     /** The host carries wallets but no Google Pay for this seller: say so, rather than draw nothing. */
@@ -226,11 +224,15 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
      */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
+        if (wallet === 'APPLE_PAY' && inSheet.included) return [];
         const result = results[wallet] ?? notOffered(wallet, input, { google: client !== null, apple: apple !== null });
         return result ? [result] : [];
       }),
     /** A token pays once: a run that used them clears them. */
-    reset: () => setResults({}),
+    reset: () => {
+      setResults({});
+      inSheet.reset();
+    },
   };
 }
 
@@ -307,6 +309,16 @@ function AbsentLine({ testId, text }: { testId: string; text: string | null }): 
   );
 }
 
+/** Apple Pay included in the charge: its sheet opens on the confirm (FUT-5519). */
+function AppleIncludedLine({ shown, text }: { shown: boolean; text: string }): ReactNode {
+  if (!shown) return null;
+  return (
+    <Typography variant="body2" role="status" data-testid="evidence-wallet-included-APPLE_PAY">
+      {text}
+    </Typography>
+  );
+}
+
 /** The wallet step: nothing at all when the host's seller view carries no wallets. */
 export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): ReactNode {
   const copy = usePlatformCopy().evidence.wallets;
@@ -344,6 +356,7 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
       </Stack>
       <AbsentLine testId="evidence-google-pay-absent" text={wallets.googleAbsent ? copy.googlePayAbsent : null} />
       <AbsentLine testId="evidence-apple-pay-absent" text={wallets.appleAbsent ? copy.applePayAbsent[wallets.appleAbsent] : null} />
+      <AppleIncludedLine shown={wallets.appleIncluded} text={copy.applePayIncluded} />
       {lines.map((result) => (
         <WalletLine key={result.type} result={result} copy={copy} />
       ))}

@@ -174,6 +174,7 @@ const BASE: Omit<PlatformHomologacaoCopy, 'productionEvidence'> = {
       applePaySheetTotal: 'Homologation test',
       applePayCannotStart: 'Apple Pay is not configured.',
       applePayCannotComplete: 'Apple Pay could not be completed.',
+      applePayIncluded: "Apple Pay included: Apple's sheet opens when you confirm the charge.",
       applePayAbsent: {
         NOT_CONFIGURED: 'Apple Pay: waiting for the Apple Developer account. Its section stays pending.',
         NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
