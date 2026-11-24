@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { BrowserCardResult, BrowserWalletResult, EvidenceBuyer, EvidenceSummary } from '@12-apps/payments-backend';
+import type { EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
@@ -9,11 +9,9 @@ import type { HomologacaoProductionEvidenceCardProps } from './HomologacaoProduc
 import type { ProductionPixView } from './ProductionPixPanel';
 import type { ProductionScenarioOutcome } from './ProductionScenarioList';
 import {
-  authenticateRealDebit,
   buyerOf,
   cardOf,
   EMPTY_CARD,
-  encryptRealCard,
   isBlank,
   rememberBuyer,
   rememberedBuyer,
@@ -21,6 +19,7 @@ import {
   type CardForm,
 } from './production-evidence-data';
 import { useRunProgress } from './production-step-results';
+import { raiseRunOrders } from './production-run-orders';
 
 /**
  * The PRODUCTION evidence card's state (FUT-4198): the form, and one run at a
@@ -66,25 +65,6 @@ export function useProductionForm() {
 }
 
 type ProductionForm = ReturnType<typeof useProductionForm>;
-
-/** The cards the browser sends: the credit one always, the debit one unless it was left blank. */
-async function browserCards(
-  prepared: Awaited<ReturnType<HomologacaoProductionEvidenceCardProps['onPrepare']>>,
-  holder: string,
-  credit: CardForm,
-  debit: CardForm,
-): Promise<BrowserCardResult[]> {
-  const cards: BrowserCardResult[] = [];
-  const creditCard = cardOf(credit);
-  if (creditCard) cards.push(await encryptRealCard('approved', creditCard, holder, prepared.publicKey));
-  const debitCard = isBlank(debit) ? null : cardOf(debit);
-  if (debitCard) {
-    cards.push(
-      await authenticateRealDebit(debitCard, holder, prepared.publicKey, prepared.threeDSSession ?? null, prepared.debitTest),
-    );
-  }
-  return cards;
-}
 
 /**
  * A paid Pix whose refund PagBank has not taken yet: the server retries it in
@@ -247,31 +227,16 @@ function useLatestRun(seller: HomologacaoProductionEvidenceCardProps['seller']) 
   return { answered, setAnswered, saved, ...useShownOutcomes(seller, answered, ownRunId) };
 }
 
-/**
- * Apple Pay, charged while its sheet is open (FUT-5519): wait for the person
- * to authorize, raise its order on the prepared run, and close the sheet with
- * PagBank's answer. Answers what phase 2 still owes for Apple Pay: nothing
- * once the sheet charged it, else why it was not charged.
- */
-async function chargeAppleInSheet(
-  sheet: EvidenceAppleSheet | null,
-  charge: HomologacaoProductionEvidenceCardProps['onChargeApplePay'],
-  runId: string,
-  buyer: EvidenceBuyer,
-): Promise<BrowserWalletResult[]> {
-  if (!sheet) return [];
-  const result = await sheet.result;
-  if (!result.token || !charge) {
-    sheet.complete(false);
-    return [result.token ? { ...result, token: null, failure: 'TOKEN_ERROR' } : result];
-  }
-  const paid = await charge(runId, result, buyer).then(
-    (answer) => answer.paid,
-    () => null,
-  );
-  sheet.complete(paid === true);
-  // Not raised at all (the call failed): phase 2 records why, never a pressless pending.
-  return paid === null ? [{ ...result, token: null, failure: 'TOKEN_ERROR' }] : [];
+/** Where the run reports to: the cards ready (then it is running), and each outcome as it arrives. */
+function reporters(progress: ReturnType<typeof useRunProgress>, enter: (next: EvidencePhase) => void) {
+  return {
+    onCards: (cards: Parameters<typeof progress.prepared>[0]) => {
+      progress.prepared(cards);
+      enter('running');
+    },
+    onTold: progress.told,
+    onSection: progress.onSection,
+  };
 }
 
 /** A sheet the run will not charge is closed as unpaid, once the person answers it. */
@@ -310,14 +275,11 @@ export function useProductionRun(
       const prepared = await props.onPrepare(buyer);
       runId = prepared.runId;
       saved(prepared.runId);
-      walletResults.push(...(await chargeAppleInSheet(appleSheet, props.onChargeApplePay, prepared.runId, buyer)));
       // The wallets' tokens are spent only once a run exists to spend them on.
       wallets.reset();
-      enter('encrypting');
-      const cards = await browserCards(prepared, buyer.name, form.credit, form.debit);
-      progress.prepared(cards);
-      enter('running');
-      const answer = await props.onRun(prepared.runId, cards, walletResults, progress.onSection, buyer);
+      enter(props.onChargeNow ? 'running' : 'encrypting');
+      const { credit, debit } = form;
+      const answer = await raiseRunOrders({ props, prepared, buyer, credit, debit, walletResults, appleSheet, ...reporters(progress, enter) });
       setAnswered({ scenarios: 'pix' in answer ? answer.scenarios : null });
       setPix('pix' in answer ? answer.pix : answer);
       form.clearCards();
@@ -341,6 +303,8 @@ export function useProductionRun(
     setConfirming,
     phase,
     progress,
+    /** Everything runs at once (FUT-5519): the host fires what needs no card through `onChargeNow`. */
+    parallel: props.onChargeNow !== undefined,
     failed,
     summary,
     pix,

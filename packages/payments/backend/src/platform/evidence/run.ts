@@ -7,19 +7,20 @@ import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, threeDSSessionStep } from './orders-debit';
-import { APPLE_PAY_KEYS, WALLET_ORDER_KEYS, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
+import { WALLET_ORDER_KEYS, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
 import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type { EvidenceRunProgress } from './outcomes';
-import { raiseOrderSections } from './run-sections';
+import { ALL_SECTIONS, claimSections, IMMEDIATE_SECTIONS, raiseOrderSections, raisedSections, saveIntoRun, sectionHolds } from './run-sections';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
   EvidenceEnvironment,
   EvidenceOutcomeCopy,
   EvidenceRecord,
+  EvidenceRunSection,
   EvidenceStep,
   EvidenceStepKey,
   EvidenceWalletsConfig,
@@ -325,51 +326,16 @@ async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
   if (cardHoldsMoney(latest)) throw new EvidenceCardRefundOpenError(latest.id);
 }
 
-/**
- * Thrown when phase 2 names a run that is not the latest prepared one, or one
- * whose orders were already raised. A second phase 2 on the same run would
- * replay idempotent creates that make no call, and overwrite the recording
- * that did — so a run raises its orders exactly once.
- */
-export class EvidenceRunNotFoundError extends Error {
-  constructor(runId: string) {
-    super(`No open homologation evidence run ${runId}`);
-    this.name = 'EvidenceRunNotFoundError';
-  }
-}
+export { blockedBecause, EvidenceRunNotFoundError, openRun, readRun } from './run-guards';
+import { blockedBecause, EvidenceRunNotFoundError, openRun, readRun } from './run-guards';
 
 /**
- * The latest run, provided it is this one and its orders were never raised —
- * Apple Pay's aside, which its sheet may have raised first (FUT-5519).
- */
-export function openRun(record: EvidenceRecord | null, runId: string): EvidenceRecord {
-  if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
-  const raised = (key: EvidenceStepKey): boolean => ORDER_KEYS.includes(key) && !APPLE_PAY_KEYS.includes(key);
-  if (record.steps.some((step) => raised(step.key))) throw new EvidenceRunNotFoundError(runId);
-  return record;
-}
-
-/** Whether the run's Apple Pay order was already raised, in its sheet. */
-export const appleRaised = (record: EvidenceRecord): boolean => record.steps.some((step) => APPLE_PAY_KEYS.includes(step.key));
-
-/** Why phase 2 may not raise orders for this run, or null when it may. */
-export function blockedBecause(
-  deps: EvidenceRunDeps,
-  record: EvidenceRecord,
-  seller: Awaited<ReturnType<typeof sandboxSeller>>,
-): string | null {
-  if (seller === 'NOT_SANDBOX') return deps.copy.notSandbox;
-  if (seller === 'NOT_CONNECTED') return deps.copy.usageNotConnected;
-  if (!deps.customer) return deps.copy.buyerMissing;
-  return record.steps.find((step) => step.key === 'connect.usage' && step.status === 'FAILED')?.observed ?? null;
-}
-
-/**
- * Phase 2: raise the Pix, card, debit and wallet orders once, record them,
- * then prove whose token they used. `wallets` is what each wallet's sheet gave
- * the browser (FUT-3755); absent, both wallet sections stay PENDING.
- * `onSection` is told each part as it starts, so a host can show the
- * operator where a run of several minutes is.
+ * Phase 2: raise the given sections' orders — every section by default —
+ * all at once, record them, then prove whose token they used (FUT-5519).
+ * Sections the browser fired as soon as the run was prepared (Pix and the
+ * wallets) are skipped once raised; a run whose card orders were raised is
+ * refused, so a run is charged once. `onSection` is told each section as it
+ * finishes, so a host shows each step's result while the rest still run.
  */
 export async function completeEvidenceRun(
   deps: EvidenceRunDeps,
@@ -377,23 +343,35 @@ export async function completeEvidenceRun(
   cards: readonly BrowserCardResult[],
   wallets: readonly BrowserWalletResult[] = [],
   onSection: EvidenceRunProgress = () => undefined,
+  sections: readonly EvidenceRunSection[] = ALL_SECTIONS,
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
-
-  let steps = record.steps;
-  const seller = await sandboxSeller(deps);
-  const blocked = blockedBecause(deps, record, seller);
-  if (blocked !== null || typeof seller !== 'object') {
-    // Recorded with the reason, so the file says WHY nothing was raised.
-    for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
-  } else {
-    const raised = await raiseOrderSections(deps, runId, cards, wallets, onSection, appleRaised(record));
-    for (const step of raised) {
-      steps = withStep(steps, step);
-    }
-    steps = withStep(steps, await usageStep(deps, steps, seller.token));
+  const raised = raisedSections(record);
+  if (sections.some((section) => raised.has(section) && !IMMEDIATE_SECTIONS.includes(section))) {
+    throw new EvidenceRunNotFoundError(runId);
   }
-  return deps.store.save({ ...record, steps, updatedAt: clockOf(deps)().toISOString() });
+  const todo = sections.filter((section) => !raised.has(section));
+  const release = claimSections(runId, todo);
+  if (!release) throw new EvidenceRunNotFoundError(runId);
+  try {
+    const seller = await sandboxSeller(deps);
+    const blocked = blockedBecause(deps, record, seller);
+    const now = () => clockOf(deps)().toISOString();
+    if (blocked !== null || typeof seller !== 'object') {
+      // Recorded with the reason, so the file says WHY nothing was raised.
+      const pending = ORDER_KEYS.filter((key) => todo.some((section) => sectionHolds(section, key))).map((key) =>
+        pendingStep(key, deps.copy, blocked ?? deps.copy.notRun),
+      );
+      return await saveIntoRun(deps, readRun(deps, runId), pending, undefined, now);
+    }
+    const steps = await raiseOrderSections(deps, runId, { cards, wallets }, todo, onSection);
+    const proveUsage = sections.includes('CARD')
+      ? async (merged: EvidenceStep[]) => withStep(merged, await usageStep(deps, merged, seller.token))
+      : undefined;
+    return await saveIntoRun(deps, readRun(deps, runId), steps, proveUsage, now);
+  } finally {
+    release();
+  }
 }
 
 /** What the operator answered about a production Pix (FUT-4198). */

@@ -46,6 +46,15 @@ export function stepResultsOf(
   return results;
 }
 
+/** What a run was told so far, each scenario's latest answer kept: sections answer in any order. */
+function mergeOutcomes(
+  previous: readonly ProductionScenarioOutcome[],
+  next: readonly ProductionScenarioOutcome[],
+): readonly ProductionScenarioOutcome[] {
+  const kept = previous.filter((outcome) => !next.some((fresh) => fresh.scenario === outcome.scenario));
+  return [...kept, ...next];
+}
+
 /** The first reason the browser could not prepare a card, if any. */
 const cardFailureOf = (cards: readonly BrowserCardResult[]): BrowserCardFailure | null =>
   cards.find((card) => card.failure)?.failure ?? null;
@@ -60,11 +69,12 @@ export function useRunProgress() {
   const [told, setTold] = useState<readonly ProductionScenarioOutcome[]>([]);
   const [cardFailure, setCardFailure] = useState<BrowserCardFailure | null>(null);
   const [finished, setFinished] = useState(false);
+  const [cardsReady, setCardsReady] = useState(false);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
   return {
     section,
-    told,
+    outcomes: told,
     cardFailure,
     finished,
     /** Starts a run: false, and nothing changes, while another is still going. */
@@ -75,14 +85,22 @@ export function useRunProgress() {
       setTold([]);
       setCardFailure(null);
       setFinished(false);
+      setCardsReady(false);
       return true;
     },
-    /** The host's `onSection`: the part the run is on, and the outcomes of the parts already done. */
+    /** The host's `onSection`: a part of the run, and the outcomes of the parts done so far. */
     onSection: (next: EvidenceRunSection, done?: readonly ProductionScenarioOutcome[]): void => {
       setSection(next);
-      if (done) setTold(done);
+      if (done) setTold((previous) => mergeOutcomes(previous, done));
     },
-    prepared: (cards: readonly BrowserCardResult[]): void => setCardFailure(cardFailureOf(cards)),
+    /** Outcomes of sections raised at once, outside phase 2 (FUT-5519): merged by scenario. */
+    told: (done: readonly ProductionScenarioOutcome[]): void => setTold((previous) => mergeOutcomes(previous, done)),
+    /** Whether the cards are ready: the encrypt step's own result. */
+    cardsReady,
+    prepared: (cards: readonly BrowserCardResult[]): void => {
+      setCardFailure(cardFailureOf(cards));
+      setCardsReady(true);
+    },
     /** The run ended; `ran` when the server held one, whose steps then stay on screen. */
     end: (ran: boolean): void => {
       inFlight.current = false;
