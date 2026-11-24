@@ -136,7 +136,10 @@ describe('Button (web)', () => {
     expect(el.className).toMatch(/MuiButton-root/u);
   });
 
-  it('fires onClick and is a real disabled button while loading', () => {
+  // FUT-5466: loading answers this button's own press, so it no longer sets a
+  // native `disabled` (that moved keyboard focus to <body>). It looks and
+  // reads busy (`aria-disabled`, `aria-busy`) and a press does nothing.
+  it('fires onClick, and while loading stays focusable and ignores a press', () => {
     const onClick = vi.fn();
     const { rerender } = render(
       <Button dataTestId="b" onClick={onClick}>
@@ -150,7 +153,12 @@ describe('Button (web)', () => {
         x
       </Button>,
     );
-    expect(screen.getByTestId('b')).toBeDisabled();
+    const busy = screen.getByTestId('b');
+    expect(busy).not.toBeDisabled();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(busy);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -44,7 +44,9 @@ describe('Given notifications that are off but can be asked for', () => {
     );
 
     const action = screen.getByTestId('notification-status-notice-enable');
-    expect(action).toBeDisabled();
+    // FUT-5466: a pending (loading) action is locked by aria-disabled and keeps focus;
+    // the press below proves it still cannot be sent twice.
+    expect(action).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(action);
     expect(onEnable).not.toHaveBeenCalled();
   });

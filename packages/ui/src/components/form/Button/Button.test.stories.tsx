@@ -2,10 +2,21 @@ import Delete from '@mui/icons-material/Delete';
 import Save from '@mui/icons-material/Save';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import * as React from 'react';
 
 import { must } from '../../../test-utils/must';
 
 import { Button } from './Button';
+
+/**
+ * Unavailable while loading, on both platforms: the web Button is aria-disabled
+ * and keeps focus (FUT-5466), the native one (react-native-web) is still
+ * disabled. The web-only contract is pinned by `LoadingKeepsFocus`.
+ */
+async function expectUnavailable(element: HTMLElement) {
+  const unavailable = element.getAttribute('aria-disabled') === 'true' || (element as HTMLButtonElement).disabled === true;
+  await expect(unavailable).toBe(true);
+}
 
 const meta: Meta<typeof Button> = {
   title: 'Form/Button/Tests',
@@ -91,7 +102,7 @@ export const LoadingStateTest: Story = {
 
     await step('Verify loading state', async () => {
       const button = canvas.getByTestId('loading-button');
-      await expect(button).toBeDisabled();
+      await expectUnavailable(button);
 
       // Check for loading spinner
       const spinner = canvas.getByRole('progressbar');
@@ -108,6 +119,65 @@ export const LoadingStateTest: Story = {
       const label = canvas.getByTestId('loading-button-busy-label');
       await expect(label).toHaveTextContent('Loading Button');
       await expect(label).toHaveStyle({ opacity: '0' });
+    });
+  },
+};
+
+/** A button that goes loading on its own press and stays so, like a host's save. */
+function PressThenLoad({ onPress }: { onPress: () => void }) {
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); onPress(); }}>
+      <Button
+        dataTestId="press-then-load"
+        type="submit"
+        disabled={busy}
+        loading={busy}
+        onClick={() => setBusy(true)}
+      >
+        Estender 1 h
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * FUT-5466: pressing a button that goes loading kept nothing focused — the
+ * native `disabled` moved keyboard focus to <body>. In Chromium, Tab to it,
+ * press Enter: it goes busy and the focus stays on it, and a second Enter
+ * neither submits nor clicks.
+ */
+export const LoadingKeepsFocus: Story = {
+  name: '⏳ Loading keeps keyboard focus',
+  // Web only: the native Button keeps its disabled loading state (FUT-5466).
+  tags: ['native-skip'],
+  args: { onClick: fn() },
+  render: (args) => <PressThenLoad onPress={() => args.onClick?.({} as React.MouseEvent<HTMLButtonElement>)} />,
+  play: async ({ canvasElement, step, args }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByTestId('press-then-load');
+    const submitted = must(args.onClick) as ReturnType<typeof fn>;
+
+    await step('Tab to the button and press Enter', async () => {
+      await userEvent.tab();
+      await waitFor(() => expect(button).toHaveFocus());
+      await userEvent.keyboard('{Enter}');
+      await expect(submitted).toHaveBeenCalledTimes(1);
+    });
+
+    await step('It is busy, and the focus stayed on it', async () => {
+      await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+      await expect(button).toHaveAttribute('aria-disabled', 'true');
+      await expect(button).not.toBeDisabled();
+      await waitFor(() => expect(button).toHaveFocus());
+      await expect(canvasElement.ownerDocument.activeElement).toBe(button);
+    });
+
+    await step('A second Enter, or Space, does nothing', async () => {
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      await expect(submitted).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(button).toHaveFocus());
     });
   },
 };
@@ -603,7 +673,7 @@ export const ComplexVariantTest: Story = {
       const loadingButton = canvas.getByTestId('ghost-danger-loading');
       const disabledButton = canvas.getByTestId('solid-neutral-disabled');
 
-      await expect(loadingButton).toBeDisabled();
+      await expectUnavailable(loadingButton);
       await expect(disabledButton).toBeDisabled();
     });
 

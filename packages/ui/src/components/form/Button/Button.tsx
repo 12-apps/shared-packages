@@ -6,7 +6,7 @@ import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
 import { pressRippleStyles } from './Button.ripple';
-import { buttonHeldStyles } from './Button.held';
+import { buttonHeldStyles, heldFocusRing } from './Button.held';
 import { ButtonProgressContent, buttonProgressStyles, useButtonPress } from './Button.progress';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -25,7 +25,7 @@ import type { ButtonComponent, ButtonProps } from './Button.types';
 
 const StyledButton = styled(MuiButton, {
   shouldForwardProp: (prop) =>
-    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple', 'progressing', 'held'].indexOf(
+    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple', 'progressing', 'held', 'busy'].indexOf(
       prop as string,
     ) === -1,
 })<{
@@ -36,7 +36,8 @@ const StyledButton = styled(MuiButton, {
   ripple?: boolean;
   progressing?: boolean;
   held?: boolean;
-}>(({ theme, customVariant, customColor = 'primary', glow, pulse, progressing, held }) => {
+  busy?: boolean;
+}>(({ theme, customVariant, customColor = 'primary', glow, pulse, progressing, held, busy }) => {
   const colorPalette = getColorFromTheme(theme, customColor);
 
   return {
@@ -54,6 +55,9 @@ const StyledButton = styled(MuiButton, {
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
     ...(progressing ? buttonProgressStyles(theme, customColor) : {}),
     ...(held ? buttonHeldStyles(theme) : {}),
+    // Loading keeps keyboard focus now (FUT-5466), so it needs a ring the
+    // disabled look does not draw — the same one a held button gets.
+    ...(busy ? heldFocusRing(theme) : {}),
   };
 });
 
@@ -178,6 +182,15 @@ function isIconOnly({ icon, children }: Pick<ButtonProps, 'icon' | 'children'>):
 }
 
 /**
+ * The root's classes: `active`, and `Mui-disabled` while loading — a loading
+ * button is not natively disabled (FUT-5466) but still LOOKS disabled, and MUI
+ * paints that look from this one class, so it is set by hand.
+ */
+function buttonClassName(active: boolean | undefined, busy: boolean, className: string | undefined): string | undefined {
+  return [active ? 'active' : '', busy ? 'Mui-disabled' : '', className].filter(Boolean).join(' ') || undefined;
+}
+
+/**
  * The design system's button.
  *
  * Typed as an `OverridableComponent` (12-70) rather than a plain `forwardRef`,
@@ -234,8 +247,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // Only an icon, so the button is a square rather than a 64px slab.
     const iconOnly = isIconOnly({ icon, children });
 
-    const mergedClassName =
-      [active ? 'active' : '', props.className].filter(Boolean).join(' ') || undefined;
+    const mergedClassName = buttonClassName(active, press.busy, props.className);
 
     return (
       <StyledButton
@@ -250,12 +262,13 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ripple={ripple}
         progressing={progress != null}
         held={press.held}
+        busy={press.busy}
         disabled={press.disabled}
         // Only when held or in progress: an explicit undefined would erase the
         // aria-disabled MUI sets on a disabled link (href), which has no `disabled`.
         {...(press.ariaDisabled ? { 'aria-disabled': true } : {})}
         aria-busy={press.ariaBusy}
-        disableRipple={!ripple}
+        disableRipple={!ripple || press.busy}
         startIcon={iconPosition === 'left' ? iconWithTestId : undefined}
         endIcon={iconPosition === 'right' ? iconWithTestId : undefined}
         onClick={press.onClick}

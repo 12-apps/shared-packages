@@ -67,11 +67,14 @@ describe("SocialLoginButton", () => {
       expect(container.querySelector('.MuiCircularProgress-root')).toBeInTheDocument();
     });
 
-    it(`should be disabled when loading for ${provider}`, () => {
+    // FUT-5466: a loading Button is unavailable and busy but keeps keyboard focus.
+    it(`should be unavailable but focusable when loading for ${provider}`, () => {
       render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} loading />);
 
       const button = screen.getByRole("button");
-      expect(button).toBeDisabled();
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(button).toHaveAttribute("aria-busy", "true");
     });
 
     it(`should be disabled when disabled prop is true for ${provider}`, () => {
@@ -160,7 +163,8 @@ describe("SocialLoginButton with iconOnly (FUT-2393)", () => {
     );
 
     expect(container.querySelector(".MuiCircularProgress-root")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google })).toBeDisabled();
+    // FUT-5466: unavailable while it hands off, yet it keeps keyboard focus.
+    expect(screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google })).toHaveAttribute("aria-disabled", "true");
   });
 });
 

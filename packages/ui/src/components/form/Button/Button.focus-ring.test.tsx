@@ -36,4 +36,14 @@ describe('keyboard focus ring on the variants that paint no surface (FUT-5521)',
     );
     expect(emittedCss(screen.getByTestId('b'))).not.toMatch(RING);
   });
+
+  // FUT-5466: a loading button keeps keyboard focus, so even a solid one draws the ring.
+  it('a loading solid button draws a ring: it keeps keyboard focus now', () => {
+    render(
+      <Button variant="solid" dataTestId="b" loading>
+        Salvar
+      </Button>,
+    );
+    expect(emittedCss(screen.getByTestId('b'))).toMatch(RING);
+  });
 });
