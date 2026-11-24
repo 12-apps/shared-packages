@@ -140,9 +140,18 @@ export async function encryptRealCard(
 }
 
 /**
+ * How long a real debit's 3-D Secure may wait on the bank (FUT-5519): long
+ * enough for a person to answer a challenge in the bank's app, never forever.
+ * With no limit, an SDK that never answered held the run on "Criptografando"
+ * indefinitely while the wallets' tokens expired.
+ */
+export const REAL_DEBIT_THREEDS_TIMEOUT_MS = 120_000;
+
+/**
  * The real debit card, encrypted and authenticated with PagBank's 3DS for the
- * amount the server will charge. No timeout: a real issuer may challenge, and
- * the person answering it takes the time they take.
+ * amount the server will charge. A real issuer may challenge, so the wait is
+ * long, but bounded by `REAL_DEBIT_THREEDS_TIMEOUT_MS`: past it the debit is
+ * recorded as not authenticated and the run goes on.
  */
 export async function authenticateRealDebit(
   card: ParsedCard,
@@ -161,6 +170,7 @@ export async function authenticateRealDebit(
     amountCents: test.amountCents,
     customer: test.customer,
     billingAddress: test.billingAddress,
+    timeoutMs: REAL_DEBIT_THREEDS_TIMEOUT_MS,
   });
   return outcome.ok
     ? { ...encrypted, authenticationId: outcome.authenticationId, authenticated: outcome.authenticated }
