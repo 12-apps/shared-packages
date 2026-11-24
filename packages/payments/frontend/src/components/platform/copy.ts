@@ -18,6 +18,8 @@
  * form does not accept.
  */
 
+import type { BrowserCardFailure } from '@12-apps/payments-backend';
+
 /** The outcome card: what was submitted, and what came back. */
 export interface HomologacaoOutcomeCopy {
   heading: string;
@@ -264,6 +266,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
       /** PagBank's own antifraud refused the charge (FUT-5512): not the card's bank. */
       antifraudDeclined: string;
     };
+    /** Why the browser could not prepare a card (FUT-5519), on the progress's encryption step. */
+    cardFailures: Record<BrowserCardFailure, string>;
     pix: {
       AWAITING_PAYMENT: string;
       REFUND_PENDING: string;

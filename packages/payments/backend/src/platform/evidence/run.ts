@@ -13,13 +13,13 @@ import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
+import { evidenceSectionOutcomes, type EvidenceRunProgress } from './outcomes';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
   EvidenceEnvironment,
   EvidenceOutcomeCopy,
   EvidenceRecord,
-  EvidenceRunSection,
   EvidenceStep,
   EvidenceStepKey,
   EvidenceWalletsConfig,
@@ -369,7 +369,7 @@ export async function completeEvidenceRun(
   runId: string,
   cards: readonly BrowserCardResult[],
   wallets: readonly BrowserWalletResult[] = [],
-  onSection: (section: EvidenceRunSection) => void = () => undefined,
+  onSection: EvidenceRunProgress = () => undefined,
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
 
@@ -380,13 +380,17 @@ export async function completeEvidenceRun(
     // Recorded with the reason, so the file says WHY nothing was raised.
     for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
   } else {
-    onSection('PIX');
+    onSection('PIX', []);
     const pix = await pixSteps(deps, runId);
-    onSection('CARD');
+    onSection('CARD', evidenceSectionOutcomes(['PIX'], pix));
     const card = await cardSteps(deps, runId, cards);
-    onSection('DEBIT');
+    onSection('DEBIT', evidenceSectionOutcomes(['PIX', 'CARD'], [...pix, ...card]));
     const debit = await debitSteps(deps, runId, cards);
-    const raised = [...pix, ...card, ...debit, ...(await walletSectionSteps(deps, runId, wallets, onSection))];
+    const before = [...pix, ...card, ...debit];
+    const walletSteps = await walletSectionSteps(deps, runId, wallets, (wallet, sofar) =>
+      onSection(wallet, evidenceSectionOutcomes(wallet === 'GOOGLE_PAY' ? ['PIX', 'CARD', 'DEBIT'] : ['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY'], [...before, ...sofar])),
+    );
+    const raised = [...before, ...walletSteps];
     for (const step of raised) {
       steps = withStep(steps, step);
     }

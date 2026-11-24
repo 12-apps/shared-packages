@@ -54,7 +54,7 @@ function outcomeRow(outcome: ProductionScenarioOutcome, copy: Copy): Row {
   return { ...base, mark: 'failed', markLabel: copy.status.failed, status: copy.status.failed, reason: reasonOf(outcome, copy) };
 }
 
-function reasonOf(outcome: ProductionScenarioOutcome, copy: Copy): string | null {
+export function reasonOf(outcome: ProductionScenarioOutcome, copy: Copy): string | null {
   if (outcome.reason === 'EMAIL_EQUALS_MERCHANT') return copy.reasons.emailEqualsMerchant;
   if (outcome.reason === 'ANTIFRAUD_DECLINED') return copy.reasons.antifraudDeclined;
   if (outcome.reason !== 'ISSUER_DECLINED') return null;
