@@ -77,7 +77,11 @@ describe("the web thread", () => {
     // The send button is icon-only (FUT-3347): "Sending…" is its accessible name while in flight.
     expect(await screen.findByLabelText(EN_US_CHAT_UI_COPY.sending)).toBeTruthy();
     expect(field().disabled).toBe(false);
-    expect((screen.getByTestId("chat-send") as HTMLButtonElement).disabled).toBe(true);
+    // FUT-5466: a loading Button is gated by aria-disabled and keeps keyboard focus,
+    // never natively disabled; a second tap does not send again.
+    const send = screen.getByTestId("chat-send") as HTMLButtonElement;
+    expect(send.getAttribute("aria-disabled")).toBe("true");
+    expect(send.disabled).toBe(false);
 
     await act(async () => release());
     expect(await screen.findByText("Gate 12")).toBeTruthy();
