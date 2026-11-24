@@ -234,8 +234,11 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // Only an icon, so the button is a square rather than a 64px slab.
     const iconOnly = isIconOnly({ icon, children });
 
+    // A loading button is not natively disabled (FUT-5466) but still LOOKS
+    // disabled: MUI paints that look from this one class, so it is set by hand.
+    const loadingLook = loading && !progress ? 'Mui-disabled' : '';
     const mergedClassName =
-      [active ? 'active' : '', props.className].filter(Boolean).join(' ') || undefined;
+      [active ? 'active' : '', loadingLook, props.className].filter(Boolean).join(' ') || undefined;
 
     return (
       <StyledButton

@@ -17,7 +17,9 @@ describe('Button (web) — loading keeps the name (FUT-3646)', () => {
     );
     const button = screen.getByRole('button', { name: 'Salvar' });
     expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(button).toBeDisabled();
+    // FUT-5466: busy and unavailable, but never natively disabled — it keeps keyboard focus.
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('b-loading')).toBeInTheDocument();
     // Transparent, not hidden: `visibility` or `display` would drop the name again.
     const label = screen.getByTestId('b-busy-label');

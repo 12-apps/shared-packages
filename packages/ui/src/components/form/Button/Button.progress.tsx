@@ -48,17 +48,24 @@ interface PressInput {
 /**
  * A `type="submit"` button is held while its form is busy (`useFormBusy`): that
  * is what keeps Save from running while a photo still uploads. Held, it is
- * `aria-disabled` and stays in the tab order — like a button with `progress`,
- * and like a settings card's Save — so a keyboard or screen-reader user finds
- * it and hears that it is held; a click or Enter does nothing (and
- * `FormContainer` refuses an implicit submit while busy). A host's own
- * `disabled` / `loading` still disable natively. Any other button is NOT held
+ * `aria-disabled` and stays in the tab order — like a button with `progress`
+ * or `loading`, and like a settings card's Save — so a keyboard or
+ * screen-reader user finds it and hears that it is held; a click or Enter does
+ * nothing (and `FormContainer` refuses an implicit submit while busy). A host's
+ * own `disabled` still disables natively. Any other button is NOT held
  * unless its host opts in, so navigation stays live.
  */
 export function useButtonPress({ progress, loading, disabled, type, onClick }: PressInput): ButtonPressState {
   const busy = useFormBusy();
   if (progress) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false };
-  const nativelyDisabled = Boolean(disabled || loading);
+  // Loading is the answer to this button's own press (FUT-5466): a native
+  // `disabled` here moved keyboard focus to <body> the moment it began, so a
+  // person who pressed Enter had to Tab again from the top of the page. It is
+  // `aria-disabled` + `aria-busy` instead, keeps its place in the tab order and
+  // ignores a press — and wins over the host's own `disabled`, which the usual
+  // `disabled={busy} loading={busy}` pair sets at the same moment.
+  if (loading) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false };
+  const nativelyDisabled = Boolean(disabled);
   const held = type === 'submit' && busy && !nativelyDisabled;
   return {
     disabled: nativelyDisabled,
