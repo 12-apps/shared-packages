@@ -104,8 +104,10 @@ describe("SubmitButton disabled and describedBy", () => {
       </FormContainer>,
     );
     fireEvent.click(screen.getByTestId("total-form-submit"));
-    await waitFor(() => expect(screen.getByTestId("total-form-submit")).toBeDisabled());
-    await waitFor(() => expect(screen.getByTestId("total-form-submit")).toBeEnabled());
+    // FUT-5466: while it submits the button is loading — locked by aria-disabled,
+    // keeping keyboard focus, never natively disabled.
+    await waitFor(() => expect(screen.getByTestId("total-form-submit")).toHaveAttribute("aria-disabled", "true"));
+    await waitFor(() => expect(screen.getByTestId("total-form-submit")).not.toHaveAttribute("aria-disabled"));
   });
 });
 

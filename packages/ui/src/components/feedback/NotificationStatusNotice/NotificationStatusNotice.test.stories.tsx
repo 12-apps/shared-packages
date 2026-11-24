@@ -116,6 +116,8 @@ export const PendingCannotBePressedTwice: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId('notification-status-notice-enable')).toBeDisabled();
+    // FUT-5466: a pending (loading) action is locked by aria-disabled and keeps
+    // keyboard focus; it is never natively disabled.
+    await expect(canvas.getByTestId('notification-status-notice-enable')).toHaveAttribute('aria-disabled', 'true');
   },
 };

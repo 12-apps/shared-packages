@@ -8,6 +8,16 @@ import { must } from '../../../test-utils/must';
 
 import { Button } from './Button';
 
+/**
+ * Unavailable while loading, on both platforms: the web Button is aria-disabled
+ * and keeps focus (FUT-5466), the native one (react-native-web) is still
+ * disabled. The web-only contract is pinned by `LoadingKeepsFocus`.
+ */
+async function expectUnavailable(element: HTMLElement) {
+  const unavailable = element.getAttribute('aria-disabled') === 'true' || (element as HTMLButtonElement).disabled === true;
+  await expect(unavailable).toBe(true);
+}
+
 const meta: Meta<typeof Button> = {
   title: 'Form/Button/Tests',
   component: Button,
@@ -92,9 +102,7 @@ export const LoadingStateTest: Story = {
 
     await step('Verify loading state', async () => {
       const button = canvas.getByTestId('loading-button');
-      // FUT-5466: unavailable and busy, never natively disabled.
-      await expect(button).not.toBeDisabled();
-      await expect(button).toHaveAttribute('aria-disabled', 'true');
+      await expectUnavailable(button);
 
       // Check for loading spinner
       const spinner = canvas.getByRole('progressbar');
@@ -141,6 +149,8 @@ function PressThenLoad({ onPress }: { onPress: () => void }) {
  */
 export const LoadingKeepsFocus: Story = {
   name: '⏳ Loading keeps keyboard focus',
+  // Web only: the native Button keeps its disabled loading state (FUT-5466).
+  tags: ['native-skip'],
   args: { onClick: fn() },
   render: (args) => <PressThenLoad onPress={() => args.onClick?.({} as React.MouseEvent<HTMLButtonElement>)} />,
   play: async ({ canvasElement, step, args }) => {
@@ -663,9 +673,7 @@ export const ComplexVariantTest: Story = {
       const loadingButton = canvas.getByTestId('ghost-danger-loading');
       const disabledButton = canvas.getByTestId('solid-neutral-disabled');
 
-      // FUT-5466: loading is unavailable but focusable; disabled is native.
-      await expect(loadingButton).not.toBeDisabled();
-      await expect(loadingButton).toHaveAttribute('aria-disabled', 'true');
+      await expectUnavailable(loadingButton);
       await expect(disabledButton).toBeDisabled();
     });
 
