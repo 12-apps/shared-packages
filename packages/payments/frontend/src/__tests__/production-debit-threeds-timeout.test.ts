@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 const CARD = { number: '5555666677778884', expMonth: '12', expYear: '2030', securityCode: '123' };
-const SESSION = { session: 'sess-1', environment: 'PRODUCTION' } as const;
+const SESSION = { session: 'sess-1', expiresAt: Date.UTC(2030, 0, 1), environment: 'PRODUCTION' as const };
 const TEST = {
   amountCents: 100,
   customer: { name: 'Comprador Teste', email: 'comprador@example.com', phone: '+55 31 99999-0000' },
