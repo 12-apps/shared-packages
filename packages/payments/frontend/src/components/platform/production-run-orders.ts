@@ -20,7 +20,7 @@ type Prepared = Awaited<ReturnType<HomologacaoProductionEvidenceCardProps['onPre
 type Props = Pick<HomologacaoProductionEvidenceCardProps, 'onRun' | 'onChargeNow' | 'onChargeApplePay'>;
 type OnSection = Parameters<HomologacaoProductionEvidenceCardProps['onRun']>[3];
 
-export interface RunIo {
+interface RunIo {
   props: Props;
   prepared: Prepared;
   buyer: EvidenceBuyer;
@@ -38,7 +38,7 @@ export interface RunIo {
 }
 
 /** The cards the browser sends: the credit one always, the debit one unless it was left blank. */
-export async function browserCards(prepared: Prepared, holder: string, credit: CardForm, debit: CardForm): Promise<BrowserCardResult[]> {
+async function browserCards(prepared: Prepared, holder: string, credit: CardForm, debit: CardForm): Promise<BrowserCardResult[]> {
   const cards: BrowserCardResult[] = [];
   const creditCard = cardOf(credit);
   if (creditCard) cards.push(await encryptRealCard('approved', creditCard, holder, prepared.publicKey));
