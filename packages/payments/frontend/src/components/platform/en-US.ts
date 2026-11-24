@@ -272,6 +272,15 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         },
         antifraudDeclined: "PagBank's antifraud declined the payment (not the card's bank)",
       },
+      cardFailures: {
+        SDK_UNAVAILABLE: "PagBank's SDK did not load in the browser",
+        NOT_PROCESSED: "PagBank's SDK did not encrypt the card",
+        NO_PUBLIC_KEY: 'no public key for the seller',
+        NO_THREEDS_SESSION: 'no 3DS session for the seller',
+        THREEDS_NOT_SUPPORTED: 'the card does not support 3DS authentication',
+        THREEDS_REFUSED: 'PagBank refused the 3DS authentication',
+        THREEDS_FAILED: 'the 3DS authentication did not complete',
+      },
       pix: {
         AWAITING_PAYMENT: 'awaiting payment',
         REFUND_PENDING: 'paid, refunding',

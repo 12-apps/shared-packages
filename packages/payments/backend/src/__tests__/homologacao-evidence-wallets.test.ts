@@ -4,8 +4,10 @@ import {
   buildHomologacaoEvidenceFile,
   buildHomologacaoEvidenceJson,
   completeEvidenceRun,
+  evidenceScenarioOutcomes,
   prepareEvidenceRun,
   type BrowserWalletResult,
+  type EvidenceScenarioOutcome,
 } from '../platform/evidence/index';
 import { cards, connected, SECRETS, wallets, world } from './homologacao-evidence-world';
 
@@ -217,5 +219,29 @@ describe('homologação evidence — the wallet sections', () => {
     const sections: string[] = [];
     await completeEvidenceRun(w.runDeps, prepared.runId, cards(), wallets(), (section) => sections.push(section));
     expect(sections).toEqual(['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY']);
+  });
+  it('given a run, then each section starts with the outcomes of the sections already done (FUT-5519)', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    const seen: { section: string; done: string[] }[] = [];
+    const reported: EvidenceScenarioOutcome[][] = [];
+    const record = await completeEvidenceRun(w.runDeps, prepared.runId, cards(), wallets(), (section, done) => {
+      seen.push({ section, done: done.map((outcome) => outcome.scenario) });
+      reported.push([...done]);
+    });
+
+    expect(seen).toEqual([
+      { section: 'PIX', done: [] },
+      { section: 'CARD', done: ['pix'] },
+      { section: 'DEBIT', done: ['pix', 'credit'] },
+      { section: 'GOOGLE_PAY', done: ['pix', 'credit', 'debit'] },
+      { section: 'APPLE_PAY', done: ['pix', 'credit', 'debit', 'googlePay'] },
+    ]);
+    // What the last section was told of the four before it is what the run's record says of them.
+    const final = evidenceScenarioOutcomes(record);
+    expect(reported.at(-1)).toEqual(
+      reported.at(-1)!.map((outcome) => final.find((fromRecord) => fromRecord.scenario === outcome.scenario)),
+    );
   });
 });

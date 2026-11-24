@@ -260,6 +260,15 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         },
         antifraudDeclined: 'o antifraude do PagBank recusou o pagamento (não foi o banco do cartão)',
       },
+      cardFailures: {
+        SDK_UNAVAILABLE: 'o SDK do PagBank não carregou no navegador',
+        NOT_PROCESSED: 'o SDK do PagBank não criptografou o cartão',
+        NO_PUBLIC_KEY: 'sem chave pública do lojista',
+        NO_THREEDS_SESSION: 'sem sessão 3DS do lojista',
+        THREEDS_NOT_SUPPORTED: 'o cartão não aceita autenticação 3DS',
+        THREEDS_REFUSED: 'o PagBank recusou a autenticação 3DS',
+        THREEDS_FAILED: 'a autenticação 3DS não foi concluída',
+      },
       pix: {
         AWAITING_PAYMENT: 'aguardando pagamento',
         REFUND_PENDING: 'pago, estornando',

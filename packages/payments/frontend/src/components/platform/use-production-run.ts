@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { BrowserCardResult, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
+import type { BrowserCardResult, EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
@@ -19,6 +19,7 @@ import {
   type BuyerForm,
   type CardForm,
 } from './production-evidence-data';
+import { useRunProgress } from './production-step-results';
 
 /**
  * The PRODUCTION evidence card's state (FUT-4198): the form, and one run at a
@@ -252,21 +253,17 @@ export function useProductionRun(
 ) {
   const [confirming, setConfirming] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
-  const [section, setSection] = useState<EvidenceRunSection | null>(null);
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const { answered, setAnswered, saved, scenarios, ranAt } = useLatestRun(props.seller);
+  const progress = useRunProgress();
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  // One run at a time, whatever a double click on the confirmation does.
-  const inFlight = useRef(false);
   const run = async (): Promise<void> => {
     const buyer = buyerOf(form.buyer);
-    if (!buyer || inFlight.current) return;
-    inFlight.current = true;
+    if (!buyer || !progress.begin()) return;
     setConfirming(false);
     setFailed(null);
     setSummary(null);
-    setSection(null);
     rememberBuyer(form.buyer);
     let current: EvidencePhase = 'preparing';
     let runId: string | null = null;
@@ -284,8 +281,9 @@ export function useProductionRun(
       wallets.reset();
       enter('encrypting');
       const cards = await browserCards(prepared, buyer.name, form.credit, form.debit);
+      progress.prepared(cards);
       enter('running');
-      const answer = await props.onRun(prepared.runId, cards, walletResults, setSection, buyer);
+      const answer = await props.onRun(prepared.runId, cards, walletResults, progress.onSection, buyer);
       setAnswered({ scenarios: 'pix' in answer ? answer.scenarios : null });
       setPix('pix' in answer ? answer.pix : answer);
       form.clearCards();
@@ -295,7 +293,7 @@ export function useProductionRun(
       if (runId) await props.onConfirmPix(runId, 'CHECK').then(setPix, () => undefined);
     } finally {
       setPhase('idle');
-      inFlight.current = false;
+      progress.end(runId !== null);
       props.onRunEnded?.();
     }
   };
@@ -306,7 +304,7 @@ export function useProductionRun(
     confirming,
     setConfirming,
     phase,
-    section,
+    progress,
     failed,
     summary,
     pix,

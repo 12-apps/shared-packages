@@ -4,22 +4,22 @@ import type { ProviderFailureReporter } from '../../core/provider-failure';
 import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession } from '../../core/types';
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
-import { pixSteps, cardSteps } from './orders';
 import { cardHoldsMoney } from './card-refund-state';
 import { pixHoldsMoney } from './orders-pix-production';
-import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
-import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
+import { DEBIT_ORDER_KEYS, threeDSSessionStep } from './orders-debit';
+import { WALLET_ORDER_KEYS, walletsConfig, type EvidenceGooglePayMerchant } from './orders-wallet';
 import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
+import type { EvidenceRunProgress } from './outcomes';
+import { raiseOrderSections } from './run-sections';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
   EvidenceEnvironment,
   EvidenceOutcomeCopy,
   EvidenceRecord,
-  EvidenceRunSection,
   EvidenceStep,
   EvidenceStepKey,
   EvidenceWalletsConfig,
@@ -369,7 +369,7 @@ export async function completeEvidenceRun(
   runId: string,
   cards: readonly BrowserCardResult[],
   wallets: readonly BrowserWalletResult[] = [],
-  onSection: (section: EvidenceRunSection) => void = () => undefined,
+  onSection: EvidenceRunProgress = () => undefined,
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
 
@@ -380,13 +380,7 @@ export async function completeEvidenceRun(
     // Recorded with the reason, so the file says WHY nothing was raised.
     for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
   } else {
-    onSection('PIX');
-    const pix = await pixSteps(deps, runId);
-    onSection('CARD');
-    const card = await cardSteps(deps, runId, cards);
-    onSection('DEBIT');
-    const debit = await debitSteps(deps, runId, cards);
-    const raised = [...pix, ...card, ...debit, ...(await walletSectionSteps(deps, runId, wallets, onSection))];
+    const raised = await raiseOrderSections(deps, runId, cards, wallets, onSection);
     for (const step of raised) {
       steps = withStep(steps, step);
     }

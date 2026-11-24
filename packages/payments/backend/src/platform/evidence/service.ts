@@ -24,7 +24,7 @@ import {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
-import { evidenceScenarioOutcomes, type EvidenceScenarioOutcome } from './outcomes';
+import { evidenceScenarioOutcomes, type EvidenceRunProgress, type EvidenceScenarioOutcome } from './outcomes';
 import { pixViewOf, type EvidencePixView } from './orders-pix-production';
 import { retryDueEvidenceRefund } from './refund-sweep';
 import { PAGBANK_SANDBOX_DEBIT_TEST, PAGBANK_SANDBOX_TEST_BUYER, productionDebitTest } from './sandbox-buyer';
@@ -34,7 +34,6 @@ import type {
   EvidenceBuyer,
   EvidenceEnvironment,
   EvidenceRecord,
-  EvidenceRunSection,
   EvidenceWalletsConfig,
   HomologacaoEvidenceCopy,
 } from './types';
@@ -159,7 +158,7 @@ export interface HomologacaoEvidenceService {
     runId: string,
     cards: readonly BrowserCardResult[],
     wallets?: readonly BrowserWalletResult[],
-    onSection?: (section: EvidenceRunSection) => void,
+    onSection?: EvidenceRunProgress,
     buyer?: EvidenceBuyer,
   ): Promise<EvidenceRecord>;
   /**

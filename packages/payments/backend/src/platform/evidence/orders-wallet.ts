@@ -131,7 +131,7 @@ export async function walletSectionSteps(
   deps: EvidenceRunDeps,
   runId: string,
   results: readonly BrowserWalletResult[],
-  onSection: (section: EvidenceWallet) => void = () => undefined,
+  onSection: (section: EvidenceWallet, sofar: readonly EvidenceStep[]) => void = () => undefined,
 ): Promise<EvidenceStep[]> {
   const merchant = (await deps.googlePayMerchant?.()) ?? null;
   const configured = {
@@ -141,7 +141,7 @@ export async function walletSectionSteps(
   };
   const steps: EvidenceStep[] = [];
   for (const wallet of ['GOOGLE_PAY', 'APPLE_PAY'] as const) {
-    onSection(wallet);
+    onSection(wallet, steps);
     steps.push(...(await walletSteps(deps, runId, wallet, results, configured)));
   }
   return steps;

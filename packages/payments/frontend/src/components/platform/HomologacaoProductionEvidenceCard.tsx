@@ -25,6 +25,7 @@ import { ProductionEvidenceForm } from './ProductionEvidenceForm';
 import { ProductionPixPanel, type ProductionPixView } from './ProductionPixPanel';
 import { ProductionScenarioList, type ProductionScenarioOutcome } from './ProductionScenarioList';
 import { useProductionForm, useProductionRun } from './use-production-run';
+import { stepResultsOf } from './production-step-results';
 
 /**
  * The PRODUCTION homologação evidence card (FUT-4198, prototype option A+C):
@@ -76,7 +77,8 @@ export interface HomologacaoProductionEvidenceCardProps {
     runId: string,
     cards: BrowserCardResult[],
     wallets: BrowserWalletResult[],
-    onSection: (section: EvidenceRunSection) => void,
+    /** Told each part as it starts, with the outcomes of the parts already done (FUT-5519). */
+    onSection: (section: EvidenceRunSection, done?: readonly ProductionScenarioOutcome[]) => void,
     buyer: EvidenceBuyer,
   ) => Promise<ProductionRunAnswer>;
   /**
@@ -242,14 +244,34 @@ function ProductionActions({
 
 type ProductionFlow = ReturnType<typeof useProductionRun>;
 
+/**
+ * The run's steps, each with its own result (FUT-5519): while it runs, the
+ * outcomes the server told so far; once it is over, every scenario's.
+ */
+function RunProgress({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoProductionEvidenceCopy }): ReactNode {
+  const { progress, phase } = flow;
+  if (phase === 'downloading') return <EvidenceProgress phase={phase} section={progress.section} full={false} walletResults={null} />;
+  const running = phase !== 'idle';
+  if (!running && !progress.finished) return null;
+  const outcomes = progress.finished && flow.scenarios ? flow.scenarios : progress.told;
+  return (
+    <EvidenceProgress
+      phase={running ? phase : 'running'}
+      section={progress.section}
+      full
+      walletResults={null}
+      results={stepResultsOf(outcomes, progress.cardFailure, copy.scenarios)}
+      finished={!running}
+    />
+  );
+}
+
 /** Beside the form while it matters: the run's progress, then the Pix a person pays. */
 function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoProductionEvidenceCopy }): ReactNode {
-  if (!flow.busy && !flow.pix && !flow.scenarios) return null;
+  if (!flow.busy && !flow.pix && !flow.scenarios && !flow.progress.finished) return null;
   return (
     <Stack spacing={2.5} sx={{ flex: '1 1 320px', minWidth: 0 }}>
-      {flow.phase !== 'idle' ? (
-        <EvidenceProgress phase={flow.phase} section={flow.section} full={flow.phase !== 'downloading'} walletResults={null} />
-      ) : null}
+      <RunProgress flow={flow} copy={copy} />
       {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} onCheck={flow.check} skipping={flow.skipping} /> : null}
       {flow.phase === 'idle' || flow.phase === 'downloading' ? (
         <ProductionScenarioList

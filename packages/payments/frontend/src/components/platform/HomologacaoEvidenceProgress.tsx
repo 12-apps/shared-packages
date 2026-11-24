@@ -19,7 +19,19 @@ import { usePlatformCopy } from './copy-context';
  */
 
 export type EvidencePhase = 'preparing' | 'encrypting' | 'running' | 'downloading';
-type EvidenceRunStep = 'prepare' | 'encrypt' | EvidenceRunSection | 'file';
+export type EvidenceRunStep = 'prepare' | 'encrypt' | EvidenceRunSection | 'file';
+
+/**
+ * What a step that already ran gave (FUT-5519), worded by the host: the
+ * production card marks each step with its own result, so a step that failed
+ * never reads as done.
+ */
+export interface EvidenceStepResult {
+  kind: 'executed' | 'failed' | 'pending';
+  /** The result's word, also the mark's name for a screen reader. */
+  label: string;
+  reason: string | null;
+}
 
 // The server's section order (`EVIDENCE_RUN_SECTIONS`), spelled here: this
 // package may import only types from the backend (ADOPTING.md §6).
@@ -42,6 +54,10 @@ interface EvidenceProgressProps {
   full: boolean;
   /** What the wallet sheets answered for this run; null on a download-only press. */
   walletResults: BrowserWalletResult[] | null;
+  /** Each step's own result once it ran (FUT-5519); a step with none reads as done. */
+  results?: Partial<Record<EvidenceRunStep, EvidenceStepResult>>;
+  /** The run is over: every step shows its result, and nothing is going. */
+  finished?: boolean;
 }
 
 // Material Symbols' check_circle and radio_button_unchecked, inline: the
@@ -50,23 +66,47 @@ const DONE_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 
 const PENDING_PATH =
   'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8';
 
+// Material Symbols' cancel and do_not_disturb_on: a failed step and one that did not run.
+const FAILED_PATH =
+  'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2m5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12z';
+const NOT_RUN_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m5 11H7v-2h10z';
+
+type MarkState = 'done' | 'current' | 'pending' | 'failed' | 'notRun';
+
+const MARK: Record<Exclude<MarkState, 'current'>, { path: string; color: string }> = {
+  done: { path: DONE_PATH, color: 'success.main' },
+  pending: { path: PENDING_PATH, color: 'text.secondary' },
+  // Ink, never red: red does not sit beside the green checks; the shape and the reason say it.
+  failed: { path: FAILED_PATH, color: 'text.primary' },
+  notRun: { path: NOT_RUN_PATH, color: 'text.secondary' },
+};
+
 /**
- * Shape, not only colour, tells the three states apart. The spinner and the
+ * Shape, not only colour, tells the states apart. The spinner and the
  * bar take the ink, never the theme's primary: on a staff screen whose primary
  * is red they would read as a failure beside the green checks.
  */
-function StepMark({ state }: { state: 'done' | 'current' | 'pending' }): ReactNode {
+function StepMark({ state, label }: { state: MarkState; label?: string }): ReactNode {
   return (
-    <Box sx={{ width: 20, height: 20, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+    <Box sx={{ width: 20, height: 20, flexShrink: 0, display: 'grid', placeItems: 'center', mt: '2px' }}>
       {state === 'current' ? (
         <CircularProgress size={18} thickness={5} color="inherit" sx={{ color: 'text.primary' }} />
       ) : (
-        <SvgIcon fontSize="small" sx={{ color: state === 'done' ? 'success.main' : 'text.secondary' }}>
-          <path d={state === 'done' ? DONE_PATH : PENDING_PATH} />
+        <SvgIcon fontSize="small" sx={{ color: MARK[state].color }} titleAccess={label}>
+          <path d={MARK[state].path} />
         </SvgIcon>
       )}
     </Box>
   );
+}
+
+const MARK_OF_RESULT: Record<EvidenceStepResult['kind'], MarkState> = { executed: 'done', failed: 'failed', pending: 'notRun' };
+
+/** A step's mark: its own result once it ran, else where the run is. */
+function stateOf(index: number, at: number, result: EvidenceStepResult | undefined): MarkState {
+  if (index > at) return 'pending';
+  if (index === at) return 'current';
+  return result ? MARK_OF_RESULT[result.kind] : 'done';
 }
 
 /** Which wallets this run carries a token for, and which stay pending. */
@@ -87,13 +127,13 @@ function WalletsLine({ results }: { results: BrowserWalletResult[] }): ReactNode
   );
 }
 
-export function EvidenceProgress({ phase, section, full, walletResults }: EvidenceProgressProps): ReactNode {
+export function EvidenceProgress({ phase, section, full, walletResults, results, finished = false }: EvidenceProgressProps): ReactNode {
   const copy = usePlatformCopy().evidence;
   const steps = full ? FULL_RUN : DOWNLOAD_ONLY;
-  const at = steps.indexOf(currentEvidenceStep(phase, section));
+  const at = finished ? steps.length : steps.indexOf(currentEvidenceStep(phase, section));
   return (
-    <Stack spacing={1} role="status" aria-busy="true" data-testid="evidence-phase">
-      <Typography variant="body2">{copy.phases[phase]}</Typography>
+    <Stack spacing={1} role="status" aria-busy={!finished} data-testid="evidence-phase">
+      {finished ? null : <Typography variant="body2">{copy.phases[phase]}</Typography>}
       <LinearProgress
         variant="determinate"
         value={(at / steps.length) * 100}
@@ -104,25 +144,34 @@ export function EvidenceProgress({ phase, section, full, walletResults }: Eviden
       {full ? (
         <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 0.5 }} data-testid="evidence-steps">
           {steps.map((step, index) => {
-            const state = index < at ? 'done' : index === at ? 'current' : 'pending';
+            const result = index < at ? results?.[step] : undefined;
+            const state = stateOf(index, at, result);
             return (
               <Stack
                 key={step}
                 component="li"
                 direction="row"
                 spacing={1}
-                sx={{ alignItems: 'center', minHeight: 24 }}
+                sx={{ alignItems: 'flex-start', minHeight: 24 }}
                 data-testid={`evidence-step-${step}`}
                 data-state={state}
                 aria-current={state === 'current' ? 'step' : undefined}
               >
-                <StepMark state={state} />
+                <StepMark state={state} label={result?.label} />
                 <Typography
                   variant="body2"
                   fontWeight={state === 'current' ? 600 : 400}
                   color={state === 'pending' ? 'text.secondary' : 'text.primary'}
+                  sx={{ minWidth: 0 }}
                 >
                   {copy.steps.names[step]}
+                  {result && result.kind !== 'executed' ? (
+                    <Typography component="span" variant="body2" color="text.secondary">
+                      {' · '}
+                      {result.label}
+                      {result.reason ? ` — ${result.reason}` : ''}
+                    </Typography>
+                  ) : null}
                 </Typography>
               </Stack>
             );
