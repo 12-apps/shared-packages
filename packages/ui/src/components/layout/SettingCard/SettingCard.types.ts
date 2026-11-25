@@ -40,6 +40,8 @@ interface SettingSurfaceProps {
   headingLevel?: SettingHeadingLevel;
   /** A decorative glyph before the title. */
   icon?: ReactNode;
+  /** A separately focusable action beside the heading, available in every card state. */
+  titleAction?: ReactNode;
   /** Maps a rejected save to the sentence shown; see {@link SettingErrorFormatter}. */
   formatError?: SettingErrorFormatter;
   /** Root test id. Parts derive theirs from it (`<id>-edit`, `<id>-save`, …). */
@@ -53,6 +55,8 @@ export interface SettingCardProps extends SettingSurfaceProps {
   copy: SettingCardCopy;
   /** The one line a closed card shows under its title: the setting's current value. */
   summary?: ReactNode;
+  /** Optional rich preview below the summary, shown only while closed. */
+  closedPreview?: ReactNode;
   /** The pill beside the title. Omit for none. */
   status?: SettingStatus;
   /** The form, rendered only while the card is open (so an uncontrolled draft is discarded on close). */

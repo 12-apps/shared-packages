@@ -52,6 +52,8 @@ const [draft, setDraft] = useState<number | null>(saved);
 | `onSave` | `() => void \| Promise<unknown>` | **required** | Persist the draft. See *Saving* below. |
 | `children` | `ReactNode` | **required** | The form. Rendered only while open. |
 | `summary` | `ReactNode` | — | What a closed card shows under its title: two lines at most, then an ellipsis. While it is cut, an [i] beside the title shows the whole text (hover, or a click/tap that pins it). |
+| `closedPreview` | `ReactNode` | — | An unclamped preview below the closed summary. Opening the editor unmounts it. |
+| `titleAction` | `ReactNode` | — | A separate action immediately after the heading. It remains available when Edit is disabled and while the form is open. Supply an accessible name for an icon-only action. With this action the full summary is shown inline. |
 | `status` | `{ label: string; color?: ColorValue }` | — | The pill beside the title. `label` is always shown, so colour never carries the meaning alone. |
 | `learnMore` | `ReactNode` | — | Longer explanation behind a disclosure in the open card. Omit for no disclosure. |
 | `onCancel` | `() => void` | — | The card closed without saving. Reset the host's draft here. |

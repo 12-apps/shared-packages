@@ -7,6 +7,7 @@ import { rem } from '../../../tokens/relative';
 import { InteractiveTooltip } from '../../data-display/InteractiveTooltip';
 
 import { SETTING_CARD } from './SettingCard.metrics';
+import { descriptionStyles, summaryStyles } from './SettingCard.styles';
 import { partTestId } from './SettingCard.parts';
 
 /**
@@ -91,15 +92,19 @@ export const SummaryInfo: React.FC<{ label: string; summary: React.ReactNode; da
 export const useSummaryInfo = ({
   summary,
   show = true,
+  titleAction,
   label,
   dataTestId,
 }: {
   summary: React.ReactNode;
   show?: boolean;
+  titleAction?: React.ReactNode;
   label: string;
   dataTestId?: string;
-}): { ref: (node: HTMLElement | null) => void; info: React.ReactNode } => {
+}) => {
   const { ref, clamped } = useClamped(summary);
+  // A host-supplied action owns this slot. Keep the entire summary readable inline.
+  if (titleAction) return { ref: undefined, info: null, sx: descriptionStyles };
   const visible = show && clamped && summary != null;
-  return { ref, info: visible ? <SummaryInfo label={label} summary={summary} dataTestId={dataTestId} /> : null };
+  return { ref, sx: summaryStyles, info: visible ? <SummaryInfo label={label} summary={summary} dataTestId={dataTestId} /> : null };
 };
