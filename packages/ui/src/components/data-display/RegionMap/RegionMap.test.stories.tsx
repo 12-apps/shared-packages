@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { RegionMap } from './RegionMap';
-import { REGION_MAP_CENTER, REGION_MAP_COPY, REGION_MAP_WITH_EXCLUSIONS } from './RegionMap.fixtures';
+import { REGION_MAP_CENTER, REGION_MAP_COPY, REGION_MAP_WITH_EXCLUSIONS, VILA_JARDIM_LEBLON_VIEW } from './RegionMap.fixtures';
 
 const meta: Meta<typeof RegionMap> = {
   title: 'Data Display/RegionMap/Tests',
@@ -53,5 +53,19 @@ export const ListIsTheKeyboardWay: Story = {
     await waitFor(() => expect(canvas.getByTestId('map-row-3106200190')).toHaveFocus());
     await userEvent.keyboard('{Enter}');
     await expect(args.onToggle).toHaveBeenCalledWith('3106200190');
+  },
+};
+
+export const InspectSmallArea: Story = {
+  name: '🧪 Zoom into a small area and select it',
+  args: { viewport: VILA_JARDIM_LEBLON_VIEW, labelMode: 'visible' },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const name = canvas.getByTestId('map-label-3106200457');
+    await waitFor(() => expect(name).toBeVisible());
+    await expect(name).toHaveTextContent('Vila Jardim Leblon');
+    await expect(canvas.queryAllByTestId('map-area-3106200365')).toHaveLength(0);
+    await userEvent.click(canvas.getByTestId('map-area-3106200457'));
+    await expect(args.onToggle).toHaveBeenCalledWith('3106200457');
   },
 };

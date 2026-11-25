@@ -37,7 +37,8 @@ export function boundsOfRings(rings: readonly RegionMapRing[]): RegionMapBounds 
 }
 
 /** A `reach` as a box in projected metres (a radius is a square around the centre). */
-export function reachBox(reach: RegionMapReach, projection: Projection): PlaneBox | null {
+export function reachBox(reach: RegionMapReach | undefined, projection: Projection): PlaneBox | null {
+  if (reach === undefined) return null;
   if ('radiusMetres' in reach) {
     const r = reach.radiusMetres;
     return Number.isFinite(r) && r > 0 ? { minX: -r, minY: -r, spanX: r * 2, spanY: r * 2 } : null;
@@ -77,10 +78,10 @@ export function centreOf(regions: readonly RegionMapRegion[]): { latitude: numbe
 }
 
 /**
- * The square `RegionMap` shows for these props, in projected metres around
+ * The viewport `RegionMap` shows for these props, in projected metres around
  * `center` (or the areas' middle) — for a host that lays its own HTML over the
  * drawing at the same scale: a point `p` sits at
- * `(p.x - view.minX) / view.spanX` across. With circles the view is centred,
+ * `(p.x - view.minX) / view.spanX` across. With automatic fitting and circles the view is centred,
  * so its half-side is `view.spanX / 2`.
  */
 export function regionMapView({
@@ -88,18 +89,21 @@ export function regionMapView({
   center,
   circles = [],
   reach,
+  viewport,
 }: {
   regions: readonly RegionMapRegion[];
   center: { latitude: number; longitude: number } | null;
   circles?: readonly RegionMapCircle[];
   reach?: RegionMapReach;
+  viewport?: PlaneBox;
 }): PlaneBox | null {
   const origin = center ?? centreOf(regions);
   if (origin === null) return null;
+  if (viewport !== undefined) return viewport;
   const projection = projectionAt(origin);
   return viewWithin(
     extent(circles.map((c) => c.radiusMetres))?.max ?? null,
-    reach === undefined ? null : reachBox(reach, projection),
+    reachBox(reach, projection),
     () => regions.map((r) => planeBounds(projectRings(r.rings, projection))),
   );
 }

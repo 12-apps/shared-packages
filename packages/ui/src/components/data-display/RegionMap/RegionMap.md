@@ -182,7 +182,16 @@ needs it.
 />
 ```
 
+## Zooming and panning
+
+Pass a square `viewport` in projected metres relative to `center` to control
+the SVG viewBox. The drawing, hit tests, overlays, draggable pin and scale read
+that same viewport. Omit it to return to the automatic fit. With
+`labelMode="visible"`, area names are placed again as their anchors enter the
+viewport; highlighted and excluded areas retain priority on collisions.
+
+The host supplies the zoom controls and pan gestures that update `viewport`.
+
 ## Not here (yet)
 
-- Zoom and pan. The list covers the areas too small to tap.
 - A React Native build.
