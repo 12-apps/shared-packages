@@ -9,7 +9,7 @@ import type { AccountDeletionSessionHooks, WebAccountDeletion, WebAccountDeletio
  * `createWebAuth` is what a host's shell builds for its session, so it sits on
  * every page's first paint. A static import of the screens put their form
  * fields and both copy packs on it for every visitor, though only a person on
- * "Excluir minha conta" ever draws them (measured on Future Pay's storefront:
+ * "Excluir minha conta" ever draws them (measured on the origin host's storefront:
  * +13.7 KiB raw on the eager path). Here the module loads on the first
  * render, once, and both screens share the one build.
  */

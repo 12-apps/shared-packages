@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { DeletionReport } from "../../../account-deletion/types";
 import { lazyAccountDeletion } from "../lazy";
@@ -29,6 +29,12 @@ const screens = () =>
   );
 
 describe("the lazy deletion screens (FUT-5322)", () => {
+  // The module the wrappers load, loaded once up front: the cases test the
+  // wrappers, not how long a cold transform takes on a busy runner.
+  beforeAll(async () => {
+    await import("../index");
+  });
+
   it("draws the page once its module has loaded", async () => {
     const { DeleteAccountPage } = screens();
     render(<DeleteAccountPage />);
