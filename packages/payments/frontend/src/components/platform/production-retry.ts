@@ -10,7 +10,7 @@ import type { EvidenceRunSection } from '@12-apps/payments-backend';
  */
 
 /** What the screen holds for a retry right now. */
-export interface RetryInputs {
+interface RetryInputs {
   /** The credit card is typed and valid. */
   credit: boolean;
   /** The debit card is typed and valid. */
