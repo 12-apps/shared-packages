@@ -25,6 +25,21 @@ afterEach(() => {
 });
 
 describe('the summary clamp', () => {
+  it('accepts a rich summary in both editable and switch cards', () => {
+    const value = <div>Saved colours</div>;
+    render(
+      <>
+        <SettingCard title="Logo" copy={EN_US_SETTING_CARD_COPY} summary={value} onSave={vi.fn()} dataTestId="card">
+          Logo editor
+        </SettingCard>
+        <SettingToggle title="Night colours" copy={EN_US_SETTING_SWITCH_COPY} summary={value} checked onChange={vi.fn()} dataTestId="toggle" />
+      </>,
+    );
+    expect(screen.getByTestId('card-summary').tagName).toBe('DIV');
+    expect(screen.getByTestId('toggle-summary').tagName).toBe('DIV');
+    expect(screen.getByRole('switch')).toHaveAccessibleDescription('Saved colours');
+  });
+
   it('offers an [i] with the whole text when a switch summary is cut', async () => {
     stubLayout(true);
     render(

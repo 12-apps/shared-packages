@@ -81,7 +81,6 @@ export const SettingSwitchBlock: React.FC<
       />
       {summary != null && (
         <Box
-          component="p"
           ref={clamp.ref}
           id={ids.summaryId}
           sx={clamp.sx}

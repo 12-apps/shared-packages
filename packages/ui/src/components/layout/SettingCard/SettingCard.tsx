@@ -215,7 +215,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
       ) : (
         <>
           {summary != null && (
-            <Box component="p" ref={clamp.ref} sx={clamp.sx} data-testid={partTestId(dataTestId, 'summary')}>
+            <Box ref={clamp.ref} sx={clamp.sx} data-testid={partTestId(dataTestId, 'summary')}>
               {summary}
             </Box>
           )}
