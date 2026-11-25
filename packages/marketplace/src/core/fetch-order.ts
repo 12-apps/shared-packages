@@ -3,7 +3,7 @@ import { ingestMarketplaceOrder } from "./ingest";
 import { readOutboundConnection, resolveIngestionTarget } from "./integration";
 import type { FetchOrderResult } from "./adapter";
 import { cancelAcceptance } from "./acceptance";
-import { cancelledBeforeIngest } from "./order-fetch-marks";
+import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
@@ -171,7 +171,7 @@ async function refusalOf(
   connectionMerchantId: string | null,
 ): Promise<{ settle: "IGNORED" | "FAILED"; reason: string; failed: boolean } | null> {
   if (await cancelledBeforeIngest(ctx, { clientId, provider: order.provider, externalOrderId: order.externalOrderId })) {
-    return { settle: "IGNORED", reason: "cancelled before its order body arrived", failed: false };
+    return { settle: "IGNORED", reason: CANCELLED_BEFORE_INGEST_REASON, failed: false };
   }
   const mismatch = merchantMismatch(order, connectionMerchantId);
   // FAILED, not IGNORED: a connection whose merchant id was entered wrong is

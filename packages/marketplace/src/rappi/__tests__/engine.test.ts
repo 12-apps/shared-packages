@@ -212,6 +212,21 @@ describe("the engine through the Rappi adapter, end to end", () => {
     expect(await h.engine.reprocess(stored!)).toMatchObject({ kind: "ingested" });
   });
 
+  it("[FUT-4898] a CANCEL after a FAILED NEW_ORDER keeps the retry sweep from creating the order", async () => {
+    const { h } = harness();
+    await connect(h);
+    h.patchIntegration({ externalMerchantId: "another-store" });
+    expect(await deliver(h, portalOrder())).toMatchObject({ kind: "failed" });
+
+    expect(await deliver(h, portalCancel(PORTAL_ORDER_ID, PORTAL_STORE_ID))).toEqual({ kind: "cancelled" });
+
+    h.patchIntegration({ externalMerchantId: PORTAL_STORE_ID });
+    const [stored] = await h.engine.retryable();
+    expect(await h.engine.reprocess(stored!)).toMatchObject({ kind: "ignored", reason: "cancelled before its order body arrived" });
+    expect(h.created).toEqual([]);
+    expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "IGNORED" });
+  });
+
   it("[R3-N2] a 'rejected' that lands after the sweep timed the request out AND the store accepted still cancels the order", async () => {
     const box: { h?: Harness; orderId?: string } = {};
     const http = rappiApi(async (request) => {
