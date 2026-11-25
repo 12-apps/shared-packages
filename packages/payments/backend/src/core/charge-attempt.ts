@@ -90,12 +90,20 @@ async function handleDecline(
    */
   reason: DeclineReason = 'CARD_DECLINED',
 ): Promise<StepResult> {
-  await recordAttempt(deps, ctx, provider, {
-    outcome: 'DECLINED',
-    failureBucket: 'BUSINESS_OUTCOME',
-    providerChargeId: snapshot?.providerChargeId ?? null,
-    error: message,
-  });
+  await recordAttempt(
+    deps,
+    ctx,
+    provider,
+    {
+      outcome: 'DECLINED',
+      failureBucket: 'BUSINESS_OUTCOME',
+      providerChargeId: snapshot?.providerChargeId ?? null,
+      error: message,
+    },
+    undefined,
+    // The issuer's own code reaches the operator's report, not just "declined" (FUT-5585).
+    snapshot?.declineCodes,
+  );
   if (policy === 'TECHNICAL_AND_DECLINE') {
     return { kind: 'ADVANCE', failure: { provider, message, kind: 'FAILURE' } };
   }

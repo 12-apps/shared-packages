@@ -145,6 +145,8 @@ interface ProviderFailureInput {
   error?: unknown;
   /** A message to use when there is no error (a ledger-only outcome). */
   message?: string | null;
+  /** The provider's own codes when no error carries them: a decline answered as a result (FUT-5585). */
+  providerCodes?: readonly string[];
 }
 
 const MESSAGE_CAP = 500;
@@ -215,7 +217,8 @@ function contextOf(input: ProviderFailureInput) {
 
 /** Build the report. Pure; exported so hosts and tests can see exactly what is sent. */
 export function describeProviderFailure(input: ProviderFailureInput): ProviderFailureReport {
-  const exchange = exchangeOf(input.error);
+  const read = exchangeOf(input.error);
+  const exchange = { ...read, providerCodes: [...new Set([...read.providerCodes, ...(input.providerCodes ?? [])])] };
   const errorName = input.error instanceof Error ? input.error.name : null;
   return {
     path: input.path,

@@ -244,6 +244,22 @@ describe('pagbank adapter — charges', () => {
     expect(snapshot.declineReason).toBe('CARD_DECLINED');
   });
 
+  it("carries PagBank's own decline codes for the operator's report, never its message (FUT-5585)", async () => {
+    mockFetch({
+      id: 'ORDE_DC',
+      charges: [
+        {
+          id: 'CHAR_DC',
+          status: 'DECLINED',
+          payment_response: { code: '20001', message: 'CONTATE A CENTRAL DO SEU CARTAO', raw_data: { reason_code: '05' } },
+        },
+      ],
+    });
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-dc'), LIVE);
+
+    expect(snapshot.declineCodes).toEqual(['20001', 'reason 05']);
+  });
+
   it('declares a subsequent recurring charge to the issuer (FUT-340)', async () => {
     // Without `recurring.type` the issuer sees an unauthenticated card charge
     // with no stored-credential agreement behind it, and is entitled to
