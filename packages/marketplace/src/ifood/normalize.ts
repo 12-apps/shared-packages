@@ -1,10 +1,12 @@
 import type {
   MarketplaceDeliveredBy,
+  MarketplaceDiscountSponsor,
   MarketplaceOrderType,
   NormalizedAddress,
   NormalizedBuyer,
   NormalizedEvent,
   NormalizedMarketplaceOrder,
+  NormalizedOrderDiscount,
   NormalizedOrderLine,
 } from "../core/types";
 import {
@@ -13,6 +15,7 @@ import {
   firstDate,
   firstString,
   pick,
+  toCents,
   verifyHmacSha256Hex,
 } from "../core/payload-read";
 
@@ -113,6 +116,45 @@ function readDeliveredBy(order: unknown): MarketplaceDeliveredBy | null {
 }
 
 /**
+ * iFood's sponsor names as who pays. ESTIMATED: the names are the ones iFood's
+ * order-details guide documents for `benefits[].sponsorshipValues[].name`, but
+ * no recorded payload in this repo carries them; confirm against a real order
+ * (https://developer.ifood.com.br/en-US/docs/guides/order/details).
+ */
+function sponsorOf(name: string | null): MarketplaceDiscountSponsor {
+  const stated = name?.toUpperCase();
+  if (stated === "IFOOD") return "MARKETPLACE";
+  return stated === "MERCHANT" ? "MERCHANT" : "OTHER";
+}
+
+/**
+ * The discounts on an order, one per sponsor's share of each benefit.
+ * ESTIMATED shape (see {@link sponsorOf}): `benefits[]` with a `value` and
+ * `sponsorshipValues[{ name, value, description? }]`. A benefit that names no
+ * sponsor is the whole `value` under OTHER; a share with no usable amount is
+ * skipped. Absent `benefits` is undefined ("did not say").
+ */
+function readDiscounts(order: unknown): NormalizedOrderDiscount[] | undefined {
+  const benefits = pick(order, "benefits");
+  if (!Array.isArray(benefits)) return undefined;
+  return benefits.flatMap((benefit): NormalizedOrderDiscount[] => {
+    const shares = pick(benefit, "sponsorshipValues");
+    const parts = Array.isArray(shares)
+      ? shares.map((share) => ({
+          cents: toCents(pick(share, "value")),
+          sponsor: sponsorOf(firstString(share, [["name"]])),
+          name: firstString(share, [["description"]]),
+        }))
+      : [{ cents: toCents(pick(benefit, "value")), sponsor: "OTHER" as const, name: null }];
+    return parts.flatMap((part) =>
+      part.cents === null || part.cents <= 0
+        ? []
+        : [{ cents: part.cents, sponsor: part.sponsor, ...(part.name === null ? {} : { name: part.name }) }],
+    );
+  });
+}
+
+/**
  * Where a delivery goes. The street is what a courier cannot find a door
  * without, so an address with none is none; a missing number reads as the
  * host's own words for "no number" (`copy.missingStreetNumber`), which keeps
@@ -133,6 +175,11 @@ function readAddress(order: unknown, missingStreetNumber: string): NormalizedAdd
     city: firstString(raw, [["city"]]),
     state: firstString(raw, [["state"]]),
   };
+}
+
+/** `{ key: value }` unless the value is undefined, so an unstated field is absent rather than `undefined`. */
+function optional<K extends string, V>(key: K, value: V | undefined): { [P in K]?: V } {
+  return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
 }
 
 /** The order body of a placed-order event, or null when it carries none. */
@@ -168,6 +215,11 @@ function readOrder(
     orderType: readOrderType(order),
     deliveredBy: readDeliveredBy(order),
     deliveryAddress: readAddress(order, missingStreetNumber),
+    // ESTIMATED names (iFood's order-details guide: `total.deliveryFee`,
+    // `total.subTotal`, `benefits[]`); absent stays absent, never 0.
+    deliveryFeeCents: firstCents(order, [["total", "deliveryFee"]]),
+    subtotalCents: firstCents(order, [["total", "subTotal"]]),
+    ...optional("discounts", readDiscounts(order)),
   };
 }
 
