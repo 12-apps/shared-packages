@@ -207,8 +207,9 @@ export async function readCatalogueDocument(
   const catalogue = ctx.registry.get(input.provider)?.catalogue;
   const table = await usableTable(ctx, input.provider);
   if (!table || catalogue?.mode !== "pull") return { kind: "refused", code: "UNSUPPORTED" };
-  const connection = await catalogueConnection(ctx, input.clientId, input.provider);
-  if ("problem" in connection) return { kind: "refused", code: "NOT_CONNECTED" };
+  // The document needs only the merchant id: no credentials are opened to serve it.
+  const externalMerchantId = await connectionMerchantId(ctx, input.clientId, input.provider);
+  if (externalMerchantId === null) return { kind: "refused", code: "NOT_CONNECTED" };
   const rows = (await table.findMany({
     where: { clientId: input.clientId, provider: input.provider, status: { in: IN_MENU } },
     select: CATALOGUE_ROW_SELECT,
@@ -221,6 +222,6 @@ export async function readCatalogueDocument(
     if (!item || priceCents === null) return [];
     return [{ ...item, priceCents, ref: row.id, productId: row.productId, externalId: row.externalId, storedImage: null }];
   });
-  const document = catalogue.menuDocument({ externalMerchantId: connection.externalMerchantId, entries, options: input.options });
+  const document = catalogue.menuDocument({ externalMerchantId, entries, options: input.options });
   return { kind: "document", document };
 }

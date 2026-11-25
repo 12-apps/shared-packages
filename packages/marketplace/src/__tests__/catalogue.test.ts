@@ -541,6 +541,30 @@ describe("catalogue publishing, pull", () => {
     });
   });
 
+  it("builds the document without opening the credentials: only the merchant id is read (FUT-5098)", async () => {
+    const h = mount([{ status: 204, body: "" }], { "p-1": BURGER });
+    await h.connect(PULLY);
+    await h.engine.publish({ clientId: TENANT, provider: PULLY, productId: "p-1" });
+    // Credentials that would throw if opened, and a seal that would too.
+    h.patchIntegration({ credentials: "not-sealed" });
+
+    const document = await h.engine.catalogueDocument({ clientId: TENANT, provider: PULLY, options: { menuName: "Menu", currency: "XTS" } });
+
+    expect(document).toMatchObject({ kind: "document", document: { merchant: "merchant-PULLY" } });
+    expect(h.logged.filter((line) => line.level === "error")).toEqual([]);
+  });
+
+  it("serves no document when the connection states no merchant id (FUT-5098)", async () => {
+    const h = mount();
+    await h.connect(PULLY);
+    h.patchIntegration({ externalMerchantId: null });
+
+    expect(await h.engine.catalogueDocument({ clientId: TENANT, provider: PULLY, options: { menuName: "Menu", currency: "XTS" } })).toEqual({
+      kind: "refused",
+      code: "NOT_CONNECTED",
+    });
+  });
+
   it("serves no document for a push marketplace or one not connected", async () => {
     const h = mount();
     const options = { menuName: "Menu", currency: "XTS" };
