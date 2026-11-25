@@ -65,6 +65,16 @@ describe("a cancellation request that FAILS says whose failure it was", () => {
     expect(await failedWith(h, orderId)).toEqual({ stored: "UNREACHABLE", told: [{ orderId, reason: "UNREACHABLE" }] });
   });
 
+  it("a stored reason that is not the marketplace's is UNREACHABLE: nothing was sent", async () => {
+    const http = scriptedHttp([TOKEN]);
+    const h = createHarness({ http, cancellationHooks: true });
+    const orderId = await requestPending(h);
+    h.patchAcceptance(orderId, { cancellationReasonCode: "NOT-A-CODE" });
+
+    expect(await failedWith(h, orderId)).toEqual({ stored: "UNREACHABLE", told: [{ orderId, reason: "UNREACHABLE" }] });
+    expect(http.requests).toEqual([]);
+  });
+
   it("a token grant iFood refuses (401) is UNREACHABLE: no judgement of the order was reached", async () => {
     const h = createHarness({ http: scriptedHttp([{ status: 401, body: "invalid client" }]), cancellationHooks: true });
     const orderId = await requestPending(h);

@@ -56,4 +56,53 @@ describe("a cancellation that outran a failed carried NEW_ORDER (FUT-4898)", () 
 
     expect(await h.engine.reprocess(stored!)).toMatchObject({ kind: "ingested" });
   });
+
+  describe("a CANCELLED that lands while the ingest's transaction is open (the host's create)", () => {
+    function racing() {
+      const box: { h?: ReturnType<typeof createHarness>; armed: boolean } = { armed: false };
+      const options = {
+        failCreate: false,
+        onCreate: async () => {
+          if (box.armed && box.h) {
+            box.armed = false;
+            expect(await deliverIfood(box.h, ifoodEvent("ext-1", "CAN"))).toEqual({ kind: "cancelled" });
+          }
+        },
+      };
+      const h = createHarness(options);
+      box.h = h;
+      return { h, box, options };
+    }
+
+    it("on a first delivery: the order is cancelled once ingested, and no confirm is owed", async () => {
+      const { h, box } = racing();
+      await h.connect("IFOOD", { autoAccept: true });
+      box.armed = true;
+
+      const outcome = await deliverIfood(h, ifoodPlaced("ext-1"));
+      if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+      expect(h.acceptance(outcome.orderId)?.status).toBe("REJECTED");
+      expect(h.refused).toEqual([{ orderId: outcome.orderId, reason: "CANCELLED" }]);
+      expect(await h.engine.runOutbound({ clientId: "tenant-1", orderId: outcome.orderId, action: "confirm" }, { attempt: 1, maxAttempts: 3 })).toMatchObject({
+        kind: "skipped",
+      });
+    });
+
+    it("on the sweep's re-run of a FAILED row: the same", async () => {
+      const { h, box, options } = racing();
+      await h.connect("IFOOD", { autoAccept: true });
+      options.failCreate = true;
+      expect((await deliverIfood(h, ifoodPlaced("ext-1"))).kind).toBe("failed");
+      options.failCreate = false;
+      box.armed = true;
+      const [stored] = await h.engine.retryable();
+
+      const outcome = await h.engine.reprocess(stored!);
+      if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+      expect(h.acceptance(outcome.orderId)?.status).toBe("REJECTED");
+      expect(h.refused).toEqual([{ orderId: outcome.orderId, reason: "CANCELLED" }]);
+    });
+  });
 });

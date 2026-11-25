@@ -241,6 +241,46 @@ describe("the engine through the Rappi adapter, end to end", () => {
     expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "IGNORED" });
   });
 
+  it("[FUT-4898] a CANCEL that lands inside the ingest's create still cancels the order, on a first delivery and on the sweep's re-run", async () => {
+    for (const rerun of [false, true]) {
+      const box: { h?: Harness; armed: boolean } = { armed: false };
+      const mounted = createHarness({
+        http: rappiApi(),
+        cancellationHooks: true,
+        onCreate: async () => {
+          if (box.armed && box.h) {
+            box.armed = false;
+            expect(await deliver(box.h, portalCancel(PORTAL_ORDER_ID, PORTAL_STORE_ID))).toEqual({ kind: "cancelled" });
+          }
+        },
+        adapters: [
+          createRappiAdapter({ copy: RAPPI_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, tokenUrl: TOKEN_URL, portalUrl: PORTAL, amountUnit: "MINOR_UNITS" }),
+        ],
+      });
+      box.h = mounted;
+      await connect(mounted);
+      let orderId: string;
+      if (rerun) {
+        mounted.patchIntegration({ externalMerchantId: "another-store" });
+        expect(await deliver(mounted, portalOrder())).toMatchObject({ kind: "failed" });
+        mounted.patchIntegration({ externalMerchantId: PORTAL_STORE_ID });
+        box.armed = true;
+        const [stored] = await mounted.engine.retryable();
+        const outcome = await mounted.engine.reprocess(stored!);
+        if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+        orderId = outcome.orderId;
+      } else {
+        box.armed = true;
+        const outcome = await deliver(mounted, portalOrder());
+        if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+        orderId = outcome.orderId;
+      }
+
+      expect(mounted.acceptance(orderId)?.status).toBe("REJECTED");
+      expect(mounted.refused).toEqual([{ orderId, reason: "CANCELLED" }]);
+    }
+  });
+
   it("[R3-N2] a 'rejected' that lands after the sweep timed the request out AND the store accepted still cancels the order", async () => {
     const box: { h?: Harness; orderId?: string } = {};
     const http = rappiApi(async (request) => {

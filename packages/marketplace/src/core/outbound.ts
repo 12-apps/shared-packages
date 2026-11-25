@@ -302,7 +302,8 @@ async function runCancellation(
   const reason = resolveReason(adapter, row.cancellationReasonCode);
   const connection = await connectionFor(ctx, payload.clientId, row.provider);
   let result: OutboundResult;
-  if (!reason) result = { kind: "refused", status: 0, message: "the stored reason is not the marketplace's" };
+  // A stored reason that is not the marketplace's own was never sent: our side (UNREACHABLE).
+  if (!reason) result = { kind: "refused", status: 0, message: "the stored reason is not the marketplace's", own: true };
   else if (typeof connection === "string") result = { kind: "refused", status: 0, message: connection, own: true };
   else {
     result = await adapter.requestCancellation(

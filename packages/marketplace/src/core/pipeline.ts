@@ -198,6 +198,11 @@ async function ingestCarried(
     return { kind: "ignored", reason: CANCELLED_BEFORE_INGEST_REASON };
   }
   const result = await ingestMarketplaceOrder(ctx, { clientId, order, settings, now });
+  // A CANCELLED that read the acceptances while this ingest's transaction was
+  // still open found none and left its marker: honour it now, through the
+  // ordinary cancel path (the order is cancelled; no confirm is owed).
+  const ref = { clientId, provider: order.provider, externalOrderId: order.externalOrderId };
+  if (await cancelledBeforeIngest(ctx, ref)) await cancelAcceptance(ctx, ref);
   await settleInboxEvent(ctx, inboxId, "PROCESSED");
   return { kind: "ingested", orderId: result.orderId, unmappedSkus: result.unmappedSkus };
 }

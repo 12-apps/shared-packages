@@ -216,7 +216,8 @@ function readOrder(
     deliveredBy: readDeliveredBy(order),
     deliveryAddress: readAddress(order, missingStreetNumber),
     // ESTIMATED names (iFood's order-details guide: `total.deliveryFee`,
-    // `total.subTotal`, `benefits[]`); absent stays absent, never 0.
+    // `total.subTotal`, `benefits[]`). Fee and subtotal are null when unstated,
+    // never 0; `discounts` is absent when `benefits` is.
     deliveryFeeCents: firstCents(order, [["total", "deliveryFee"]]),
     subtotalCents: firstCents(order, [["total", "subTotal"]]),
     ...optional("discounts", readDiscounts(order)),
