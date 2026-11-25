@@ -12,7 +12,8 @@ import {
 import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
 import { useCredentialsSignIn } from "./credentials-sign-in";
 import { postPasswordSignIn, type PasswordSignInResult } from "./password-signin";
-import { createWebAccountDeletion, type WebAccountDeletion, type WebAccountDeletionConfig } from "./account-deletion";
+import type { WebAccountDeletion, WebAccountDeletionConfig } from "./account-deletion";
+import { lazyAccountDeletion } from "./account-deletion/lazy";
 
 /**
  * The browser half of `@12-apps/auth`, as one factory taking one config object.
@@ -384,7 +385,7 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     SessionProvider,
     useSession,
     ...(config.accountDeletion
-      ? { accountDeletion: createWebAccountDeletion({ fetchImpl, ...config.accountDeletion }, { useSession }) }
+      ? { accountDeletion: lazyAccountDeletion({ fetchImpl, ...config.accountDeletion }, { useSession }) }
       : {}),
   };
 }
