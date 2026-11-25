@@ -10,7 +10,7 @@ import {
 import { readOutboundConnection, type OutboundConnection } from "./integration";
 import type { OutboundJobPayload } from "./outbound-queue";
 import { failAsTimeout } from "./outbound-sweep";
-import type { EngineContext } from "./ports";
+import type { CancellationFailureReason, EngineContext } from "./ports";
 import { resolveReason } from "./registry";
 
 /**
@@ -133,15 +133,16 @@ async function stampCancellation(
   row: OutboundRow,
   status: "REQUESTED" | "CONFIRMED" | "FAILED",
   clientId: string,
+  failure: CancellationFailureReason = "REFUSED",
 ): Promise<void> {
   if (status === "CONFIRMED") return stampConfirmedCancellation(ctx, row, clientId);
   const db = await ctx.ports.db();
-  const data = status === "FAILED" ? failedRequestData("REFUSED") : { cancellationStatus: status };
+  const data = status === "FAILED" ? failedRequestData(failure) : { cancellationStatus: status };
   const moved = await db.marketplaceAcceptance.updateMany({
     where: { orderId: row.orderId, cancellationStatus: "PENDING" },
     data,
   });
-  if (moved.count > 0 && status === "FAILED") await tellCancellationFailed(ctx, clientId, row.orderId, "REFUSED");
+  if (moved.count > 0 && status === "FAILED") await tellCancellationFailed(ctx, clientId, row.orderId, failure);
 }
 
 /**
@@ -218,7 +219,7 @@ async function settle(
   result: OutboundResult,
   attempt: OutboundAttempt,
   succeed: () => Promise<void>,
-  fail: () => Promise<void>,
+  fail: (reason: CancellationFailureReason) => Promise<void>,
 ): Promise<OutboundOutcome> {
   if (result.kind === "accepted") {
     await succeed();
@@ -229,7 +230,9 @@ async function settle(
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
     throw new OutboundRetryError(`${payload.action} for order ${row.orderId}: ${reason}`);
   }
-  await fail();
+  // A refusal that is the marketplace's judgement is REFUSED; anything else (our
+  // own refusal, retries that ran out) never got one.
+  await fail(result.kind === "refused" && !result.own ? "REFUSED" : "UNREACHABLE");
   ctx.ports.logger.error(`marketplace.outbound: ${payload.action} for order ${row.orderId} failed: ${reason}`);
   ctx.ports.publishChanged(payload.clientId);
   return { kind: "failed", action: payload.action, reason };
@@ -248,7 +251,7 @@ async function runConfirm(
   const connection = await connectionFor(ctx, payload.clientId, row.provider);
   const result: OutboundResult =
     typeof connection === "string"
-      ? { kind: "refused", status: 0, message: connection }
+      ? { kind: "refused", status: 0, message: connection, own: true }
       : await adapter.confirm(
           { http: ctx.ports.http, tokens: ctx.tokens, now, ...connection },
           refOf(row),
@@ -300,7 +303,7 @@ async function runCancellation(
   const connection = await connectionFor(ctx, payload.clientId, row.provider);
   let result: OutboundResult;
   if (!reason) result = { kind: "refused", status: 0, message: "the stored reason is not the marketplace's" };
-  else if (typeof connection === "string") result = { kind: "refused", status: 0, message: connection };
+  else if (typeof connection === "string") result = { kind: "refused", status: 0, message: connection, own: true };
   else {
     result = await adapter.requestCancellation(
       { http: ctx.ports.http, tokens: ctx.tokens, now: ctx.ports.clock.now(), ...connection },
@@ -316,7 +319,7 @@ async function runCancellation(
     result,
     attempt,
     () => stampCancellation(ctx, row, taken, payload.clientId),
-    () => stampCancellation(ctx, row, "FAILED", payload.clientId),
+    (failure) => stampCancellation(ctx, row, "FAILED", payload.clientId, failure),
   );
 }
 
@@ -335,12 +338,12 @@ async function stampLastAttemptFailure(ctx: EngineContext, payload: OutboundJobP
       })
     : db.marketplaceAcceptance.updateMany({
         where: { orderId: payload.orderId, clientId: payload.clientId, cancellationStatus: "PENDING" },
-        data: failedRequestData("REFUSED"),
+        data: failedRequestData("UNREACHABLE"),
       }));
   ctx.ports.logger.error(`marketplace.outbound: ${payload.action} for order ${payload.orderId} failed: ${reason}`);
   ctx.ports.publishChanged(payload.clientId);
   if (payload.action === "requestCancellation" && moved.count > 0) {
-    await tellCancellationFailed(ctx, payload.clientId, payload.orderId, "REFUSED");
+    await tellCancellationFailed(ctx, payload.clientId, payload.orderId, "UNREACHABLE");
   }
   return { kind: "failed", action: payload.action, reason };
 }

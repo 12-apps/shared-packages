@@ -237,8 +237,9 @@ async function afterCommit(ctx: EngineContext, clientId: string, planned: readon
     try {
       if (one.decided.status === "ACCEPTED" && one.input.decision === "ACCEPT") await ctx.ports.order.onAccepted(clientId, orderId);
       else if (!one.requestOnly) await ctx.ports.order.onRefused(clientId, orderId, "REJECTED");
-      // A request the marketplace cannot take through its API failed at once:
-      // the order stays, and a person cancels it in the marketplace's app.
+      // A request the marketplace cannot take through its API failed at once
+      // (REFUSED: its own limit): the order stays, and a person cancels it in
+      // the marketplace's app.
       else if (one.decided.cancellation === "FAILED") await tellCancellationFailed(ctx, clientId, orderId, "REFUSED");
     } catch (error) {
       ctx.ports.logger.error(

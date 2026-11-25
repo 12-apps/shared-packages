@@ -168,6 +168,20 @@ describe("the engine through the Rappi adapter, end to end", () => {
     expect((await h.engine.orderStates(TENANT, [orderId])).get(orderId)?.appUrl).toBe(PORTAL);
   });
 
+  it("[FUT-4917] a token grant Rappi refuses (401) is UNREACHABLE (its reject 400 stays REFUSED, above)", async () => {
+    // The NEW_ORDER webhook carries its order, so no token was needed to ingest it.
+    const http = scriptedHttp((request) => (request.url === TOKEN_URL.SANDBOX ? { status: 401, body: "invalid_client" } : { status: 200, body: "" }));
+    const { h } = harness({ http });
+    await connect(h);
+    const orderId = await arrive(h);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "ORDER_TOTAL_INCORRECT" });
+
+    await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
+
+    expect(h.acceptance(orderId)).toMatchObject({ cancellationStatus: "FAILED", cancellationFailureReason: "UNREACHABLE" });
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "UNREACHABLE" }]);
+  });
+
   it("[P1] a cancel after take has no public endpoint: FAILED at once, nothing sent, the portal opens", async () => {
     const { h, http } = harness();
     await connect(h);

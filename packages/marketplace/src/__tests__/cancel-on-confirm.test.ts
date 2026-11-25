@@ -166,7 +166,7 @@ describe("the marketplace refuses the store's request", () => {
     expect(h.cancellationFailed).toEqual([{ orderId, reason: "REFUSED" }]);
   });
 
-  it("by the last attempt dying: FAILED, REFUSED, told", async () => {
+  it("by the last attempt dying: FAILED, UNREACHABLE, told", async () => {
     const http = scriptedHttp(() => {
       throw new Error("socket hang up");
     });
@@ -177,7 +177,7 @@ describe("the marketplace refuses the store's request", () => {
     await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, LAST);
 
     expect(h.acceptance(orderId)?.cancellationStatus).toBe("FAILED");
-    expect(h.cancellationFailed).toEqual([{ orderId, reason: "REFUSED" }]);
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "UNREACHABLE" }]);
   });
 
   it("a FAILED request may be asked again, and it starts afresh", async () => {

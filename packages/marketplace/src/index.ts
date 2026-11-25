@@ -25,6 +25,7 @@ export { stableUuid } from "./core/catalogue-ids";
 export {
   answered,
   outboundResultOf,
+  tokenGrantResultOf,
   type AdapterCallContext,
   type AdapterTokenCache,
   type CancellationReason,
