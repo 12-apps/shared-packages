@@ -209,6 +209,8 @@ export interface ChargeSnapshot {
    */
   settlementHints?: SettlementHints;
   declineReason?: DeclineReason;
+  /** The provider's own decline codes (e.g. `['20001', 'reason 05']`), for the operator's report only (FUT-5585). */
+  declineCodes?: string[];
   /** A charge split in N (FUT-4382): the count, and the price before the buyer's interest. */
   installments?: number;
   principal?: Money;

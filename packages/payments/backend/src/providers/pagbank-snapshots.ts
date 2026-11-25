@@ -304,16 +304,30 @@ export function mapPix(
  */
 function cardOutcome(
   charge: PagBankCardCharge | undefined,
-): Pick<ChargeSnapshot, 'status' | 'declineReason' | 'declineRetriable'> {
+): Pick<ChargeSnapshot, 'status' | 'declineReason' | 'declineRetriable' | 'declineCodes'> {
   if (charge?.status === 'PAID') return { status: 'PAID' };
   if (charge?.status === 'AUTHORIZED') return { status: 'AUTHORIZED' };
   const response = charge?.payment_response;
   const decline = pagbankDecline(response?.code, response?.raw_data);
+  const codes = declineCodesOf(response);
   return {
     status: 'DECLINED',
     declineReason: decline.reason,
     declineRetriable: decline.retriable,
+    ...(codes.length > 0 ? { declineCodes: codes } : {}),
   };
+}
+
+/**
+ * PagBank's own codes for a decline (FUT-5585): `payment_response.code` and the
+ * issuer's `raw_data.reason_code`, for the operator's report. Codes only —
+ * never the message, which can echo the buyer.
+ */
+function declineCodesOf(response: PagBankCardCharge['payment_response']): string[] {
+  const code = typeof response?.code === 'string' && /^\w{1,12}$/.test(response.code) ? response.code : null;
+  const reason = response?.raw_data?.reason_code;
+  const issuer = typeof reason === 'string' && /^\w{1,12}$/.test(reason) ? `reason ${reason}` : null;
+  return [code, issuer].filter((value): value is string => value !== null);
 }
 
 /**

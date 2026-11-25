@@ -279,6 +279,23 @@ describe('the charge walk reports every non-success attempt', () => {
     ]);
   });
 
+  it("reports a decline's own provider codes, so the report names the issuer's refusal (FUT-5585)", async () => {
+    const w = world({
+      chain: [
+        {
+          adapter: scripted('alpha', {
+            charge: async (input) =>
+              snapshotOf('alpha', input, { status: 'DECLINED', declineReason: 'CARD_DECLINED', declineCodes: ['20001', 'reason 05'] }),
+          }),
+        },
+      ],
+    });
+    await w.gateway.charge(TENANT, pixInput());
+    expect(w.reports.map((r) => [r.outcome, r.providerCodes, r.fingerprint.endsWith('20001,reason 05')])).toEqual([
+      ['DECLINED', ['20001', 'reason 05'], true],
+    ]);
+  });
+
   it('reports a decline thrown by the adapter at info level, before the typed decline is thrown', async () => {
     const w = world({
       chain: [{ adapter: scripted('alpha', { charge: refuse(new ChargeDeclinedError('alpha', 'FRAUD_SUSPECTED')) }) }],

@@ -82,8 +82,10 @@ export async function recordAttempt(
     error?: string | null;
   },
   silence?: ProviderFailureSilence,
+  /** The provider's own codes for this outcome, for the report only (FUT-5585); never recorded on the attempt row. */
+  providerCodes?: readonly string[],
 ): Promise<boolean> {
-  if (fields.outcome !== 'SUCCEEDED' && !silence) reportAttempt(deps, ctx, provider, fields);
+  if (fields.outcome !== 'SUCCEEDED' && !silence) reportAttempt(deps, ctx, provider, fields, providerCodes);
   try {
     await deps.attempts.record({
       merchant: ctx.merchant,
@@ -104,6 +106,7 @@ function reportAttempt(
   ctx: AttemptContext,
   provider: ProviderName,
   fields: Parameters<typeof recordAttempt>[3],
+  providerCodes: readonly string[] | undefined,
 ): void {
   reportProviderFailure(deps.onProviderFailure, {
     path: 'CHARGE',
@@ -117,6 +120,7 @@ function reportAttempt(
     environment: ctx.environment ?? null,
     ...(ctx.cause === undefined ? {} : { error: ctx.cause }),
     message: fields.error ?? null,
+    ...(providerCodes && providerCodes.length > 0 ? { providerCodes } : {}),
   });
 }
 /**
