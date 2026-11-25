@@ -11,6 +11,7 @@ import {
   REGION_MAP_COPY,
   REGION_MAP_WITH_CONTEXT,
   REGION_MAP_WITH_EXCLUSIONS,
+  VILA_JARDIM_LEBLON_VIEW,
 } from '../RegionMap.fixtures';
 
 /**
@@ -264,4 +265,23 @@ describe('the list', () => {
     expect(screen.getByTestId('map-legend')).toBeInTheDocument();
     expect(testIdsStartingWith('map-list')).toEqual([]);
   });
+});
+
+it('redraws a controlled viewport, culls distant regions and labels a small visible area', () => {
+  const props = { regions: REGION_MAP_AREAS, center: REGION_MAP_CENTER, circles: [{ radiusMetres: 6000 }], copy: REGION_MAP_COPY };
+  const { rerender } = render(<RegionMap {...props} />);
+  const svg = screen.getByRole('img');
+  const fit = svg.getAttribute('viewBox');
+  const tiny = 'region-map-label-3106200457';
+  expect(screen.queryAllByTestId(tiny)).toHaveLength(0);
+  expect(screen.getByTestId('region-map-area-3106200365')).toBeInTheDocument();
+  const view = VILA_JARDIM_LEBLON_VIEW;
+  rerender(<RegionMap {...props} viewport={view} labelMode="visible" />);
+  expect(svg).toHaveAttribute('viewBox', `${view.minX} ${view.minY} ${view.spanX} ${view.spanY}`);
+  expect(screen.getByTestId(tiny)).toHaveTextContent('Vila Jardim Leblon');
+  expect(screen.queryAllByTestId('region-map-area-3106200365')).toHaveLength(0);
+  rerender(<RegionMap {...props} />);
+  expect(svg).toHaveAttribute('viewBox', fit);
+  expect(screen.getByTestId('region-map-area-3106200365')).toBeInTheDocument();
+  expect(screen.queryAllByTestId(tiny)).toHaveLength(0);
 });

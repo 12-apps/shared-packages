@@ -177,6 +177,10 @@ export interface RegionMapProps {
    * and the reach together. Omit it and the view is the circles' (or areas').
    */
   reach?: RegionMapReach;
+  /** The visible square in the centre's projected metres. Omit to fit the circles and reach. */
+  viewport?: PlaneBox;
+  /** Display ordinary area names as space permits, alongside excluded and highlighted areas. */
+  labelMode?: 'selection' | 'visible';
   /**
    * A host layer drawn INSIDE the drawing's SVG, over the excluded hatch and
    * under the circles, highlights and centre, so it shares the map's view,

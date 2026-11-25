@@ -5,10 +5,10 @@ import React from 'react';
 
 import { rem, remPx } from '../../../tokens/relative';
 
-import { labelPosition, type AreaGeometry, type DrawnRegion, type PlaneBox } from './RegionMap.helpers';
+import type { AreaGeometry, DrawnRegion, PlaneBox } from './RegionMap.helpers';
 import type { RegionMapModel } from './RegionMap.hooks';
-import { labelOrder, placeLabels } from './RegionMap.labels';
-import type { RegionMapLayer } from './RegionMap.types';
+import { mapLabels, placeLabels } from './RegionMap.labels';
+import type { RegionMapLayer, RegionMapProps } from './RegionMap.types';
 import type { Moving } from './RegionMapPin';
 import { PinOverlay, PinShapes } from './RegionMapPin';
 
@@ -16,6 +16,7 @@ export interface RegionMapDrawingProps {
   model: RegionMapModel & { view: PlaneBox };
   /** The host's layer, drawn inside the SVG under the circles (`RegionMapProps.overlay`). */
   overlay?: (layer: RegionMapLayer) => React.ReactNode;
+  labelMode?: RegionMapProps['labelMode'];
   showCenter: boolean;
   /** The movable centre and what is drawn with it (`RegionMapProps.pin`, `ghost`, `dots`). */
   moving?: Moving;
@@ -45,10 +46,11 @@ export function RegionMapDrawing(props: RegionMapDrawingProps): React.JSX.Elemen
   const highlighted = drawn.filter((d) => wanted.has(d.id));
   // Highlighted, then excluded, then larger, then by name: the order labels
   // claim their place in, so a collision hides the less important one.
-  const labelled = labelOrder(drawn.filter((d) => d.excluded || wanted.has(d.id)), wanted);
+  const labelled = mapLabels(drawn, wanted, view, props.labelMode);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
-  useLabelPlacement(boxRef, labelled.map((d) => d.id).join('|'), remPx(theme, 4));
+  const layoutKey = labelled.map(({ area, at }) => `${area.id}:${at.fractionX}:${at.fractionY}`).join('|');
+  useLabelPlacement(boxRef, layoutKey, remPx(theme, 4));
   const base = drawn.map((d) => ({ id: d.id, name: d.name, geometry: d.geometry, outside: d.outside === true }));
   return (
     <Box
@@ -102,8 +104,8 @@ export function RegionMapDrawing(props: RegionMapDrawingProps): React.JSX.Elemen
           />
         )}
       </svg>
-      {labelled.map((d) => (
-        <AreaLabel key={`l-${d.id}`} area={d} view={view} testId={testId} theme={theme} />
+      {labelled.map(({ area, at }) => (
+        <AreaLabel key={area.id} area={area} at={at} testId={testId} theme={theme} />
       ))}
       <PinOverlay model={model} moving={moving} svgRef={svgRef} testId={testId} theme={theme} />
     </Box>
@@ -306,16 +308,15 @@ function useLabelPlacement(boxRef: React.RefObject<HTMLDivElement | null>, key: 
  */
 function AreaLabel({
   area,
-  view,
+  at,
   testId,
   theme,
 }: {
   area: DrawnRegion;
-  view: PlaneBox;
+  at: { fractionX: number; fractionY: number };
   testId: string;
   theme: Theme;
 }): React.JSX.Element {
-  const at = labelPosition(area.geometry.rings, view);
   const halo = `0 0 ${rem(theme, 3)} ${theme.palette.background.paper}`;
   return (
     <Typography

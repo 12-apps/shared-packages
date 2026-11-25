@@ -88,15 +88,16 @@ export function useRegionMap({
   center,
   circles = [],
   reach,
+  viewport,
   onToggle,
-}: Pick<RegionMapProps, 'regions' | 'center' | 'circles' | 'reach' | 'onToggle'>): RegionMapModel {
+}: Pick<RegionMapProps, 'regions' | 'center' | 'circles' | 'reach' | 'viewport' | 'onToggle'>): RegionMapModel {
   const { projection, geometryOf } = useGeometry(center ?? centreOf(regions));
   const radii = circles.map((c) => c.radiusMetres);
   const outermostMetres = extent(radii)?.max ?? null;
   const view =
     projection === null || geometryOf === null
       ? null
-      : viewWithin(outermostMetres, reach === undefined ? null : reachBox(reach, projection), () =>
+      : viewport ?? viewWithin(outermostMetres, reachBox(reach, projection), () =>
           regions.map((r) => geometryOf(r.rings).bounds),
         );
   const drawn = geometryOf && view ? drawOrder(regions, geometryOf, view) : [];

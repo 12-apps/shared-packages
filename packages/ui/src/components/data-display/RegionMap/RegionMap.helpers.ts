@@ -254,12 +254,12 @@ export function planeArea(rings: readonly (readonly PlanePoint[])[]): number {
 export function labelPosition(
   rings: readonly (readonly PlanePoint[])[],
   view: PlaneBox,
-  inset = 0.04,
+  inset: number | null = 0.04,
 ): { fractionX: number; fractionY: number } {
   const largest = rings
     .map(ringCentroid)
     .reduce((a, b) => (Math.abs(b.area) > Math.abs(a.area) ? b : a), { area: 0, x: 0, y: 0 });
-  const clamp = (value: number): number => Math.min(1 - inset, Math.max(inset, value));
+  const clamp = (value: number): number => inset === null ? value : Math.min(1 - inset, Math.max(inset, value));
   return {
     fractionX: clamp((largest.x - view.minX) / view.spanX),
     fractionY: clamp((largest.y - view.minY) / view.spanY),

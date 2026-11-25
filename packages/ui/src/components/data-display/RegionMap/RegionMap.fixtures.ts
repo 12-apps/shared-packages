@@ -1,3 +1,4 @@
+import { regionMapView } from './RegionMap.view';
 import { decodePolyline } from './RegionMap.helpers';
 import type { RegionMapCopy, RegionMapRegion } from './RegionMap.types';
 
@@ -65,3 +66,9 @@ export const REGION_MAP_WITH_EXCLUSIONS: RegionMapRegion[] = REGION_MAP_AREAS.ma
   ...area,
   excluded: area.name === 'Minascaixa' || area.name === 'Jardim Leblon',
 }));
+
+/** Zoom tightly enough to inspect the two small parts of Vila Jardim Leblon. */
+export const VILA_JARDIM_LEBLON_VIEW = regionMapView({
+  regions: REGION_MAP_AREAS.filter((area) => area.id === '3106200457'),
+  center: REGION_MAP_CENTER,
+})!;

@@ -110,6 +110,12 @@ describe('the view with a reach', () => {
   const kmEast = 1000 / (111_195 * Math.cos((center.latitude * Math.PI) / 180));
   const kmNorth = 1000 / 111_195;
 
+  it('uses the host viewport for overlays when the drawing has a centre', () => {
+    const viewport = { minX: 20, minY: 40, spanX: 200, spanY: 200 };
+    expect(regionMapView({ regions: [], center, viewport })).toEqual(viewport);
+    expect(regionMapView({ regions: [], center: null, viewport })).toBeNull();
+  });
+
   it('is the circles\' view when no reach is given', () => {
     expect(regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }] })).toEqual(viewBoxFor(5000, null));
   });

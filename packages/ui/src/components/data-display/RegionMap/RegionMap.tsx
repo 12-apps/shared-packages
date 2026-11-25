@@ -43,6 +43,8 @@ export function RegionMap({
   ghost,
   dots,
   reach,
+  viewport,
+  labelMode,
   overlay,
   onToggle,
   highlightedIds = NO_IDS,
@@ -54,7 +56,7 @@ export function RegionMap({
   dataTestId = 'region-map',
 }: RegionMapProps): React.JSX.Element | null {
   const theme = useTheme();
-  const model = useRegionMap({ regions, center, circles, reach, onToggle });
+  const model = useRegionMap({ regions, center, circles, reach, viewport, onToggle });
   const { view } = model;
   if (view === null && regions.length === 0) return null;
   return (
@@ -64,6 +66,7 @@ export function RegionMap({
           <RegionMapDrawing
             model={{ ...model, view }}
             overlay={overlay}
+            labelMode={labelMode}
             showCenter={center !== null}
             moving={center === null ? undefined : { center, pin, ghost, dots, copy }}
             highlightedIds={highlightedIds}

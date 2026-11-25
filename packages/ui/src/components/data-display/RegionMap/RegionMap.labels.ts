@@ -1,3 +1,6 @@
+import { labelPosition, type DrawnRegion, type PlaneBox } from './RegionMap.helpers';
+import type { RegionMapProps } from './RegionMap.types';
+
 // How the labels over a RegionMap drawing are ranked and laid out.
 
 /** Where a label's centre may go along one axis so the whole label stays in view. */
@@ -56,5 +59,21 @@ export function placeLabels(labels: readonly LabelBox[], box: { spanX: number; s
     const visible = !kept.some((o) => rect.x0 < o.x1 && o.x0 < rect.x1 && rect.y0 < o.y1 && o.y0 < rect.y1);
     if (visible) kept.push(rect);
     return { x, y, visible };
+  });
+}
+
+/** During navigation, labels belong to anchors in the visible square. Their
+ * DOM measurements decide which names fit, with the selection taking priority. */
+export function mapLabels(
+  drawn: readonly DrawnRegion[],
+  highlighted: ReadonlySet<string>,
+  view: PlaneBox,
+  mode: RegionMapProps['labelMode'] = 'selection',
+): { area: DrawnRegion; at: { fractionX: number; fractionY: number } }[] {
+  const candidates = mode === 'visible' ? drawn : drawn.filter((area) => area.excluded || highlighted.has(area.id));
+  return labelOrder(candidates, highlighted).flatMap((area) => {
+    const at = labelPosition(area.geometry.rings, view, mode === 'visible' ? null : 0.04);
+    if (at.fractionX < 0 || at.fractionX > 1 || at.fractionY < 0 || at.fractionY > 1) return [];
+    return [{ area, at }];
   });
 }
