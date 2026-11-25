@@ -55,11 +55,7 @@ export interface AccountDeletionSessionHooks {
   useSession: () => { signIn: (provider?: string, callbackUrl?: string) => Promise<void>; signOut: () => Promise<void> };
 }
 
-/** The pending deletion a session answer carries, if any. */
-export function pendingDeletionOf(session: unknown): { purgeAt: string } | null {
-  const deletion = (session as { deletion?: { purgeAt?: unknown } } | null)?.deletion;
-  return deletion && typeof deletion.purgeAt === "string" ? { purgeAt: deletion.purgeAt } : null;
-}
+export { pendingDeletionOf } from "./pending";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
