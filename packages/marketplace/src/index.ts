@@ -25,6 +25,7 @@ export { stableUuid } from "./core/catalogue-ids";
 export {
   answered,
   outboundResultOf,
+  tokenGrantResultOf,
   type AdapterCallContext,
   type AdapterTokenCache,
   type CancellationReason,
@@ -70,12 +71,14 @@ export {
   PROVIDER_ID_PATTERN,
   type CancellationOutcome,
   type MarketplaceDeliveredBy,
+  type MarketplaceDiscountSponsor,
   type MarketplaceOrderType,
   type MarketplaceProvider,
   type NormalizedAddress,
   type NormalizedBuyer,
   type NormalizedEvent,
   type NormalizedMarketplaceOrder,
+  type NormalizedOrderDiscount,
   type NormalizedOrderLine,
 } from "./core/types";
 export type {

@@ -1,6 +1,7 @@
 import {
   answered,
   outboundResultOf,
+  tokenGrantResultOf,
   type AdapterCallContext,
   type CancellationRequestInput,
   type FetchOrderResult,
@@ -76,7 +77,7 @@ export async function bearer(
     }).toString(),
   });
   if (response.status < 200 || response.status >= 300) {
-    const result = outboundResultOf(response);
+    const result = tokenGrantResultOf(response);
     return result.kind === "accepted" ? { kind: "retry", reason: "unexpected token answer" } : result;
   }
   const token = tokenOf(response.body);
@@ -215,6 +216,10 @@ export function openDeliveryRequestCancellation(
       body: { reason: input.text === "" ? input.reason.label : input.text, code: input.reason.code, mode: input.mode },
     });
     if ("kind" in response) return response;
-    return alreadyCancelled(response) ? { kind: "accepted" } : outboundResultOf(response);
+    if (alreadyCancelled(response)) return { kind: "accepted" };
+    const result = outboundResultOf(response);
+    // Open Delivery's 400 is a malformed request (a bad id or body: ours);
+    // its 422 is the business answer and stays a refusal.
+    return result.kind === "refused" && result.status === 400 ? { ...result, own: true } : result;
   });
 }

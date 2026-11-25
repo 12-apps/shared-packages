@@ -17,7 +17,7 @@ export interface MarketplaceOrderState {
   confirmFailedAt: Date | null;
   cancellation: CancellationStatus | null;
   cancellationReasonCode: string | null;
-  /** Why the request FAILED (REFUSED or TIMEOUT); null unless `cancellation` is FAILED, and on rows from before it. */
+  /** Why the request FAILED (REFUSED, UNREACHABLE or TIMEOUT); null unless `cancellation` is FAILED, and on rows from before it. */
   cancellationFailure: CancellationFailureReason | null;
   /** The adapter's app link, or null when no adapter is registered for it. */
   appUrl: string | null;

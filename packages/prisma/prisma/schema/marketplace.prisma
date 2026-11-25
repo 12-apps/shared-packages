@@ -228,9 +228,9 @@ model MarketplaceAcceptance {
   /// With a NULL status it is a TOMBSTONE: the request an accept cleared,
   /// which a synchronous marketplace's late "cancelled" can still match.
   cancellationRequestedAt DateTime? @map("cancellation_requested_at")
-  /// Why the request FAILED: REFUSED (the marketplace said no, or every
-  /// attempt failed) or TIMEOUT (no answer inside its window). CHECK in the
-  /// migration; NULL unless `cancellationStatus` is FAILED.
+  /// Why the request FAILED: REFUSED (the marketplace denied it), UNREACHABLE
+  /// (our own request never got a judgement) or TIMEOUT (no answer inside its
+  /// window). CHECK in the migrations; NULL unless `cancellationStatus` is FAILED.
   cancellationFailureReason String? @map("cancellation_failure_reason")
   /// The preparation time the accept stated, for a confirm that takes one.
   preparationMinutes Int? @map("preparation_minutes")
