@@ -268,7 +268,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         emailEqualsMerchant: "PagBank refused: the buyer's e-mail cannot be the merchant account's",
         issuerDeclined: {
           credit: 'the bank declined the credit card',
-          debit: 'the bank declined the debit card',
+          debit: 'the bank declined the debit card; try another debit card (prepaid and corporate cards are often declined)',
           wallet: 'the bank declined the card',
         },
         antifraudDeclined: "PagBank's antifraud declined the payment (not the card's bank)",
@@ -300,6 +300,19 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       retryEveryRefund: 'Try the refunds again',
     },
     charge: '3. Charge R$ 1.00 per scenario and refund',
+    retry: {
+      button: (names) => `Retry only what failed: ${names}`,
+      waiting: (needs) => `To retry the rest too: ${needs}.`,
+      needs: {
+        CARD: 'type the credit card',
+        DEBIT: 'type the debit card',
+        GOOGLE_PAY: 'tap the Google Pay button',
+        APPLE_PAY: 'tap the Apple Pay button',
+      },
+      confirmTitle: 'Retry in production?',
+      confirmBody: (names, reais) =>
+        `${reais} (R$ 1.00 per scenario) will be charged only on: ${names}, and each refunded right after. What already passed is not charged again.`,
+    },
     confirm: {
       title: 'Charge in production?',
       body: 'Up to R$ 5.00 (R$ 1.00 per scenario) will be charged on the cards, the Pix and each wallet tapped, and each refunded right after.',

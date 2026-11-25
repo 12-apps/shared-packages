@@ -25,6 +25,7 @@ import { ProductionEvidenceForm } from './ProductionEvidenceForm';
 import { ProductionPixPanel, type ProductionPixView } from './ProductionPixPanel';
 import { ProductionScenarioList, type ProductionScenarioOutcome } from './ProductionScenarioList';
 import { useProductionForm, useProductionRun } from './use-production-run';
+import { ProductionRetry } from './ProductionRetry';
 import { stepResultsOf } from './production-step-results';
 
 /**
@@ -50,6 +51,8 @@ export interface HomologacaoProductionSellerView extends HomologacaoSellerView {
   lastRunAt?: string | null;
   /** The latest run's id, so the card knows whether these outcomes are the run it just made (FUT-5519). */
   lastRunId?: string | null;
+  /** The latest run's sections a retry may raise again: did not pass, took no money (FUT-5584). */
+  retryable?: readonly EvidenceRunSection[] | null;
 }
 
 /** What the run answers: the Pix it raised and, from a host that reads them, each scenario's outcome. */
@@ -82,7 +85,15 @@ export interface HomologacaoProductionEvidenceCardProps {
     buyer: EvidenceBuyer,
     /** Only these sections (FUT-5519): the ones not fired at once through `onChargeNow`. Absent: all. */
     sections?: readonly EvidenceRunSection[],
+    /** `retry` (FUT-5584): raise again sections of the latest run that did not pass, in the same run. */
+    options?: { retry?: boolean },
   ) => Promise<ProductionRunAnswer>;
+  /**
+   * Phase 1 again for a retry of the latest run (FUT-5584): a fresh public key
+   * and 3DS session for the SAME run. Present, the card offers "Tentar de novo
+   * só o que falhou" once a run left sections that did not pass.
+   */
+  onPrepareRetry?: (runId: string, buyer: EvidenceBuyer) => ReturnType<HomologacaoProductionEvidenceCardProps['onPrepare']>;
   /**
    * The sections that need no card encryption, fired as soon as the run is
    * prepared (FUT-5519): the Pix and Google Pay at once, Apple Pay while its
@@ -90,7 +101,8 @@ export interface HomologacaoProductionEvidenceCardProps {
    */
   onChargeNow?: (
     runId: string,
-    input: { pix: boolean; wallets: BrowserWalletResult[] },
+    /** `retry` (FUT-5584): raise again sections of the latest run that did not pass. */
+    input: { pix: boolean; wallets: BrowserWalletResult[]; retry?: boolean },
     buyer: EvidenceBuyer,
   ) => Promise<{ paid: Partial<Record<'GOOGLE_PAY' | 'APPLE_PAY', boolean>>; outcomes: readonly ProductionScenarioOutcome[] }>;
   /**
@@ -174,7 +186,7 @@ function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['step
   );
 }
 
-function ConfirmDialog({
+export function ConfirmDialog({
   open,
   copy,
   onCancel,
@@ -370,6 +382,8 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
               {blockedBy}
             </Typography>
           ) : null}
+          {/* Under the charge's own hint, which is about the full run (FUT-5584). */}
+          <ProductionRetry copy={copy} seller={props.seller} form={form} wallets={wallets} flow={flow} />
           <EvidenceResult summary={flow.summary} failed={flow.failed} />
         </Stack>
         <ProductionSidePanel flow={flow} copy={copy} />

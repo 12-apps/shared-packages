@@ -7,6 +7,8 @@ import { consultConnectApplication, type ConsultConnectApplicationsDeps } from '
 import { beginSellerConnect, completeSellerConnect, type SellerCallback } from './connect';
 import { buildHomologacaoEvidenceFile, type EvidenceFile } from './file';
 import { buildHomologacaoEvidenceJson } from './json';
+import { retryableSections } from './retry';
+import { prepareEvidenceRetry } from './run-retry';
 import {
   createPrismaHomologacaoEvidenceStore,
   prismaEvidenceCharge,
@@ -144,6 +146,11 @@ export interface HomologacaoSellerConnection {
   lastRunAt: string | null;
   /** PRODUCTION (FUT-5519): the latest run's id, so a screen knows whose outcomes these are. */
   lastRunId: string | null;
+  /**
+   * PRODUCTION (FUT-5584): the latest run's sections a retry may raise again —
+   * those that did not pass and took no money. Empty in sandbox and before any run.
+   */
+  retryable: EvidenceRunSection[];
 }
 
 export interface HomologacaoEvidenceService {
@@ -155,6 +162,11 @@ export interface HomologacaoEvidenceService {
    * null when not minted. PRODUCTION takes the real cardholder (FUT-4198).
    */
   prepare(buyer?: EvidenceBuyer): Promise<PreparedEvidenceRun>;
+  /**
+   * Phase 1 again for a retry of the latest run (FUT-5584): a fresh public key
+   * and 3DS session for the SAME run. PRODUCTION takes the real cardholder.
+   */
+  prepareRetry(runId: string, buyer?: EvidenceBuyer): Promise<PreparedEvidenceRun>;
   /** Phase 2, with the browser's cards and — when their buttons were pressed — wallet tokens. */
   run(
     runId: string,
@@ -164,6 +176,8 @@ export interface HomologacaoEvidenceService {
     buyer?: EvidenceBuyer,
     /** Only these sections (FUT-5519): the ones the browser did not fire at once. Default: all. */
     sections?: readonly EvidenceRunSection[],
+    /** `retry` (FUT-5584): raise again sections of the run that did not pass and took no money, replacing their steps. */
+    options?: { retry?: boolean },
   ): Promise<EvidenceRecord>;
   /**
    * The sections that need no card encryption — the Pix and each wallet with a
@@ -171,7 +185,7 @@ export interface HomologacaoEvidenceService {
    */
   chargeNow(
     runId: string,
-    input: { pix: boolean; wallets: readonly BrowserWalletResult[] },
+    input: { pix: boolean; wallets: readonly BrowserWalletResult[]; retry?: boolean },
     buyer?: EvidenceBuyer,
   ): Promise<ImmediateCharge>;
   /**
@@ -240,9 +254,15 @@ function sellerView(
 function latestRunView(
   run: EvidenceRecord | null,
   skippedNote: string,
-): Pick<HomologacaoSellerConnection, 'pix' | 'scenarios' | 'lastRunAt' | 'lastRunId'> {
-  if (!run) return { pix: null, scenarios: null, lastRunAt: null, lastRunId: null };
-  return { pix: pixViewOf(run, skippedNote), scenarios: evidenceScenarioOutcomes(run), lastRunAt: run.createdAt, lastRunId: run.id };
+): Pick<HomologacaoSellerConnection, 'pix' | 'scenarios' | 'lastRunAt' | 'lastRunId' | 'retryable'> {
+  if (!run) return { pix: null, scenarios: null, lastRunAt: null, lastRunId: null, retryable: [] };
+  return {
+    pix: pixViewOf(run, skippedNote),
+    scenarios: evidenceScenarioOutcomes(run),
+    lastRunAt: run.createdAt,
+    lastRunId: run.id,
+    retryable: retryableSections(run, skippedNote, new Date()),
+  };
 }
 
 /** Google Pay mints against the seller's PagBank account in the evidence's own environment. */
@@ -304,8 +324,16 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
         buyer && environment === 'PRODUCTION' ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
       );
     },
-    run: (runId, cards, wallets, onSection, buyer, sections) =>
-      completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection, sections),
+    prepareRetry: async (runId, buyer) => {
+      if (environment === 'PRODUCTION' && !buyer) throw new EvidenceBuyerRequiredError();
+      return prepareEvidenceRetry(
+        { ...runDeps, customer: customerFor(environment, buyer) },
+        runId,
+        buyer && environment === 'PRODUCTION' ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
+      );
+    },
+    run: (runId, cards, wallets, onSection, buyer, sections, options) =>
+      completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection, sections, options),
     chargeNow: (runId, input, buyer) =>
       chargeImmediateSections({ ...runDeps, customer: customerFor(environment, buyer) }, runId, input),
     chargeApplePay: (runId, wallet, buyer) =>

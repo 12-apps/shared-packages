@@ -108,7 +108,7 @@ describe('the production evidence card shows the server’s outcomes (PG1)', () 
 
     await waitFor(() => expect(screen.getByTestId('production-scenario-credit')).toBeTruthy());
     expect(text('credit')).toBe('Crédito · falhou — o PagBank recusou: o e-mail do comprador não pode ser o da conta do lojista');
-    expect(text('debit')).toBe('Débito (3DS) · falhou — o banco recusou o cartão de débito');
+    expect(text('debit')).toBe('Débito (3DS) · falhou — o banco recusou o cartão de débito; tente outro cartão de débito (pré-pagos e corporativos costumam ser recusados)');
     expect(screen.getByTestId('production-scenarios').textContent).not.toContain('registrado no arquivo');
   });
 

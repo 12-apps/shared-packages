@@ -28,6 +28,8 @@ export {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
+export { EvidenceSectionNotRetryableError, retryableSections } from './retry';
+export { prepareEvidenceRetry } from './run-retry';
 export { chargeApplePayInSheet, chargeImmediateSections, type ImmediateCharge } from './apple-in-sheet';
 export { buildHomologacaoEvidenceFile, formatEvidenceTime, type EvidenceFile, type EvidenceFileDeps } from './file';
 export { buildHomologacaoEvidenceJson } from './json';

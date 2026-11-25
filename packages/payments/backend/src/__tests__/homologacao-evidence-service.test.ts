@@ -112,6 +112,7 @@ describe('createHomologacaoEvidence', () => {
       scenarios: null,
       lastRunAt: null,
       lastRunId: null,
+      retryable: [],
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
