@@ -34,8 +34,8 @@ function probed() {
     trace.httpAtDepth.push(trace.depth);
     return request.url.includes("/oauth/token") ? TOKEN : { status: 202, body: "" };
   });
-  const h = createHarness({ http, store: { db: memory.db, transaction } });
-  return { h, trace, http };
+  const subject = createHarness({ http, store: { db: memory.db, transaction } });
+  return { h: subject, trace, http };
 }
 
 describe("no HTTP while a transaction is open (FUT-5114)", () => {

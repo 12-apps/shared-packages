@@ -11,6 +11,23 @@ import { createHarness, deliverIfood, ifoodEvent, ifoodPlaced } from "./harness"
  * `99food/__tests__/engine.test.ts`.
  */
 
+/** A harness whose host's create delivers a CAN once armed: the cancel lands inside the ingest's transaction. */
+function racing() {
+  const gate: { subject?: ReturnType<typeof createHarness>; armed: boolean } = { armed: false };
+  const hostOptions = {
+    failCreate: false,
+    onCreate: async () => {
+      if (gate.armed && gate.subject) {
+        gate.armed = false;
+        expect(await deliverIfood(gate.subject, ifoodEvent("ext-1", "CAN"))).toEqual({ kind: "cancelled" });
+      }
+    },
+  };
+  const subject = createHarness(hostOptions);
+  gate.subject = subject;
+  return { h: subject, gate, hostOptions };
+}
+
 describe("a cancellation that outran a failed carried NEW_ORDER (FUT-4898)", () => {
   it("settles the FAILED row IGNORED on the retry and creates no host order", async () => {
     const options = { failCreate: true };
@@ -58,26 +75,10 @@ describe("a cancellation that outran a failed carried NEW_ORDER (FUT-4898)", () 
   });
 
   describe("a CANCELLED that lands while the ingest's transaction is open (the host's create)", () => {
-    function racing() {
-      const box: { h?: ReturnType<typeof createHarness>; armed: boolean } = { armed: false };
-      const options = {
-        failCreate: false,
-        onCreate: async () => {
-          if (box.armed && box.h) {
-            box.armed = false;
-            expect(await deliverIfood(box.h, ifoodEvent("ext-1", "CAN"))).toEqual({ kind: "cancelled" });
-          }
-        },
-      };
-      const h = createHarness(options);
-      box.h = h;
-      return { h, box, options };
-    }
-
     it("on a first delivery: the order is cancelled once ingested, and no confirm is owed", async () => {
-      const { h, box } = racing();
+      const { h, gate: trigger } = racing();
       await h.connect("IFOOD", { autoAccept: true });
-      box.armed = true;
+      trigger.armed = true;
 
       const outcome = await deliverIfood(h, ifoodPlaced("ext-1"));
       if (outcome.kind !== "ingested") throw new Error(outcome.kind);
@@ -90,12 +91,12 @@ describe("a cancellation that outran a failed carried NEW_ORDER (FUT-4898)", () 
     });
 
     it("on the sweep's re-run of a FAILED row: the same", async () => {
-      const { h, box, options } = racing();
+      const { h, gate: trigger, hostOptions: host } = racing();
       await h.connect("IFOOD", { autoAccept: true });
-      options.failCreate = true;
+      host.failCreate = true;
       expect((await deliverIfood(h, ifoodPlaced("ext-1"))).kind).toBe("failed");
-      options.failCreate = false;
-      box.armed = true;
+      host.failCreate = false;
+      trigger.armed = true;
       const [stored] = await h.engine.retryable();
 
       const outcome = await h.engine.reprocess(stored!);

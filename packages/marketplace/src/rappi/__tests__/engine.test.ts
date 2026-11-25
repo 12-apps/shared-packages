@@ -91,6 +91,26 @@ async function arrive(subject: Harness, orderId = PORTAL_ORDER_ID): Promise<stri
   return outcome.orderId;
 }
 
+/** Rappi mounted so that, once armed, its cancel event is delivered from inside the host's create. */
+function cancelInsideCreate() {
+  const gate: { sub?: Harness; armed: boolean } = { armed: false };
+  const sub = createHarness({
+    http: rappiApi(),
+    cancellationHooks: true,
+    onCreate: async () => {
+      if (gate.armed && gate.sub) {
+        gate.armed = false;
+        expect(await deliver(gate.sub, portalCancel(PORTAL_ORDER_ID, PORTAL_STORE_ID))).toEqual({ kind: "cancelled" });
+      }
+    },
+    adapters: [
+      createRappiAdapter({ copy: RAPPI_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, tokenUrl: TOKEN_URL, portalUrl: PORTAL, amountUnit: "MINOR_UNITS" }),
+    ],
+  });
+  gate.sub = sub;
+  return { sub, gate };
+}
+
 describe("the engine through the Rappi adapter, end to end", () => {
   it("[P1] registers beside iFood and 99Food and takes its webhooks at the one route", () => {
     const { h } = harness();
@@ -241,44 +261,32 @@ describe("the engine through the Rappi adapter, end to end", () => {
     expect(h.memory.tables.marketplaceInboxEvent.rows[0]).toMatchObject({ status: "IGNORED" });
   });
 
-  it("[FUT-4898] a CANCEL that lands inside the ingest's create still cancels the order, on a first delivery and on the sweep's re-run", async () => {
-    for (const rerun of [false, true]) {
-      const box: { h?: Harness; armed: boolean } = { armed: false };
-      const mounted = createHarness({
-        http: rappiApi(),
-        cancellationHooks: true,
-        onCreate: async () => {
-          if (box.armed && box.h) {
-            box.armed = false;
-            expect(await deliver(box.h, portalCancel(PORTAL_ORDER_ID, PORTAL_STORE_ID))).toEqual({ kind: "cancelled" });
-          }
-        },
-        adapters: [
-          createRappiAdapter({ copy: RAPPI_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, tokenUrl: TOKEN_URL, portalUrl: PORTAL, amountUnit: "MINOR_UNITS" }),
-        ],
-      });
-      box.h = mounted;
-      await connect(mounted);
-      let orderId: string;
-      if (rerun) {
-        mounted.patchIntegration({ externalMerchantId: "another-store" });
-        expect(await deliver(mounted, portalOrder())).toMatchObject({ kind: "failed" });
-        mounted.patchIntegration({ externalMerchantId: PORTAL_STORE_ID });
-        box.armed = true;
-        const [stored] = await mounted.engine.retryable();
-        const outcome = await mounted.engine.reprocess(stored!);
-        if (outcome.kind !== "ingested") throw new Error(outcome.kind);
-        orderId = outcome.orderId;
-      } else {
-        box.armed = true;
-        const outcome = await deliver(mounted, portalOrder());
-        if (outcome.kind !== "ingested") throw new Error(outcome.kind);
-        orderId = outcome.orderId;
-      }
+  it("[FUT-4898] a CANCEL that lands inside the ingest's create still cancels the order, on a first delivery", async () => {
+    const { sub: rappi, gate: trigger } = cancelInsideCreate();
+    await connect(rappi);
+    trigger.armed = true;
 
-      expect(mounted.acceptance(orderId)?.status).toBe("REJECTED");
-      expect(mounted.refused).toEqual([{ orderId, reason: "CANCELLED" }]);
-    }
+    const outcome = await deliver(rappi, portalOrder());
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    expect(rappi.acceptance(outcome.orderId)?.status).toBe("REJECTED");
+    expect(rappi.refused).toEqual([{ orderId: outcome.orderId, reason: "CANCELLED" }]);
+  });
+
+  it("[FUT-4898] a CANCEL that lands inside the ingest's create still cancels the order, on the sweep's re-run", async () => {
+    const { sub: rappi, gate: trigger } = cancelInsideCreate();
+    await connect(rappi);
+    rappi.patchIntegration({ externalMerchantId: "another-store" });
+    expect(await deliver(rappi, portalOrder())).toMatchObject({ kind: "failed" });
+    rappi.patchIntegration({ externalMerchantId: PORTAL_STORE_ID });
+    trigger.armed = true;
+    const [stored] = await rappi.engine.retryable();
+
+    const outcome = await rappi.engine.reprocess(stored!);
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    expect(rappi.acceptance(outcome.orderId)?.status).toBe("REJECTED");
+    expect(rappi.refused).toEqual([{ orderId: outcome.orderId, reason: "CANCELLED" }]);
   });
 
   it("[R3-N2] a 'rejected' that lands after the sweep timed the request out AND the store accepted still cancels the order", async () => {
