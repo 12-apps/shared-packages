@@ -296,6 +296,18 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
   };
   /** The primary action: charge R$ 1,00 per scenario and refund it. */
   charge: string;
+  /**
+   * Retrying only what did not pass (FUT-5584): the button names the
+   * scenarios it raises again, `waiting` says what the others still need.
+   */
+  retry: {
+    button: (names: string) => string;
+    waiting: (needs: string) => string;
+    /** What a section waits for before a retry can raise it. */
+    needs: { CARD: string; DEBIT: string; GOOGLE_PAY: string; APPLE_PAY: string };
+    confirmTitle: string;
+    confirmBody: (names: string, reais: string) => string;
+  };
   confirm: {
     title: string;
     body: string;

@@ -108,7 +108,7 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
 
     expect(text('credit')).toBe('Crédito · executado');
     expect(mark('credit')).toBe('executado');
-    expect(text('debit')).toBe('Débito (3DS) · falhou — o banco recusou o cartão de débito');
+    expect(text('debit')).toBe('Débito (3DS) · falhou — o banco recusou o cartão de débito; tente outro cartão de débito (pré-pagos e corporativos costumam ser recusados)');
   });
 
   it('R5 given the 3 refund attempts refused, then the Pix row is ✗ "pago, não estornado" with the hint, and the button sits under the list', () => {

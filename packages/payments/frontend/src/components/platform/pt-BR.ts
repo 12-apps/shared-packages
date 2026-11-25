@@ -256,7 +256,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         emailEqualsMerchant: 'o PagBank recusou: o e-mail do comprador não pode ser o da conta do lojista',
         issuerDeclined: {
           credit: 'o banco recusou o cartão de crédito',
-          debit: 'o banco recusou o cartão de débito',
+          debit: 'o banco recusou o cartão de débito; tente outro cartão de débito (pré-pagos e corporativos costumam ser recusados)',
           wallet: 'o banco recusou o cartão',
         },
         antifraudDeclined: 'o antifraude do PagBank recusou o pagamento (não foi o banco do cartão)',
@@ -289,6 +289,19 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       retryEveryRefund: 'Tentar o estorno de novo',
     },
     charge: '3. Cobrar R$ 1,00 por cenário e estornar',
+    retry: {
+      button: (names) => `Tentar de novo só o que falhou: ${names}`,
+      waiting: (needs) => `Para tentar também: ${needs}.`,
+      needs: {
+        CARD: 'digite o cartão de crédito',
+        DEBIT: 'digite o cartão de débito',
+        GOOGLE_PAY: 'toque no botão do Google Pay',
+        APPLE_PAY: 'toque no botão do Apple Pay',
+      },
+      confirmTitle: 'Tentar de novo em produção?',
+      confirmBody: (names, reais) =>
+        `Vai cobrar ${reais} (R$ 1,00 por cenário) só em: ${names}, e estornar cada um logo em seguida. O que já passou não é cobrado de novo.`,
+    },
     confirm: {
       title: 'Cobrar em produção?',
       body: 'Vai cobrar até R$ 5,00 (R$ 1,00 por cenário) nos cartões, no Pix e em cada carteira tocada, e estornar cada um logo em seguida.',

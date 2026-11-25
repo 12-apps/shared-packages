@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { EvidenceSummary } from '@12-apps/payments-backend';
+import type { EvidenceBuyer, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
 import type { EvidenceAppleSheet } from './evidence-apple-sheet';
-import type { HomologacaoProductionEvidenceCardProps } from './HomologacaoProductionEvidenceCard';
+import type { HomologacaoProductionEvidenceCardProps, ProductionRunAnswer } from './HomologacaoProductionEvidenceCard';
 import type { ProductionPixView } from './ProductionPixPanel';
 import type { ProductionScenarioOutcome } from './ProductionScenarioList';
 import {
@@ -49,6 +49,8 @@ export function useProductionForm() {
   const [credit, setCredit] = useState<CardForm>(EMPTY_CARD);
   const [debit, setDebit] = useState<CardForm>(EMPTY_CARD);
   const ready = buyerOf(buyer) !== null && cardOf(credit) !== null && (isBlank(debit) || cardOf(debit) !== null);
+  // A retry (FUT-5584) needs only the cards of the sections it raises: a debit-only retry needs no credit card.
+  const retryInputs = { buyer: buyerOf(buyer) !== null, credit: cardOf(credit) !== null, debit: !isBlank(debit) && cardOf(debit) !== null };
   // Cleared once a run is through: the real card numbers are not kept past it (a failed run keeps them for the retry).
   const clearCards = (): void => {
     setCredit(EMPTY_CARD);
@@ -56,6 +58,7 @@ export function useProductionForm() {
   };
   return {
     ready,
+    retryInputs,
     buyer,
     credit,
     debit,
@@ -244,6 +247,74 @@ function closeUnpaid(sheet: EvidenceAppleSheet | null): void {
   if (sheet) void sheet.result.then(() => sheet.complete(false));
 }
 
+type Prepare = (buyer: EvidenceBuyer) => ReturnType<HomologacaoProductionEvidenceCardProps['onPrepare']>;
+
+/** Which phase 1 a run starts with: a first run's, or a retry's of the latest run (FUT-5584); null when a retry cannot start. */
+function phaseOne(props: HomologacaoProductionEvidenceCardProps, retry: readonly EvidenceRunSection[] | undefined): Prepare | null {
+  if (!retry) return props.onPrepare;
+  const runId = props.seller?.lastRunId;
+  const prepareRetry = props.onPrepareRetry;
+  return runId && prepareRetry ? (buyer) => prepareRetry(runId, buyer) : null;
+}
+
+interface RunContext {
+  props: HomologacaoProductionEvidenceCardProps;
+  form: ProductionForm;
+  wallets: Pick<EvidenceWallets, 'collect' | 'reset'>;
+  progress: ReturnType<typeof useRunProgress>;
+  saved: (runId: string) => void;
+  settle: (answer: ProductionRunAnswer) => void;
+  setPix: (pix: ProductionPixView) => void;
+  setPhase: (phase: Phase) => void;
+  setFailed: (phase: EvidencePhase | null) => void;
+  reset: () => void;
+}
+
+/**
+ * A first run (`retry` absent), or a retry of the latest run raising only
+ * these sections again in the same run (FUT-5584).
+ */
+function runOf(ctx: RunContext) {
+  const { props, form, wallets, progress } = ctx;
+  return async (appleSheet: EvidenceAppleSheet | null = null, retry?: readonly EvidenceRunSection[]): Promise<void> => {
+    const buyer = buyerOf(form.buyer);
+    const prepare = phaseOne(props, retry);
+    if (!buyer || !prepare || !progress.begin()) return closeUnpaid(appleSheet);
+    ctx.reset();
+    rememberBuyer(form.buyer);
+    let current: EvidencePhase = 'preparing';
+    let runId: string | null = null;
+    const enter = (next: EvidencePhase): void => {
+      current = next;
+      ctx.setPhase(next);
+    };
+    try {
+      enter('preparing');
+      const walletResults = wallets.collect();
+      const prepared = await prepare(buyer);
+      runId = prepared.runId;
+      ctx.saved(prepared.runId);
+      // The wallets' tokens are spent only once a run exists to spend them on.
+      wallets.reset();
+      enter(props.onChargeNow ? 'running' : 'encrypting');
+      const { credit, debit } = form;
+      const io = { props, prepared, buyer, credit, debit, walletResults, appleSheet, ...reporters(progress, enter) };
+      ctx.settle(await raiseRunOrders(retry ? { ...io, retry } : io));
+      form.clearCards();
+    } catch {
+      // A sheet still open when the run broke is closed as not charged.
+      closeUnpaid(appleSheet);
+      ctx.setFailed(current);
+      // The run may have raised its Pix before its answer was lost: ask.
+      if (runId) await props.onConfirmPix(runId, 'CHECK').then(ctx.setPix, () => undefined);
+    } finally {
+      ctx.setPhase('idle');
+      progress.end(runId !== null);
+      props.onRunEnded?.();
+    }
+  };
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -256,45 +327,25 @@ export function useProductionRun(
   const { answered, setAnswered, saved, scenarios, ranAt } = useLatestRun(props.seller);
   const progress = useRunProgress();
   const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
-  const run = async (appleSheet: EvidenceAppleSheet | null = null): Promise<void> => {
-    const buyer = buyerOf(form.buyer);
-    if (!buyer || !progress.begin()) return closeUnpaid(appleSheet);
-    setConfirming(false);
-    setFailed(null);
-    setSummary(null);
-    rememberBuyer(form.buyer);
-    let current: EvidencePhase = 'preparing';
-    let runId: string | null = null;
-    const enter = (next: EvidencePhase): void => {
-      current = next;
-      setPhase(next);
-    };
-    try {
-      enter('preparing');
-      const walletResults = wallets.collect();
-      const prepared = await props.onPrepare(buyer);
-      runId = prepared.runId;
-      saved(prepared.runId);
-      // The wallets' tokens are spent only once a run exists to spend them on.
-      wallets.reset();
-      enter(props.onChargeNow ? 'running' : 'encrypting');
-      const { credit, debit } = form;
-      const answer = await raiseRunOrders({ props, prepared, buyer, credit, debit, walletResults, appleSheet, ...reporters(progress, enter) });
+  const run = runOf({
+    props,
+    form,
+    wallets,
+    progress,
+    saved,
+    setPix,
+    setPhase,
+    setFailed,
+    settle: (answer) => {
       setAnswered({ scenarios: 'pix' in answer ? answer.scenarios : null });
       setPix('pix' in answer ? answer.pix : answer);
-      form.clearCards();
-    } catch {
-      // A sheet still open when the run broke is closed as not charged.
-      closeUnpaid(appleSheet);
-      setFailed(current);
-      // The run may have raised its Pix before its answer was lost: ask.
-      if (runId) await props.onConfirmPix(runId, 'CHECK').then(setPix, () => undefined);
-    } finally {
-      setPhase('idle');
-      progress.end(runId !== null);
-      props.onRunEnded?.();
-    }
-  };
+    },
+    reset: () => {
+      setConfirming(false);
+      setFailed(null);
+      setSummary(null);
+    },
+  });
 
   const download = useDownload(props.onDownload, setPhase, setFailed, setSummary);
 
@@ -317,6 +368,9 @@ export function useProductionRun(
     ran: answered !== null,
     charged: answered !== null && !pixOpen,
     run,
+    /** Retry only these sections of the latest run (FUT-5584); offered only with the host's `onPrepareRetry`. */
+    retry: (sections: readonly EvidenceRunSection[], appleSheet: EvidenceAppleSheet | null = null) => run(appleSheet, sections),
+    canRetry: props.onPrepareRetry !== undefined && Boolean(props.seller?.lastRunId),
     download,
     skip,
     retryRefund,

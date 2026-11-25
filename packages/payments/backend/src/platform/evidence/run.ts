@@ -13,7 +13,8 @@ import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer'
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type { EvidenceRunProgress } from './outcomes';
-import { ALL_SECTIONS, claimSections, IMMEDIATE_SECTIONS, raiseOrderSections, raisedSections, saveIntoRun, sectionHolds } from './run-sections';
+import { ALL_SECTIONS, claimSections, raiseOrderSections, saveIntoRun, sectionHolds } from './run-sections';
+import { notRaisable, readFor, todoOf } from './retry';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
@@ -220,12 +221,12 @@ export interface PreparedEvidenceRun {
 }
 
 /** A phase 1 that stopped before minting anything for the browser. */
-function unminted(record: EvidenceRecord, debitTest: DebitTestData): Omit<PreparedEvidenceRun, 'wallets'> {
+export function unminted(record: EvidenceRecord, debitTest: DebitTestData): Omit<PreparedEvidenceRun, 'wallets'> {
   return { runId: record.id, publicKey: null, threeDSSession: null, debitTest };
 }
 
 /** The seller's card public key, minted in the run's environment and recorded. */
-async function mintPublicKey(deps: EvidenceRunDeps, token: string): Promise<{ publicKey: string | null; step: EvidenceStep }> {
+export async function mintPublicKey(deps: EvidenceRunDeps, token: string): Promise<{ publicKey: string | null; step: EvidenceStep }> {
   const minted = await recordTraffic(() =>
     fetchPagbankCardPublicKey({ apiBase: pagbankApiBase(environmentOf(deps)), token }),
   );
@@ -327,7 +328,7 @@ async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
 }
 
 export { blockedBecause, EvidenceRunNotFoundError, openRun, readRun } from './run-guards';
-import { blockedBecause, EvidenceRunNotFoundError, openRun, readRun } from './run-guards';
+import { blockedBecause, openRun, readRun } from './run-guards';
 
 /**
  * Phase 2: raise the given sections' orders — every section by default —
@@ -344,15 +345,12 @@ export async function completeEvidenceRun(
   wallets: readonly BrowserWalletResult[] = [],
   onSection: EvidenceRunProgress = () => undefined,
   sections: readonly EvidenceRunSection[] = ALL_SECTIONS,
+  options: { retry?: boolean } = {},
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
-  const raised = raisedSections(record);
-  if (sections.some((section) => raised.has(section) && !IMMEDIATE_SECTIONS.includes(section))) {
-    throw new EvidenceRunNotFoundError(runId);
-  }
-  const todo = sections.filter((section) => !raised.has(section));
+  const todo = todoOf(deps, record, sections, options.retry === true);
   const release = claimSections(runId, todo);
-  if (!release) throw new EvidenceRunNotFoundError(runId);
+  if (!release) throw notRaisable(runId, todo, options.retry === true);
   try {
     const seller = await sandboxSeller(deps);
     const blocked = blockedBecause(deps, record, seller);
@@ -365,10 +363,10 @@ export async function completeEvidenceRun(
       return await saveIntoRun(deps, readRun(deps, runId), pending, undefined, now);
     }
     const steps = await raiseOrderSections(deps, runId, { cards, wallets }, todo, onSection);
-    const proveUsage = sections.includes('CARD')
+    const proveUsage = todo.includes('CARD')
       ? async (merged: EvidenceStep[]) => withStep(merged, await usageStep(deps, merged, seller.token))
       : undefined;
-    return await saveIntoRun(deps, readRun(deps, runId), steps, proveUsage, now);
+    return await saveIntoRun(deps, readFor(deps, runId, todo, options.retry === true), steps, proveUsage, now);
   } finally {
     release();
   }

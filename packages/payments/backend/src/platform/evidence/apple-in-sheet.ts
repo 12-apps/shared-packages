@@ -1,6 +1,7 @@
 import { evidenceSectionOutcomes, type EvidenceScenarioOutcome } from './outcomes';
 import { raiseOrderSections, raisedSections, claimSections, saveIntoRun } from './run-sections';
 import { blockedBecause, EvidenceRunNotFoundError, openRun, readRun, sandboxSeller, type EvidenceRunDeps } from './run';
+import { EvidenceSectionNotRetryableError, retryTodo, withoutSections } from './retry';
 import { clockOf } from './steps';
 import type { BrowserWalletResult, EvidenceRunSection, EvidenceWallet } from './types';
 
@@ -24,20 +25,25 @@ export interface ImmediateCharge {
 export async function chargeImmediateSections(
   deps: EvidenceRunDeps,
   runId: string,
-  input: { pix: boolean; wallets: readonly BrowserWalletResult[] },
+  input: { pix: boolean; wallets: readonly BrowserWalletResult[]; retry?: boolean },
 ): Promise<ImmediateCharge> {
   const sections: EvidenceRunSection[] = [...(input.pix ? (['PIX'] as const) : []), ...input.wallets.map((wallet) => wallet.type)];
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
-  const raised = raisedSections(record);
-  if (sections.some((section) => raised.has(section))) throw new EvidenceRunNotFoundError(runId);
+  if (input.retry) {
+    // A retry (FUT-5584): only sections that did not pass and took no money.
+    retryTodo(deps, record, sections);
+  } else if (sections.some((section) => raisedSections(record).has(section))) {
+    throw new EvidenceRunNotFoundError(runId);
+  }
   const release = claimSections(runId, sections);
-  if (!release) throw new EvidenceRunNotFoundError(runId);
+  if (!release) throw input.retry ? new EvidenceSectionNotRetryableError(runId, sections) : new EvidenceRunNotFoundError(runId);
   try {
     const seller = await sandboxSeller(deps);
     const blocked = blockedBecause(deps, record, seller);
     if (blocked !== null || typeof seller !== 'object') throw new Error(blocked ?? deps.copy.notRun);
     const steps = await raiseOrderSections(deps, runId, { cards: [], wallets: input.wallets }, sections);
-    await saveIntoRun(deps, readRun(deps, runId), steps, undefined, () => clockOf(deps)().toISOString());
+    const read = input.retry ? async () => withoutSections(await readRun(deps, runId)(), sections) : readRun(deps, runId);
+    await saveIntoRun(deps, read, steps, undefined, () => clockOf(deps)().toISOString());
     const paid = (wallet: EvidenceWallet): boolean =>
       steps.some((step) => step.key === `${wallet === 'GOOGLE_PAY' ? 'gpay' : 'apay'}.approved` && step.status === 'EXECUTED');
     return {
@@ -54,7 +60,8 @@ export async function chargeApplePayInSheet(
   deps: EvidenceRunDeps,
   runId: string,
   result: BrowserWalletResult,
+  retry = false,
 ): Promise<{ paid: boolean }> {
-  const { paid } = await chargeImmediateSections(deps, runId, { pix: false, wallets: [result] });
+  const { paid } = await chargeImmediateSections(deps, runId, { pix: false, wallets: [result], retry });
   return { paid: paid.APPLE_PAY === true };
 }
