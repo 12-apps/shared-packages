@@ -377,12 +377,13 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
             onCharge={() => flow.setConfirming(true)}
             onDownload={() => void flow.download()}
           />
-          <ProductionRetry copy={copy} seller={props.seller} form={form} wallets={wallets} flow={flow} />
           {blockedBy ? (
             <Typography variant="caption" color="text.secondary" data-testid="production-incomplete-data">
               {blockedBy}
             </Typography>
           ) : null}
+          {/* Under the charge's own hint, which is about the full run (FUT-5584). */}
+          <ProductionRetry copy={copy} seller={props.seller} form={form} wallets={wallets} flow={flow} />
           <EvidenceResult summary={flow.summary} failed={flow.failed} />
         </Stack>
         <ProductionSidePanel flow={flow} copy={copy} />
