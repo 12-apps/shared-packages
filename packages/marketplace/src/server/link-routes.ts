@@ -1,11 +1,10 @@
-import { z } from "zod";
-
 import type { WireResponse, WireRoute } from "@12-apps/wiring";
 
 import type { MarketplaceIntegrationView } from "../core/integration";
 import type { LinkFailure, LinkPendingView, LinkRefusalCode } from "../core/linking";
 import { MARKETPLACE_MANAGE } from "./contribution";
 import { iso, ok, parse, refuse, type MarketplaceActor, type MarketplaceApiConfig } from "./http";
+import { finishLinkBody, linkMerchantsQuery, linkStateQuery, selectLinkMerchantBody, startLinkBody } from "./mcp-link";
 
 /**
  * Linking a store through the software's own marketplace app (FUT-5613), as
@@ -21,19 +20,6 @@ import { iso, ok, parse, refuse, type MarketplaceActor, type MarketplaceApiConfi
  */
 
 const BASE = "/admin/:tenantSlug/marketplace/link";
-
-const provider = z.string().regex(/^[A-Z][A-Z0-9_]*$/u);
-const environment = z.enum(["SANDBOX", "PRODUCTION"]);
-
-const linkStateQuery = z.strictObject({ provider, environment: environment.optional() });
-const startLinkBody = z.strictObject({ provider, environment: environment.optional() });
-const finishLinkBody = z.strictObject({
-  provider,
-  authorizationCode: z.string().trim().min(1).max(512),
-  enabled: z.boolean().optional(),
-});
-const linkMerchantsQuery = z.strictObject({ provider });
-const selectLinkMerchantBody = z.strictObject({ provider, merchantId: z.string().trim().min(1).max(200) });
 
 /** The HTTP status each refusal answers. */
 const STATUS: Readonly<Record<LinkRefusalCode, number>> = {

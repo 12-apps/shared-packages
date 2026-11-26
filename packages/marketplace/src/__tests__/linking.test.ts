@@ -256,10 +256,13 @@ describe("a linked connection's calls", () => {
   });
 
   it("refreshes once for concurrent calls, and stores a rotated refresh token", async () => {
-    let grants = 0;
-    const token = () => {
-      grants += 1;
-      return { status: 200, body: JSON.stringify({ accessToken: `access-${grants}`, expiresIn: 21600, refreshToken: `refresh-${grants}` }) };
+    // The exchange buys access-1/refresh-1; a refresh with refresh-1 rotates to access-2/refresh-2.
+    const token = (request: MarketplaceHttpRequest) => {
+      const generation = form(request).grantType === "refresh_token" ? 2 : 1;
+      return {
+        status: 200,
+        body: JSON.stringify({ accessToken: `access-${generation}`, expiresIn: 21600, refreshToken: `refresh-${generation}` }),
+      };
     };
     const http = ifood({ token });
     const h = createHarness({ http, appCredentials });
@@ -278,14 +281,10 @@ describe("a linked connection's calls", () => {
   });
 
   it("marks the connection FAILED when iFood no longer honours the refresh token", async () => {
-    let first = true;
-    const token = () => {
-      if (first) {
-        first = false;
-        return { status: 200, body: JSON.stringify({ accessToken: "access-1", expiresIn: 21600, refreshToken: "refresh-1" }) };
-      }
-      return { status: 401, body: JSON.stringify({ error: { code: "Unauthorized", message: "Bad credentials" } }) };
-    };
+    const token = (request: MarketplaceHttpRequest) =>
+      form(request).grantType === "refresh_token"
+        ? { status: 401, body: JSON.stringify({ error: { code: "Unauthorized", message: "Bad credentials" } }) }
+        : { status: 200, body: JSON.stringify({ accessToken: "access-1", expiresIn: 21600, refreshToken: "refresh-1" }) };
     const h = createHarness({ http: ifood({ token }), appCredentials });
     const orderId = await acceptedOrder(h);
     h.setNow(new Date(h.clock.at.getTime() + 21_600_000));

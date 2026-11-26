@@ -91,3 +91,10 @@ export type MarketplaceAppCredentialsPort = (
   provider: string,
   environment: "SANDBOX" | "PRODUCTION",
 ) => MarketplaceCredentials | null | Promise<MarketplaceCredentials | null>;
+
+/** The link-attempt delegate the engine reads and writes (the `MarketplaceLinkAttempt` model). */
+export interface MarketplaceLinkAttemptDelegate {
+  findUnique(args: unknown): Promise<unknown>;
+  upsert(args: unknown): Promise<unknown>;
+  deleteMany(args: unknown): Promise<{ count: number }>;
+}

@@ -58,7 +58,7 @@ export function cacheLinkToken(ctx: EngineContext, key: string, grant: LinkGrant
 const inflight = new WeakMap<AdapterTokenCache, Map<string, Promise<{ token: string } | OutboundResult>>>();
 
 /** Who a grant is for. */
-export interface LinkedConnection {
+interface LinkedConnection {
   clientId: string;
   provider: MarketplaceProvider;
   environment: "SANDBOX" | "PRODUCTION";

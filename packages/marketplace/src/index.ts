@@ -226,6 +226,7 @@ export type {
   LinkResult,
   LinkedMerchant,
   MarketplaceAppCredentialsPort,
+  MarketplaceLinkAttemptDelegate,
   MarketplaceLinking,
 } from "./core/linking-port";
 export type { LinkFailure, LinkFinished, LinkPendingView, LinkRefusalCode } from "./core/linking";

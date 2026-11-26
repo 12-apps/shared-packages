@@ -183,15 +183,15 @@ describe("iFood's merchant list", () => {
 
   it("reads the next page while a page is full", async () => {
     const full = Array.from({ length: 100 }, (_, index) => merchant(`m-${index}`));
-    const { ctx, requests } = fake([
+    const paged = fake([
       { status: 200, body: JSON.stringify(full) },
       { status: 200, body: JSON.stringify([merchant("m-last")]) },
     ]);
 
-    const answer = await IFOOD_LINKING.merchants(ctx, { accessToken: "tok" });
+    const answer = await IFOOD_LINKING.merchants(paged.ctx, { accessToken: "tok" });
 
     expect(answer.kind === "ok" ? answer.value.length : 0).toBe(101);
-    expect(requests.map((request) => request.url.split("?")[1])).toEqual(["page=1&size=100", "page=2&size=100"]);
+    expect(paged.requests.map((request) => request.url.split("?")[1])).toEqual(["page=1&size=100", "page=2&size=100"]);
   });
 
   it("refuses an answer that is not a list", async () => {

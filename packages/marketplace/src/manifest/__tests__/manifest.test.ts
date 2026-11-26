@@ -106,6 +106,11 @@ describe("the manifests", () => {
       "upsertMarketplaceMenuLinks",
       "listMarketplaceAcceptances",
       "decideMarketplaceOrders",
+      "getMarketplaceLink",
+      "listMarketplaceLinkMerchants",
+      "startMarketplaceLink",
+      "finishMarketplaceLink",
+      "selectMarketplaceLinkMerchant",
     ]);
   });
 });
@@ -220,7 +225,8 @@ describe("the job blueprints", () => {
       "marketplace.outbound-sweep",
       "marketplace.reconcile-inbox",
     ]);
-    expect(wired.routes).toHaveLength(7);
+    // Two webhooks (per store, and the app's one address), six connection, SKU and queue routes, five linking routes.
+    expect(wired.routes).toHaveLength(13);
     expect(wired.mcpEndpoints.map((tool) => tool.path)).toContain("/api/admin/{tenantSlug}/marketplace/acceptances");
 
     const event = h.engine.normalize("IFOOD", { id: "e", code: "PLC", orderId: "ext-1", order: { items: [{ externalCode: "S", name: "S", quantity: 1, unitPrice: 1 }] } });

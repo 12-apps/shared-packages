@@ -225,16 +225,9 @@ export async function finishLink(
   ctx: EngineContext,
   input: { clientId: string; provider: MarketplaceProvider; authorizationCode: string; actorId: string | null; enabled?: boolean },
 ): Promise<LinkFinished | LinkFailure> {
-  const attempts = (await ctx.ports.db()).marketplaceLinkAttempt;
-  if (!attempts) return refused("UNAVAILABLE");
-  const attempt = (await attempts.findUnique({ where: keyOf(input.clientId, input.provider) })) as AttemptRow | null;
-  if (!attempt) return refused("NO_LINK_IN_PROGRESS");
-  const environment: Environment = attempt.environment === "SANDBOX" ? "SANDBOX" : "PRODUCTION";
-  const ready = await linkingOf(ctx, input.provider, environment);
-  if (!ready) return refused("UNAVAILABLE");
-  if (attempt.expiresAt.getTime() <= ready.call.now.getTime()) return refused("LINK_EXPIRED");
-
-  const verifier = ctx.ports.secrets.open(attempt.verifier);
+  const opened = await openAttempt(ctx, input);
+  if ("kind" in opened) return opened;
+  const { ready, environment, verifier } = opened;
   const exchanged = await ready.linking.exchange(ready.call, { authorizationCode: input.authorizationCode.trim(), verifier });
   if (exchanged.kind === "retry") return exchanged;
   if (exchanged.kind === "refused") return refused("CODE_REFUSED", exchanged.status, exchanged.message);
@@ -253,6 +246,43 @@ export async function finishLink(
   return { kind: "linked", integration: await viewOf(ctx, input.clientId, input.provider), merchants };
 }
 
+type Ready = NonNullable<Awaited<ReturnType<typeof linkingOf>>>;
+
+/** The store's live attempt, opened: its verifier and the app to exchange it with. */
+async function openAttempt(
+  ctx: EngineContext,
+  input: { clientId: string; provider: MarketplaceProvider },
+): Promise<{ ready: Ready; environment: Environment; verifier: string } | LinkFailure> {
+  const attempts = (await ctx.ports.db()).marketplaceLinkAttempt;
+  if (!attempts) return refused("UNAVAILABLE");
+  const attempt = (await attempts.findUnique({ where: keyOf(input.clientId, input.provider) })) as AttemptRow | null;
+  if (!attempt) return refused("NO_LINK_IN_PROGRESS");
+  const environment: Environment = attempt.environment === "SANDBOX" ? "SANDBOX" : "PRODUCTION";
+  const ready = await linkingOf(ctx, input.provider, environment);
+  if (!ready) return refused("UNAVAILABLE");
+  if (attempt.expiresAt.getTime() <= ready.call.now.getTime()) return refused("LINK_EXPIRED");
+  return { ready, environment, verifier: ctx.ports.secrets.open(attempt.verifier) };
+}
+
+/** A linked connection's call context and a live access token, through its own grant. */
+async function grantCall(
+  ctx: EngineContext,
+  clientId: string,
+  provider: MarketplaceProvider,
+): Promise<{ call: LinkCallContext; accessToken: string } | LinkFailure> {
+  const views = await listMarketplaceIntegrations(ctx, clientId, { providers: [provider] });
+  if (views[0]?.authMode !== "LINKED") return refused("NOT_LINKED");
+  const connection = await readOutboundConnection(ctx, clientId, provider).catch(() => null);
+  if (!connection?.grant) return refused("UNAVAILABLE");
+  const token = await connection.grant.accessToken();
+  if ("token" in token) {
+    const call = { http: ctx.ports.http, credentials: connection.credentials, environment: connection.environment, now: ctx.ports.clock.now() };
+    return { call, accessToken: token.token };
+  }
+  if (token.kind === "retry") return token;
+  return token.kind === "refused" ? refused("NOT_LINKED", token.status, token.message) : refused("NOT_LINKED");
+}
+
 /** The merchants a linked connection's grant covers, listed through the grant itself. */
 async function grantMerchants(
   ctx: EngineContext,
@@ -261,22 +291,9 @@ async function grantMerchants(
 ): Promise<LinkedMerchant[] | LinkFailure> {
   const linking = ctx.registry.get(provider)?.linking;
   if (!linking) return refused("UNAVAILABLE");
-  const views = await listMarketplaceIntegrations(ctx, clientId, { providers: [provider] });
-  if (views[0]?.authMode !== "LINKED") return refused("NOT_LINKED");
-  let connection: Awaited<ReturnType<typeof readOutboundConnection>>;
-  try {
-    connection = await readOutboundConnection(ctx, clientId, provider);
-  } catch {
-    return refused("UNAVAILABLE");
-  }
-  if (!connection?.grant) return refused("NOT_LINKED");
-  const token = await connection.grant.accessToken();
-  if (!("token" in token)) {
-    if (token.kind === "retry") return token;
-    return token.kind === "refused" ? refused("NOT_LINKED", token.status, token.message) : refused("NOT_LINKED");
-  }
-  const call = { http: ctx.ports.http, credentials: connection.credentials, environment: connection.environment, now: ctx.ports.clock.now() };
-  const listed = await linking.merchants(call, { accessToken: token.token });
+  const granted = await grantCall(ctx, clientId, provider);
+  if ("kind" in granted) return granted;
+  const listed = await linking.merchants(granted.call, { accessToken: granted.accessToken });
   if (listed.kind === "ok") return listed.value;
   return listed.kind === "retry" ? listed : refused("MARKETPLACE_REFUSED", listed.status, listed.message);
 }

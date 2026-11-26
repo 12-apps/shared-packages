@@ -132,34 +132,49 @@ async function admitApp(
   request: WireRequest<unknown>,
 ): Promise<Admitted | WireResponse> {
   const { provider = "" } = request.params;
-  const { engine } = config;
-  if (!engine.knows(provider)) return { status: 404, body: { error: "unknown_provider" } };
+  if (!config.engine.knows(provider)) return { status: 404, body: { error: "unknown_provider" } };
   const raw = request.request;
   if (!raw) return { status: 400, body: { error: "raw_request_required" } };
   const rawBody = await raw.text();
-  let payload: unknown;
-  try {
-    payload = JSON.parse(rawBody) as unknown;
-  } catch {
-    return { status: 400, body: { error: "invalid_json" } };
+  const payload = parsedJson(rawBody);
+  if (payload === undefined) return { status: 400, body: { error: "invalid_json" } };
+  const found = await appConnection(config, provider, payload);
+  if ("status" in found) return found;
+  // The app's address never takes an unsigned delivery, whatever the store's own setting.
+  const signature = config.engine.readSignature(provider, (name) => raw.headers.get(name));
+  const secret = found.target.webhookSecret;
+  if (!secret || !config.engine.verifySignature(provider, rawBody, signature, secret)) {
+    config.logger.warn(`marketplace.webhook: app ${provider} delivery for ${found.clientId} refused`);
+    return UNAUTHORIZED;
   }
-  const merchantId = engine.normalize(provider, payload)?.externalMerchantId ?? null;
-  const clientId = merchantId === null ? null : await engine.tenantFor(provider, merchantId);
-  if (!clientId) return UNAUTHORIZED;
-  let target: IngestionTarget | null;
+  return { ...found, provider, payload };
+}
+
+/** A JSON body, or undefined when it is not JSON. */
+function parsedJson(rawBody: string): unknown {
   try {
-    target = await engine.target(clientId, provider);
+    return JSON.parse(rawBody) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The store whose live connection holds the merchant a delivery names, or the 401. */
+async function appConnection(
+  config: MarketplaceApiConfig,
+  provider: string,
+  payload: unknown,
+): Promise<{ clientId: string; target: IngestionTarget } | WireResponse> {
+  const merchantId = config.engine.normalize(provider, payload)?.externalMerchantId ?? null;
+  const clientId = merchantId === null ? null : await config.engine.tenantFor(provider, merchantId);
+  if (!clientId) return UNAUTHORIZED;
+  try {
+    const target = await config.engine.target(clientId, provider);
+    return target ? { clientId, target } : UNAUTHORIZED;
   } catch (error) {
     config.logger.error(`marketplace.webhook: app ${provider} key of ${clientId} unavailable: ${String(error)}`);
     return UNAUTHORIZED;
   }
-  // The app's address never takes an unsigned delivery, whatever the store's own setting.
-  const signature = engine.readSignature(provider, (name) => raw.headers.get(name));
-  if (!target?.webhookSecret || !engine.verifySignature(provider, rawBody, signature, target.webhookSecret)) {
-    config.logger.warn(`marketplace.webhook: app ${provider} delivery for ${clientId} refused`);
-    return UNAUTHORIZED;
-  }
-  return { clientId, provider, payload, target };
 }
 
 /**

@@ -226,6 +226,62 @@ They live only in `src/ifood/outbound.ts` and `src/ifood/copy.ts`, whose
 headers say so, so the homologation run corrects two files. Tests never reach
 iFood: the HTTP client is the host's port.
 
+## Linking a store through the software's own app (FUT-5613)
+
+A store connects iFood WITHOUT typing a client id, a secret, a webhook key or a
+webhook address: it authorizes the software's own iFood app (iFood's
+"distributed app") on iFood's portal. The host's screen is three steps; the
+engine supplies each one:
+
+| step | engine | route (`marketplace:manage`) |
+|---|---|---|
+| the code to copy, and the portal link that already carries it | `startLink({ clientId, provider, environment? })` → `{ userCode, verificationUrl, verificationUrlComplete, expiresAt }` | `POST …/marketplace/link/start` |
+| the screen after a reload | `linkState(...)` → `{ available, pending }` | `GET …/marketplace/link?provider=` |
+| the authorization code pasted back | `finishLink({ clientId, provider, authorizationCode, actorId, enabled? })` → `{ integration, merchants }` | `POST …/marketplace/link/finish` |
+| a grant covering several iFood stores | `linkedMerchants(...)`, `selectLinkedMerchant({ …, merchantId })` | `GET …/link/merchants`, `PUT …/link/merchant` |
+
+- **The verifier never leaves the server.** `startLink` seals iFood's
+  `authorizationCodeVerifier` with the host's secrets port into
+  `marketplace_link_attempts` (one per store and marketplace; starting again
+  replaces it; the exchange removes it). No answer carries a token, the
+  verifier or the app's credentials.
+- **The tokens.** `finishLink` stores the refresh token sealed in the
+  connection's `credentials` and marks it `authMode: "LINKED"`, `VERIFIED`,
+  unarchived (a disconnected store reconnecting gets its `unarchive` audit
+  line). The merchant is selected when the grant covers exactly one, and
+  never when another store's live connection holds it. The access token lives
+  in the per-process cache, per STORE (never per app); a missing or expiring
+  one is refreshed once however many calls ask at once, and a rotated refresh
+  token is stored back. A refused refresh marks the connection `FAILED`: the
+  store links again.
+- **The app's credentials** are the host's, through the optional
+  `appCredentials(provider, environment)` port (client id, secret, and the key
+  the app's deliveries are signed with). Unbound, or null for a marketplace:
+  `available: false`, and a store's own credentials keep working exactly as
+  before. Typing credentials into a linked connection makes it `CREDENTIALS`
+  again.
+- **One webhook address for every linked store:** `POST
+  /webhooks/marketplace/:provider`. The store is found by the merchant the
+  delivery names, and the delivery must carry a valid signature by the app's
+  key (unsigned is refused here, whatever the store's own setting). The
+  per-store address keeps working.
+
+What iFood's pages settle, read 2026-11-26 as Markdown
+(`developer.ifood.com.br/pt-BR/docs/guides/modules/authentication/distributed.md`,
+`…/merchant/endpoints.md`), and what they do not:
+
+| fact | status |
+|---|---|
+| `POST /authentication/v1.0/oauth/userCode`, form `clientId` → `userCode`, `authorizationCodeVerifier`, `verificationUrl`, `verificationUrlComplete`, `expiresIn` (600: ten minutes) | CONFIRMED |
+| `POST /authentication/v1.0/oauth/token`, form `grantType=authorization_code`, `clientId`, `clientSecret`, `authorizationCode`, `authorizationCodeVerifier`; and `grantType=refresh_token` with `refreshToken` | CONFIRMED |
+| The token answer: `accessToken`, `type`, `expiresIn` (21600: six hours) | CONFIRMED |
+| The refresh token's FIELD in that answer (`refreshToken`, `refresh_token` as a fallback) | ESTIMATED: the page says one is returned, its table lists none |
+| Whether a refresh rotates the refresh token | ESTIMATED: stored when answered, kept when not |
+| The refresh token's lifetime | ESTIMATED: unstated; a refused refresh marks the connection FAILED |
+| `GET /merchant/v1.0/merchants?page=&size=` (size 100) → `[{ id, name, corporateName }]` | CONFIRMED |
+| The status of a wrong or used authorization code | ESTIMATED: any final 4xx is `CODE_REFUSED` |
+| The key iFood signs an app's webhook deliveries with | ESTIMATED: the host passes it as the app's `webhookSecret` |
+
 ## 99Food, on Open Delivery
 
 99Food completed Open Delivery (Abrasel) adherence, so its adapter speaks
