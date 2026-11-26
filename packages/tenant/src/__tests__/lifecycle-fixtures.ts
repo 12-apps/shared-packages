@@ -17,9 +17,9 @@ import { coreConfig } from './fixtures';
  * through a transaction that rolls the whole state back when its body throws.
  */
 
-export type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
+type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
 
-export interface Tx {
+interface Tx {
   label: 'tx';
 }
 
