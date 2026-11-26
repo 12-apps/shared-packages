@@ -3,8 +3,9 @@
  *
  * The tenant row, its slugs and its domains stay the host's. The package never
  * maps them (Prisma refuses two models on one table, and a shared partial has
- * no foreign key into a host table), so it asks the host through these nine
- * functions instead (the tree's four included). Every one is required.
+ * no foreign key into a host table), so it asks the host through these five
+ * functions instead. Every one is required. (The tenant tree has a port of its
+ * own, `TenantTreePort`, optional as a whole.)
  *
  * TRANSACTIONS. Every lifecycle step changes the tenant row and the package's
  * own rows together: a close flips the status, recounts the blockers (one
@@ -96,28 +97,6 @@ export interface TenantPort<S extends string = string, Tx = unknown> {
   clearProfile(tx: Tx, id: string): Promise<void>;
   /** The tenant's IANA time zone (`America/Sao_Paulo`): reminders and purge dates are computed in it. */
   timeZone(id: string): Promise<string>;
-  /**
-   * The tree: one tenant's node, ONE read. Null when none exists. Read inside
-   * `tx` when one is given, so a move's plan sees what its write will.
-   */
-  treeNode(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
-  /**
-   * The tree: the tenant and every tenant above it, in ONE read (the ids are
-   * the segments of its own path). Any order; empty when the tenant is unknown.
-   */
-  treeAncestors(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
-  /**
-   * The tree: the tenant and every tenant below it at any depth, in ONE
-   * indexed prefix read on the path. Any order; empty when the tenant is unknown.
-   */
-  treeDescendants(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
-  /**
-   * The tree: apply a planned move in ONE statement, inside the caller's
-   * transaction (required: a write never runs outside it), and answer the rows
-   * written. 0 means the tree changed since the plan (the subtree is no longer
-   * at `fromPath`, or the parent no longer at `parentPath`): nothing written.
-   */
-  moveSubtree(move: TenantTreeMove, tx: Tx): Promise<number>;
 }
 
 /** The port's members, in a fixed order: what startup validation checks. */
@@ -127,8 +106,44 @@ export const TENANT_PORT_METHODS = [
   'setStatusIf',
   'clearProfile',
   'timeZone',
+] as const satisfies readonly (keyof TenantPort)[];
+
+/**
+ * The tenant TREE's port: OPTIONAL as a whole, and every member required when
+ * it is given (`createApiTenant`'s `tree`). A host with no tree passes none and
+ * gets no `tenant.tree`; a host written against a release before the tree
+ * boots unchanged. Same transaction rule as the tenant port: the one write
+ * takes the caller's `tx`, required; the reads take it optionally.
+ */
+export interface TenantTreePort<Tx = unknown> {
+  /**
+   * One tenant's node, ONE read. Null when none exists. Read inside
+   * `tx` when one is given, so a move's plan sees what its write will.
+   */
+  treeNode(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
+  /**
+   * The tenant and every tenant above it, in ONE read (the ids are
+   * the segments of its own path). Any order; empty when the tenant is unknown.
+   */
+  treeAncestors(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
+  /**
+   * The tenant and every tenant below it at any depth, in ONE
+   * indexed prefix read on the path. Any order; empty when the tenant is unknown.
+   */
+  treeDescendants(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
+  /**
+   * Apply a planned move in ONE statement, inside the caller's
+   * transaction (required: a write never runs outside it), and answer the rows
+   * written. 0 means the tree changed since the plan (the subtree is no longer
+   * at `fromPath`, or the parent no longer at `parentPath`): nothing written.
+   */
+  moveSubtree(move: TenantTreeMove, tx: Tx): Promise<number>;
+}
+
+/** The tree port's members, in a fixed order: what startup validation checks when a tree is given. */
+export const TENANT_TREE_PORT_METHODS = [
   'treeNode',
   'treeAncestors',
   'treeDescendants',
   'moveSubtree',
-] as const satisfies readonly (keyof TenantPort)[];
+] as const satisfies readonly (keyof TenantTreePort)[];

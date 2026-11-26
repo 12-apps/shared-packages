@@ -109,10 +109,6 @@ function fakePort(calls: PortCall[]): TenantPort<ClinicStatus, FakeTx> {
       calls.push(['timeZone', id]);
       return 'Europe/London';
     },
-    treeNode: async () => null,
-    treeAncestors: async () => [],
-    treeDescendants: async () => [],
-    moveSubtree: async () => 0,
   };
 }
 

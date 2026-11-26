@@ -14,9 +14,9 @@
  */
 import type { TenantCoreConfig } from '../config';
 import { createReadings, frozenCopy, type DeepReadonly, type TenantReadings } from '../core';
-import type { TenantPort, TenantRecord } from '../port';
+import type { TenantPort, TenantRecord, TenantTreePort } from '../port';
 import { createTenantTree, type TenantTree } from '../tree';
-import { validateCoreConfig, validatePort } from '../validate';
+import { validateCoreConfig, validatePort, validateTreePort } from '../validate';
 
 export { TenantConfigError } from '../validate';
 
@@ -28,11 +28,19 @@ export interface TenantRoute {
   handler(request: Request): Promise<Response>;
 }
 
-/** Everything `createApiTenant` needs. Nothing is optional. */
+/**
+ * Everything `createApiTenant` needs. Nothing is optional but the tenant tree,
+ * an opt-in feature: give `tree` and every one of its members is required.
+ */
 export interface TenantServerConfig<S extends string = string, Tx = unknown>
   extends TenantCoreConfig<S> {
   /** The host's tenant row, reached only through this port. */
   port: TenantPort<S, Tx>;
+  /**
+   * The tenant tree's port (a tenant under a parent, any depth). Left out, the
+   * host has no tree and `tenant.tree` is absent.
+   */
+  tree?: TenantTreePort<Tx>;
 }
 
 export interface ApiTenant<S extends string = string, Tx = unknown> extends TenantReadings<S> {
@@ -40,8 +48,8 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   config: DeepReadonly<TenantCoreConfig<S>>;
   /** The host's tenant port, as given. */
   port: TenantPort<S, Tx>;
-  /** The tenant tree, read and moved through the port's tree methods. */
-  tree: TenantTree<Tx>;
+  /** The tenant tree, read and moved through `config.tree`; absent when none was given. */
+  tree?: TenantTree<Tx>;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
   /** The tenant, read through the port, on `tx` when given. */
@@ -60,6 +68,8 @@ export function createApiTenant<S extends string, Tx = unknown>(
 ): ApiTenant<S, Tx> {
   validateCoreConfig(config);
   validatePort((config as { port?: unknown }).port);
+  const treePort = (config as { tree?: unknown }).tree;
+  if (treePort !== undefined) validateTreePort(treePort);
   const data = frozenCopy({ statuses: config.statuses, ids: config.ids, copy: config.copy });
   const known = new Set<string>(data.statuses.all);
   const { port } = config;
@@ -67,7 +77,7 @@ export function createApiTenant<S extends string, Tx = unknown>(
     ...createReadings(data),
     config: data,
     port,
-    tree: createTenantTree(port),
+    ...(config.tree === undefined ? {} : { tree: createTenantTree(config.tree) }),
     routes: Object.freeze([]),
     byId: (id, tx) => port.byId(id, tx),
     setStatusIf: (id, from, to, tx) => {

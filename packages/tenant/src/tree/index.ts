@@ -11,7 +11,9 @@
  * Participation (a tenant selling inside another tenant's space) is not a
  * parent: the tree is ownership only.
  */
-import type { TenantPort, TenantTreeMove, TenantTreeNode } from '../port';
+import type { TenantTreeMove, TenantTreeNode, TenantTreePort } from '../port';
+
+export type { TenantTreePort } from '../port';
 import {
   TenantTreeError,
   assertSegment,
@@ -32,11 +34,6 @@ export {
   type TenantTreeErrorCode,
 } from './path';
 
-/** The tree's half of the port. `Tx` is the host's transaction client. */
-export type TenantTreePort<Tx = unknown> = Pick<
-  TenantPort<string, Tx>,
-  'treeNode' | 'treeAncestors' | 'treeDescendants' | 'moveSubtree'
->;
 
 /**
  * Every read takes the host's transaction optionally (to read what a write in

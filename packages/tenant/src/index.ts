@@ -22,6 +22,7 @@ export {
 } from './config';
 export {
   TENANT_PORT_METHODS,
+  TENANT_TREE_PORT_METHODS,
   type TenantPort,
   type TenantRecord,
   type TenantTreeMove,
@@ -40,5 +41,5 @@ export {
   type TenantTreeErrorCode,
   type TenantTreePort,
 } from './tree';
-export { TenantConfigError, validateCoreConfig, validatePort } from './validate';
+export { TenantConfigError, validateCoreConfig, validatePort, validateTreePort } from './validate';
 export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';
