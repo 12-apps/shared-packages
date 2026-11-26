@@ -1,8 +1,11 @@
 import {
+  HOLD_REFUSALS,
   MOVE_ATTEMPTS,
   REFUSALS,
   bindDecision,
+  holdDecision,
   markDecision,
+  releaseHold,
   versionOf,
 } from './decisions';
 import {
@@ -124,6 +127,31 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * oldest first: the money a counter may still use. No read for no terminal.
    */
   findUnclaimed(clientId: string, deviceIds: readonly string[], tx?: TTx): Promise<TerminalCaptureRecord[]>;
+  /**
+   * Hold an UNBOUND capture for a sale context: `holdKey` is the host's own
+   * opaque key for what the money was taken for (a bill, a table's tab), so
+   * that ANY terminal settling that context is offered it as already received
+   * ({@link findHeld}). Meant for a capture a settle refused because the bill
+   * GREW after the charge: the money is good, the sale is not written yet.
+   *
+   * Idempotent: holding it again for the same context writes nothing
+   * (`held: false`). Refused as a {@link CaptureError}, with nothing written:
+   * `NOT_FOUND`; `NOT_UNBOUND` when a sale holds it; `FLAGGED` when its flag is
+   * live (money owed back is never held); `BOUND_ELSEWHERE` when it is held for
+   * another context. A bind (or a sale marking it created) lets go of the
+   * hold. The 24 h sweep still reads a held capture as UNBOUND: a hold does not
+   * extend the window. Throws a plain `Error` when the store keeps no holds
+   * ({@link holdsReady}).
+   */
+  hold(key: CaptureKey, holdKey: string, tx?: TTx): Promise<{ held: boolean }>;
+  /**
+   * The captures held for this sale context and still usable: UNBOUND, flag
+   * not live. Oldest first. Throws a plain `Error` when the store keeps no
+   * holds ({@link holdsReady}).
+   */
+  findHeld(clientId: string, holdKey: string, tx?: TTx): Promise<TerminalCaptureRecord[]>;
+  /** The store keeps holds (it answers `findHeld`): {@link hold} and {@link findHeld} work. */
+  readonly holdsReady: boolean;
   /**
    * UNBOUND -> ORDER_CREATED: a creating path wrote the sale before settling
    * it. A replay naming the same sale is a no-op, and so is one that finds the
@@ -272,7 +300,7 @@ async function markSaleCreated<TTx>(engine: Engine<TTx>, tx: TTx, key: CaptureKe
     const decision = markDecision(current, orderId);
     if (decision === 'replay') return current;
     if (decision !== 'mark') throw new CaptureError(decision, transactionCode, REFUSALS[decision]);
-    const after = await landOn(store, current, { state: 'ORDER_CREATED', orderId });
+    const after = await landOn(store, current, { state: 'ORDER_CREATED', orderId, ...releaseHold(current) });
     if (after) return after;
   }
   throw new CaptureError('CONTENDED', transactionCode, REFUSALS.CONTENDED);
@@ -298,6 +326,7 @@ async function bindOne(store: TerminalCaptureStore, clientId: string, code: stri
       orderId: target.orderId,
       paymentId: target.paymentId,
       ...(decision.clearFlag ? { refundClearedAt: now } : {}),
+      ...releaseHold(current),
     });
     if (after) return { record: after, moved: true };
     // Changed since the read (a racing bind, a flag): read and decide again.
@@ -338,6 +367,33 @@ async function flag<TTx>(engine: Engine<TTx>, key: CaptureKey, reason: string, n
   return { flagged: false };
 }
 
+const NO_HOLDS = 'The capture store keeps no holds: map a nullable hold_key column and answer findHeld (see the README).';
+
+function heldReader(store: TerminalCaptureStore): NonNullable<TerminalCaptureStore['findHeld']> {
+  if (!store.findHeld) throw new Error(NO_HOLDS);
+  return store.findHeld.bind(store);
+}
+
+function validHoldKey(holdKey: string): string {
+  if (typeof holdKey !== 'string' || holdKey.length === 0) throw new Error('holdKey must be a non-empty string.');
+  return holdKey;
+}
+
+async function hold<TTx>(engine: Engine<TTx>, key: CaptureKey, holdKey: string, tx?: TTx): Promise<{ held: boolean }> {
+  validHoldKey(holdKey);
+  const store = engine.storeFor(tx);
+  heldReader(store);
+  for (let attempt = 0; attempt < MOVE_ATTEMPTS; attempt += 1) {
+    const current = await readOrRefuse(store, key.clientId, key.transactionCode);
+    const decision = holdDecision(current, holdKey);
+    if (decision === 'replay') return { held: false };
+    if (decision !== 'hold') throw new CaptureError(decision, key.transactionCode, HOLD_REFUSALS[decision]);
+    // The hold is part of the predicate: two contexts racing for one capture, the second decides again.
+    if (await store.writeIfUnchanged({ ...versionOf(current), holdKey: null }, { holdKey })) return { held: true };
+  }
+  throw new CaptureError('CONTENDED', key.transactionCode, REFUSALS.CONTENDED);
+}
+
 export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptureLedgerConfig<TTx>): TerminalCaptureLedger<TTx> {
   const maxAmountCents = positive('maxAmountCents', config.maxAmountCents);
   const unboundRefundAfterMs = positive('unboundRefundAfterMs', config.unboundRefundAfterMs);
@@ -376,6 +432,13 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
     async findUnclaimed(clientId, deviceIds, tx) {
       if (deviceIds.length === 0) return [];
       return storeFor(tx).findUnclaimed(clientId, [...new Set(deviceIds)]);
+    },
+    hold: (key, holdKey, tx) => hold(engine, key, holdKey, tx),
+    async findHeld(clientId, holdKey, tx) {
+      return heldReader(storeFor(tx))(clientId, validHoldKey(holdKey));
+    },
+    get holdsReady() {
+      return typeof storeFor().findHeld === 'function';
     },
     markSaleCreated: (tx, key, orderId) => markSaleCreated(engine, tx, key, orderId),
     bind: async (tx, clientId, codes, target, now = clock()) => (await bind(engine, tx, clientId, codes, target, now)).bound,

@@ -39,9 +39,11 @@ interface Row extends TerminalCaptureRecord {
 
 const keyOf = (clientId: string, code: string): string => `${clientId}\u0000${code}`;
 
+/** The row as the store answers it: its own clock dropped, and `holdKey` only while it holds one. */
 function answer(row: Row): TerminalCaptureRecord {
   const record: Partial<Row> = { ...row };
   delete record.recordedAt;
+  if ((record.holdKey ?? null) === null) delete record.holdKey;
   return record as TerminalCaptureRecord;
 }
 
@@ -54,6 +56,7 @@ function matches(row: Row, seen: CaptureVersion): boolean {
     row.orderId === seen.orderId &&
     sameTime(row.refundFlaggedAt, seen.refundFlaggedAt) &&
     sameTime(row.refundClearedAt, seen.refundClearedAt) &&
+    (seen.holdKey === undefined || (row.holdKey ?? null) === seen.holdKey) &&
     (!seen.awaitingReport ||
       (row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null))
   );
@@ -174,6 +177,12 @@ function memoryStore(table: Table): TerminalCaptureStore {
             devices.has(row.deviceId) &&
             (!refundLive(row) || row.refundReason === 'UNBOUND_TIMEOUT'),
         )
+        .sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime() || a.id.localeCompare(b.id))
+        .map(answer);
+    },
+    async findHeld(clientId, holdKey) {
+      return rows()
+        .filter((row) => row.clientId === clientId && row.state === 'UNBOUND' && row.holdKey === holdKey && !refundLive(row))
         .sort((a, b) => a.capturedAt.getTime() - b.capturedAt.getTime() || a.id.localeCompare(b.id))
         .map(answer);
     },

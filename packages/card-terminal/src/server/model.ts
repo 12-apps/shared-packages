@@ -113,6 +113,14 @@ export interface TerminalCaptureRecord extends Required<CaptureTrace> {
   /** A {@link PackageRefundReason}, or a reason the host wrote itself. */
   refundReason: string | null;
   refundClearedAt: Date | null;
+  /**
+   * The sale context (the host's opaque key, a bill or a table's tab, say) an
+   * UNBOUND capture is held for after a settle refused it because the bill
+   * grew: any terminal settling that context is offered it as money already
+   * received. `null` or absent: held for none. A store that keeps no holds
+   * never answers it.
+   */
+  holdKey?: string | null;
 }
 
 /** The sale and payment row a capture becomes a leg of. */

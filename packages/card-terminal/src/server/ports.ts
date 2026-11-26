@@ -35,6 +35,12 @@ export interface CaptureVersion {
    * `authorizationCode` or `terminalSerial`. So only the first report fills it.
    */
   awaitingReport?: boolean;
+  /**
+   * When present, the write also requires the row's hold to be exactly this
+   * (`null`: held for none). Absent: the hold is not part of the predicate, so
+   * a store that keeps no holds is never asked for the column.
+   */
+  holdKey?: string | null;
 }
 
 /** The columns a move may write. Absent: left as it is. */
@@ -48,6 +54,8 @@ export interface CapturePatch extends CaptureTrace {
   refundFlaggedAt?: Date;
   refundReason?: string;
   refundClearedAt?: Date | null;
+  /** The sale context the capture is held for; `null` clears the hold. Written only on a store that keeps holds. */
+  holdKey?: string | null;
 }
 
 /** Where the held sweep's read resumes: strictly after this capture, in (`capturedAt`, `id`) order. */
@@ -110,6 +118,17 @@ export interface TerminalCaptureStore {
    * clears that one), or cleared. Oldest capture first.
    */
   findUnclaimed(clientId: string, deviceIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
+  /**
+   * The UNBOUND captures held for this sale context at this tenant whose flag
+   * is not live (never flagged, or cleared), oldest capture first. A flagged
+   * capture is owed back, so it is never offered as held.
+   *
+   * Optional, so a store written before it still type-checks: its presence is
+   * what says the store keeps holds (the host's table maps a nullable
+   * `hold_key` column). Without it, holding a capture throws and nothing is
+   * written.
+   */
+  findHeld?(clientId: string, holdKey: string): Promise<TerminalCaptureRecord[]>;
 }
 
 /** The store on the host's transaction, or on its root handle when none is passed. */

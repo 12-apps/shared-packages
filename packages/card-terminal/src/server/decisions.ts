@@ -33,7 +33,34 @@ export function versionOf(current: TerminalCaptureRecord): CaptureVersion {
     orderId: current.orderId,
     refundFlaggedAt: current.refundFlaggedAt,
     refundClearedAt: current.refundClearedAt,
+    // Only a store that keeps holds answers the column; one that does not is never asked for it.
+    ...(current.holdKey === undefined ? {} : { holdKey: current.holdKey }),
   };
+}
+
+/** Why a capture cannot be held for a sale context, by the code {@link holdDecision} answers. */
+export const HOLD_REFUSALS: Record<'NOT_UNBOUND' | 'FLAGGED' | 'BOUND_ELSEWHERE', string> = {
+  NOT_UNBOUND: 'A sale already holds the capture; only a capture no sale holds may be held for a sale context.',
+  FLAGGED: 'The capture is flagged for a refund; money owed back is never held for a sale context.',
+  BOUND_ELSEWHERE: 'The capture is already held for another sale context.',
+};
+
+/**
+ * What holding `current` for the sale context `holdKey` means: `"replay"` when
+ * it is already held there, `"hold"` when it may be, or the refusal. Only an
+ * UNBOUND capture whose flag is not live may be held, and for one context.
+ */
+export function holdDecision(current: TerminalCaptureRecord, holdKey: string): 'replay' | 'hold' | keyof typeof HOLD_REFUSALS {
+  if (current.state !== 'UNBOUND') return 'NOT_UNBOUND';
+  if (refundLive(current)) return 'FLAGGED';
+  const heldFor = current.holdKey ?? null;
+  if (heldFor === holdKey) return 'replay';
+  return heldFor === null ? 'hold' : 'BOUND_ELSEWHERE';
+}
+
+/** The patch that lets go of a capture's hold when a sale takes it; nothing when it held none. */
+export function releaseHold(current: TerminalCaptureRecord): { holdKey?: null } {
+  return (current.holdKey ?? null) === null ? {} : { holdKey: null };
 }
 
 /** Flagged and not cleared for a reason a bind refuses: the money is owed back. */

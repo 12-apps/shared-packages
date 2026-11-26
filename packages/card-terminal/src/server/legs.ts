@@ -119,6 +119,16 @@ export interface TerminalLegs<TTx = unknown> {
    * window. One read; none for no terminal.
    */
   unclaimed(clientId: string, deviceIds: readonly string[]): Promise<StationCaptureWire[]>;
+  /**
+   * The captures held for a sale context (`ledger.hold`, after a settle refused
+   * them because the bill grew), as the wire a terminal leg resends, oldest
+   * first: ANY terminal settling that context — not only the one that took
+   * them — is offered them as money already received, and
+   * charges only the rest. A flagged capture is never offered. The settle that
+   * binds them lets go of the hold. One read. Throws when the ledger's store
+   * keeps no holds (`ledger.holdsReady`).
+   */
+  heldFor(clientId: string, holdKey: string): Promise<StationCaptureWire[]>;
   /** A move the record refused mid-request, as its code. */
   refusalCodeOf(error: CaptureError): CaptureNotBoundReason;
 }
@@ -273,6 +283,7 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
       return byOrder;
     },
     unclaimed: async (clientId, deviceIds) => (await ledger.findUnclaimed(clientId, deviceIds)).map(wireOf),
+    heldFor: async (clientId, holdKey) => (await ledger.findHeld(clientId, holdKey)).map(wireOf),
     refusalCodeOf: notBoundReasonOf,
   };
 }
