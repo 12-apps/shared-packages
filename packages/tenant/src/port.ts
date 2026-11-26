@@ -4,7 +4,8 @@
  * The tenant row, its slugs and its domains stay the host's. The package never
  * maps them (Prisma refuses two models on one table, and a shared partial has
  * no foreign key into a host table), so it asks the host through these five
- * functions instead. Every one is required.
+ * functions instead. Every one is required. (The tenant tree has a port of its
+ * own, `TenantTreePort`, optional as a whole.)
  *
  * TRANSACTIONS. Every lifecycle step changes the tenant row and the package's
  * own rows together: a close flips the status, recounts the blockers (one
@@ -23,6 +24,44 @@ export interface TenantRecord<S extends string = string> {
   slug: string;
   /** The tenant row's current status: any value of the host's status set. */
   status: S;
+}
+
+/**
+ * One tenant's place in the tenant tree, as the host stores it.
+ *
+ * The tree is ownership only (a company above its units, a unit above its
+ * venues), of any depth. `path` is the materialized path the package computes
+ * (`/<root id>/…/<own id>/`), so no tree read recurses.
+ */
+export interface TenantTreeNode {
+  /** The host's tenant id. */
+  id: string;
+  /** The tenant directly above, or null for a standalone tenant (a root). */
+  parentId: string | null;
+  /** `/<root id>/…/<own id>/`; a root's is `/<own id>/`. */
+  path: string;
+}
+
+/**
+ * A subtree move, planned and validated by the package. The host first locks
+ * the subtree and the new parent (ADOPTING.md, "The tenant tree (opt-in)"), then
+ * rewrites in ONE statement: every path starting with `fromPath` has that
+ * prefix replaced by `toPath`, and the row `id` is re-pointed at `parentId`.
+ */
+export interface TenantTreeMove {
+  /** The tenant that moves, everything below it moving with it. */
+  id: string;
+  /** Its new parent, or null to make it a root. */
+  parentId: string | null;
+  /**
+   * The new parent's path as the package read it (null with no parent). The
+   * host applies the move only while the parent's path still is this.
+   */
+  parentPath: string | null;
+  /** The moving tenant's path before the move: the prefix replaced. */
+  fromPath: string;
+  /** Its path after the move: the replacement prefix. */
+  toPath: string;
 }
 
 /**
@@ -69,3 +108,44 @@ export const TENANT_PORT_METHODS = [
   'clearProfile',
   'timeZone',
 ] as const satisfies readonly (keyof TenantPort)[];
+
+/**
+ * The tenant TREE's port: OPTIONAL as a whole, and every member required when
+ * it is given (`createApiTenant`'s `tree`). A host with no tree passes none and
+ * gets no `tenant.tree`; a host written against a release before the tree
+ * boots unchanged. Same transaction rule as the tenant port: the one write
+ * takes the caller's `tx`, required; the reads take it optionally.
+ */
+export interface TenantTreePort<Tx = unknown> {
+  /**
+   * One tenant's node, ONE read. Null when none exists. Read inside
+   * `tx` when one is given, so a move's plan sees what its write will.
+   */
+  treeNode(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
+  /**
+   * The tenant and every tenant above it, in ONE read (the ids are
+   * the segments of its own path). Any order; empty when the tenant is unknown.
+   */
+  treeAncestors(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
+  /**
+   * The tenant and every tenant below it at any depth, in ONE
+   * indexed prefix read on the path. Any order; empty when the tenant is unknown.
+   */
+  treeDescendants(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
+  /**
+   * Apply a planned move inside the caller's transaction (required: a write
+   * never runs outside it): lock the subtree and the new parent, then ONE
+   * rewrite statement (ADOPTING.md, "The tenant tree (opt-in)"). Answers the rows
+   * written. 0 means the tree changed since the plan (the subtree is no longer
+   * at `fromPath`, or the parent no longer at `parentPath`): nothing written.
+   */
+  moveSubtree(move: TenantTreeMove, tx: Tx): Promise<number>;
+}
+
+/** The tree port's members, in a fixed order: what startup validation checks when a tree is given. */
+export const TENANT_TREE_PORT_METHODS = [
+  'treeNode',
+  'treeAncestors',
+  'treeDescendants',
+  'moveSubtree',
+] as const satisfies readonly (keyof TenantTreePort)[];

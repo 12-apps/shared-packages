@@ -11,7 +11,7 @@ import {
   type TenantCoreConfig,
   type TenantIds,
 } from './config';
-import { TENANT_PORT_METHODS, type TenantPort } from './port';
+import { TENANT_PORT_METHODS, TENANT_TREE_PORT_METHODS, type TenantPort, type TenantTreePort } from './port';
 
 /** Thrown at startup when the config is missing a piece or carries a bad one. */
 export class TenantConfigError extends Error {
@@ -199,6 +199,25 @@ export function validatePort(value: unknown): asserts value is TenantPort {
     }
     if (typeof port[method] !== 'function') {
       throw new TenantConfigError(`port.${method}`, 'must be a function');
+    }
+  }
+}
+
+/**
+ * The tenant tree's port, when the host gives one: every member required. Left
+ * out (`undefined`), there is no tree and nothing to check; anything else that
+ * is not a port with all four members fails at startup, named.
+ */
+export function validateTreePort(value: unknown): asserts value is TenantTreePort {
+  if (value === null || !isBag(value)) {
+    throw new TenantConfigError('tree', 'must be the tree port object, or be left out');
+  }
+  for (const method of TENANT_TREE_PORT_METHODS) {
+    if (value[method] === undefined || value[method] === null) {
+      throw new TenantConfigError(`tree.${method}`, 'is required and missing');
+    }
+    if (typeof value[method] !== 'function') {
+      throw new TenantConfigError(`tree.${method}`, 'must be a function');
     }
   }
 }
