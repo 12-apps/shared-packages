@@ -88,3 +88,7 @@ packages/messaging
 # and MUI are optional peers for its ./react half), so its position is free. It
 # sits last because it is the newest.
 packages/card-terminal
+# `@12-apps/tenant` needs nothing here at runtime (no dependencies; wiring is
+# an optional type-only peer and hono an optional peer of its ./hono half), so
+# its position is free. It sits last because it is the newest.
+packages/tenant

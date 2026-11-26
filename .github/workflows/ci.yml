@@ -74,6 +74,7 @@ env:
     packages/marketplace
     packages/messaging
     packages/card-terminal
+    packages/tenant
 
 jobs:
   # ── Change detection ───────────────────────────────────────────────────────

@@ -947,6 +947,50 @@
     "kind": "exempt",
     "why": "the React half is components a host renders inside its own screens, not a mountable surface with its own routes — the one web narrowing in the estate that was always valid"
   },
+  "@12-apps/tenant :: areas": {
+    "kind": "exempt",
+    "why": "suggests no nav rows: it ships no web surface to place, and where a close setting sits is the host's layout"
+  },
+  "@12-apps/tenant :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: the factories and the migration are driven by unit suites on real Postgres, and the screens a journey would cross are not shipped yet"
+  },
+  "@12-apps/tenant :: email": {
+    "kind": "exempt",
+    "why": "sends no mail yet; when it does, every subject and body is a whole sentence from the host's copy pack, never a template of its own"
+  },
+  "@12-apps/tenant :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env: the status set, the ids, the copy packs and the tenant port all arrive as required config at startup"
+  },
+  "@12-apps/tenant :: http": {
+    "kind": "exempt",
+    "why": "ships no route yet: createApiTenant returns an empty route list in this slice, and the close, reopen and export routes arrive with the lifecycle slice that serves them"
+  },
+  "@12-apps/tenant :: jobs": {
+    "kind": "exempt",
+    "why": "runs nothing on a cadence yet: the reminder and purge sweep and the export build arrive with the lifecycle, purge and export slices"
+  },
+  "@12-apps/tenant :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: closing a tenant and taking its data are destructive acts a host exposes to an agent, if at all, in its own vocabulary"
+  },
+  "@12-apps/tenant :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as manifest data: every notification type id is the host's, passed in config, and the copy is the host's whole sentences"
+  },
+  "@12-apps/tenant :: observability": {
+    "kind": "exempt",
+    "why": "files nothing under a namespace of its own yet: this slice only validates config at startup, and its failures throw to the host's boot"
+  },
+  "@12-apps/tenant :: permissions": {
+    "kind": "exempt",
+    "why": "declares no permission catalogue: the one permission it checks (close) is the host's own id, passed in config, never a package-owned id"
+  },
+  "@12-apps/tenant :: surface": {
+    "kind": "exempt",
+    "why": "ships no web surface yet: createWebTenant hands out the validated copy and readings, and the close and export screens arrive with the screens slice"
+  },
   "@12-apps/thermal-printing": {
     "kind": "exempt",
     "why": "a pure library with nothing to wire: it owns no routes, models, jobs, copy or web surface, and its whole contract is four functions over a value type — a manifest would declare capabilities that do not exist so that a gate could tick"
