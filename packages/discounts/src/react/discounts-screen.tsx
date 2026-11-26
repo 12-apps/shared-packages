@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType, type JSX } from "react";
+import { useState, type ComponentType, type JSX } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import AddIcon from "@mui/icons-material/Add";
@@ -42,6 +42,7 @@ import {
 import { useBulkActions, type BulkActions } from "./use-bulk-actions";
 import { useBulkDelete } from "./use-bulk-delete";
 import { useDiscountsData } from "./use-discounts-data";
+import { useOpenOnCreateRequest } from "./use-open-on-create-request";
 import type { DiscountsBulkSlotProps } from "./use-discounts-bulk";
 
 /**
@@ -73,9 +74,8 @@ export interface DiscountsScreenProps {
    * its chrome, landing here. Once the list has loaded the dialog opens, the
    * same one the header's button opens, and {@link onCreateRequestHandled}
    * fires exactly once, so the host can drop whatever carried the request (a
-   * URL param) and a reload does not reopen it. Re-renders while this stays
-   * true neither reopen the dialog nor call the handler again; it is read
-   * again after it goes false.
+   * URL param). Re-renders while this stays true neither reopen the dialog
+   * nor call the handler again; a new request needs it to go false first.
    */
   createRequested?: boolean;
   onCreateRequestHandled?: () => void;
@@ -329,45 +329,13 @@ function ScreenBody({
   );
 }
 
-/**
- * Honour a host's {@link DiscountsScreenProps.createRequested}: open once the
- * screen is `ready`, then report it handled. A latch holds until the request
- * is dropped, so re-renders before the host commits that (or StrictMode's
- * second effect) cannot reopen a dialog already being typed in. `open` and
- * `handled` are read through refs so an inline arrow does not re-run the effect.
- */
-function useOpenOnCreateRequest(
-  requested: boolean,
-  ready: boolean,
-  open: () => void,
-  handled?: () => void,
-): void {
-  const latest = useRef({ open, handled });
-  latest.current = { open, handled };
-  const done = useRef(false);
-  useEffect(() => {
-    if (!requested) {
-      done.current = false;
-      return;
-    }
-    if (!ready || done.current) return;
-    done.current = true;
-    latest.current.open();
-    latest.current.handled?.();
-  }, [requested, ready]);
-}
-
 export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const { api, copy, formatters, onError, breadcrumb, timezone } = props;
   const [searchParams] = useSearchParams();
   const data = useDiscountsData(api, discountsSearch(searchParams), onError);
   const [createOpen, setCreateOpen] = useState(false);
-  useOpenOnCreateRequest(
-    props.createRequested === true,
-    !data.loading && data.error === null,
-    () => setCreateOpen(true),
-    props.onCreateRequestHandled,
-  );
+  const ready = !data.loading && data.error === null;
+  useOpenOnCreateRequest(props.createRequested === true, ready, () => setCreateOpen(true), props.onCreateRequestHandled);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
   const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot, timezone);
