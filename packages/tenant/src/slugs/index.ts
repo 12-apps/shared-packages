@@ -95,9 +95,18 @@ export function createKeptSlugs(memory: KeptMemory): KeptSlugs {
 }
 
 export interface TenantSlugs<R extends TenantSlugRecord = TenantSlugRecord> extends TenantSlugResolver<R> {
-  /** The tenant `slug` names, kept: from memory when resolved since the last change, else through the port. */
+  /**
+   * The tenant `slug` names, kept: from memory when resolved since the last
+   * change, else through the port. Shares its key and slot with `remember`:
+   * for a given slug a host uses one or the other, never both, or each would
+   * be answered with what the other kept.
+   */
   resolve(slug: string, lookup?: TenantSlugLookup): Promise<R | null>;
-  /** Keep a host's own reading of a slug in the same memory (a host that reads more than the port does). */
+  /**
+   * Keep a host's own reading of a slug in the same memory (a host that reads
+   * more than the port does). Same key and slot as `resolve`: use one or the
+   * other for a given slug.
+   */
   remember: KeptSlugs['read'];
 }
 

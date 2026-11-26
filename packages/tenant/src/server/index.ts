@@ -62,7 +62,11 @@ export interface TenantRoute {
  * slug resolution, opt-in features: give `tree` or `slugs` and every one of
  * its members is required.
  */
-export interface TenantServerConfig<S extends string = string, Tx = unknown>
+export interface TenantServerConfig<
+  S extends string = string,
+  Tx = unknown,
+  R extends TenantSlugRecord = TenantSlugRecord,
+>
   extends TenantCoreConfig<S> {
   /** The host's tenant row, reached only through this port. */
   port: TenantPort<S, Tx>;
@@ -75,10 +79,11 @@ export interface TenantServerConfig<S extends string = string, Tx = unknown>
    * Slug resolution (kept slugs, the resolution cache). Left out, the host
    * resolves slugs itself and `tenant.slugs` is absent.
    */
-  slugs?: TenantSlugsConfig;
+  slugs?: TenantSlugsConfig<R>;
 }
 
-export interface ApiTenant<S extends string = string, Tx = unknown> extends TenantReadings<S> {
+export interface ApiTenant<S extends string = string, Tx = unknown, R extends TenantSlugRecord = TenantSlugRecord>
+  extends TenantReadings<S> {
   /** The validated config's data parts (statuses, ids, copy), deep-frozen copies. */
   config: DeepReadonly<TenantCoreConfig<S>>;
   /** The host's tenant port, as given. */
@@ -86,7 +91,7 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   /** The tenant tree, read and moved through `config.tree`; absent when none was given. */
   tree?: TenantTree<Tx>;
   /** Slug resolution through `config.slugs`; absent when none was given. */
-  slugs?: TenantSlugs;
+  slugs?: TenantSlugs<R>;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
   /** The tenant, read through the port, on `tx` when given. */
@@ -100,9 +105,9 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   setStatusIf(id: string, from: S, to: S, tx: Tx): Promise<boolean>;
 }
 
-export function createApiTenant<S extends string, Tx = unknown>(
-  config: TenantServerConfig<S, Tx>,
-): ApiTenant<S, Tx> {
+export function createApiTenant<S extends string, Tx = unknown, R extends TenantSlugRecord = TenantSlugRecord>(
+  config: TenantServerConfig<S, Tx, R>,
+): ApiTenant<S, Tx, R> {
   validateCoreConfig(config);
   validatePort((config as { port?: unknown }).port);
   const treePort = (config as { tree?: unknown }).tree;

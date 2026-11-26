@@ -240,6 +240,11 @@ two members and the memory are checked at startup (`slugs.port.current`,
   answers a burst of the same lookup; a read through a transaction (`via`)
   never starts the `LISTEN`, which on a single connection would wait for it.
   Make the database client before the first lookup when `listen` depends on it.
+- **`resolve` or `remember`, never both for one slug.** They share one key and
+  one slot: `resolve` keeps the port's record, `remember` keeps your own
+  reading of the same address, so mixing them on a slug answers each with
+  what the other kept. Pick one per slug (a host whose reading carries more
+  than the port's record uses `remember` throughout).
 - **One memory per channel per process**, shared by everything that reads
   under that channel. Two memories on one channel each open a listener.
 

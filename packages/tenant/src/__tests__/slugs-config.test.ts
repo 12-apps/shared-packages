@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { TENANT_PORT_METHODS, TenantConfigError } from '../index';
 import { createApiTenant } from '../server';
-import { TENANT_SLUG_PORT_METHODS, createKeptMemory, type KeptMemory, type TenantSlugPort } from '../slugs';
+import {
+  TENANT_SLUG_PORT_METHODS,
+  createKeptMemory,
+  type KeptMemory,
+  type TenantSlugPort,
+  type TenantSlugs,
+} from '../slugs';
 import { serverConfig, withValue } from './fixtures';
 
 /**
@@ -63,6 +69,22 @@ describe('a host with slug resolution', () => {
     const tenant = createApiTenant({ ...serverConfig(), slugs: { port: slugPort(), memory: memory() } });
     expect(await tenant.slugs?.resolve('north-wing')).toEqual(RECORD);
     expect(await tenant.slugs?.resolve('nowhere')).toBeNull();
+  });
+
+  it("hands back the host's own record type from tenant.slugs", async () => {
+    interface Wing {
+      id: string;
+      slug: string;
+      floor: number;
+    }
+    const wing: Wing = { ...RECORD, floor: 3 };
+    const port: TenantSlugPort<Wing> = { current: async () => wing, former: async () => null };
+    const tenant = createApiTenant({ ...serverConfig(), slugs: { port, memory: memory() } });
+    const found = await tenant.slugs?.resolve('north-wing');
+    expectTypeOf(found).toEqualTypeOf<Wing | null | undefined>();
+    expect(found?.floor).toBe(3);
+    // A host with no slugs keeps the default record type.
+    expectTypeOf(createApiTenant(serverConfig()).slugs).toEqualTypeOf<TenantSlugs | undefined>();
   });
 
   it.each(TENANT_SLUG_PORT_METHODS)('refuses a slug port with no %s, by name', (method) => {

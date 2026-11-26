@@ -245,6 +245,39 @@ describe('a value kept until the database says it changed', () => {
     expect(onError).toHaveBeenCalledWith({ phase: 'start', channel: 'clinic_config_changed', error });
   });
 
+  it('stays usable when the host reporter throws on a failed start, and retries after retryMs', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: NOON });
+    const memory = setup({
+      retryMs: 5_000,
+      onError: () => {
+        throw new Error('the logger is down');
+      },
+    });
+    nextListenRefused(new Error('listen refused'));
+    const load = vi.fn(async () => HOURS);
+    expect(await memory.read('north-wing', 'hours', load)).toEqual(HOURS);
+    expect(await memory.read('north-wing', 'hours', load)).toEqual(HOURS);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(listen).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(new Date('2026-10-29T12:00:05.001Z'));
+    await memory.read('north-wing', 'hours', load);
+    await memory.read('north-wing', 'hours', load);
+    expect(listen).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(3);
+  });
+
+  it('swallows a host reporter that throws on a dropped listener', async () => {
+    const memory = setup({
+      onError: () => {
+        throw new Error('the logger is down');
+      },
+    });
+    await memory.read('north-wing', 'hours', async () => HOURS);
+    expect(() => handlers().onError(new Error('connection reset'))).not.toThrow();
+    const load = vi.fn(async () => LATE);
+    expect(await memory.read('north-wing', 'hours', load)).toEqual(HOURS);
+  });
+
   it('keeps nothing when the listener throws instead of rejecting', async () => {
     const memory = setup();
     nextListen(() => {
