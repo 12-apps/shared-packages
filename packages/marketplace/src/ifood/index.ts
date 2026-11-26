@@ -3,7 +3,7 @@ import { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from 
 import { IFOOD_CATALOGUE } from "./catalogue";
 import { IFOOD_CATALOGUE_READER } from "./catalogue-read";
 import { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
-import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodRequestCancellation } from "./outbound";
+import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodInformStatus, ifoodRequestCancellation, ifoodStatusSupported } from "./outbound";
 import { IFOOD_AVAILABILITY } from "./pause";
 
 /**
@@ -60,6 +60,10 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
       // request in seconds when it answers at all, so 5 minutes is generous.
       // A host overrides it with the engine's `cancellationWindowMs`.
       cancellationAnswerWindowMs: IFOOD_CANCELLATION_ANSWER_WINDOW_MS,
+      // Told what iFood has an endpoint for (ESTIMATED, see `./outbound.ts`): ready for
+      // pickup, and dispatched for a merchant bag. Never "handed over": iFood's own
+      // CONCLUDED is that.
+      statusSteps: ["READY", "DISPATCHED"],
     },
     normalize: (payload) => normalizeIfoodEvent(payload, normalizeOptions),
     readSignature: (header) => header("x-ifood-signature") ?? header("x-signature"),
@@ -71,6 +75,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
     catalogueReader: IFOOD_CATALOGUE_READER,
     confirm: (ctx, order) => ifoodConfirm(ctx, order),
     requestCancellation: ifoodRequestCancellation,
+    statusSupported: ifoodStatusSupported,
+    informStatus: ifoodInformStatus,
     // The Merchant API's interruptions: an id and an end per closure (FUT-4851).
     availability: IFOOD_AVAILABILITY,
     // No per-order deep link is known, so the portal, where a live order is

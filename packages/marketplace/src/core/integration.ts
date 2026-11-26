@@ -19,6 +19,12 @@ export interface MarketplaceIntegrationView {
   status: "UNVERIFIED" | "VERIFIED" | "FAILED";
   externalMerchantId: string | null;
   autoAccept: boolean;
+  /**
+   * Whether the marketplace's DISPATCHED and CONCLUDED events move the pedido
+   * forward here (FUT-4653). Always set by this version; optional in the type
+   * so a view built by hand against 1.x still compiles.
+   */
+  followStatus?: boolean;
   ackSlaSeconds: number;
   /**
    * Whether the store has a usable connection — i.e. whether secrets are on
@@ -40,6 +46,7 @@ interface IntegrationRow {
   status: string;
   externalMerchantId: string | null;
   autoAccept: boolean;
+  followStatus?: boolean;
   ackSlaSeconds: number;
   credentials: string;
   lastEventAt: Date | null;
@@ -54,6 +61,7 @@ const VIEW_SELECT = {
   status: true,
   externalMerchantId: true,
   autoAccept: true,
+  followStatus: true,
   ackSlaSeconds: true,
   credentials: true,
   lastEventAt: true,
@@ -69,6 +77,7 @@ function toView(row: IntegrationRow): MarketplaceIntegrationView {
     status: row.status as MarketplaceIntegrationView["status"],
     externalMerchantId: row.externalMerchantId,
     autoAccept: row.autoAccept,
+    followStatus: row.followStatus ?? true,
     ackSlaSeconds: row.ackSlaSeconds,
     connected: row.credentials !== "",
     lastEventAt: row.lastEventAt,
@@ -107,6 +116,8 @@ export interface SaveMarketplaceIntegrationInput {
   environment?: "SANDBOX" | "PRODUCTION";
   externalMerchantId?: string | null;
   autoAccept?: boolean;
+  /** Whether the marketplace's DISPATCHED and CONCLUDED events move the pedido forward here. New connections: true. */
+  followStatus?: boolean;
   ackSlaSeconds?: number;
   /**
    * The secrets, when the operator re-entered them. Absent means "leave the
@@ -144,6 +155,7 @@ export async function saveMarketplaceIntegration(
       ? {}
       : { externalMerchantId: input.externalMerchantId }),
     ...(input.autoAccept === undefined ? {} : { autoAccept: input.autoAccept }),
+    ...(input.followStatus === undefined ? {} : { followStatus: input.followStatus }),
     ...(input.ackSlaSeconds === undefined ? {} : { ackSlaSeconds: input.ackSlaSeconds }),
     ...(sealed === undefined ? {} : { credentials: sealed, status: "UNVERIFIED" }),
   };
@@ -166,6 +178,8 @@ export async function saveMarketplaceIntegration(
 export interface IngestionTarget {
   enabled: boolean;
   autoAccept: boolean;
+  /** Whether lifecycle events move the pedido forward (FUT-4653). */
+  followStatus: boolean;
   ackSlaSeconds: number;
   webhookSecret: string | null;
   /** The merchant the store connected; a fetched order naming another is refused. */
@@ -211,6 +225,7 @@ export async function resolveIngestionTarget(
     select: {
       enabled: true,
       autoAccept: true,
+      followStatus: true,
       ackSlaSeconds: true,
       credentials: true,
       archivedAt: true,
@@ -220,6 +235,7 @@ export async function resolveIngestionTarget(
     externalMerchantId: string | null;
     enabled: boolean;
     autoAccept: boolean;
+    followStatus?: boolean;
     ackSlaSeconds: number;
     credentials: string;
     archivedAt: Date | null;
@@ -229,6 +245,7 @@ export async function resolveIngestionTarget(
   return {
     enabled: row.enabled,
     autoAccept: row.autoAccept,
+    followStatus: row.followStatus ?? true,
     ackSlaSeconds: row.ackSlaSeconds,
     externalMerchantId: row.externalMerchantId ?? null,
     // An unopenable blob must not read as "no secret configured" — that would

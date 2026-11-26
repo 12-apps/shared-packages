@@ -37,6 +37,12 @@ import type {
  * else is recorded and IGNORED: a missed cancellation is visible in the inbox,
  * a false one would cancel a live order.
  *
+ * Rappi maps NO lifecycle event (FUT-4653: no `lifecycle` on any event it
+ * normalizes). ESTIMATED: the `event` values of ORDER_OTHER_EVENT are
+ * undocumented (https://dev-portal.rappi.com/, read 2026-11-25), so nothing
+ * here can name "dispatched" or "concluded" without guessing; such an event
+ * stays IGNORED, as before.
+ *
  * Rappi payloads carry no event id, so the inbox key is derived from the
  * order and the event, deterministic so a redelivery collides on the inbox's
  * unique index.

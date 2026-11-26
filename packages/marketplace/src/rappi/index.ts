@@ -7,7 +7,7 @@ import {
   verifyRappiSignature,
   type RappiAmountUnit,
 } from "./normalize";
-import { rappiReject, rappiTake, type RappiBaseUrls } from "./outbound";
+import { rappiInformStatus, rappiReject, rappiStatusSupported, rappiTake, type RappiBaseUrls } from "./outbound";
 import { rappiAvailability } from "./pause";
 
 /**
@@ -148,6 +148,9 @@ export function createRappiAdapter(config: RappiAdapterConfig): MarketplaceAdapt
       // `take/{cookingTime}`, in minutes.
       confirmTakesPreparationTime: true,
       cancellationAnswerWindowMs: RAPPI_CANCELLATION_ANSWER_WINDOW_MS,
+      // READY only, and ESTIMATED (see `./outbound.ts`). Rappi's normalizer maps no
+      // lifecycle event: its `event` values are undocumented (see `./normalize.ts`).
+      statusSteps: ["READY"],
     },
     normalize: (payload) => normalizeRappiEvent(payload, normalizeOptions),
     readSignature: (header) => header(RAPPI_SIGNATURE_HEADER),
@@ -155,6 +158,8 @@ export function createRappiAdapter(config: RappiAdapterConfig): MarketplaceAdapt
     cancellationReasons: () => reasons,
     confirm: (ctx, order, input) => rappiTake(ctx, hosts, order, input),
     requestCancellation: (ctx, order, input) => rappiReject(ctx, hosts, order, input),
+    statusSupported: rappiStatusSupported,
+    informStatus: (ctx, order, facts) => rappiInformStatus(ctx, hosts, order, facts),
     appLink: () => config.portalUrl,
     ...(config.pauseByStoreSwitch ? { availability: rappiAvailability(hosts) } : {}),
   };

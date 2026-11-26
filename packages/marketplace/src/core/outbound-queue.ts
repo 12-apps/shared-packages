@@ -1,3 +1,4 @@
+import type { StatusStep } from "./adapter";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -14,19 +15,29 @@ import type { MarketplaceProvider } from "./types";
 /** The wire name, `<namespace>.<blueprint>` as the jobs contribution binds it. */
 export const MARKETPLACE_OUTBOUND_JOB = "marketplace.outbound";
 
-/** What goes out: the store's aceite, or the store's cancellation request. */
-export type OutboundAction = "confirm" | "requestCancellation";
+/**
+ * What goes out: the store's aceite, the store's cancellation request, or a
+ * step of the pedido the store reached (`status`, FUT-4653).
+ */
+export type OutboundAction = "confirm" | "requestCancellation" | "status";
 
 /** The outbound job's payload. Identifiers only. */
 export interface OutboundJobPayload {
   clientId: string;
   orderId: string;
   action: OutboundAction;
+  /** OPTIONAL. The step a `status` call tells the marketplace about; absent on every other action. */
+  step?: StatusStep;
 }
 
 /** The dedupe key: at most one queued call per (order, action). */
 export function outboundDedupeKey(payload: OutboundJobPayload): string {
-  return `${MARKETPLACE_OUTBOUND_JOB}:${payload.action}:${payload.orderId}`;
+  return `${MARKETPLACE_OUTBOUND_JOB}:${payload.action}:${payload.step ? `${payload.step}:` : ""}${payload.orderId}`;
+}
+
+/** The dedupe key of one status move: a re-dispatch after an undo is another instant, so another key. */
+export function statusDedupeKey(step: StatusStep, orderId: string, at: Date): string {
+  return `${MARKETPLACE_OUTBOUND_JOB}:status:${step}:${orderId}:${at.getTime()}`;
 }
 
 /**
@@ -50,7 +61,11 @@ export async function enqueueOutbound(
   const adapter = ctx.registry.get(provider);
   if (!adapter) return false;
   const able =
-    payload.action === "confirm" ? adapter.capabilities.apiConfirm : adapter.capabilities.apiCancel;
+    payload.action === "status"
+      ? Boolean(payload.step && adapter.capabilities.statusSteps?.includes(payload.step))
+      : payload.action === "confirm"
+        ? adapter.capabilities.apiConfirm
+        : adapter.capabilities.apiCancel;
   if (!able) return false;
   const outcome = await ctx.ports.enqueue.enqueue(MARKETPLACE_OUTBOUND_JOB, payload, { dedupeKey });
   if (!outcome.enqueued) {

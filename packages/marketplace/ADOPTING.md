@@ -75,6 +75,7 @@ export const engine = createMarketplaceEngine({
 | `withdraw({ clientId, provider, productId })` | The switch turned OFF (and the undo of an ON). `queued` (WITHDRAWING), or `unchanged` when the product was never switched on, or is WITHDRAWN at once because its connection was archived or removed since. |
 | `catalogueState({ clientId, productIds, providers? })` | The product page's read: one row per marketplace the product was ever switched on for, in one query. Draw PUBLISHED as "in the catalogue" (with your sentence for a `warningCode`, IMAGE_TOO_LARGE or IMAGE_REFUSED: it went out without its photo), PUBLISHING / WITHDRAWING as "sending…" (switch disabled), FAILED with your own sentence for its `failureCode` (REFUSED, UNAVAILABLE, TIMEOUT, NOT_CONNECTED, CREDENTIALS, PRODUCT_GONE, UNSUPPORTED, INTERNAL), the marketplace's own words from `failureReason` beside a REFUSED, and a retry (`publish` or `withdraw` again, per `failedAction`). The engine writes no sentence a person reads. No row is OFF. |
 | `catalogueDocument({ clientId, provider, options: { menuName, currency } })` | PULL marketplaces only (99Food): the menu part of the document the marketplace reads. Serve it from the route the marketplace pulls (Open Delivery's `GET /v1/merchant`), merged into the rest of that document, which is the host's (`id`, `status`, `lastUpdate`, `TTL`, `basicInfo`, `services`). The menu's name and the currency are the host's words. |
+| `informStatus({ clientId, orderId, step, at, delayMs? })` | A pedido reached `READY`, `DISPATCHED` or `HANDED_OVER` (FUT-4653). One enqueue, no statement, never throws: call it after the move's commit, from the one place every writer of that step passes, gated on the pedido being a marketplace's. `at` is the move's own timestamp (it makes the job's dedupe key, so a re-dispatch after an undo is a new job); `delayMs` is the board's undo window for a dispatch. Your `enqueue` port must pass `options.delayMs` on. The job decides everything else (see the README). |
 | `ingest(...)`, `deliver(...)` | A producer that hands over an order directly; the webhook does `deliver` for you. |
 
 A host never writes `provider === "IFOOD"`. A capability is asked of
@@ -221,6 +222,22 @@ that already has the predecessor's tables it adds the outbound columns
 connection's `archived_at`, keeps the host's foreign keys, and replaces the
 closed provider lists (`*_provider_valid`) with a shape check, so a new
 adapter is never a migration.
+
+`20261126120000_marketplace_status_updates` (1.8, FUT-4653) adds
+`marketplace_integrations.follow_status` (NOT NULL DEFAULT true: every existing
+connection follows the marketplace's status once the hook is bound) and
+`marketplace_status_updates`, one row per (order, step) with its step, source and
+state CHECKed and a partial index the outbound sweep reads. Additive; `order_id`
+is by value. Compose it with the schema in the same change as the engine bump: the
+engine selects `follow_status`. To follow the marketplace's status a host binds
+`order.onLifecycle`; to tell it, `order.statusHolds` and calls `informStatus`.
+Both are optional: a host that binds neither behaves as before.
+`MarketplaceDb.marketplaceStatusUpdate` is optional in the type, so a host that has
+not composed the model still compiles, and the two paths then do nothing.
+`DeliveryOutcome` gains `{ kind: "moved", orderId, lifecycle }`, and
+`OutboundAction` gains `"status"` (the payload an optional `step`): a host that
+switches over either exhaustively adds the case; allow `"status"` in any
+action allow-list in front of the outbound job.
 
 ## 6. What stays the host's
 

@@ -6,6 +6,7 @@ import {
   type CancellationRequestInput,
   type OutboundOrderRef,
   type OutboundResult,
+  type StatusFacts,
 } from "../core/adapter";
 
 /**
@@ -113,4 +114,38 @@ export function ifoodRequestCancellation(
     reason: input.text === "" ? input.reason.label : input.text,
     cancellationCode: input.reason.code,
   });
+}
+
+/**
+ * What iFood is told, per step (FUT-4653). ESTIMATED, every row: iFood's
+ * developer portal answered 403 behind Cloudflare to our reader
+ * (https://developer.ifood.com.br, 2026-11-25), so the endpoint names below are
+ * the Merchant API's commonly documented ones (`order/v1.0`), not read off a
+ * page.
+ *
+ * - READY: `POST /orders/{id}/readyToPickup`, for a take-out, and ESTIMATED
+ *   whether iFood takes it for its own fleet; not for a bag the merchant
+ *   delivers, which is dispatched, not made ready for pickup.
+ * - DISPATCHED: `POST /orders/{id}/dispatch`, only for `deliveredBy: MERCHANT`.
+ * - HANDED_OVER: none. iFood has no conclude endpoint for a merchant;
+ *   CONCLUDED is iFood's own event.
+ */
+const STATUS_ACTION: Readonly<Record<string, (facts: StatusFacts) => string | null>> = {
+  READY: (facts) => (facts.deliveredBy === "MERCHANT" ? null : "readyToPickup"),
+  DISPATCHED: (facts) => (facts.deliveredBy === "MERCHANT" ? "dispatch" : null),
+};
+
+/** Whether iFood takes this step for this kind of order: answered offline. */
+export function ifoodStatusSupported(facts: StatusFacts): boolean {
+  return STATUS_ACTION[facts.step]?.(facts) != null;
+}
+
+/** Tell iFood a step happened. `unsupported` when it has no endpoint for it. */
+export async function ifoodInformStatus(
+  ctx: AdapterCallContext,
+  order: OutboundOrderRef,
+  facts: StatusFacts,
+): Promise<OutboundResult | { kind: "unsupported" }> {
+  const action = STATUS_ACTION[facts.step]?.(facts) ?? null;
+  return action === null ? { kind: "unsupported" } : postOrder(ctx, order.externalOrderId, action);
 }
