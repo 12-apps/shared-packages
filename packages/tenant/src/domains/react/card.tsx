@@ -10,7 +10,7 @@
  * The writes are the host's (its API, its keyed mutation, its refusal words);
  * the card only routes each refusal to where it is told.
  */
-import { useCallback, useState, type JSX } from 'react';
+import { useCallback, useState, type JSX, type ReactNode } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
@@ -57,16 +57,25 @@ export interface DomainsCardProps<D extends TenantDomainItem> {
   /** The resolved pack for this render. */
   copy: TenantDomainsCopy;
   writes: TenantDomainWrites<D>;
+  /**
+   * The host's own empty state, drawn in place of the package's (an
+   * `EmptyState` titled `records.emptyTitle`, test id `domains-empty`) when
+   * there is no domain yet: for a host whose tooling reads its own JSX, such
+   * as a search index that files the card under its test id.
+   */
+  emptyState?: ReactNode;
 }
 
 /** No domain yet: the invitation, and the address to have ready. */
-function NoDomainsYet({ dnsTargets }: { dnsTargets: string[] }): JSX.Element {
+function NoDomainsYet({ dnsTargets, emptyState }: { dnsTargets: string[]; emptyState?: ReactNode }): JSX.Element {
   const records = useDomainsScreen().copy.records;
   return (
     <>
       {/* An invitation rather than a statement of absence: the state a tenant
           is in when it arrives on this screen for the first time. */}
-      <EmptyState variant="minimal" title={records.emptyTitle} description={records.emptyBody} dataTestId="domains-empty" />
+      {emptyState ?? (
+        <EmptyState variant="minimal" title={records.emptyTitle} description={records.emptyBody} dataTestId="domains-empty" />
+      )}
       {/* Unnumbered: with no domain there is no TXT record yet, so this is not
           step 2 of anything; it is the address to have ready. */}
       <PointingRecord dnsTargets={dnsTargets} numbered={false} copy={records} />
@@ -93,7 +102,14 @@ function rowRefusalOf<D extends TenantDomainItem>(writes: TenantDomainWrites<D>[
   };
 }
 
-function CardBody<D extends TenantDomainItem>({ domains, removed, dnsTargets, disabled, writes: host }: DomainsCardProps<D>): JSX.Element {
+function CardBody<D extends TenantDomainItem>({
+  domains,
+  removed,
+  dnsTargets,
+  disabled,
+  writes: host,
+  emptyState,
+}: DomainsCardProps<D>): JSX.Element {
   const { copy } = useDomainsScreen();
   const { writes, run, remove } = host;
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -124,7 +140,7 @@ function CardBody<D extends TenantDomainItem>({ domains, removed, dnsTargets, di
       ))}
 
       {domains.length === 0 ? (
-        <NoDomainsYet dnsTargets={dnsTargets} />
+        <NoDomainsYet dnsTargets={dnsTargets} emptyState={emptyState} />
       ) : (
         domains.map((domain) => (
           <DomainRow

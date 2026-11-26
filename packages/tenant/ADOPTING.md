@@ -446,7 +446,9 @@ pieces standalone, each checking its own: `createDnsChecks(dns)`,
   isPending, dismiss }, run, remove }`, one write per domain, `remove`
   rejecting with the refusal so the confirmation stays open); the test ids are
   the ones a journey reads (`domains-card`, `domain-row`, `domain-verify`,
-  `domain-remove`, `domains-error`, `domain-restore`, …).
+  `domain-remove`, `domains-error`, `domain-restore`, …). An optional `emptyState` draws your
+  own empty state (keep its `domains-empty` test id) in place of the
+  package's, for tooling that reads your JSX, such as a search index.
 
 ### The schema and the migration
 

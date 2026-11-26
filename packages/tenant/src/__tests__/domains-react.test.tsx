@@ -151,6 +151,22 @@ describe('the domains screen', () => {
     expect(screen.getByText('«point A»')).toBeTruthy();
   });
 
+  it("draws the host's own empty state in place of the package's when given one", () => {
+    render(
+      <screenOf.DomainsCard
+        domains={[]}
+        removed={[]}
+        dnsTargets={[]}
+        disabled={false}
+        copy={PACK}
+        writes={writes()}
+        emptyState={<p data-testid="domains-empty">host empty</p>}
+      />,
+    );
+    expect(screen.getByTestId('domains-empty').textContent).toBe('host empty');
+    expect(screen.getByTestId('domains-card').textContent).not.toContain('«emptyTitle»');
+  });
+
   it('a pending pair: its name, status, the records and the two buttons, all from the pack', () => {
     const host = writes();
     render(<Card domains={[item()]} host={host} />);
