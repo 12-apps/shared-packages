@@ -314,7 +314,8 @@
         "@12-apps/rbac",
         "@12-apps/realtime",
         "@12-apps/report-builder",
-        "@12-apps/shift"
+        "@12-apps/shift",
+        "@12-apps/tenant"
       ]
     },
     "packages/pwa": {
