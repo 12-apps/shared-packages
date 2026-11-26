@@ -78,7 +78,8 @@ async function composeLines(
     quantity: line.quantity,
     unitPriceCents: line.unitPriceCents,
     note: line.note,
-    subjectRef: mapping.get(line.externalSku) ?? null,
+    subjectRef: mapping.get(line.externalSku)?.menuItemId ?? null,
+    variationRef: mapping.get(line.externalSku)?.variationId ?? null,
   }));
 }
 

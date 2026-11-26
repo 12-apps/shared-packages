@@ -198,7 +198,7 @@ export function createMemoryDb() {
       unique: [["clientId", "provider"]],
     }),
     marketplaceMenuLink: new MemoryTable("link", {
-      defaults: () => ({ externalName: null, menuItemId: null, lastSeenAt: EPOCH }),
+      defaults: () => ({ externalName: null, menuItemId: null, variationId: null, lastSeenAt: EPOCH }),
       unique: [["clientId", "provider", "externalSku"]],
     }),
     marketplaceInboxEvent: new MemoryTable("inbox", {

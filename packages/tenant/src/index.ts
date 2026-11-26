@@ -20,6 +20,26 @@ export {
   type TenantRefusalCodes,
   type TenantStatusSet,
 } from './config';
-export { TENANT_PORT_METHODS, type TenantPort, type TenantRecord } from './port';
-export { TenantConfigError, validateCoreConfig, validatePort } from './validate';
+export {
+  TENANT_PORT_METHODS,
+  TENANT_TREE_PORT_METHODS,
+  type TenantPort,
+  type TenantRecord,
+  type TenantTreeMove,
+  type TenantTreeNode,
+} from './port';
+export {
+  TenantTreeError,
+  childPath,
+  createTenantTree,
+  depthOf,
+  isWithin,
+  parsePath,
+  rootPath,
+  validateNode,
+  type TenantTree,
+  type TenantTreeErrorCode,
+  type TenantTreePort,
+} from './tree';
+export { TenantConfigError, validateCoreConfig, validatePort, validateTreePort } from './validate';
 export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';

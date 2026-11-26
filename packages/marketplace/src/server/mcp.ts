@@ -106,12 +106,16 @@ export const listMarketplaceMenuLinksQuery = z.strictObject({
   ids: idsText.optional(),
 });
 
-/** Map one external SKU to a catalog id, or unmap it with `menuItemId: null`. */
+/**
+ * Map one external SKU to a catalog id, or unmap it with `menuItemId: null`.
+ * `variationId` narrows it to one variation of that id; absent or null maps the item alone.
+ */
 const menuLinkInput = z.strictObject({
   provider: providerSchema,
   externalSku: z.string().trim().min(1),
   externalName: z.string().trim().min(1).optional(),
   menuItemId: z.string().min(1).nullable(),
+  variationId: z.string().min(1).nullable().optional(),
 });
 
 /** Many SKU links, all-or-nothing; idempotent on (provider, externalSku). */
@@ -206,6 +210,7 @@ const menuLinkSchema = z.object({
   externalSku: z.string(),
   externalName: z.string(),
   menuItemId: z.string().nullable(),
+  variationId: z.string().nullable(),
   lastSeenAt: z.string(),
 });
 
@@ -277,7 +282,7 @@ export const MARKETPLACE_MCP_TOOLS = [
     method: "PUT",
     path: `${BASE}/menu-links`,
     summary:
-      "Map one or many external marketplace SKUs to the store's catalog ids, or unmap them with `menuItemId: null`, in one all-or-nothing call keyed by (`provider`, `externalSku`). A SKU never seen is created, so a store can map ahead of the first order. Applies to orders ingested from now on. Any problem (a catalog id that is not the store's, a repeated SKU) writes nothing; `validateOnly: true` checks without writing.",
+      "Map one or many external marketplace SKUs to the store's catalog ids, or unmap them with `menuItemId: null`; `variationId` maps a SKU to one variation of its catalog id instead of the item alone, in one all-or-nothing call keyed by (`provider`, `externalSku`). A SKU never seen is created, so a store can map ahead of the first order. Applies to orders ingested from now on. Any problem (a catalog id that is not the store's, a variation that is not one of its catalog id's, a repeated SKU) writes nothing; `validateOnly: true` checks without writing.",
     tags: ["marketplace"],
     params: marketplaceParams,
     body: upsertMarketplaceMenuLinksBody,

@@ -112,6 +112,73 @@ const port: TenantPort<Status, Tx> = {
 - **`bySlug` resolves the tenant's current slug only.** A former slug you keep
   for redirects is not answered here.
 
+### The tenant tree (opt-in)
+
+A tenant may sit under another (ownership only, any depth: a company above its
+units, a unit above its venues). **The tree is optional.** A host with no tree
+passes no `tree` and gets no `tenant.tree` (`createApiTenant` leaves the key
+out); a host written for a release before the tree boots unchanged, since none
+of the tree's methods is on the tenant port. A host that wants it passes its
+own port as `tree`, and then all four members are required and checked at
+startup (`TenantConfigError`, key `tree.<method>`):
+
+```ts
+const tree: TenantTreePort<Tx> = {
+  treeNode: (id, tx) => …,          // on tx when given: { id, parentId, path } | null — one read
+  treeAncestors: (id, tx) => …,     // on tx when given: the node and every node above it — one read
+  treeDescendants: (id, tx) => …,   // on tx when given: the node and every node below it — one read
+  moveSubtree: (move, tx) => …,     // a planned move ON tx — lock, then ONE rewrite; rows written
+};
+const tenant = createApiTenant({ ...config, port, tree });
+```
+
+Store three columns on your tenant row: the parent's id (NULL for a standalone
+tenant), the **materialized path** and, if you want one, your own unit code.
+The package computes and validates every path; you store it and apply what it
+plans.
+
+- **The path** is `/<root id>/…/<own id>/`; a standalone tenant's is
+  `/<own id>/`, so backfilling an existing table makes every row a root.
+  Ids must not contain `/`.
+- **`treeAncestors(id)`**: ONE read of the rows whose ids are the segments of
+  the tenant's own path (a primary-key read; nothing recurses).
+- **`treeDescendants(id)`**: ONE read of the rows whose path starts with the
+  tenant's own, served by an index on the path. With a byte-ordered collation
+  (Postgres `COLLATE "C"`) the prefix is exactly the range
+  `path >= p AND path < p-minus-its-last-"/" || '0'`.
+- **`moveSubtree(move, tx)`**, on the caller's transaction:
+  1. **Lock** every row of the subtree AND the new parent `FOR UPDATE`, in ONE
+     global order that never changes (by id). Two crossing moves (A under B
+     while B goes under A) then wait on each other instead of deadlocking.
+  2. **Rewrite** in ONE statement: replace the prefix `move.fromPath` with
+     `move.toPath` on every row under it and re-point the row `move.id` at
+     `move.parentId`, ONLY while that row's path is still `fromPath` and the
+     parent's is still `parentPath`. Answer the rows written; 0 tells the
+     package the tree moved under its plan, and it refuses the move by name
+     (`moved`).
+- **A new unit reads its parent's path `FOR SHARE`** (an insert trigger, or
+  your writer). With the move's lock above, an insert under a moving tenant
+  either waits for the move and takes the moved path, or commits first and the
+  move's rewrite (a later statement) moves it too. Without both locks a unit
+  can keep a stale prefix, and a stale prefix names the wrong ancestors.
+- **Hold the row to its path** in the database too: a path that names the row
+  once and last, and is `/<own id>/` exactly when there is no parent, so no
+  writer can store a cycle. Such a check does not hold the path's PREFIX to
+  the parent's path; only the port's writes keep that true, so write the tree
+  through them.
+
+`tenant.tree` answers `parentOf`, `rootOf`, `ancestorsOf`, `descendantsOf` (one
+port call each, at any depth; each takes your transaction optionally) and
+`move(id, parentId, tx)`, which runs its reads and its write in your
+transaction (required) and refuses a cycle (`TenantTreeError`, code `cycle`)
+before anything is written.
+
+A grant across a tree is your authorization's business, not the package's.
+Keep it distinguishable from a grant on the parent tenant itself: a scope that
+names "the tenants below X" must never be the same string as X's own. And
+wherever you gather the holders of grants by scope, gather the WHOLE chain
+above a tenant, not only its parent.
+
 ### The schema and the migration
 
 - Copy the partial into your schema folder with

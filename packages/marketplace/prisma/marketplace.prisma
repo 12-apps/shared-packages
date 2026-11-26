@@ -99,6 +99,9 @@ model MarketplaceIntegration {
 ///
 /// `lastSeenAt` is what the list sorts by, so a store fixing five mappings
 /// fixes the five costing them money rather than the five added first.
+///
+/// `variationId` narrows the mapping to one variation of the item: the host
+/// asks its own catalog whether it belongs (`order.catalogHasVariation`).
 model MarketplaceMenuLink {
   id       String @id @default(uuid())
   clientId String @map("client_id")
@@ -111,6 +114,9 @@ model MarketplaceMenuLink {
 
   /// The host catalog row this SKU means, or NULL while nothing does.
   menuItemId String? @map("menu_item_id")
+  /// The variation of `menuItemId` this SKU names, or NULL for the parent
+  /// item alone. Never set without `menuItemId` (FUT-4927).
+  variationId String? @map("variation_id")
 
   lastSeenAt DateTime @default(now()) @map("last_seen_at")
 
