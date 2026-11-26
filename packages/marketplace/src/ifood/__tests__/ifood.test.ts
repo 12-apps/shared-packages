@@ -273,6 +273,7 @@ describe("the iFood adapter", () => {
       perOrderAppLink: false,
       confirmTakesPreparationTime: false,
       cancellationAnswerWindowMs: 5 * 60_000,
+      statusSteps: ["READY", "DISPATCHED"],
     });
     expect(adapter.appLink({ externalOrderId: "ord-1", externalDisplayId: "4821" })).toMatch(/^https:\/\//);
   });

@@ -60,6 +60,7 @@ import {
 } from "./integration";
 import { listMarketplaceMenuLinks, type MarketplaceMenuLinkView } from "./menu-links";
 import { runOutbound, type OutboundAttempt, type OutboundOutcome } from "./outbound";
+import { informStatus, type InformStatusInput } from "./status-inform";
 import {
   availabilityState,
   pauseStore,
@@ -195,6 +196,13 @@ export interface MarketplaceEngine {
   sweepOutbound(now?: Date): Promise<OutboundSweepResult>;
   /** Run one queued outbound call (the `marketplace.outbound` job's body). */
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
+  /**
+   * Tell the marketplace the order reached a step (FUT-4653): ONE enqueue of
+   * the `marketplace.outbound` job, action `status`. Never throws, runs no
+   * statement and calls nobody: the job decides everything else. True when the
+   * queue took it.
+   */
+  informStatus(input: InformStatusInput): Promise<boolean>;
   /** Fetch and ingest one announced order (the `marketplace.fetch-order` job's body). */
   runFetchOrder(payload: FetchOrderJobPayload, attempt: OutboundAttempt): Promise<FetchOrderOutcome>;
 
@@ -310,6 +318,7 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     sweepOutbound: (now) => sweepOutbound(ctx, now ?? ports.clock.now()),
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
     runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
+    informStatus: (input) => informStatus(ctx, input),
 
     // Null too when the host bound no catalogue port: nothing could be published.
     catalogueMode: (provider) => (ports.catalogue ? (registry.get(provider)?.catalogue?.mode ?? null) : null),

@@ -72,6 +72,7 @@ const integrationUpsertInput = z.strictObject({
   environment: environmentSchema.optional(),
   externalMerchantId: z.string().trim().min(1).nullable().optional(),
   autoAccept: z.boolean().optional(),
+  followStatus: z.boolean().optional(),
   // Below a minute nothing human can answer in time; above an hour the
   // deadline has stopped describing anything a marketplace would wait for.
   ackSlaSeconds: z.number().int().min(60).max(3600).optional(),
@@ -186,6 +187,7 @@ const integrationSchema = z.object({
   status: z.enum(["UNVERIFIED", "VERIFIED", "FAILED"]),
   externalMerchantId: z.string().nullable(),
   autoAccept: z.boolean(),
+  followStatus: z.boolean(),
   ackSlaSeconds: z.number().int(),
   connected: z.boolean(),
   lastEventAt: z.string().nullable(),

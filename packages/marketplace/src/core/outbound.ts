@@ -9,6 +9,7 @@ import {
 } from "./cancellation-outcome";
 import { readOutboundConnection, type OutboundConnection } from "./integration";
 import type { OutboundJobPayload } from "./outbound-queue";
+import { failStatusRow, runStatus } from "./status-job";
 import { failAsTimeout } from "./outbound-sweep";
 import type { CancellationFailureReason, EngineContext } from "./ports";
 import { resolveReason } from "./registry";
@@ -62,6 +63,7 @@ interface OutboundRow {
   status: string;
   confirmedAt: Date | null;
   confirmFailedAt: Date | null;
+  deliveredBy: string | null;
   cancellationStatus: string | null;
   cancellationReasonCode: string | null;
   cancellationOffendingSkus: unknown;
@@ -78,6 +80,7 @@ const ROW_SELECT = {
   status: true,
   confirmedAt: true,
   confirmFailedAt: true,
+  deliveredBy: true,
   cancellationStatus: true,
   cancellationReasonCode: true,
   cancellationOffendingSkus: true,
@@ -331,6 +334,11 @@ async function runCancellation(
  */
 async function stampLastAttemptFailure(ctx: EngineContext, payload: OutboundJobPayload, error: unknown): Promise<OutboundOutcome> {
   const reason = error instanceof Error ? error.message : String(error);
+  if (payload.action === "status") {
+    await failStatusRow(ctx, payload);
+    ctx.ports.logger.error(`marketplace.outbound: status ${payload.step ?? ""} for order ${payload.orderId} failed: ${reason}`);
+    return { kind: "failed", action: payload.action, reason };
+  }
   const db = await ctx.ports.db();
   const moved = await (payload.action === "confirm"
     ? db.marketplaceAcceptance.updateMany({
@@ -358,6 +366,9 @@ async function runOnce(ctx: EngineContext, payload: OutboundJobPayload, attempt:
   if (!row) return { kind: "skipped", reason: "no acceptance for this order" };
   const adapter = ctx.registry.get(row.provider);
   if (!adapter) return { kind: "skipped", reason: `no adapter for ${row.provider}` };
+  if (payload.action === "status") {
+    return runStatus(ctx, payload, row, adapter, { attempt, ref: refOf(row), retryError: (m) => new OutboundRetryError(m) });
+  }
   return payload.action === "confirm"
     ? runConfirm(ctx, payload, row, adapter, attempt)
     : runCancellation(ctx, payload, row, adapter, attempt);

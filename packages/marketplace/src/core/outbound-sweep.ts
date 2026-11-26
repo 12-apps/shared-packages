@@ -2,6 +2,8 @@ import { NO_STANDING_REQUEST } from "./cancellation";
 import { sweepCatalogue } from "./catalogue-sweep";
 import { cancellationWindowMs, failedRequestData, requestsFirst, tellCancellationFailed } from "./cancellation-outcome";
 import { MARKETPLACE_OUTBOUND_JOB, enqueueOutbound, type OutboundAction } from "./outbound-queue";
+import { statusTable, type StatusRowStep } from "./status-store";
+import type { StatusStep } from "./adapter";
 import type { EngineContext } from "./ports";
 
 /**
@@ -67,20 +69,30 @@ interface OwedRow {
   clientId: string;
   orderId: string;
   provider: string;
+  /** Only a status row has one. */
+  step?: StatusRowStep;
+  /** Only a status row has one: the claim the sweep takes over. */
+  claimKey?: string;
 }
 
 const OWED_SELECT = { clientId: true, orderId: true, provider: true } as const;
 
 /** The sweep's own dedupe key: distinct from the job's, and per pass. */
-function sweepDedupeKey(action: OutboundAction, orderId: string, now: Date): string {
-  return `${MARKETPLACE_OUTBOUND_JOB}:${action}:${orderId}:sweep:${now.getTime()}`;
+function sweepDedupeKey(action: OutboundAction, orderId: string, now: Date, step?: string): string {
+  return `${MARKETPLACE_OUTBOUND_JOB}:${action}:${step ? `${step}:` : ""}${orderId}:sweep:${now.getTime()}`;
 }
 
 async function requeue(ctx: EngineContext, rows: readonly OwedRow[], action: OutboundAction, now: Date): Promise<number> {
   let queued = 0;
   for (const row of rows) {
-    const payload = { clientId: row.clientId, orderId: row.orderId, action };
-    if (await enqueueOutbound(ctx, payload, row.provider, sweepDedupeKey(action, row.orderId, now))) queued += 1;
+    const payload = {
+      clientId: row.clientId,
+      orderId: row.orderId,
+      action,
+      ...(row.step ? { step: row.step as StatusStep } : {}),
+      ...(row.claimKey === undefined ? {} : { claimKey: row.claimKey }),
+    };
+    if (await enqueueOutbound(ctx, payload, row.provider, sweepDedupeKey(action, row.orderId, now, row.step))) queued += 1;
   }
   return queued;
 }
@@ -138,6 +150,37 @@ async function expireUnanswered(ctx: EngineContext, now: Date): Promise<number> 
 }
 
 /**
+ * The status calls a dead job left SENDING (FUT-4653): re-queued once older
+ * than the job's retry span, failed once older than the give-up (a marketplace
+ * has long settled the order). Returns how many it re-queued and gave up on.
+ */
+async function sweepStatus(ctx: EngineContext, now: Date): Promise<{ requeued: number; givenUp: number }> {
+  const table = statusTable(await ctx.ports.db());
+  if (!table) return { requeued: 0, givenUp: 0 };
+  const stale = new Date(now.getTime() - OUTBOUND_STALE_MS);
+  const giveUp = new Date(now.getTime() - OUTBOUND_GIVE_UP_MS);
+  const givenUp = (await table.updateMany({ where: { state: "SENDING", updatedAt: { lt: giveUp } }, data: { state: "FAILED" } })).count;
+  if (givenUp > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${givenUp} status call(s).`);
+  const owed = (await table.findMany({
+    where: { state: "SENDING", source: "STORE", updatedAt: { lt: stale, gte: giveUp } },
+    select: { clientId: true, orderId: true, provider: true, step: true, claimKey: true },
+  })) as OwedRow[];
+  // The stale claim is TAKEN OVER under a fresh key, predicated on the old one, before the job
+  // is queued under the new: a job still alive under the old key can then settle or fail
+  // nothing, and a second sweep pass finds nothing to take.
+  const claimed: OwedRow[] = [];
+  for (const row of owed) {
+    const fresh = `sweep:${now.getTime()}`;
+    const taken = await table.updateMany({
+      where: { orderId: row.orderId, step: row.step, state: "SENDING", claimKey: row.claimKey, updatedAt: { lt: stale } },
+      data: { claimKey: fresh },
+    });
+    if (taken.count > 0) claimed.push({ ...row, claimKey: fresh });
+  }
+  return { requeued: await requeue(ctx, claimed, "status", now), givenUp };
+}
+
+/**
  * One sweep pass: expire the requests nobody answered, give up on the very old,
  * and re-queue what is still owed, the catalogue's publishes and withdraws
  * included (`./catalogue-sweep.ts`).
@@ -170,5 +213,6 @@ export async function sweepOutbound(ctx: EngineContext, now: Date): Promise<Outb
     (await requeue(ctx, cancellations, "requestCancellation", now)) + (await requeue(ctx, confirms, "confirm", now));
   if (givenUp > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${givenUp} cancellation request(s).`);
   const catalogueRequeued = await sweepCatalogue(ctx, now);
-  return { requeued, givenUp, timedOut, catalogueRequeued };
+  const status = await sweepStatus(ctx, now);
+  return { requeued: requeued + status.requeued, givenUp: givenUp + status.givenUp, timedOut, catalogueRequeued };
 }
