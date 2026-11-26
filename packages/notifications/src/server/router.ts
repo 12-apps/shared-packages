@@ -125,7 +125,7 @@ export interface NotifyResult {
   channels: NotificationChannel[];
 }
 
-interface NotificationRouterDeps extends NotificationDispatchDeps {
+export interface NotificationRouterDeps extends NotificationDispatchDeps {
   /** Paid-message caps, counted when the delivery rows are created. */
   caps?: CapsGate;
   generators: NotificationGeneratorRegistry;
@@ -166,7 +166,7 @@ function policyFallback(channels: NotificationChannel[]): NotificationChannel[] 
 }
 
 /** Apply the host's policy, degrading to the free channels on an error. */
-async function applyPolicy(
+export async function applyPolicy(
   deps: NotificationRouterDeps,
   clientId: string | null | undefined,
   channels: NotificationChannel[],
@@ -189,7 +189,7 @@ async function applyPolicy(
  * (every reader sees it) rather than failing the emit: a notification that
  * reaches one app too many is recoverable, one that was never written is not.
  */
-function sideFor(deps: NotificationRouterDeps, type: string): string | null {
+export function sideFor(deps: NotificationRouterDeps, type: string): string | null {
   if (!deps.sideOf) return null;
   try {
     return deps.sideOf(type) ?? null;
@@ -279,7 +279,7 @@ async function commit(
   content: { title: string; body: string; link?: string; data?: Record<string, unknown> },
   channels: NotificationChannel[],
   side: string | null,
-): Promise<{ id: string; userId: string; clientId: string | null }> {
+): Promise<{ id: string; userId: string | null; clientId: string | null }> {
   const client = await deps.db();
   return client.$transaction(async (tx) => {
     const created = await tx.notification.create({
@@ -358,7 +358,7 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
       // about — the classic read-your-own-hint race.
       announce(deps, {
         notificationId: notification.id,
-        userId: notification.userId,
+        userId: event.recipient.userId,
         clientId: notification.clientId,
       });
 

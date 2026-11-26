@@ -18,32 +18,24 @@ import {
 } from './by-permission';
 import type { NotificationsRoute } from './context';
 import type { NotificationContactDirectory, NotificationsDbProvider } from './db';
-import { createCapsGate, type CapsGate, type NotificationCapsConfig } from './caps';
-import {
-  createConsentEngine,
-  resolveConsentConfig,
-  type ConsentEngine,
-  type NotificationConsentApi,
-} from './consent';
+import type { NotificationCapsConfig } from './caps';
+import type { ConsentEngine, NotificationConsentApi } from './consent';
 import type { PaidChannel } from './consent-text';
 import type { NotificationConsentConfig } from './consent-types';
-import {
-  DEFAULT_MAX_DELIVERY_ATTEMPTS,
-  type NotificationConsentGate,
-  type NotificationDispatchDeps,
-} from './dispatch';
 import {
   applyDeliveryReceipt,
   type AppliedDeliveryReceipt,
   type DeliveryReceiptInput,
   type DeliveryReceiptOutcome,
 } from './receipts';
+import { createGuestNotify } from './guest';
 import { createInboxStore, type NotificationInboxStore } from './inbox';
 import { createPreferenceStore, type NotificationPreferenceStore } from './preferences';
 import {
   createPushSubscriptionStore,
   type PushSubscriptionStore,
 } from './push-subscriptions';
+import { paidPolicy, present, routerDepsOf } from './mount-deps';
 import { notificationRoutes } from './routes';
 import {
   createNotificationRouter,
@@ -171,6 +163,13 @@ export interface ApiNotifications {
   routes: NotificationsRoute[];
   /** The emit front door. */
   notify: NotificationRouter['notify'];
+  /**
+   * The emit for a GUEST — a phone with no account (`./guest.ts`): only the
+   * paid phone channels the type declares, never past the number's STOP, within
+   * the caps by phone. Rejects when `consent` is not configured: a guest's STOP
+   * is kept and checked there.
+   */
+  notifyGuest: ReturnType<typeof createGuestNotify>;
   /** Send every still-QUEUED delivery of one notification. */
   dispatchDeliveries: NotificationRouter['dispatchDeliveries'];
   /** The retry sweep, for a cron/admin trigger. */
@@ -205,13 +204,6 @@ export interface ApiNotifications {
    * Read it with `messagesOf({ messages }, locale)`.
    */
   messages: NotificationsCopySource<NotificationWireMessages>;
-}
-
-/** Drop the keys the host left unset, so an absent seam stays absent. */
-function present<T extends object>(entries: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(entries).filter(([, value]) => value !== undefined),
-  ) as Partial<T>;
 }
 
 /** Fallback logger — used until the host passes its own. */
@@ -271,27 +263,15 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
 
   const paid = paidPolicy(config, transports, logger);
 
-  const router = createNotificationRouter({
-    db: config.db,
-    generators,
-    transports,
-    preferences,
-    pushSubscriptions,
-    contacts: config.contacts,
-    logger,
-    maxAttempts: config.maxDeliveryAttempts ?? DEFAULT_MAX_DELIVERY_ATTEMPTS,
-    // `exactOptionalPropertyTypes` is on, so an absent host seam must be an
-    // ABSENT key rather than an explicit `undefined`.
-    ...present({
-      channelPolicy: config.channelPolicy,
-      emitChannelFilter: config.emitChannelFilter,
-      scheduleDispatch: config.scheduleDispatch,
-      onCommitted: config.onCommitted,
-      sideOf: config.sideOf,
-      consentGate: paid.gate,
-      onRejected: paid.onRejected,
-      caps: paid.caps,
-    }),
+  const routerDeps = routerDepsOf(
+    config,
+    { generators, transports, preferences, pushSubscriptions, logger },
+    paid,
+  );
+  const router = createNotificationRouter(routerDeps);
+  const notifyGuest = createGuestNotify({
+    ...routerDeps,
+    ...present({ guestDestination: paid.consent?.guestDestination }),
   });
 
   const notifyByPermission = permissionFanOut(config, router, logger);
@@ -308,6 +288,7 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
       ...present({ onInboxChanged: config.onInboxChanged, consent: paid.consent }),
     }),
     notify: router.notify,
+    notifyGuest,
     dispatchDeliveries: router.dispatchDeliveries,
     drainPending: router.drainPending,
     notifyByPermission,
@@ -319,41 +300,6 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
     messages,
     applyDeliveryReceipt: receiptApplier(config, logger),
     ...(paid.consent ? { consent: publicConsent(paid.consent) } : {}),
-  };
-}
-
-/**
- * The paid-channel policy of one mount: the consent engine (when `consent` is
- * configured), the gate it applies (whenever `consent` is configured: the
- * channels in `requireConsent` need a confirmation, and EVERY paid channel
- * stops at an opt-out — a mount that merely collects consent otherwise sends as
- * before), what a provider refusal of a number records, and the caps. Every
- * part is absent unless the host asked for it.
- */
-function paidPolicy(
-  config: NotificationsServerConfig,
-  transports: TransportRegistry,
-  logger: NotificationLogger,
-): {
-  consent?: ConsentEngine;
-  gate?: NotificationConsentGate;
-  onRejected?: NotificationDispatchDeps['onRejected'];
-  caps?: CapsGate;
-} {
-  const requireConsent = config.requireConsent ?? [];
-  const consentConfig = resolveConsentConfig(config.consent, requireConsent);
-  const caps = config.caps ? createCapsGate(config.db, config.caps, logger) : null;
-  if (!consentConfig) return caps ? { caps } : {};
-  const consent = createConsentEngine(
-    { db: config.db, contacts: config.contacts, transports, config: consentConfig, caps, logger },
-    requireConsent,
-  );
-  return {
-    consent,
-    gate: consent.allowed,
-    onRejected: ({ deliveryId, ...rejection }) =>
-      consent.rejected({ ...rejection, ref: `provider-refusal:${deliveryId}` }),
-    ...(caps ? { caps } : {}),
   };
 }
 

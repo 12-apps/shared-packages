@@ -15,7 +15,9 @@ import type {
 import type { PushSubscriptionStore } from './push-subscriptions';
 import type { TransportRegistry } from './transports/registry';
 import { failed, markSent } from './dispatch-outcome';
+import { guestRecipient } from './guest-recipient';
 import type { ProviderRejection } from './twilio';
+import type { NotificationRow } from '../wire';
 
 /**
  * Handing a delivery to its transport, and the retry sweep that re-hands the
@@ -94,7 +96,8 @@ export type NotificationConsentGate = (
 /** A send the provider refused because of the NUMBER (see `./twilio.ts`). */
 export interface NotificationRejectedSend {
   deliveryId: string;
-  userId: string;
+  /** The account, or `null` for a GUEST send (`notifyGuest`). */
+  userId: string | null;
   /** The phone on file when the send was refused. */
   phone: string | null;
   channel: NotificationChannel;
@@ -110,6 +113,12 @@ export interface NotificationDispatchDeps {
   logger: NotificationLogger;
   maxAttempts: number;
   consentGate?: NotificationConsentGate;
+  /**
+   * A GUEST's gate (`notifyGuest`): the paid channels this number may still get
+   * with no account. Applied before every send of a guest row, as
+   * {@link NotificationDispatchDeps.consentGate} is for an account's.
+   */
+  guestGate?: (phone: string, channels: NotificationChannel[]) => Promise<NotificationChannel[]>;
   /**
    * Told once per send refused for the number itself, after its row is DEAD:
    * the consent engine drops a grandfathering (a bad number) or records the
@@ -142,6 +151,18 @@ export async function loadRecipient(
     // notification no reachable subscription exists for.
     pushSubscriptionCount: await deps.pushSubscriptions.count(userId, clientId, side),
   };
+}
+
+/** The stored row's recipient: a guest's phone, or the account's contact. */
+async function recipientOf(
+  deps: NotificationDispatchDeps,
+  notification: Pick<NotificationRow, 'userId' | 'recipientPhone' | 'clientId' | 'side'>,
+): Promise<TransportRecipient | null> {
+  if (notification.userId !== null) {
+    return loadRecipient(deps, notification.userId, notification.clientId, notification.side);
+  }
+  const phone = notification.recipientPhone ?? null;
+  return phone === null ? null : guestRecipient(phone, notification.clientId, notification.side);
 }
 
 /** The stored inbox row, back as the agnostic content a formatter takes. */
@@ -205,10 +226,11 @@ async function abandonUnreachable(
   deps: NotificationDispatchDeps,
   client: NotificationsDb,
   queued: readonly NotificationDeliveryRow[],
-  userId: string,
+  userId: string | null,
 ): Promise<void> {
   deps.logger.error(
-    `[notifications] no contact for user ${userId}: ${queued.length} delivery row(s) marked DEAD`,
+    `[notifications] no contact for ${userId === null ? 'a guest row with no phone' : `user ${userId}`}: ` +
+      `${queued.length} delivery row(s) marked DEAD`,
   );
   for (const delivery of queued) {
     await client.notificationDelivery.update({
@@ -231,9 +253,10 @@ async function withConsent(
   queued: NotificationDeliveryRow[],
   recipient: TransportRecipient,
 ): Promise<NotificationDeliveryRow[]> {
-  if (!deps.consentGate) return queued;
   const channels = queued.map((row) => row.channel as NotificationChannel);
-  const kept = new Set(await deps.consentGate(recipient.userId, recipient.phone, channels));
+  const gate = gateFor(deps, recipient);
+  if (!gate) return queued;
+  const kept = new Set(await gate(channels));
   const withdrawn = queued.filter((row) => !kept.has(row.channel as NotificationChannel));
   for (const row of withdrawn) {
     await client.notificationDelivery.updateMany({
@@ -242,6 +265,26 @@ async function withConsent(
     });
   }
   return queued.filter((row) => kept.has(row.channel as NotificationChannel));
+}
+
+/**
+ * The gate a recipient's rows pass before every send: the guest gate for a
+ * guest (with none wired, NOTHING of a guest's is sent: a STOP it cannot check
+ * is not honoured), the consent gate for an account (none = everything).
+ */
+function gateFor(
+  deps: NotificationDispatchDeps,
+  recipient: TransportRecipient,
+): ((channels: NotificationChannel[]) => Promise<NotificationChannel[]>) | null {
+  if (recipient.guest) {
+    const guestGate = deps.guestGate;
+    const phone = recipient.phone;
+    return (channels) => (guestGate && phone ? guestGate(phone, channels) : Promise.resolve([]));
+  }
+  const consentGate = deps.consentGate;
+  return consentGate
+    ? (channels) => consentGate(recipient.userId, recipient.phone, channels)
+    : null;
 }
 
 /**
@@ -265,12 +308,7 @@ export async function dispatchOne(
 
   // The STORED column, so the retry sweep scopes identically to the first
   // attempt — anything less would let a retry leak what the first send withheld.
-  const recipient = await loadRecipient(
-    deps,
-    notification.userId,
-    notification.clientId,
-    notification.side,
-  );
+  const recipient = await recipientOf(deps, notification);
   if (!recipient) {
     await abandonUnreachable(deps, client, queued, notification.userId);
     return 0;

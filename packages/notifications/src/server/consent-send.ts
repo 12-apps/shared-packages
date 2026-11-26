@@ -205,8 +205,10 @@ async function lostSlot(
   store: ChannelConsentDelegate,
   row: ChannelConsentRow,
 ): Promise<ConfirmationResult> {
-  await deps.caps?.refundConfirmation(row.userId);
-  const after = await store.findUnique({ where: { userId_channel: { userId: row.userId, channel: row.channel } } });
+  // A confirmation is only ever an account's; a guest row is never asked.
+  const userId = row.userId ?? '';
+  await deps.caps?.refundConfirmation(userId);
+  const after = await store.findUnique({ where: { userId_channel: { userId, channel: row.channel } } });
   const refusal = after ? slotRefusal(deps, after, new Date()) : null;
   return refusal ?? { status: 'COOLDOWN', retryAfterMs: deps.config.resendCooldownMs };
 }
@@ -251,6 +253,9 @@ export async function askOneGrandfathered(
   store: ChannelConsentDelegate,
   row: ChannelConsentRow,
 ): Promise<boolean> {
+  // Only an account is grandfathered; a guest row (only ever OPTED_OUT) is never asked.
+  const userId = row.userId;
+  if (userId === null) return false;
   const channel = row.channel as PaidChannel;
   const method = methodOf(deps, channel);
   const now = new Date();
@@ -263,18 +268,18 @@ export async function askOneGrandfathered(
 
   const release = (): Promise<{ count: number }> =>
     store.updateMany({ where: { id: row.id }, data: { askedAt: null } });
-  const contact = await deps.contacts.getContact(row.userId);
+  const contact = await deps.contacts.getContact(userId);
   // A number that changed since the row was written is not this row's to ask.
   if (!contact || storedDestination(contact.phone, deps.config.defaultCountryCode) !== row.destination) {
     return false;
   }
-  if (deps.caps && !(await deps.caps.admitConfirmation(row.userId))) {
+  if (deps.caps && !(await deps.caps.admitConfirmation(userId))) {
     await release();
     return false;
   }
   try {
     await deliverConfirmation(deps, contact, {
-      userId: row.userId,
+      userId,
       rowId: row.id,
       ...messageInput(channel, method, contact, 'GRANDFATHERED', code),
     });

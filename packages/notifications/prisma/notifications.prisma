@@ -26,7 +26,13 @@
 // on the delivery row are closed here, because those two are the LIBRARY's.
 model Notification {
   id        String    @id @default(uuid())
-  userId    String    @map("user_id")
+  // The account this row is for. NULL only for a GUEST row (`notifyGuest`): a
+  // person with a phone and no account, told on a paid channel about a place a
+  // store holds for them. A guest row is in nobody's inbox.
+  userId    String?   @map("user_id")
+  // A guest row's destination (E.164), the only way to reach that person. NULL
+  // on every account row. A CHECK in the migration holds exactly one of the two.
+  recipientPhone String? @map("recipient_phone")
   clientId  String?   @map("client_id")
   // Which SIDE of the business this row is for — the host's vocabulary
   // (`customer`, `staff`), resolved from `type` by the host's `sideOf` at the
@@ -185,7 +191,10 @@ model PushSubscription {
 // this partial.
 model NotificationChannelConsent {
   id                  String    @id @default(uuid())
-  userId              String    @map("user_id")
+  // NULL for a GUEST row: a number with no account that said stop (only ever
+  // OPTED_OUT). One per (number, channel), by a partial unique index in the
+  // migration (Prisma cannot express a partial index).
+  userId              String?   @map("user_id")
   channel             String
   destination         String
   status              String

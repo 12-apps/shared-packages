@@ -94,7 +94,7 @@ export async function failed(
   try {
     await deps.onRejected?.({
       deliveryId: delivery.id,
-      userId: recipient.userId,
+      userId: recipient.guest ? null : recipient.userId,
       phone: recipient.phone,
       channel: delivery.channel as NotificationChannel,
       kind,

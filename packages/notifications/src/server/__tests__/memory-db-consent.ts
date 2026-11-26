@@ -89,12 +89,17 @@ export function memoryConsentDelegate(
     createMany({ data }) {
       let count = 0;
       for (const entry of data) {
-        const clash = consents.some((row) => row.userId === entry.userId && row.channel === entry.channel);
+        // The two unique keys: an account's (user_id, channel), and a GUEST's
+        // (destination, channel) WHERE user_id IS NULL (a partial index).
+        const clash = consents.some((row) =>
+          entry.userId === null
+            ? row.userId === null && row.destination === entry.destination && row.channel === entry.channel
+            : row.userId === entry.userId && row.channel === entry.channel,
+        );
         if (clash) continue;
         const now = new Date();
         consents.push({
           id: nextId('c'),
-          ...entry,
           codeHash: null,
           codeExpiresAt: null,
           codeAttempts: 0,
@@ -109,6 +114,7 @@ export function memoryConsentDelegate(
           askedAt: null,
           createdAt: now,
           updatedAt: now,
+          ...entry,
         });
         count += 1;
       }

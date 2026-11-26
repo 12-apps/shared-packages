@@ -79,6 +79,15 @@ export interface ConsentEngine extends NotificationConsentApi {
   startTurnedOn(userId: string, channels: readonly PaidChannel[]): Promise<void>;
   /** The provider refused a send for the number itself (see `./dispatch.ts`). */
   rejected(rejection: Omit<NotificationRejectedSend, 'deliveryId'> & { ref: string }): Promise<void>;
+  /**
+   * A GUEST's gate (`notifyGuest`): of `channels`, the paid ones this NUMBER
+   * may get with no account. A channel the host requires consent on never
+   * passes (a guest cannot confirm), and no paid channel passes a STOP this
+   * number gave — on any account or as a guest.
+   */
+  allowedForGuest(phone: string, channels: NotificationChannel[]): Promise<NotificationChannel[]>;
+  /** A guest's phone as consent stores it (E.164), or `null` when it is not a phone. */
+  guestDestination(phone: string): string | null;
 }
 
 const DEFAULTS = { resendCooldownMs: 60_000, maxSendsPerDay: 3, codeTtlMs: 10 * 60_000, maxCodeAttempts: 5 };
@@ -262,6 +271,27 @@ async function allowedFor(
 }
 
 /**
+ * The guest gate: only paid channels (a guest has no e-mail, no push), none the
+ * host requires a confirmation on, and none this number said stop to — any
+ * row for the number on the channel, an account's or the guest one. One read.
+ */
+async function allowedForGuest(
+  deps: ConsentDeps,
+  required: ReadonlySet<NotificationChannel>,
+  phone: string,
+  channels: NotificationChannel[],
+): Promise<NotificationChannel[]> {
+  const destination = storedDestination(phone, deps.config.defaultCountryCode);
+  const open = channels.filter((channel) => isPaidChannel(channel) && !required.has(channel));
+  if (!destination || open.length === 0) return [];
+  const stopped = await (await consentStore(deps)).findMany({
+    where: { destination, channel: { in: open }, status: 'OPTED_OUT' },
+  });
+  const refused = new Set(stopped.map((row) => row.channel));
+  return open.filter((channel) => !refused.has(channel));
+}
+
+/**
  * The provider refused a send because of the number. A BAD number loses its
  * grandfathering (owner, 2026-11-16: a permanent failure on a grandfathered
  * phone stops sends); a confirmed number is not touched, its owner proved it.
@@ -277,6 +307,15 @@ async function recordRejection(
   const { userId, channel } = input;
   if (!isPaidChannel(channel)) return;
   const store = await consentStore(deps);
+  if (userId === null) {
+    // A GUEST: nothing is grandfathered for a number with no account, and a
+    // STOP the provider holds stops the number everywhere, as a guest too.
+    if (input.kind !== 'OPTED_OUT') return;
+    const destination = storedDestination(input.phone, deps.config.defaultCountryCode);
+    if (!destination) return;
+    await applyInboundConsent(deps, { channel, from: destination, optOut: true, at: new Date(), externalId: input.ref });
+    return;
+  }
   if (input.kind === 'BAD_NUMBER') {
     await store.deleteMany({ where: { userId, channel, status: 'GRANDFATHERED' } });
     return;
@@ -331,5 +370,7 @@ export function createConsentEngine(deps: ConsentDeps, requireConsent: readonly 
     allowed: (userId, phone, channels) => allowedFor(deps, required, { userId, phone, channels }),
     startTurnedOn: (userId, channels) => startTurnedOn(deps, userId, channels),
     rejected: (rejection) => recordRejection(deps, rejection),
+    allowedForGuest: (phone, channels) => allowedForGuest(deps, required, phone, channels),
+    guestDestination: (phone) => storedDestination(phone, deps.config.defaultCountryCode),
   };
 }

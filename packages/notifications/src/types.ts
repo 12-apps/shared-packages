@@ -98,6 +98,28 @@ export interface NotificationRecipient {
 }
 
 /**
+ * A GUEST: a person with a phone and NO account, told on a paid phone channel
+ * about something a store holds for them (a place in a queue taken at the door).
+ *
+ * Always a store's (`clientId` is required): the store's plan gate and monthly
+ * cap apply, and a guest is never a platform audience.
+ */
+export interface NotificationGuestRecipient {
+  /** As typed or stored; normalized to E.164 with the consent config's country code. */
+  phone: string;
+  clientId: string;
+  /** The guest's language, when the host knows it; absent = the generator's default. */
+  locale?: string | null;
+}
+
+/** A typed domain event for a guest — see {@link NotificationGuestRecipient}. */
+export interface NotificationGuestEvent<TPayload = unknown> {
+  type: string;
+  recipient: NotificationGuestRecipient;
+  payload: TPayload;
+}
+
+/**
  * A typed domain event handed to `notify`. `type` selects the registered
  * generator; `payload` is that generator's typed input. Callers never touch
  * channels, formatting, or preferences.
@@ -195,7 +217,13 @@ export interface NotificationGenerator<TPayload = unknown> {
  * {@link NotificationTransport.supports}.
  */
 export interface TransportRecipient {
+  /** The account, or the empty string for a GUEST (see {@link TransportRecipient.guest}). */
   userId: string;
+  /**
+   * `true` for a guest (`notifyGuest`): no account, so no e-mail, no push and no
+   * preferences — only {@link TransportRecipient.phone}. Absent on every account.
+   */
+  guest?: true;
   email: string | null;
   /**
    * The recipient's own language, when the host's contact directory states
