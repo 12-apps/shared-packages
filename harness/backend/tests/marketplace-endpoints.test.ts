@@ -93,7 +93,8 @@ describe('the adoption', () => {
     // Every descriptor is claimed by the mount, the webhook included.
     const claimed = marketplace.routes.map((r) => `${r.route.method} ${r.mountPath}${r.route.path}`);
     expect(unclaimedRoutes(marketplace.routes, claimed), renderWiringReport(marketplace.report)).toEqual([]);
-    expect(marketplace.routes).toHaveLength(7);
+    // 7 before FUT-5613, plus its five link routes and the app-level webhook.
+    expect(marketplace.routes).toHaveLength(13);
     expect(marketplace.jobs.map((job) => job.name).sort()).toEqual([
       'marketplace.availability',
       'marketplace.availability-sweep',
