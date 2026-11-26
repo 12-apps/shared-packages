@@ -134,11 +134,27 @@ change leg; `changeLegCents` is the cash handed over, if any.
 | as above | none or too small | given | `EXCESS` (not refused) | `admitExcess(plan)`, then `createCaptureExcess(...).settle` |
 | — no capture at all | | | `NONE` | nothing |
 
-`FLAG` takes the latest captures off until the rest fit the bill, as
-`REFUND_AND_RECHARGE` does: a capture is flagged or held, never both, and one
-that fits is never refunded. Write the flags and holds on your refusal's own
-transaction (or right after it): a capture used by another settle in between is
-the double count.
+Two rules decide the bill that went down:
+
+- **Several captures above the bill.** `FLAG` takes the latest captures off
+  until the rest fit, the same split as `REFUND_AND_RECHARGE`: only the ones
+  that overshoot are flagged, the ones that fit are held (a capture is flagged
+  or held, never both, and one that fits is never refunded). With a single
+  capture above the bill, that capture is flagged.
+- **A cash leg smaller than the excess.** Change never exceeds the cash handed
+  over, so the change rule cannot absorb it: the cash is handed back whole and
+  the captures above the bill are decided as above (`FLAG`).
+
+The two amounts count the cash leg differently:
+
+- `HOLD.shortCents` assumes the next settle sends the cash leg AGAIN with the
+  held captures (the bill less both). If it does not resend the cash, charge
+  `shortCents + changeLegCents`.
+- `FLAG.rechargeCents` does not count the cash: it was handed back whole, so it
+  is the bill less the held captures.
+
+Write the flags and holds on your refusal's own transaction (or right after
+it): a capture used by another settle in between is the double count.
 
 ### Captures held for a sale context (`ledger.hold`, `ledger.findHeld`, `legs.heldFor`)
 
@@ -156,9 +172,17 @@ context is offered it, not only the one that took it.
 2. `legs.heldFor(clientId, holdKey)` (or `ledger.findHeld`) — one read: the
    UNBOUND captures held for the key whose flag is not live, oldest first, as
    the leg wire. Offer them as already received; charge only the rest.
-3. Settle with them as legs as usual (`heldForSale`, `bindingFor`). The bind
-   lets go of the hold, and so does `markSaleCreated`; a bind that rolls back
-   leaves it held.
+3. Settle with them as legs as usual, passing the SAME `holdKey` as the last
+   argument of `heldForSale`, `held`, `bindingFor` and `markCreatedIn` (or
+   `markSaleCreated`, or `BindTarget.holdKey` to `bind`). The bind lets go of
+   the hold, and so does `markSaleCreated`; a bind that rolls back leaves it
+   held.
+
+A held capture is that context's money: any other context, or a settle that
+names none, is refused it as `BOUND_ELSEWHERE` (look-up, bind and mark alike,
+in the same predicated write, so a hold that lands mid-bind refuses the bind),
+and `unclaimed` / `findUnclaimed` no longer list it on the terminal that took
+it.
 
 A hold does not extend the sweep's window: a held capture still UNBOUND after
 `unboundRefundAfterMs` is flagged `UNBOUND_TIMEOUT` and stops being offered.
@@ -227,12 +251,17 @@ answers null; your bind then clears the flag.
 
 ### Upgrading to 1.2.0 (held captures)
 
-Additive: nothing you built before needs a change to compile or run.
-`TerminalCaptureRecord.holdKey`, `CaptureVersion.holdKey`, `CapturePatch.holdKey`
-and `TerminalCaptureStore.findHeld` are optional; `TerminalCaptureLedger` gains
-`hold`, `findHeld` and `holdsReady`, and `TerminalLegs` gains `heldFor` — a
-hand-built double of either needs them. To use holds, migrate the column and
-pass `{ holds: true }` (above).
+Nothing built on the factories (`createTerminalCaptureLedger`,
+`createTerminalLegs`, the stores) needs a change to compile or run.
+`TerminalCaptureRecord.holdKey`, `CaptureVersion.holdKey`, `CapturePatch.holdKey`,
+`BindTarget.holdKey` and `TerminalCaptureStore.findHeld` are optional, and so are
+the new trailing `holdKey` arguments of `held`, `heldForSale`, `bindingFor`,
+`markCreatedIn` and `markSaleCreated`. A hand-built double of
+`TerminalCaptureLedger` needs `hold`, `findHeld` and `holdsReady`, and one of
+`TerminalLegs` needs `heldFor`. Behaviour changes only for a capture someone
+held, which only `hold` (new here, on a store that keeps holds) can do: such a
+capture is refused to any other context and left out of `unclaimed`. To use
+holds, migrate the column and pass `{ holds: true }` (above).
 
 ### Upgrading to 1.1.0
 

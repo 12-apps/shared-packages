@@ -15,7 +15,7 @@ import { capturedAbove, planExcess, type ExcessCapture, type ExcessPlan, type Ex
  *
  * | reason | change leg | choice | decision |
  * |---|---|---|---|
- * | `UNDERCHARGED` (the bill GREW) | any | any | `HOLD` every capture; `shortCents` left to charge |
+ * | `UNDERCHARGED` (the bill GREW) | any | any | `HOLD` every capture; `shortCents` left to charge (cash resent) |
  * | `OVERCHARGED` / `WRITTEN_OFF_LINE`, nothing over | any | any | `HOLD` every capture (refused money never floats) |
  * | went down, the change leg covers the excess | cash ≥ excess | any | `CHANGE`: no refusal, the excess is change |
  * | went down, the captures alone exceed the bill | none or too small | none, `FLAG` | `FLAG` the latest captures until the rest fit; `HOLD` the rest; `rechargeCents` |
@@ -56,14 +56,28 @@ export interface CaptureRefusalInput {
 /** What to do with a refused settle's captures. `refused: false`: the settle may go ahead as the decision says. */
 export type CaptureRefusalDecision =
   | { kind: 'NONE'; refused: true; flag: ExcessCapture[]; hold: ExcessCapture[] }
-  | { kind: 'HOLD'; refused: true; shortCents: number; flag: ExcessCapture[]; hold: ExcessCapture[] }
+  | {
+      kind: 'HOLD';
+      refused: true;
+      /**
+       * What is left to charge, assuming the next settle sends the change
+       * (cash) leg AGAIN with the held captures: the bill less both. A settle
+       * that does not resend the cash must also charge `changeLegCents`.
+       */
+      shortCents: number;
+      flag: ExcessCapture[];
+      hold: ExcessCapture[];
+    }
   | { kind: 'CHANGE'; refused: false; changeCents: number; flag: ExcessCapture[]; hold: ExcessCapture[] }
   | {
       kind: 'FLAG';
       refused: true;
       /** What the captures took above the bill. */
       excessCents: number;
-      /** What is left to charge once the held captures are used: the bill less them. */
+      /**
+       * What is left to charge once the held captures are used: the bill less
+       * them. The change (cash) leg is NOT counted: it was handed back whole.
+       */
       rechargeCents: number;
       flag: ExcessCapture[];
       hold: ExcessCapture[];
