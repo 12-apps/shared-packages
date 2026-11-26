@@ -444,13 +444,11 @@ describe("[P13] the outbound sweep and a job that died after its claim", () => {
 
 describe("[B1] two jobs for one step never both call the marketplace", () => {
   it("a dispatch, an undo and a second dispatch (two keys): the second job runs while the first call is in flight: ONE call", async () => {
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    // The first call waits on iFood until the gate is aborted.
+    const gate = new AbortController();
     const http = scriptedHttp(async (request) => {
       if (request.url.endsWith("/token")) return TOKEN;
-      await gate;
+      await new Promise((resolve) => gate.signal.addEventListener("abort", resolve));
       return { status: 202, body: "" };
     });
     const h = createHarness({ http, statusHolds: () => true });
@@ -460,7 +458,7 @@ describe("[B1] two jobs for one step never both call the marketplace", () => {
     // The first job has claimed and is waiting on iFood.
     await vi.waitFor(() => expect(statusRows(h)).toHaveLength(1));
     const second = await h.engine.runOutbound(job(orderId, "DISPATCHED", "move-2"), FIRST);
-    release();
+    gate.abort();
 
     expect(second.kind).toBe("skipped");
     expect((await first).kind).toBe("done");
