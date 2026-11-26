@@ -7,7 +7,7 @@
  * JavaScript, or one that casts, gets the same answer as a typed one.
  */
 import {
-  TENANT_COPY_KEYS,
+  TENANT_COPY_SHAPE,
   type TenantCoreConfig,
   type TenantIds,
 } from './config';
@@ -63,23 +63,38 @@ function requireDistinct(values: Record<string, string>, key: string): void {
   }
 }
 
+/** A non-empty list of distinct non-empty strings, as a set. */
+function requireStatusList(value: unknown, key: string): Set<string> {
+  if (value === undefined || value === null) {
+    throw new TenantConfigError(key, 'is required and missing');
+  }
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TenantConfigError(key, 'must be a non-empty array');
+  }
+  const seen = new Set<string>();
+  value.forEach((status, index) => {
+    const name = requireString(status, `${key}[${index}]`);
+    if (seen.has(name)) throw new TenantConfigError(`${key}[${index}]`, `repeats "${name}"`);
+    seen.add(name);
+  });
+  return seen;
+}
+
+function validateClosableFrom(value: unknown, known: Set<string>, named: Record<string, string>): void {
+  const closable = requireStatusList(value, 'statuses.closableFrom');
+  for (const name of closable) {
+    if (!known.has(name)) {
+      throw new TenantConfigError('statuses.closableFrom', `names "${name}", which statuses.all does not list`);
+    }
+    if (name === named.closing || name === named.closed) {
+      throw new TenantConfigError('statuses.closableFrom', `names "${name}", a status a close cannot start from`);
+    }
+  }
+}
+
 function validateStatuses(value: unknown): void {
   const statuses = requireBag(value, 'statuses');
-  const all = statuses.all;
-  if (all === undefined || all === null) {
-    throw new TenantConfigError('statuses.all', 'is required and missing');
-  }
-  if (!Array.isArray(all) || all.length === 0) {
-    throw new TenantConfigError('statuses.all', 'must be a non-empty array');
-  }
-  const known = new Set<string>();
-  all.forEach((status, index) => {
-    const name = requireString(status, `statuses.all[${index}]`);
-    if (known.has(name)) {
-      throw new TenantConfigError(`statuses.all[${index}]`, `repeats "${name}"`);
-    }
-    known.add(name);
-  });
+  const known = requireStatusList(statuses.all, 'statuses.all');
   const named: Record<string, string> = {};
   for (const role of ['active', 'closing', 'closed'] as const) {
     const name = requireString(statuses[role], `statuses.${role}`);
@@ -89,10 +104,26 @@ function validateStatuses(value: unknown): void {
     named[role] = name;
   }
   requireDistinct(named, 'statuses');
+  validateClosableFrom(statuses.closableFrom, known, named);
 }
 
 const ID_GROUPS = {
-  refusals: ['closing', 'closed', 'readOnly', 'gone'],
+  refusals: [
+    'closing',
+    'closed',
+    'readOnly',
+    'gone',
+    'reasonTooShort',
+    'nameMismatch',
+    'alreadyClosing',
+    'notActive',
+    'closingBlocked',
+    'purged',
+    'notClosing',
+    'exportNeedsPerson',
+    'exportNotFound',
+    'exportExpired',
+  ],
   audit: [
     'closeScheduled',
     'closeReopened',
@@ -101,7 +132,7 @@ const ID_GROUPS = {
     'exportRequested',
     'exportDownloaded',
   ],
-  notifications: ['closingScheduled', 'closingWeek', 'closingDay', 'exportReady'],
+  notifications: ['closingScheduled', 'closingWeek', 'closingDay', 'reopened', 'exportReady'],
   permissions: ['close'],
 } as const satisfies { [G in keyof TenantIds]: readonly (keyof TenantIds[G])[] };
 
@@ -119,9 +150,22 @@ function validateIds(value: unknown): void {
   for (const [group, names] of Object.entries(ID_GROUPS)) validateIdGroup(ids[group], group, names);
 }
 
+function requireSentence(value: unknown, key: string): void {
+  if (value === undefined || value === null) {
+    throw new TenantConfigError(key, 'is required and missing');
+  }
+  if (typeof value !== 'function') {
+    throw new TenantConfigError(key, 'must be a function that writes the whole sentence');
+  }
+}
+
 function validatePack(value: unknown, tag: string): void {
   const pack = requireBag(value, `copy.locales.${tag}`);
-  TENANT_COPY_KEYS.forEach((copyKey) => requireString(pack[copyKey], `copy.locales.${tag}.${copyKey}`));
+  for (const [copyKey, kind] of Object.entries(TENANT_COPY_SHAPE)) {
+    const key = `copy.locales.${tag}.${copyKey}`;
+    if (kind === 'text') requireString(pack[copyKey], key);
+    else requireSentence(pack[copyKey], key);
+  }
 }
 
 function validateCopy(value: unknown): void {

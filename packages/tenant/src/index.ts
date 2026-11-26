@@ -8,6 +8,7 @@
  */
 export {
   TENANT_COPY_KEYS,
+  TENANT_COPY_SHAPE,
   type TenantAuditActionIds,
   type TenantCopyConfig,
   type TenantCopyKey,
@@ -21,4 +22,4 @@ export {
 } from './config';
 export { TENANT_PORT_METHODS, type TenantPort, type TenantRecord } from './port';
 export { TenantConfigError, validateCoreConfig, validatePort } from './validate';
-export type { TenantReadings, TenantRefusalKind } from './core';
+export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';
