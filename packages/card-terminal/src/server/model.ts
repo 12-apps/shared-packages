@@ -127,6 +127,12 @@ export interface TerminalCaptureRecord extends Required<CaptureTrace> {
 export interface BindTarget {
   orderId: string;
   paymentId: string;
+  /**
+   * The sale context the sale settles (the key captures are held under). A
+   * capture held for another context, or for any context when this is absent,
+   * is `BOUND_ELSEWHERE`; one held for this context is bound and let go.
+   */
+  holdKey?: string;
 }
 
 /** A capture's key: a transaction code is unique per tenant only. */

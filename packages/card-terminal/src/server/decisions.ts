@@ -69,13 +69,24 @@ export function owedBackForGood(record: TerminalCaptureRecord): boolean {
 }
 
 /**
+ * The capture is held for a sale context other than `holdKey` (absent: no
+ * context at all): its money is that context's, so another sale may not take
+ * it. A capture held for none is held elsewhere for no one.
+ */
+export function heldElsewhere(current: Pick<TerminalCaptureRecord, 'holdKey'>, holdKey?: string): boolean {
+  const heldFor = current.holdKey ?? null;
+  return heldFor !== null && heldFor !== holdKey;
+}
+
+/**
  * What marking `current` created for `orderId` means: `"replay"` when it
  * already carries that sale, `"mark"` when it may move, or the refusal. A
  * capture flagged for a reason a bind would refuse may not move either, so it
  * never reaches an ORDER_CREATED that a bind then refuses.
  */
-export function markDecision(current: TerminalCaptureRecord, orderId: string): 'replay' | 'mark' | CaptureErrorCode {
+export function markDecision(current: TerminalCaptureRecord, orderId: string, holdKey?: string): 'replay' | 'mark' | CaptureErrorCode {
   if (current.orderId !== null) return current.orderId === orderId ? 'replay' : 'BOUND_ELSEWHERE';
+  if (heldElsewhere(current, holdKey)) return 'BOUND_ELSEWHERE';
   if (owedBackForGood(current)) return 'FLAGGED';
   return 'mark';
 }
@@ -94,6 +105,7 @@ export function bindDecision(
     return current.orderId === target.orderId && current.paymentId === target.paymentId ? 'replay' : 'BOUND_ELSEWHERE';
   }
   if (current.orderId !== null && current.orderId !== target.orderId) return 'BOUND_ELSEWHERE';
+  if (heldElsewhere(current, target.holdKey)) return 'BOUND_ELSEWHERE';
   const flagged = refundLive(current);
   if (flagged && current.refundReason !== 'UNBOUND_TIMEOUT') return 'FLAGGED';
   return { clearFlag: flagged };

@@ -49,9 +49,14 @@ function answer(row: Row): TerminalCaptureRecord {
 
 const sameTime = (a: Date | null, b: Date | null): boolean => (a === null || b === null ? a === b : a.getTime() === b.getTime());
 
-/** The optional parts of a predicate: the hold when it is named, the legacy report when it is awaited. */
+/**
+ * The optional parts of a predicate: the hold, and the legacy report when it
+ * is awaited. This table always keeps holds, and answers no `holdKey` for a
+ * row held for none, so a version that names none read a row held for none: a
+ * hold landed since makes it match nothing, as on a database store.
+ */
 function optionalPartsMatch(row: Row, seen: CaptureVersion): boolean {
-  if (seen.holdKey !== undefined && (row.holdKey ?? null) !== seen.holdKey) return false;
+  if ((row.holdKey ?? null) !== (seen.holdKey ?? null)) return false;
   if (!seen.awaitingReport) return true;
   return row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null;
 }
@@ -178,6 +183,7 @@ function memoryStore(table: Table): TerminalCaptureStore {
           (row) =>
             row.clientId === clientId &&
             row.state === 'UNBOUND' &&
+            (row.holdKey ?? null) === null &&
             row.deviceId !== null &&
             devices.has(row.deviceId) &&
             (!refundLive(row) || row.refundReason === 'UNBOUND_TIMEOUT'),

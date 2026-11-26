@@ -115,7 +115,8 @@ export interface TerminalCaptureStore {
   /**
    * The UNBOUND captures these terminals (never empty) took at this tenant
    * that are not owed back: never flagged, flagged `UNBOUND_TIMEOUT` (a bind
-   * clears that one), or cleared. Oldest capture first.
+   * clears that one), or cleared, and held for no sale context (a store that
+   * keeps holds). Oldest capture first.
    */
   findUnclaimed(clientId: string, deviceIds: readonly string[]): Promise<TerminalCaptureRecord[]>;
   /**

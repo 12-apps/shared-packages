@@ -76,7 +76,7 @@ const NOT_OWED_BACK = [...NOT_LIVE, { refundReason: 'UNBOUND_TIMEOUT' }] as cons
 type CaptureFindManyWhere =
   | { clientId: string; transactionCode: { in: string[] } }
   | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' }
-  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK }
+  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; holdKey?: null; OR: typeof NOT_OWED_BACK }
   | { clientId: string; holdKey: string; state: 'UNBOUND'; OR: typeof NOT_LIVE }
   | {
       state: 'ORDER_CREATED';
@@ -230,7 +230,8 @@ export function createPrismaTerminalCaptureStore(source: ClientSource, options: 
     },
     async findUnclaimed(clientId, deviceIds) {
       const rows = await (await client()).terminalCapture.findMany({
-        where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', OR: NOT_OWED_BACK },
+        // A held capture is its sale context's money, never "received, no sale" on its terminal.
+        where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', ...(options.holds ? { holdKey: null } : {}), OR: NOT_OWED_BACK },
         orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
         select,
       });
