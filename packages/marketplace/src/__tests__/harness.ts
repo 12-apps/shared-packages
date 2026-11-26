@@ -1,5 +1,5 @@
 import { createMarketplaceEngine } from "../core/engine";
-import type { MarketplaceAdapter, MarketplaceHttpRequest, MarketplaceHttpResponse, StatusStep } from "../core/adapter";
+import type { MarketplaceAdapter, StatusStep } from "../core/adapter";
 import type { OutboundJobPayload } from "../core/outbound-queue";
 import type {
   MarketplaceDb,
@@ -18,6 +18,9 @@ import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types"
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
 import { createMemoryDb } from "./memory-db";
+import { scriptedHttp } from "./scripted-http";
+
+export { scriptedHttp };
 
 /* eslint-disable test-flakiness/no-database-operations --
    The seed helpers below write rows into the harness's OWN in-memory fake
@@ -39,21 +42,6 @@ const open = (sealed: string): string => {
   if (!sealed.startsWith("sealed:")) throw new Error("does not open");
   return Buffer.from(sealed.slice("sealed:".length), "base64").toString();
 };
-
-/** Answer each request with the next scripted response (the last one repeats). */
-export function scriptedHttp(
-  responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse | Promise<MarketplaceHttpResponse>),
-) {
-  const requests: MarketplaceHttpRequest[] = [];
-  const http = async (request: MarketplaceHttpRequest): Promise<MarketplaceHttpResponse> => {
-    requests.push(request);
-    if (typeof responses === "function") return responses(request);
-    const response = responses[Math.min(requests.length - 1, responses.length - 1)];
-    if (!response) throw new Error("no scripted response");
-    return response;
-  };
-  return { http, requests };
-}
 
 interface HarnessOptions {
   adapters?: readonly MarketplaceAdapter[];
