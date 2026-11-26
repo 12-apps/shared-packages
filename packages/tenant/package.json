@@ -1,0 +1,79 @@
+{
+  "name": "@12-apps/tenant",
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Domain-agnostic tenant behaviours: the lifecycle of a tenant (closing, reopening, the purge and the data export), configured by each host with its own status set, ids, copy packs and a required tenant port. The tenant row stays the host's: the package reads and writes it only through the port, and owns two tables of its own (tenant_closings, tenant_data_exports) keyed by an opaque tenant id with no foreign key. Backend factory (./server), Hono mount (./hono), frontend factory (./react) and the package-owned Prisma partial + migrations. Adoption contract in ADOPTING.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./hono": "./src/hono/index.ts",
+    "./react": "./src/react/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "prisma:sync": "node scripts/sync-tenant-schema.mjs",
+    "prisma:sync:check": "node scripts/sync-tenant-schema.mjs --check",
+    "clean": "rm -rf node_modules coverage dist"
+  },
+  "peerDependencies": {
+    "@12-apps/wiring": ">=1.3.0",
+    "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
+    "@electric-sql/pglite": "^0.2.17",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "hono": "^4.6.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/tenant"
+  },
+  "files": [
+    "src",
+    "prisma",
+    "scripts",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ],
+  "wiring": {
+    "db": {
+      "partial": "prisma/tenant.prisma",
+      "migrations": "prisma/migrations"
+    }
+  }
+}
