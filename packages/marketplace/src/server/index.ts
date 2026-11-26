@@ -29,7 +29,7 @@ export function createApiMarketplace(config: MarketplaceApiConfig): ApiMarketpla
 
 export type { MarketplaceActor, MarketplaceApiConfig } from "./http";
 export type { MarketplaceRoute } from "./routes";
-export type { MarketplaceServerCopy } from "./copy";
+export type { MarketplaceLinkCopy, MarketplaceServerCopy } from "./copy";
 export {
   MARKETPLACE_DECIDE,
   MARKETPLACE_MANAGE,

@@ -19,4 +19,17 @@ export const MARKETPLACE_SERVER_COPY_PT_BR = {
     NOTHING_TO_UPDATE: "Nada para atualizar.",
     CATALOG_ITEM_NOT_FOUND: "Produto não encontrado.",
   },
+  link: {
+    problems: {
+      UNAVAILABLE: "A conexão pelo aplicativo não está disponível para este marketplace.",
+      NO_LINK_IN_PROGRESS: "Nenhuma conexão em andamento. Comece de novo pelo primeiro passo.",
+      LINK_EXPIRED: "O código expirou. Gere um código novo e repita os passos.",
+      CODE_REFUSED: "O marketplace recusou o código de autorização. Confira o código e cole de novo.",
+      MARKETPLACE_REFUSED: "O marketplace recusou o pedido de conexão.",
+      NOT_LINKED: "Esta loja não está conectada pelo aplicativo. Conecte de novo.",
+      UNKNOWN_MERCHANT: "Esta loja não está entre as autorizadas no marketplace.",
+      MERCHANT_TAKEN: "Esta loja do marketplace já está conectada a outra conta.",
+    },
+    tryAgain: "O marketplace não respondeu. Tente de novo em instantes.",
+  },
 } as const satisfies MarketplaceServerCopy;

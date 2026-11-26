@@ -15,7 +15,8 @@ import {
   upsertMarketplaceIntegrationsBody,
   upsertMarketplaceMenuLinksBody,
 } from "./mcp";
-import { webhookRoute } from "./webhook";
+import { linkRoutes } from "./link-routes";
+import { appWebhookRoute, webhookRoute } from "./webhook";
 
 /**
  * The marketplace HTTP surface as framework-neutral wiring descriptors: the
@@ -208,7 +209,9 @@ function acceptanceRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceAc
 export function marketplaceRoutes(config: MarketplaceApiConfig): MarketplaceRoute[] {
   return [
     webhookRoute(config),
+    appWebhookRoute(config),
     ...integrationRoutes(config),
+    ...linkRoutes(config),
     ...menuLinkRoutes(config),
     ...acceptanceRoutes(config),
   ];

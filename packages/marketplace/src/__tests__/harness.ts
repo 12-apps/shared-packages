@@ -1,9 +1,5 @@
 import { createMarketplaceEngine } from "../core/engine";
-import type {
-  MarketplaceAdapter,
-  MarketplaceHttpRequest,
-  MarketplaceHttpResponse,
-} from "../core/adapter";
+import type { MarketplaceAdapter, MarketplaceHttpRequest, MarketplaceHttpResponse, StatusStep } from "../core/adapter";
 import type { OutboundJobPayload } from "../core/outbound-queue";
 import type {
   MarketplaceDb,
@@ -16,7 +12,7 @@ import type {
   MarketplaceLifecycleAnswer,
   MarketplaceLifecycleFacts,
 } from "../core/ports";
-import type { StatusStep } from "../core/adapter";
+import type { MarketplaceAppCredentialsPort } from "../core/linking-port";
 import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
@@ -36,7 +32,7 @@ import { createMemoryDb } from "./memory-db";
 const NOW = new Date("2026-11-11T12:00:00.000Z");
 export const TENANT = "tenant-1";
 
-/** Reversible "sealing", so a test can read what was stored. */
+/** Reversible "sealing", so a test can read what was stored (`open` it back). */
 const seal = (plaintext: string): string => `sealed:${Buffer.from(plaintext).toString("base64")}`;
 const open = (sealed: string): string => {
   if (!sealed.startsWith("sealed:")) throw new Error("does not open");
@@ -90,6 +86,7 @@ interface HarnessOptions {
   lifecycle?: readonly (MarketplaceLifecycleAnswer | Error)[];
   /** Whether the host says an order still holds a step; absent, `statusHolds` is not bound. */
   statusHolds?: (step: StatusStep) => boolean | Promise<boolean>;
+  appCredentials?: MarketplaceAppCredentialsPort; // The software's own app (FUT-5613); absent, no linking.
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -215,6 +212,7 @@ export function createHarness(options: HarnessOptions = {}) {
     maxInboxAttempts: 5,
     ...(options.cancellationWindowMs === undefined ? {} : { cancellationWindowMs: options.cancellationWindowMs }),
     ...(options.catalogue ? { catalogue: options.catalogue } : {}),
+    ...(options.appCredentials ? { appCredentials: options.appCredentials } : {}),
     adapters: options.adapters ?? [createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US })],
   });
 
