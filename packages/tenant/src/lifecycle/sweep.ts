@@ -70,7 +70,7 @@ async function dropStale<S extends string, Tx>(context: LifecycleContext<S, Tx>,
     const { count } = await (await context.table(tx)).deleteMany({
       where: { tenantId: row.tenantId, requestedAt: row.requestedAt, purgedAt: null },
     });
-    if (count > 0 && context.config.mirror !== undefined) await context.config.mirror.deleted(tx, row.tenantId);
+    if (count > 0 && context.config.mirror !== undefined) await context.config.mirror.deleted(tx, row.tenantId, row.requestedAt);
   });
 }
 

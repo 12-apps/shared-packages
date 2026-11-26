@@ -35,7 +35,7 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const clone = (state: State): State => structuredClone(state);
 
 export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
-  let state: State = {
+  const state: State = {
     tenants: [
       { id: 't-1', slug: 'north', status: 'OPEN', name: 'Clínica Norte' },
       { id: 't-2', slug: 'south', status: 'ON_HOLD', name: 'Clínica Sul' },
@@ -47,6 +47,8 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
   const log: string[] = [];
   const notices: { type: string; payload: TenantNoticePayload }[] = [];
   const errors: { act: string; tenantId: string; error: unknown }[] = [];
+  /** What each `mirror.deleted` was handed: the tenant and the deleted row's `requestedAt`. */
+  const mirrorDeletes: { tenantId: string; requestedAt: Date | undefined }[] = [];
   const knobs = {
     blockers: [] as TenantBlockerCount[],
     /** Called on the close's recount (with tx): the race the recount exists for. */
@@ -186,7 +188,7 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
           log.push('commit');
           return value;
         } catch (error) {
-          state = saved;
+          Object.assign(state, saved); // restore in place: every reader holds this one object
           log.push('rollback');
           throw error;
         }
@@ -250,8 +252,9 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
         log.push(`mirror:${event.kind}`);
         state.mirror[tenantId] = { ...state.mirror[tenantId], [`event:${event.kind}`]: event.at };
       },
-      deleted: async (_tx, tenantId) => {
+      deleted: async (_tx, tenantId, requestedAt) => {
         log.push('mirror:deleted');
+        mirrorDeletes.push({ tenantId, requestedAt });
         delete state.mirror[tenantId];
       },
     },
@@ -273,6 +276,7 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
     log,
     notices,
     errors,
+    mirrorDeletes,
     knobs,
   };
 }

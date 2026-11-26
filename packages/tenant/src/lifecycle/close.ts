@@ -174,7 +174,7 @@ export async function reopenTenant<S extends string, Tx>(
       throw context.refuse(row?.purgedAt ? 'purged' : 'notClosing');
     }
     await (await context.table(tx)).deleteMany({ where: { tenantId: id } });
-    if (config.mirror !== undefined) await config.mirror.deleted(tx, id);
+    if (config.mirror !== undefined) await config.mirror.deleted(tx, id, row?.requestedAt);
     await config.audit(tx, ids.audit.closeReopened, {
       act: 'closeReopened',
       tenantId: id,

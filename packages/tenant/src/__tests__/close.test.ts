@@ -9,7 +9,10 @@ import { DAY_MS, lifecycleHost, request } from './lifecycle-fixtures';
  * back, the tree blocker, the two entries, and the hooks after the commit.
  */
 
-const NOW = new Date('2026-11-26T12:00:00.000Z');
+/** A fresh Date each call: no Date object is shared between tests. */
+function now(): Date {
+  return new Date('2026-11-26T12:00:00.000Z');
+}
 
 async function refusalOf(run: () => Promise<unknown>): Promise<TenantLifecycleRefusal> {
   try {
@@ -22,16 +25,16 @@ async function refusalOf(run: () => Promise<unknown>): Promise<TenantLifecycleRe
 }
 
 function memberClose(host: ReturnType<typeof lifecycleHost>, overrides: Record<string, unknown> = {}) {
-  const lifecycle = host.tenant().lifecycle;
-  if (!lifecycle) throw new Error('no lifecycle');
-  return lifecycle.close({
+  const flow = host.tenant().lifecycle;
+  if (!flow) throw new Error('no lifecycle');
+  return flow.close({
     tenant: { ...host.tenantOf('t-1')! },
     by: 'member',
     reason: '  Moving away  ',
     typedName: '  clínica   NORTE ',
     actorUserId: 'u-1',
     request: request(),
-    now: NOW,
+    now: now(),
     ...overrides,
   });
 }
@@ -42,15 +45,15 @@ describe('a member closes', () => {
     const state = await memberClose(host);
     expect(state).toEqual({
       status: 'WINDING_DOWN',
-      requestedAt: NOW.toISOString(),
-      purgeAt: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(),
+      requestedAt: now().toISOString(),
+      purgeAt: new Date(now().getTime() + 30 * DAY_MS).toISOString(),
     });
     expect(host.tenantOf('t-1')?.status).toBe('WINDING_DOWN');
     expect(host.closingOf('t-1')).toMatchObject({
       requestedById: 'u-1',
       reason: 'Moving away',
       priorStatus: 'OPEN',
-      afterCloseDoneAt: NOW,
+      afterCloseDoneAt: now(),
     });
     expect(host.log).toEqual([
       'confirm',
@@ -141,10 +144,10 @@ describe('a member closes', () => {
     const host = lifecycleHost();
     host.knobs.afterCloseFails = 1;
     await memberClose(host);
-    expect(host.closingOf('t-1')).toMatchObject({ afterCloseDoneAt: null, afterCloseFailedAt: NOW });
+    expect(host.closingOf('t-1')).toMatchObject({ afterCloseDoneAt: null, afterCloseFailedAt: now() });
     expect(host.state.audit.map((line) => line.action)).toEqual(['clinic_close.scheduled', 'clinic_close.after_close_failed']);
     expect(host.state.audit[1]?.event).toEqual({ act: 'afterCloseFailed', tenantId: 't-1', error: 'billing timeout' });
-    expect(host.state.mirror['t-1']).toHaveProperty('event:afterClose', NOW);
+    expect(host.state.mirror['t-1']).toHaveProperty('event:afterClose', now());
     expect(host.errors.map((entry) => entry.act)).toEqual(['afterClose']);
     expect(host.tenantOf('t-1')?.status).toBe('WINDING_DOWN');
     expect(host.notices).toHaveLength(1);
@@ -190,7 +193,7 @@ describe('the platform closes', () => {
       reason: 'Fraud review',
       actorUserId: 'ignored',
       request: request(),
-      now: NOW,
+      now: now(),
     });
     expect(host.tenantOf('t-2')?.status).toBe('WINDING_DOWN');
     expect(host.closingOf('t-2')).toMatchObject({ requestedById: null, priorStatus: 'ON_HOLD' });
@@ -228,16 +231,16 @@ describe('the tree blocker', () => {
   it('counts an open unit, and only an open one', async () => {
     const host = lifecycleHost({ tree });
     const lifecycle = host.tenant().lifecycle!;
-    expect(await lifecycle.blockers('t-1', NOW)).toEqual([{ kind: 'units', count: 1, path: 'units' }]);
+    expect(await lifecycle.blockers('t-1', now())).toEqual([{ kind: 'units', count: 1, path: 'units' }]);
     const refusal = await refusalOf(() => memberClose(host));
     expect(refusal.kind).toBe('closingBlocked');
     (host.tenantOf('t-2') as { status: string }).status = 'WINDING_DOWN';
-    expect(await lifecycle.blockers('t-1', NOW)).toEqual([]);
+    expect(await lifecycle.blockers('t-1', now())).toEqual([]);
   });
 
   it('counts open units in ONE read, from the status the descendants read carries', async () => {
     const host = lifecycleHost({ tree });
-    await host.tenant().lifecycle!.blockers('t-1', NOW);
+    await host.tenant().lifecycle!.blockers('t-1', now());
     expect(host.log).toEqual(['blockers', 'treeDescendants']);
   });
 
@@ -248,7 +251,7 @@ describe('the tree blocker', () => {
       tree: { ...host.config.tree!, treeDescendants: async () => tree },
       lifecycle: host.lifecycle,
     });
-    await expect(tenant.lifecycle!.blockers('t-1', NOW)).rejects.toMatchObject({ key: 'tree.treeDescendants' });
+    await expect(tenant.lifecycle!.blockers('t-1', now())).rejects.toMatchObject({ key: 'tree.treeDescendants' });
   });
 
   it('hands the after-close hook the node, so a unit can leave its root alone', async () => {
@@ -291,7 +294,7 @@ describe('blockers and state', () => {
     expect(host.log).toEqual([]);
     await memberClose(host);
     host.log.length = 0;
-    expect(await lifecycle.state({ id: 't-1', status: 'WINDING_DOWN' })).toMatchObject({ requestedAt: NOW.toISOString() });
+    expect(await lifecycle.state({ id: 't-1', status: 'WINDING_DOWN' })).toMatchObject({ requestedAt: now().toISOString() });
     expect(host.log).toEqual(['findUnique']);
   });
 });

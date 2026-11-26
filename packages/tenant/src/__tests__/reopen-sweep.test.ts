@@ -7,25 +7,34 @@ import { DAY_MS, lifecycleHost, request } from './lifecycle-fixtures';
 
 /** Reopening, the sweep, and the pure readings they rest on. */
 
-const NOW = new Date('2026-11-26T12:00:00.000Z');
-const PURGE = new Date(NOW.getTime() + 30 * DAY_MS);
-const before = (days: number) => new Date(PURGE.getTime() - days * DAY_MS);
+/** Fresh Dates each call: no Date object is shared between tests. */
+function now(): Date {
+  return new Date('2026-11-26T12:00:00.000Z');
+}
+
+function purgeDay(): Date {
+  return new Date(now().getTime() + 30 * DAY_MS);
+}
+
+function before(days: number): Date {
+  return new Date(purgeDay().getTime() - days * DAY_MS);
+}
 
 async function closed(id: 't-1' | 't-2', by: 'member' | 'platform' = id === 't-1' ? 'member' : 'platform') {
-  const host = lifecycleHost();
-  const tenant = host.tenant();
-  await tenant.lifecycle!.close({
-    tenant: { ...host.tenantOf(id)! },
+  const made = lifecycleHost();
+  const flow = made.tenant().lifecycle!;
+  await flow.close({
+    tenant: { ...made.tenantOf(id)! },
     by,
     reason: 'Moving',
-    typedName: host.tenantOf(id)?.name,
+    typedName: made.tenantOf(id)?.name,
     actorUserId: 'u-1',
     request: request(),
-    now: NOW,
+    now: now(),
   });
-  host.log.length = 0;
-  host.notices.length = 0;
-  return { host, lifecycle: tenant.lifecycle! };
+  made.log.length = 0;
+  made.notices.length = 0;
+  return { host: made, lifecycle: flow };
 }
 
 describe('reopen', () => {
@@ -40,11 +49,13 @@ describe('reopen', () => {
       act: 'closeReopened',
       tenantId: 't-2',
       by: 'platform',
-      purgeAt: PURGE,
+      purgeAt: purgeDay(),
       restored: 'ON_HOLD',
     });
     expect(host.notices.map((notice) => notice.type)).toEqual(['clinic.reopened']);
     expect(host.notices[0]?.payload.restored).toBe('ON_HOLD');
+    // The older table loses only that same close (a re-close it recorded since stays).
+    expect(host.mirrorDeletes).toEqual([{ tenantId: 't-2', requestedAt: now() }]);
   });
 
   it('restores active when no prior status was recorded (a row copied from before the column)', async () => {
@@ -55,7 +66,7 @@ describe('reopen', () => {
 
   it('refuses a purged tenant and one that is not closing', async () => {
     const { host, lifecycle } = await closed('t-1');
-    host.closingOf('t-1')!.purgedAt = PURGE;
+    host.closingOf('t-1')!.purgedAt = purgeDay();
     (host.tenantOf('t-1') as { status: string }).status = 'SHUT';
     await expect(lifecycle.reopen({ tenant: host.tenantOf('t-1') as never, by: 'member' })).rejects.toMatchObject({
       kind: 'purged',
@@ -94,7 +105,7 @@ describe('the sweep', () => {
       typedName: 'Clínica Norte',
       actorUserId: 'u-1',
       request: request(),
-      now: NOW,
+      now: now(),
     });
     expect((await lifecycle.sweep(before(20))).afterCloseRetried).toBe(0);
     expect((await lifecycle.sweep(before(20))).afterCloseRetried).toBe(1);
@@ -110,7 +121,7 @@ describe('the sweep', () => {
   ] as const)('stamps the purge on %s', async (outcome, counted, stamped) => {
     const { host, lifecycle } = await closed('t-1');
     host.knobs.purge = outcome;
-    const after = new Date(PURGE.getTime() + 60_000);
+    const after = new Date(purgeDay().getTime() + 60_000);
     expect((await lifecycle.sweep(after)).purged).toBe(counted);
     expect(host.closingOf('t-1')?.purgedAt).toEqual(stamped ? after : null);
     expect(host.knobs.purgeCalls).toBe(1);
@@ -121,7 +132,7 @@ describe('the sweep', () => {
   it('drops a stale row of a tenant that is no longer closing, with its mirror, and purges nothing', async () => {
     const { host, lifecycle } = await closed('t-1');
     (host.tenantOf('t-1') as { status: string }).status = 'OPEN';
-    expect(await lifecycle.sweep(new Date(PURGE.getTime() + 1))).toEqual({
+    expect(await lifecycle.sweep(new Date(purgeDay().getTime() + 1))).toEqual({
       reminded: { week: 0, day: 0 },
       purged: 0,
       afterCloseRetried: 0,
@@ -129,12 +140,13 @@ describe('the sweep', () => {
     expect(host.knobs.purgeCalls).toBe(0);
     expect(host.state.closings).toEqual([]);
     expect(host.state.mirror).toEqual({});
+    expect(host.mirrorDeletes).toEqual([{ tenantId: 't-1', requestedAt: now() }]);
   });
 
   it('keeps a stale row whose close was replaced since the read (the delete is conditional on requestedAt)', async () => {
     const { host } = await closed('t-1');
     (host.tenantOf('t-1') as { status: string }).status = 'OPEN';
-    const replaced = new Date(NOW.getTime() + 1000);
+    const replaced = new Date(now().getTime() + 1000);
     const broken = host.build({
       onError: () => undefined,
       blockers: {
@@ -149,7 +161,7 @@ describe('the sweep', () => {
       if (id === 't-1') host.closingOf('t-1')!.requestedAt = replaced;
       return found;
     };
-    await broken.lifecycle!.sweep(new Date(PURGE.getTime() + 1));
+    await broken.lifecycle!.sweep(new Date(purgeDay().getTime() + 1));
     host.config.port.byId = realById;
     expect(host.closingOf('t-1')?.requestedAt).toEqual(replaced);
   });
@@ -161,7 +173,7 @@ describe('the sweep', () => {
       host.state.tenants.push({ id, slug: id, status: 'OPEN', name: id });
       host.state.closings.push({ ...host.closingOf('t-1')!, tenantId: id, purgeAt: new Date(index) });
     }
-    const result = await lifecycle.sweep(new Date(PURGE.getTime() + 1));
+    const result = await lifecycle.sweep(new Date(purgeDay().getTime() + 1));
     expect(result.purged).toBe(1);
     expect(host.state.closings.map((row) => row.tenantId)).toEqual(['t-1']);
     expect(host.closingOf('t-1')?.purgedAt).not.toBeNull();
@@ -178,7 +190,7 @@ describe('the sweep', () => {
         return 'purged';
       },
     });
-    expect((await broken.lifecycle!.sweep(new Date(PURGE.getTime() + 1))).purged).toBe(1);
+    expect((await broken.lifecycle!.sweep(new Date(purgeDay().getTime() + 1))).purged).toBe(1);
     expect(host.knobs.purgeCalls).toBe(0);
     expect(host.errors).toEqual([]);
     const wide = host.build({
@@ -187,7 +199,7 @@ describe('the sweep', () => {
         return 'purged';
       },
     });
-    await wide.lifecycle!.sweep(new Date(PURGE.getTime() + 1));
+    await wide.lifecycle!.sweep(new Date(purgeDay().getTime() + 1));
     expect(host.errors.map((entry) => `${entry.act}:${entry.tenantId}`)).toEqual(['sweep:t-1']);
   });
 
@@ -225,7 +237,7 @@ describe('createNoticeWords', () => {
         },
       },
     });
-    const payload = { tenantId: 't-1', name: 'North', slug: 'north', purgeAt: PURGE.toISOString(), by: 'platform' as const, reason: 'Audit' };
+    const payload = { tenantId: 't-1', name: 'North', slug: 'north', purgeAt: purgeDay().toISOString(), by: 'platform' as const, reason: 'Audit' };
     expect(words('clinic.closing_scheduled', payload, { locale: 'en-GB', timeZone: 'UTC' })).toEqual({
       title: 't:North',
       body: 'b:North:26/12/2026:Audit',
@@ -236,7 +248,7 @@ describe('createNoticeWords', () => {
   it('words a platform close with no reason through its own sentence, never "Motivo: ."', () => {
     const host = lifecycleHost();
     const words = host.tenant().lifecycle!.noticeWords;
-    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: PURGE.toISOString(), by: 'platform' as const, reason: null };
+    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: purgeDay().toISOString(), by: 'platform' as const, reason: null };
     expect(words('clinic.closing_scheduled', payload, { locale: 'pt-BR', timeZone: 'UTC' }).body).toBe(
       'pt-BR: platform body, no reason(Sul, 26/12/2026).',
     );
@@ -248,7 +260,7 @@ describe('createNoticeWords', () => {
   it('words a reopen that restored a status other than active through the restored sentences', () => {
     const host = lifecycleHost();
     const words = host.tenant().lifecycle!.noticeWords;
-    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: PURGE.toISOString(), by: null, reason: null };
+    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: purgeDay().toISOString(), by: null, reason: null };
     expect(words('clinic.reopened', { ...payload, restored: 'ON_HOLD' }, { locale: 'pt-BR', timeZone: 'UTC' })).toEqual({
       title: 'pt-BR: restored title(Sul).',
       body: 'pt-BR: restored body(Sul).',
@@ -272,7 +284,7 @@ describe('createNoticeWords', () => {
 
 describe('the pure readings', () => {
   it('counts the grace period in milliseconds', () => {
-    expect(purgeAtFor(NOW, 30).getTime() - NOW.getTime()).toBe(30 * DAY_MS);
+    expect(purgeAtFor(now(), 30).getTime() - now().getTime()).toBe(30 * DAY_MS);
   });
 
   it('compares names in the configured locale', () => {
@@ -282,8 +294,8 @@ describe('the pure readings', () => {
 
   it('sends the day alone when the week was missed, and nothing once due', () => {
     const days = { week: 7, day: 1 };
-    expect(reminderDue(PURGE, { week: false, day: false }, before(0.5), days)).toBe('day');
-    expect(reminderDue(PURGE, { week: false, day: true }, before(3), days)).toBeNull();
-    expect(reminderDue(PURGE, { week: false, day: false }, PURGE, days)).toBeNull();
+    expect(reminderDue(purgeDay(), { week: false, day: false }, before(0.5), days)).toBe('day');
+    expect(reminderDue(purgeDay(), { week: false, day: true }, before(3), days)).toBeNull();
+    expect(reminderDue(purgeDay(), { week: false, day: false }, purgeDay(), days)).toBeNull();
   });
 });

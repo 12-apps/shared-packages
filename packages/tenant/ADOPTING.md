@@ -347,7 +347,10 @@ const tenant = createApiTenant({
 #### Moving an older closing table (expand and contract)
 
 Pass `mirror: { replaced, event, deleted }`: each runs on the package's own
-transaction, so the two tables never disagree. Write each stamp where it is
+transaction, so the two tables never disagree. `deleted(tx, tenantId, requestedAt?)`
+hands you the deleted row's `requestedAt`: delete your old row only while it
+is that same close, so a re-close your previous release wrote meanwhile
+survives (absent when the package read no row: delete by tenant). Write each stamp where it is
 still null, as the package does. Rows your PREVIOUS release wrote only into
 the old table (during a rolling deploy) are not in `tenant_closings`: before
 each sweep, catch them up with one upsert (`INSERT … SELECT … ON CONFLICT

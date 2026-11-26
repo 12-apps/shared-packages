@@ -99,8 +99,14 @@ export interface TenantClosingMirror<Tx> {
   replaced(tx: Tx, row: TenantClosingCreate): Promise<void>;
   /** A stamp landed; write it where still null, as the package did. */
   event(tx: Tx, tenantId: string, event: TenantClosingEvent): Promise<void>;
-  /** A reopen deleted the tenant's row. */
-  deleted(tx: Tx, tenantId: string): Promise<void>;
+  /**
+   * A reopen, or the sweep's stale-row drop, deleted the tenant's row.
+   * `requestedAt` is the deleted row's own: delete the older table's row only
+   * while it is that same close (a re-close the older release wrote since
+   * stays). Absent when the package read no row (a reopen of a close only the
+   * older table holds): delete by tenant.
+   */
+  deleted(tx: Tx, tenantId: string, requestedAt?: Date): Promise<void>;
 }
 
 /** The facts of an audited act. The host writes its own `after` shape from them. */

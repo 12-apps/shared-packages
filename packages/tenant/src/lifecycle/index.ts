@@ -65,8 +65,8 @@ function scheduledWords(copy: TenantCopyPack, extra: TenantLifecycleCopyPack, na
  * registry renders them apart from the lifecycle wiring (no hooks needed):
  * the tenant's copy packs plus the lifecycle's copy extension, validated
  * here as `createTenantLifecycle` validates it (every key, every locale of
- * the base copy). A locale with no extension reads the default locale's,
- * never the member's sentence in its place.
+ * the base copy), so every locale the reader may resolve to has its own
+ * extension, and a platform close never falls back to the member's sentence.
  */
 export function createNoticeWords(
   tenant: Pick<LifecycleTenant<string, unknown>, 'config' | 'copyFor'>,
@@ -76,8 +76,8 @@ export function createNoticeWords(
   const { statuses } = tenant.config;
   const { locales, defaultLocale } = tenant.config.copy;
   validateLifecycleCopy((config as { copy?: unknown }).copy, Object.keys(locales));
-  const extraFor = (tag: string): TenantLifecycleCopyPack =>
-    (config.copy.locales[tag] ?? config.copy.locales[defaultLocale]) as TenantLifecycleCopyPack;
+  // Validated above for every base locale, and `tag` is always one of them.
+  const extraFor = (tag: string): TenantLifecycleCopyPack => config.copy.locales[tag] as TenantLifecycleCopyPack;
   const writers = new Map<string, Writer>([
     [notifications.closingScheduled, scheduledWords],
     [notifications.closingWeek, (copy, _extra, name, day) => ({ title: copy.noticeWeekTitle(name), body: copy.noticeWeekBody(name, day) })],
