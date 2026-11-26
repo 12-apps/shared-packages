@@ -3,13 +3,20 @@
  * the host's two widgets. The card provides it; a part rendered outside the
  * card (the records, standalone) takes its copy as a prop instead.
  */
-import { createContext, useContext, type ComponentType, type ReactNode } from 'react';
+import { createContext, useContext, type JSXElementConstructor, type ReactNode } from 'react';
 
 import { useTheme } from '@12-apps/ui/mui/styles';
 import useMediaQuery from '@12-apps/ui/mui/useMediaQuery';
 
-import type { DnsRecordSpec } from '../dns-names';
 import type { TenantDomainsCopy } from './copy';
+
+/** One record as the host's wire sends it (the type as a plain string). */
+export interface TenantDomainItemRecord {
+  type: string;
+  name: string;
+  fqdn: string;
+  values: string[];
+}
 
 /** A domain as the screen reads it: the host's wire view (dates as ISO strings). */
 export interface TenantDomainItem {
@@ -23,7 +30,7 @@ export interface TenantDomainItem {
   status: string;
   /** The FQDN the verification TXT record is published at. */
   recordName: string;
-  dnsRecords: { verification: DnsRecordSpec; pointing: DnsRecordSpec[] };
+  dnsRecords: { verification: TenantDomainItemRecord; pointing: TenantDomainItemRecord[] };
   /** `null` is unknown and is never told as a problem; only `false` is. */
   dnsPointsHere: boolean | null;
   /** The tenant's main domain: the platform address redirects to its principal name. */
@@ -35,8 +42,12 @@ export interface TenantDomainItem {
   createdAt: string;
 }
 
-/** The host's confirm-gated button (its own words for the popup's chrome). */
-export type TenantDomainsConfirmButton = ComponentType<{
+/**
+ * The host's confirm-gated button (its own words for the popup's chrome). A
+ * constructor of these props, so a host's wider button (more variants, more
+ * props) fits.
+ */
+export type TenantDomainsConfirmButton = JSXElementConstructor<{
   variant: 'outline';
   color: 'primary';
   size: 'sm';
@@ -48,7 +59,7 @@ export type TenantDomainsConfirmButton = ComponentType<{
 }>;
 
 /** The host's one-line choice of equal parts. */
-export type TenantDomainsSegmented = ComponentType<{
+export type TenantDomainsSegmented = JSXElementConstructor<{
   label: string;
   value: 'root' | 'www';
   options: readonly { value: 'root' | 'www'; label: string }[];

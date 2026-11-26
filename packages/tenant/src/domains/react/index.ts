@@ -17,6 +17,7 @@ export {
 } from './card';
 export {
   type TenantDomainItem,
+  type TenantDomainItemRecord,
   type TenantDomainsComponents,
   type TenantDomainsConfirmButton,
   type TenantDomainsSegmented,
