@@ -34,6 +34,7 @@ error at mount, never a default that quietly adopts another host's policy.
 | `reconcileBatchSize` | `number` | Stored deliveries one reconciliation pass re-runs (origin: 50). |
 | `maxInboxAttempts` | `number` | Re-runs before a stored delivery is retired (origin: 5). |
 | `catalogue` | OPTIONAL. `{ items(clientId, productIds) => Promise<Map<string, CatalogueItem>>; image(url) => Promise<{ contentType; base64 } \| null> }` | Catalogue publishing (1.2, FUT-4768). `items` maps the host's products into `{ name, description, imageUrl, categoryName, priceCents }` (the store's price, smallest unit; the photo an absolute https URL that CHANGES when the photo changes, such as a content hash or upload id in it: a marketplace's uploaded copy is reused while the URL is the same), keyed by product id; a missing id is a product that no longer exists. Called at publish (to check it exists) and by the job when it sends, so what goes out is the product as it is then. `image` reads a photo's bytes for a marketplace that takes an upload (iFood); null publishes without a photo. Absent: every catalogue call answers `UNSUPPORTED`. |
+| `appCredentials` | OPTIONAL. `(provider, environment) => { clientId; clientSecret; webhookSecret } \| null` (sync or async) | The software's OWN app on each marketplace, for linking a store without its own credentials (FUT-5613, section 9). Absent or null: linking is unavailable there and the per-store credentials work as before. |
 | `cancellationWindowMs` | OPTIONAL. `number` | For a host that requests first (binds `onCancellationConfirmed`): how long a store's cancellation request may wait (PENDING: not yet delivered, or REQUESTED: delivered and unanswered) before the outbound sweep fails it as TIMEOUT, for every adapter; a PENDING request's retries stop with it. A 1.0.0 host has no window: its requests are re-queued and given up after 24 hours, as before. Absent: each adapter's `capabilities.cancellationAnswerWindowMs` (iFood: 5 minutes, estimated); an adapter with none is given up on only after 24 hours. |
 
 Plus `adapters: readonly MarketplaceAdapter[]` — one per marketplace the host
@@ -240,6 +241,15 @@ not composed the model still compiles, and the two paths then do nothing.
 switches over either exhaustively adds the case; allow `"status"` in any
 action allow-list in front of the outbound job.
 
+`20261127090000_marketplace_app_link` (FUT-5613) adds
+`marketplace_integrations.auth_mode` (NOT NULL DEFAULT 'CREDENTIALS', CHECKed
+CREDENTIALS | LINKED: every existing connection stays the store's own app) and
+`marketplace_link_attempts`, one linking in progress per (store, marketplace)
+with its sealed verifier, environment CHECKed and provider shape-checked.
+Additive. Compose it with the schema in the same change as the engine bump:
+the engine selects `auth_mode`. `MarketplaceDb.marketplaceLinkAttempt` is
+optional in the type; without it linking reports itself unavailable.
+
 ## 6. What stays the host's
 
 The stock draw at the acceptance, the settlement effects, the board's and the
@@ -318,3 +328,29 @@ key, every existing link stays the item alone. The engine selects the column,
 so a Prisma client generated before the migration throws on the unknown
 `variationId`: on the bump, sync the partial, run `prisma generate` and apply
 the migration together.
+
+## 9. Linking a store through the software's own app
+
+The flow and its routes are in the README ("Linking a store through the
+software's own app"). What the host binds and decides:
+
+- **`appCredentials`** (OPTIONAL port): `(provider, environment) =>
+  { clientId, clientSecret, webhookSecret } | null`, sync or async, read at
+  each use (a rotation reaches every linked store at once). Answer it from the
+  host's secret store; never from a store's row. Null or unbound: the screen
+  shows the per-store form, as before.
+- **The app's webhook**: register `…/webhooks/marketplace/IFOOD` (under the
+  host's mount) as the app's one webhook address on iFood's developer portal,
+  iFood signs it with the app's client secret, so `webhookSecret` may be left
+  null; pass it only to verify with another key.
+- **The screen** is the host's: `GET …/link` says whether to offer it and
+  restores a code in progress after a reload; `start`, `finish` and, when the
+  grant covers several iFood stores, `merchants` and `merchant`. Each refusal
+  answers a `code` (`UNAVAILABLE`, `NO_LINK_IN_PROGRESS`, `LINK_EXPIRED`,
+  `CODE_REFUSED`, `MARKETPLACE_REFUSED`, `NOT_LINKED`, `UNKNOWN_MERCHANT`,
+  `MERCHANT_TAKEN`; 503 `MARKETPLACE_UNREACHABLE`) and the pack's sentence
+  (`copy.link`, optional in the type, carried by both shipped packs).
+- **Disconnect** is the existing archive (`PUT …/marketplace`, operation
+  `archive`): the row is kept; linking again unarchives it with its audit line.
+- **A view** gains `authMode`; a host that switches on it treats an absent
+  value as `CREDENTIALS`.

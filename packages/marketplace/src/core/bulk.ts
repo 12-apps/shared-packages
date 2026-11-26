@@ -4,6 +4,7 @@ import {
   type MarketplaceIntegrationView,
   type SaveMarketplaceIntegrationInput,
 } from "./integration";
+import { MarketplaceMerchantTakenError, isUniqueViolation, merchantHeldElsewhere } from "./merchant-claim";
 import { upsertLink, type MarketplaceMenuLinkView } from "./menu-links";
 import type { EngineContext, MarketplaceAuditEntry, MarketplaceDb } from "./ports";
 
@@ -24,7 +25,9 @@ export type BulkProblemCode =
   | "UNKNOWN_PROVIDER"
   | "NOTHING_TO_UPDATE"
   | "NOT_FOUND"
-  | "CATALOG_ITEM_NOT_FOUND";
+  | "CATALOG_ITEM_NOT_FOUND"
+  /** Another store's live connection holds the merchant id this row sets, or revives (FUT-5613). */
+  | "MERCHANT_TAKEN";
 
 export interface BulkProblem {
   path: (string | number)[];
@@ -87,6 +90,29 @@ function integrationRowProblems(
   return changes ? [] : [{ path: ["integrations", index], code: "NOTHING_TO_UPDATE" }];
 }
 
+/**
+ * The rows that would give a merchant id another store's live connection
+ * holds: an upsert setting it (refused at the merchant field), or an
+ * unarchive reviving it (refused at the provider).
+ */
+async function merchantProblems(
+  ctx: EngineContext,
+  clientId: string,
+  rows: readonly IntegrationRowInput[],
+  merchantOf: ReadonlyMap<string, string | null>,
+): Promise<BulkProblem[]> {
+  const db = await ctx.ports.db();
+  const problems: BulkProblem[] = [];
+  for (const [index, row] of rows.entries()) {
+    const unarchive = row.operation === "unarchive";
+    const merchantId = unarchive ? merchantOf.get(row.provider) : "externalMerchantId" in row ? row.externalMerchantId : null;
+    if (row.operation === "archive" || !merchantId) continue;
+    if (!(await merchantHeldElsewhere(db, clientId, row.provider, merchantId))) continue;
+    problems.push({ path: ["integrations", index, unarchive ? "provider" : "externalMerchantId"], code: "MERCHANT_TAKEN" });
+  }
+  return problems;
+}
+
 /** Thrown inside the transaction to roll a `validateOnly` call back. */
 class ValidateOnly extends Error {
   constructor() {
@@ -136,14 +162,15 @@ export async function upsertIntegrations(
   ctx: EngineContext,
   input: { clientId: string; actorId: string | null; rows: readonly IntegrationRowInput[]; validateOnly?: boolean },
 ): Promise<BulkResult<MarketplaceIntegrationView>> {
-  const existing = new Set(
-    (await listMarketplaceIntegrations(ctx, input.clientId, { includeArchived: true })).map((row) => row.provider),
-  );
+  const stored = await listMarketplaceIntegrations(ctx, input.clientId, { includeArchived: true });
+  const existing = new Set(stored.map((row) => row.provider));
+  const merchantOf = new Map(stored.map((row) => [row.provider as string, row.externalMerchantId]));
   const problems = [
     ...duplicates(input.rows, (row) => row.provider, "integrations", "provider"),
     ...unknownProviders(ctx, input.rows, "integrations"),
     ...input.rows.flatMap((row, index) => integrationRowProblems(row, index, existing)),
   ];
+  if (problems.length === 0) problems.push(...(await merchantProblems(ctx, input.clientId, input.rows, merchantOf)));
   if (problems.length > 0) return { kind: "refused", problems };
 
   const validateOnly = input.validateOnly === true;
@@ -151,10 +178,18 @@ export async function upsertIntegrations(
   // The audit lines are written INSIDE the archive's transaction, through its
   // client: an archive never lands without its line, and an audit that fails
   // rolls the archive back. A `validateOnly` call rolls both back.
-  await inTransaction(ctx, validateOnly, async (db) => {
-    for (const row of input.rows) await writeIntegration(ctx, db, input.clientId, row, now);
-    await auditArchives(ctx, db, input, now);
-  });
+  try {
+    await inTransaction(ctx, validateOnly, async (db) => {
+      for (const row of input.rows) await writeIntegration(ctx, db, input.clientId, row, now);
+      await auditArchives(ctx, db, input, now);
+    });
+  } catch (error) {
+    // A race lost to another store's write of the same merchant, seen by the save's own check or the unique index.
+    const raced = error instanceof MarketplaceMerchantTakenError || isUniqueViolation(error);
+    const lost = raced ? await merchantProblems(ctx, input.clientId, input.rows, merchantOf) : [];
+    if (lost.length === 0) throw error;
+    return { kind: "refused", problems: lost };
+  }
   const providers = input.rows.map((row) => row.provider);
   const rows = validateOnly
     ? []

@@ -15,7 +15,8 @@ import {
   upsertMarketplaceIntegrationsBody,
   upsertMarketplaceMenuLinksBody,
 } from "./mcp";
-import { webhookRoute } from "./webhook";
+import { linkRoutes } from "./link-routes";
+import { appWebhookRoute, webhookRoute } from "./webhook";
 
 /**
  * The marketplace HTTP surface as framework-neutral wiring descriptors: the
@@ -60,7 +61,7 @@ function problemsOut(copy: MarketplaceServerCopy, problems: readonly (BulkProble
     const host = "host" in problem ? problem.host : undefined;
     return {
       ...problem,
-      message: host?.message ?? copy.problems[problem.code],
+      message: host?.message ?? (problem.code === "MERCHANT_TAKEN" ? (copy.link?.problems.MERCHANT_TAKEN ?? problem.code) : copy.problems[problem.code]),
       ...(host ? { hostCode: host.code, details: host.details } : {}),
     };
   });
@@ -208,7 +209,9 @@ function acceptanceRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceAc
 export function marketplaceRoutes(config: MarketplaceApiConfig): MarketplaceRoute[] {
   return [
     webhookRoute(config),
+    appWebhookRoute(config),
     ...integrationRoutes(config),
+    ...linkRoutes(config),
     ...menuLinkRoutes(config),
     ...acceptanceRoutes(config),
   ];

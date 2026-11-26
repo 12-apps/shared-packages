@@ -1,5 +1,5 @@
 import { createMarketplaceEngine } from "../core/engine";
-import type { MarketplaceAdapter, MarketplaceHttpRequest, MarketplaceHttpResponse, StatusStep } from "../core/adapter";
+import type { MarketplaceAdapter, StatusStep } from "../core/adapter";
 import type { OutboundJobPayload } from "../core/outbound-queue";
 import type {
   MarketplaceDb,
@@ -13,10 +13,14 @@ import type {
   MarketplaceLifecycleFacts,
   ResolvedOrderLine,
 } from "../core/ports";
+import type { MarketplaceAppCredentialsPort } from "../core/linking-port";
 import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
 import { createMemoryDb } from "./memory-db";
+import { scriptedHttp } from "./scripted-http";
+
+export { scriptedHttp };
 
 /* eslint-disable test-flakiness/no-database-operations --
    The seed helpers below write rows into the harness's OWN in-memory fake
@@ -32,27 +36,12 @@ import { createMemoryDb } from "./memory-db";
 const NOW = new Date("2026-11-11T12:00:00.000Z");
 export const TENANT = "tenant-1";
 
-/** Reversible "sealing", so a test can read what was stored. */
+/** Reversible "sealing", so a test can read what was stored (`open` it back). */
 const seal = (plaintext: string): string => `sealed:${Buffer.from(plaintext).toString("base64")}`;
 const open = (sealed: string): string => {
   if (!sealed.startsWith("sealed:")) throw new Error("does not open");
   return Buffer.from(sealed.slice("sealed:".length), "base64").toString();
 };
-
-/** Answer each request with the next scripted response (the last one repeats). */
-export function scriptedHttp(
-  responses: MarketplaceHttpResponse[] | ((req: MarketplaceHttpRequest) => MarketplaceHttpResponse | Promise<MarketplaceHttpResponse>),
-) {
-  const requests: MarketplaceHttpRequest[] = [];
-  const http = async (request: MarketplaceHttpRequest): Promise<MarketplaceHttpResponse> => {
-    requests.push(request);
-    if (typeof responses === "function") return responses(request);
-    const response = responses[Math.min(requests.length - 1, responses.length - 1)];
-    if (!response) throw new Error("no scripted response");
-    return response;
-  };
-  return { http, requests };
-}
 
 interface HarnessOptions {
   adapters?: readonly MarketplaceAdapter[];
@@ -88,6 +77,7 @@ interface HarnessOptions {
   lifecycle?: readonly (MarketplaceLifecycleAnswer | Error)[];
   /** Whether the host says an order still holds a step; absent, `statusHolds` is not bound. */
   statusHolds?: (step: StatusStep) => boolean | Promise<boolean>;
+  appCredentials?: MarketplaceAppCredentialsPort; // The software's own app (FUT-5613); absent, no linking.
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -215,6 +205,7 @@ export function createHarness(options: HarnessOptions = {}) {
     maxInboxAttempts: 5,
     ...(options.cancellationWindowMs === undefined ? {} : { cancellationWindowMs: options.cancellationWindowMs }),
     ...(options.catalogue ? { catalogue: options.catalogue } : {}),
+    ...(options.appCredentials ? { appCredentials: options.appCredentials } : {}),
     adapters: options.adapters ?? [createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US })],
   });
 

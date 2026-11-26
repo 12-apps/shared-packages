@@ -30,6 +30,7 @@ const TABLES = {
   marketplaceCatalogueCategory: "marketplace_catalogue_categories",
   marketplaceStorePause: "marketplace_store_pauses",
   marketplaceStatusUpdate: "marketplace_status_updates",
+  marketplaceLinkAttempt: "marketplace_link_attempts",
 } as const;
 
 const COMPOUND_KEYS: Record<string, readonly string[]> = {
@@ -160,7 +161,7 @@ function delegate(conn: () => Queryable, table: string, hasUpdatedAt: boolean) {
   };
 }
 
-/** The eight delegates over a connection, plus the transaction port. */
+/** The delegates over a connection, plus the transaction port. */
 export function pgliteDb(pg: PGlite) {
   let current: Queryable = pg;
   const conn = () => current;
@@ -173,6 +174,7 @@ export function pgliteDb(pg: PGlite) {
     marketplaceCatalogueCategory: delegate(conn, TABLES.marketplaceCatalogueCategory, true),
     marketplaceStorePause: delegate(conn, TABLES.marketplaceStorePause, true),
     marketplaceStatusUpdate: delegate(conn, TABLES.marketplaceStatusUpdate, true),
+    marketplaceLinkAttempt: delegate(conn, TABLES.marketplaceLinkAttempt, true),
   } as unknown as MarketplaceDb;
   async function transaction<T>(fn: (tx: MarketplaceDb) => Promise<T>): Promise<T> {
     return pg.transaction(async (tx) => {

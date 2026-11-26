@@ -52,12 +52,23 @@ import { ingestMarketplaceOrder, type IngestResult, type IngestSettings } from "
 import {
   listMarketplaceIntegrations,
   resolveIngestionTarget,
-  resolveTenantByMerchant,
   saveMarketplaceIntegration,
   type IngestionTarget,
   type MarketplaceIntegrationView,
   type SaveMarketplaceIntegrationInput,
 } from "./integration";
+import {
+  finishLink,
+  linkState,
+  linkedMerchants,
+  selectLinkedMerchant,
+  startLink,
+  type LinkFailure,
+  type LinkFinished,
+  type LinkPendingView,
+} from "./linking";
+import type { LinkedMerchant } from "./linking-port";
+import { guardMerchantClaim, resolveTenantByMerchant } from "./merchant-claim";
 import { listMarketplaceMenuLinks, type MarketplaceMenuLinkView } from "./menu-links";
 import { runOutbound, type OutboundAttempt, type OutboundOutcome } from "./outbound";
 import { informStatus, type InformStatusInput } from "./status-inform";
@@ -131,7 +142,7 @@ export interface MarketplaceEngine {
     clientId: string,
     options?: { providers?: readonly string[]; includeArchived?: boolean },
   ): Promise<MarketplaceIntegrationView[]>;
-  /** Create or patch ONE connection (the bulk call's single-row form, with no audit). */
+  /** Create or patch ONE connection (the bulk call's single-row form, with no audit). Throws MarketplaceMerchantTakenError. */
   saveIntegration(input: SaveMarketplaceIntegrationInput): Promise<MarketplaceIntegrationView>;
   /** Create, patch, archive or unarchive many connections, all-or-nothing. */
   upsertIntegrations(input: {
@@ -140,6 +151,43 @@ export interface MarketplaceEngine {
     rows: readonly IntegrationRowInput[];
     validateOnly?: boolean;
   }): Promise<BulkResult<MarketplaceIntegrationView>>;
+
+  /**
+   * Whether this store can link this marketplace through the software's own
+   * app (FUT-5613), and the linking it left in progress. `available` is false
+   * when the adapter links nothing, the host configured no app for it, or the
+   * link table is not composed: the store's own credentials still work.
+   */
+  linkState(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+    environment?: "SANDBOX" | "PRODUCTION";
+  }): Promise<{ available: boolean; pending: LinkPendingView | null }>;
+  /** Ask for the portal code; the verifier stays sealed server-side. Replaces an earlier attempt. */
+  startLink(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+    environment?: "SANDBOX" | "PRODUCTION";
+  }): Promise<{ kind: "started"; pending: LinkPendingView } | LinkFailure>;
+  /** Exchange the pasted authorization code for the store's tokens; select the merchant when only one. */
+  finishLink(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+    authorizationCode: string;
+    actorId: string | null;
+    enabled?: boolean;
+  }): Promise<LinkFinished | LinkFailure>;
+  /** The merchants a linked connection's grant covers. */
+  linkedMerchants(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+  }): Promise<{ kind: "listed"; merchants: LinkedMerchant[] } | LinkFailure>;
+  /** Choose the marketplace store of a linked connection whose grant covers several. */
+  selectLinkedMerchant(input: {
+    clientId: string;
+    provider: MarketplaceProvider;
+    merchantId: string;
+  }): Promise<{ kind: "selected"; integration: MarketplaceIntegrationView } | LinkFailure>;
 
   /** The SKU map. `unmappedOnly` is the store's attention list; `ids` narrows. */
   menuLinks(input: {
@@ -295,8 +343,16 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     deliver: (input) => processDelivery(ctx, input),
 
     integrations: (clientId, options) => listMarketplaceIntegrations(ctx, clientId, options),
-    saveIntegration: async (input) => saveMarketplaceIntegration(ctx, input, await ports.db()),
+    saveIntegration: (input) =>
+      guardMerchantClaim(ctx, { ...input, merchantId: input.externalMerchantId }, async () =>
+        saveMarketplaceIntegration(ctx, input, await ports.db()),
+      ),
     upsertIntegrations: (input) => upsertIntegrations(ctx, input),
+    linkState: (input) => linkState(ctx, input),
+    startLink: (input) => startLink(ctx, input),
+    finishLink: (input) => finishLink(ctx, input),
+    linkedMerchants: (input) => linkedMerchants(ctx, input),
+    selectLinkedMerchant: (input) => selectLinkedMerchant(ctx, input),
 
     menuLinks: (input) => listMarketplaceMenuLinks(ctx, input),
     upsertMenuLinks: (input) => upsertMenuLinks(ctx, input),

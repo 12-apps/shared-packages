@@ -1,5 +1,6 @@
 import type { MarketplaceCatalogue } from "./catalogue-port";
 import type { CatalogueReader } from "./catalogue-read-port";
+import type { MarketplaceLinking } from "./linking-port";
 import type { MarketplaceAvailability } from "./pause-port";
 import type {
   MarketplaceDeliveredBy,
@@ -132,14 +133,29 @@ export interface OutboundOrderRef {
 /** A per-engine token cache an adapter reads and fills. Never persisted. */
 export type AdapterTokenCache = Map<string, { token: string; expiresAt: number }>;
 
+/**
+ * A connection LINKED through the software's own app (FUT-5613): the store's
+ * access token comes from its refresh token, not from a client-credentials
+ * grant. `key` is where the token sits in {@link AdapterTokenCache} (delete it
+ * to forget a token the marketplace refused); `accessToken` answers the cached
+ * one or refreshes, once per connection however many calls ask at once.
+ */
+export interface AdapterGrant {
+  key: string;
+  accessToken(): Promise<{ token: string } | OutboundResult>;
+}
+
 /** What one outbound call is handed. */
 export interface AdapterCallContext {
   http: MarketplaceHttp;
+  /** The store's own credentials, or, for a linked connection, the software's app. */
   credentials: MarketplaceCredentials;
   environment: "SANDBOX" | "PRODUCTION";
   /** Written to no row, log or audit entry: memory only, per process. */
   tokens: AdapterTokenCache;
   now: Date;
+  /** Present for a linked connection: the token comes from here, never from a client-credentials grant. */
+  grant?: AdapterGrant;
 }
 
 /** One outbound call's answer, in the three shapes the engine acts on. */
@@ -242,6 +258,11 @@ export interface MarketplaceAdapter {
    * API, and the host says so.
    */
   readonly availability?: MarketplaceAvailability;
+  /**
+   * OPTIONAL. Linking a store through the software's own app on this
+   * marketplace (FUT-5613). Absent: a store connects with its own credentials only.
+   */
+  readonly linking?: MarketplaceLinking;
   /** Where "open it on the marketplace" goes: the order when `perOrderAppLink`, else the portal. Always https. */
   appLink(order: Pick<OutboundOrderRef, "externalOrderId" | "externalDisplayId">): string;
 }

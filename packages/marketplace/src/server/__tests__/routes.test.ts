@@ -137,6 +137,11 @@ describe("the authenticated routes", () => {
     expect(table).toEqual([
       `GET ${BASE} -> marketplace:manage`,
       `PUT ${BASE} -> marketplace:manage`,
+      `GET ${BASE}/link -> marketplace:manage`,
+      `GET ${BASE}/link/merchants -> marketplace:manage`,
+      `POST ${BASE}/link/start -> marketplace:manage`,
+      `POST ${BASE}/link/finish -> marketplace:manage`,
+      `PUT ${BASE}/link/merchant -> marketplace:manage`,
       `GET ${BASE}/menu-links -> marketplace:manage`,
       `PUT ${BASE}/menu-links -> marketplace:manage`,
       `GET ${BASE}/acceptances -> marketplace:decide`,

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { WireMcpTool } from "@12-apps/wiring";
 
+import { marketplaceLinkTools } from "./mcp-link";
+
 /**
  * The marketplace tool surface — authored ONCE, beside the route descriptors
  * it proxies to, and reused as the runtime validators. The advertised schema
@@ -197,6 +199,7 @@ const integrationSchema = z.object({
   lastEventAt: z.string().nullable(),
   lastVerifiedAt: z.string().nullable(),
   archivedAt: z.string().nullable(),
+  authMode: z.enum(["CREDENTIALS", "LINKED"]),
   capabilities: capabilitiesSchema.nullable(),
   reasons: z.array(reasonSchema),
 });
@@ -236,7 +239,7 @@ const decidedSchema = z.object({
 
 const BASE = "/admin/{tenantSlug}/marketplace";
 
-/** The six marketplace tools: a read and a bulk write per entity. */
+/** The marketplace tools: a read and a bulk write per entity, and the five linking tools (FUT-5613). */
 export const MARKETPLACE_MCP_TOOLS = [
   {
     operationId: "listMarketplaceIntegrations",
@@ -255,7 +258,7 @@ export const MARKETPLACE_MCP_TOOLS = [
     method: "PUT",
     path: BASE,
     summary:
-      "Create, update, archive or unarchive one or many marketplace connections in one all-or-nothing call. A row is keyed by `provider`; `operation` is `upsert` (default: any subset of the settings; omitting `credentials` keeps the stored secrets, sending them resets the status to UNVERIFIED), `archive` or `unarchive` (reversible, audited, with an optional `reason`). Any problem writes nothing and every problem comes back with its path. `validateOnly: true` checks without writing.",
+      "Create, update, archive or unarchive one or many marketplace connections in one all-or-nothing call. A row is keyed by `provider`; `operation` is `upsert` (default: any subset of the settings; omitting `credentials` keeps the stored secrets, sending them resets the status to UNVERIFIED), `archive` or `unarchive` (reversible, audited, with an optional `reason`). An `externalMerchantId` another store's live connection holds is refused `MERCHANT_TAKEN` at that field (an unarchive reviving one, at `provider`). Any problem writes nothing and every problem comes back with its path. `validateOnly: true` checks without writing.",
     tags: ["marketplace"],
     params: marketplaceParams,
     body: upsertMarketplaceIntegrationsBody,
@@ -310,4 +313,5 @@ export const MARKETPLACE_MCP_TOOLS = [
     response: z.object({ data: z.object({ validateOnly: z.boolean(), decisions: z.array(decidedSchema) }) }),
     annotations: { readOnly: false, destructive: true, openWorld: true },
   },
+  ...marketplaceLinkTools(marketplaceParams, integrationSchema),
 ] as const satisfies readonly WireMcpTool<z.ZodType>[];

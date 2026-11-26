@@ -2,6 +2,7 @@ import type { AdapterRegistry } from "./registry";
 import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp, StatusStep } from "./adapter";
 import type { CatalogueImage, CatalogueItem } from "./catalogue-port";
 import type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
+import type { MarketplaceAppCredentialsPort, MarketplaceLinkAttemptDelegate } from "./linking-port";
 import type {
   CancellationFailureReason,
   MarketplaceAdmission,
@@ -110,6 +111,7 @@ export interface MarketplaceDb {
     create(args: unknown): Promise<unknown>;
     updateMany(args: unknown): Promise<{ count: number }>;
   };
+  marketplaceLinkAttempt?: MarketplaceLinkAttemptDelegate; // OPTIONAL, as above; absent: no linking (FUT-5613).
 }
 
 /** One decision as the host's admission sees it, BEFORE the claim commits. */
@@ -333,6 +335,7 @@ export interface MarketplacePorts {
    * catalogue. Absent: every catalogue call answers `UNSUPPORTED`.
    */
   catalogue?: MarketplaceCataloguePort;
+  appCredentials?: MarketplaceAppCredentialsPort; // OPTIONAL. The software's own app, to link a store (FUT-5613).
   /** The acceptance window a connection gets when it does not state its own. */
   defaultAckSlaSeconds: number;
   /** How many stored deliveries one reconciliation pass re-runs. */
