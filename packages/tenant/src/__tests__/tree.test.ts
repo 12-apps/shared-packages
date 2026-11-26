@@ -59,14 +59,12 @@ function memoryHost(nodes: TenantTreeNode[]) {
       const parent = move.parentId === null ? null : rows.get(move.parentId);
       if (!top || top.path !== move.fromPath) return 0;
       if (move.parentId !== null && parent?.path !== move.parentPath) return 0;
-      let written = 0;
-      for (const row of rows.values()) {
-        if (!row.path.startsWith(move.fromPath)) continue;
+      const moving = [...rows.values()].filter((row) => row.path.startsWith(move.fromPath));
+      for (const row of moving) {
         row.path = move.toPath + row.path.slice(move.fromPath.length);
         if (row.id === move.id) row.parentId = move.parentId;
-        written += 1;
       }
-      return written;
+      return moving.length;
     },
   };
   return { port, rows, calls, moves, txs };
@@ -81,7 +79,8 @@ function chainNodes(ids: readonly string[]): TenantTreeNode[] {
   }));
 }
 
-const DEEP = Array.from({ length: 12 }, (_, index) => `t${index}`);
+/** A fresh twelve-deep chain of ids, t0 -> … -> t11, for each test. */
+const deepIds = (): string[] => Array.from({ length: 12 }, (_, index) => `t${index}`);
 
 async function refusal(work: Promise<unknown>): Promise<TenantTreeError> {
   const error = await work.then(
@@ -142,7 +141,7 @@ describe('the reads, each ONE port call at any depth', () => {
   });
 
   it('reads the parent and the root of a tenant twelve levels deep with one call each', async () => {
-    const host = memoryHost(chainNodes(DEEP));
+    const host = memoryHost(chainNodes(deepIds()));
     const tree = createTenantTree(host.port);
     expect(await tree.parentOf('t11')).toBe('t10');
     expect(await tree.rootOf('t11')).toBe('t0');
@@ -150,16 +149,16 @@ describe('the reads, each ONE port call at any depth', () => {
   });
 
   it('reads every ancestor, nearest first, with one call', async () => {
-    const host = memoryHost([...chainNodes(DEEP), { id: 'other', parentId: null, path: '/other/' }]);
+    const host = memoryHost([...chainNodes(deepIds()), { id: 'other', parentId: null, path: '/other/' }]);
     const tree = createTenantTree(host.port);
     const ancestors = await tree.ancestorsOf('t11');
-    expect(ancestors.map((node) => node.id)).toEqual([...DEEP].slice(0, 11).reverse());
+    expect(ancestors.map((node) => node.id)).toEqual([...deepIds()].slice(0, 11).reverse());
     expect(host.calls).toEqual(['treeAncestors']);
   });
 
   it('reads every descendant, shallowest first, the tenant itself excluded, with one call', async () => {
     const host = memoryHost([
-      ...chainNodes(DEEP),
+      ...chainNodes(deepIds()),
       { id: 'side', parentId: 't2', path: '/t0/t1/t2/side/' },
       { id: 'other', parentId: null, path: '/other/' },
     ]);
@@ -200,7 +199,7 @@ describe('a tenant cannot become its own ancestor', () => {
   });
 
   it('refuses a move under any of its own descendants, at any depth, and writes nothing', async () => {
-    const host = memoryHost(chainNodes(DEEP));
+    const host = memoryHost(chainNodes(deepIds()));
     const tree = createTenantTree(host.port);
     for (const below of ['t1', 't5', 't11']) {
       expect((await refusal(tree.move('t0', below, TX))).code).toBe('cycle');
@@ -240,9 +239,9 @@ describe('a subtree move', () => {
   });
 
   it('moves a deep subtree down a deep chain', async () => {
-    const host = memoryHost([...chainNodes(DEEP), ...chainNodes(['x0', 'x1', 'x2'])]);
+    const host = memoryHost([...chainNodes(deepIds()), ...chainNodes(['x0', 'x1', 'x2'])]);
     expect(await createTenantTree(host.port).move('x1', 't11', TX)).toBe(2);
-    expect(host.rows.get('x2')?.path).toBe(`/${DEEP.join('/')}/x1/x2/`);
+    expect(host.rows.get('x2')?.path).toBe(`/${deepIds().join('/')}/x1/x2/`);
     expect(depthOf(host.rows.get('x2')?.path ?? '')).toBe(13);
   });
 
