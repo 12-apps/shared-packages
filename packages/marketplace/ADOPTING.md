@@ -14,8 +14,9 @@ error at mount, never a default that quietly adopts another host's policy.
 | `db` | `() => Promise<MarketplaceDb>` | The Prisma client generated from a schema that includes `prisma/marketplace.prisma`. Structural: the four delegates `marketplaceIntegration`, `marketplaceMenuLink`, `marketplaceInboxEvent`, `marketplaceAcceptance`, and the catalogue's `marketplaceCataloguePublication` (optional in the type; the catalogue calls need it). |
 | `transaction` | `<T>(fn: (db: MarketplaceDb) => Promise<T>) => Promise<T>` | Prisma's interactive `$transaction`: run `fn` with the transaction's client; a throw rolls back. Every bulk write and every decision (admission + claim) is one transaction. |
 | `order.admit` | `(request: { clientId; orderId; decision: "ACCEPT" \| "REJECT"; admission: MarketplaceAdmission; db: MarketplaceDb }) => Promise<{ admitted: true } \| { admitted: false; code: string; message: string; details?: unknown }>` | Judge each decision BEFORE its claim commits, inside the claim's transaction (`request.db` is the transaction's client: draw the stock there, and a refusal anywhere in the call rolls the draw back). `admission` is `{ admitStockPastZero?: boolean }` as the person stated it. Refuse with your own code: the route answers 409 with it (`MARKETPLACE_STOCK_ASK` and the short lines in `details`). Never called for an ingest or `recordStoreCancellation`. |
-| `order.create` | `(clientId, order: NormalizedMarketplaceOrder, lines: readonly ResolvedOrderLine[], db: MarketplaceDb) => Promise<string>` | Create the host's own order from a normalized one; return its id. `lines[i].subjectRef` is the mapped catalog id or null (never refuse the order for a null). `db` is the ingest's transaction client: write the order through it, so the order and the acceptance row commit together (a lost race rolls the host's order back instead of leaving an orphan a redelivery would duplicate). |
+| `order.create` | `(clientId, order: NormalizedMarketplaceOrder, lines: readonly ResolvedOrderLine[], db: MarketplaceDb) => Promise<string>` | Create the host's own order from a normalized one; return its id. `lines[i].subjectRef` is the mapped catalog id or null (never refuse the order for a null); `lines[i].variationRef` is the variation of it the SKU was mapped to, or null for the item alone. `db` is the ingest's transaction client: write the order through it, so the order and the acceptance row commit together (a lost race rolls the host's order back instead of leaving an orphan a redelivery would duplicate). |
 | `order.catalogHas` | `(clientId, subjectRef) => Promise<boolean>` | Does this catalog id exist and belong to this tenant? Asked before a SKU is mapped. |
+| `order.catalogHasVariation` (optional) | `(clientId, subjectRef, variationRef) => Promise<boolean>` | Is `variationRef` a variation of this tenant's catalog id `subjectRef`? Asked before a SKU is mapped to a variation, after `catalogHas`. Absent: a mapping that names a variation is refused (`CATALOG_ITEM_NOT_FOUND` at `variationId`). |
 | `order.onAccepted` | `(clientId, orderId) => Promise<void>` | The store accepted, or the connection auto-accepts. Start whatever accepting means here (the ticket, the board). Runs after the commit and AFTER the confirm is queued; a throw is logged and cannot un-accept or lose the confirm. Atomic work (the stock draw) belongs in `admit`. |
 | `order.mayAutoAccept` | OPTIONAL. `(clientId) => Promise<boolean>` | May a NEW order of this tenant be accepted automatically? Asked once per order, before the ingest's transaction, and only when the connection auto-accepts (never for a redelivery). `false` declines the automatic acceptance: the order lands exactly as with auto-accept off (AWAITING on the clock, no confirm queued, no `onAccepted`) and a person decides it; the order is never refused for it. A throw is logged and declines too. Not bound: every auto-accept proceeds, as before. It sits on every order's ingest, so answer it from something already in hand rather than a fresh query. |
 | `order.onRefused` | `(clientId, orderId, reason: "REJECTED" \| "EXPIRED" \| "CANCELLED") => Promise<void>` | Refuse/cancel the host order: the store refused on the clock, the clock lapsed, or the marketplace cancelled. After the commit and after the cancellation request is queued; a throw on a decision is logged. NOT called for `recordStoreCancellation`. A host that binds `onCancellationConfirmed` (request first) does not get `"REJECTED"` from `decide` either, nor `"CANCELLED"` for a cancellation the store asked for: `onCancellationConfirmed` replaces both. |
@@ -292,3 +293,28 @@ if you want one). The `MarketplaceDb.marketplaceStorePause` delegate is
 OPTIONAL in the type, so a 1.x host compiles before it migrates; `pauseStore`
 and `resumeStore` throw naming the migration until it does, and
 `availabilityState` reads every marketplace OPEN.
+
+## 8. Mapping a SKU to a variation (FUT-4927)
+
+A marketplace SKU usually names one flavour or size of an item. A link can now
+carry that variation beside the catalog id: `variationId` on
+`upsertMenuLinks` / `setMenuLink` rows, on `PUT …/menu-links` and its MCP
+tool, and on every link view. Absent or null maps the item alone, exactly as
+before; a write always sets both halves, so re-mapping to the item clears a
+variation and an unmap clears both. A variation on an unmap is refused.
+
+**The port.** Bind `order.catalogHasVariation(clientId, subjectRef,
+variationRef)` to answer whether the variation is one of that item's and the
+tenant's. Without it every mapping that names a variation is refused, and
+mapping to the item works as it did.
+
+**The line.** `ResolvedOrderLine.variationRef` is the mapped variation, or
+null. Write it on the order line with `subjectRef`; a host that ignores it
+keeps selling the item alone.
+
+**The database.** Migration `20261126230000_marketplace_menu_link_variation`
+adds the nullable `marketplace_menu_links.variation_id`: additive, no foreign
+key, every existing link stays the item alone. The engine selects the column,
+so a Prisma client generated before the migration throws on the unknown
+`variationId`: on the bump, sync the partial, run `prisma generate` and apply
+the migration together.

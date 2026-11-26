@@ -1,9 +1,5 @@
 import { createMarketplaceEngine } from "../core/engine";
-import type {
-  MarketplaceAdapter,
-  MarketplaceHttpRequest,
-  MarketplaceHttpResponse,
-} from "../core/adapter";
+import type { MarketplaceAdapter, MarketplaceHttpRequest, MarketplaceHttpResponse, StatusStep } from "../core/adapter";
 import type { OutboundJobPayload } from "../core/outbound-queue";
 import type {
   MarketplaceDb,
@@ -15,8 +11,8 @@ import type {
   CancellationFailureReason,
   MarketplaceLifecycleAnswer,
   MarketplaceLifecycleFacts,
+  ResolvedOrderLine,
 } from "../core/ports";
-import type { StatusStep } from "../core/adapter";
 import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
@@ -81,6 +77,8 @@ interface HarnessOptions {
   cancellationWindowMs?: number;
   /** The host's say on an automatic acceptance; absent, the port is not bound. */
   mayAutoAccept?: (clientId: string) => Promise<boolean>;
+  /** `false`: the host cannot answer for variations (no `catalogHasVariation`, FUT-4927). */
+  variations?: boolean;
   /** The host's catalogue port, for the catalogue suites (FUT-4768). */
   catalogue?: MarketplaceCataloguePort;
   /**
@@ -98,7 +96,7 @@ export function createHarness(options: HarnessOptions = {}) {
   const memory = createMemoryDb();
   const http = options.http ?? scriptedHttp([{ status: 500, body: "unscripted" }]);
   const clock = { at: NOW };
-  const created: { clientId: string; order: NormalizedMarketplaceOrder; orderId: string }[] = [];
+  const created: { clientId: string; order: NormalizedMarketplaceOrder; orderId: string; lines: readonly ResolvedOrderLine[] }[] = [];
   const accepted: string[] = [];
   const refused: { orderId: string; reason: MarketplaceRefusal }[] = [];
   const enqueued: { name: string; payload: OutboundJobPayload; dedupeKey?: string; delayMs?: number }[] = [];
@@ -135,14 +133,16 @@ export function createHarness(options: HarnessOptions = {}) {
         admitted.push(request);
         return options.admit ? options.admit(request) : { admitted: true };
       },
-      create: async (clientId, order, _lines, db) => {
+      create: async (clientId, order, lines, db) => {
         if (options.failCreate) throw new Error("host is down");
         if (options.onCreate) await options.onCreate(db, order);
         const orderId = `order-${created.length + 1}`;
-        created.push({ clientId, order, orderId });
+        created.push({ clientId, order, orderId, lines });
         return orderId;
       },
       catalogHas: async (_clientId, ref) => catalog.has(ref),
+      // A variation is in the catalog as `<item>#<variation>`.
+      ...(options.variations === false ? {} : { catalogHasVariation: async (_c: string, ref: string, v: string) => catalog.has(`${ref}#${v}`) }),
       onAccepted: async (_clientId, orderId) => {
         accepted.push(orderId);
         if (options.failHostHalf) throw new Error("host half failed");
