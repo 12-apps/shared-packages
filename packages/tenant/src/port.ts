@@ -43,9 +43,10 @@ export interface TenantTreeNode {
 }
 
 /**
- * A subtree move, planned and validated by the package. The host applies it
- * as ONE statement: every path starting with `fromPath` has that prefix
- * replaced by `toPath`, and the row `id` is re-pointed at `parentId`.
+ * A subtree move, planned and validated by the package. The host first locks
+ * the subtree and the new parent (ADOPTING.md, "The tenant tree (opt-in)"), then
+ * rewrites in ONE statement: every path starting with `fromPath` has that
+ * prefix replaced by `toPath`, and the row `id` is re-pointed at `parentId`.
  */
 export interface TenantTreeMove {
   /** The tenant that moves, everything below it moving with it. */
@@ -132,8 +133,9 @@ export interface TenantTreePort<Tx = unknown> {
    */
   treeDescendants(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
   /**
-   * Apply a planned move in ONE statement, inside the caller's
-   * transaction (required: a write never runs outside it), and answer the rows
+   * Apply a planned move inside the caller's transaction (required: a write
+   * never runs outside it): lock the subtree and the new parent, then ONE
+   * rewrite statement (ADOPTING.md, "The tenant tree (opt-in)"). Answers the rows
    * written. 0 means the tree changed since the plan (the subtree is no longer
    * at `fromPath`, or the parent no longer at `parentPath`): nothing written.
    */
