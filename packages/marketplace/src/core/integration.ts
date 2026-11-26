@@ -20,7 +20,7 @@ export interface MarketplaceIntegrationView {
   externalMerchantId: string | null;
   autoAccept: boolean;
   /**
-   * Whether the marketplace's DISPATCHED and CONCLUDED events move the pedido
+   * Whether the marketplace's DISPATCHED and CONCLUDED events move the order
    * forward here (FUT-4653). Always set by this version; optional in the type
    * so a view built by hand against 1.x still compiles.
    */
@@ -116,7 +116,7 @@ export interface SaveMarketplaceIntegrationInput {
   environment?: "SANDBOX" | "PRODUCTION";
   externalMerchantId?: string | null;
   autoAccept?: boolean;
-  /** Whether the marketplace's DISPATCHED and CONCLUDED events move the pedido forward here. New connections: true. */
+  /** Whether the marketplace's DISPATCHED and CONCLUDED events move the order forward here. New connections: true. */
   followStatus?: boolean;
   ackSlaSeconds?: number;
   /**
@@ -178,7 +178,7 @@ export async function saveMarketplaceIntegration(
 export interface IngestionTarget {
   enabled: boolean;
   autoAccept: boolean;
-  /** Whether lifecycle events move the pedido forward (FUT-4653). */
+  /** Whether lifecycle events move the order forward (FUT-4653). */
   followStatus: boolean;
   ackSlaSeconds: number;
   webhookSecret: string | null;

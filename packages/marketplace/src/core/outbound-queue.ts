@@ -17,7 +17,7 @@ export const MARKETPLACE_OUTBOUND_JOB = "marketplace.outbound";
 
 /**
  * What goes out: the store's aceite, the store's cancellation request, or a
- * step of the pedido the store reached (`status`, FUT-4653).
+ * step of the order the store reached (`status`, FUT-4653).
  */
 export type OutboundAction = "confirm" | "requestCancellation" | "status";
 

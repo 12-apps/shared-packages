@@ -3,7 +3,7 @@ import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceLifecycle } from "./types";
 
 /**
- * The engine's memory of what was said about a pedido's steps, in
+ * The engine's memory of what was said about an order's steps, in
  * `marketplace_status_updates` (FUT-4653): one row per (order, step), so the
  * same row is the claim that keeps a step from being sent twice, the marker an
  * inbound echo is recognised by, and the note of what the marketplace itself

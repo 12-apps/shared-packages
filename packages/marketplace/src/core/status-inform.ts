@@ -2,7 +2,7 @@ import type { StatusStep } from "./adapter";
 import { MARKETPLACE_OUTBOUND_JOB, statusDedupeKey } from "./outbound-queue";
 import type { EngineContext } from "./ports";
 
-/** What the host says when a pedido reaches a step (FUT-4653). */
+/** What the host says when an order reaches a step (FUT-4653). */
 export interface InformStatusInput {
   clientId: string;
   /** The host's order id. */
@@ -20,7 +20,7 @@ export interface InformStatusInput {
 
 /**
  * One enqueue and nothing else: no statement, no call to a marketplace, no
- * provider lookup (the host knows the pedido is a marketplace's, not whose).
+ * provider lookup (the host knows the order is a marketplace's, not whose).
  * The job asks the adapter whether it takes the step. A refused or throwing
  * queue is logged and answers false; nothing owed is recorded, so nothing is
  * re-queued (no row exists before the job, and writing one in the host's tap

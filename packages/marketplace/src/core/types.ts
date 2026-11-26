@@ -137,10 +137,10 @@ export interface NormalizedMarketplaceOrder {
 export type CancellationOutcome = "CONFIRMED" | "FAILED";
 
 /**
- * A step of the pedido's life a marketplace announces about an order it
+ * A step of the order's life a marketplace announces about an order it
  * already has (FUT-4653): the courier left (`DISPATCHED`) or the order is
  * finished (`CONCLUDED`). An event that names one moves nothing by itself; the
- * engine asks the host to move the pedido forward (`onLifecycle`).
+ * engine asks the host to move the order forward (`onLifecycle`).
  */
 export type MarketplaceLifecycle = "DISPATCHED" | "CONCLUDED";
 

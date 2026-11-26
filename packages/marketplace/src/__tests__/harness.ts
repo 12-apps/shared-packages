@@ -83,7 +83,7 @@ interface HarnessOptions {
    * an Error is thrown by the hook. Absent, `onLifecycle` is not bound.
    */
   lifecycle?: readonly (MarketplaceLifecycleAnswer | Error)[];
-  /** Whether the host says a pedido still holds a step; absent, `statusHolds` is not bound. */
+  /** Whether the host says an order still holds a step; absent, `statusHolds` is not bound. */
   statusHolds?: (step: StatusStep) => boolean | Promise<boolean>;
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };

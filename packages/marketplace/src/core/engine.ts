@@ -197,7 +197,7 @@ export interface MarketplaceEngine {
   /** Run one queued outbound call (the `marketplace.outbound` job's body). */
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
   /**
-   * Tell the marketplace the pedido reached a step (FUT-4653): ONE enqueue of
+   * Tell the marketplace the order reached a step (FUT-4653): ONE enqueue of
    * the `marketplace.outbound` job, action `status`. Never throws, runs no
    * statement and calls nobody: the job decides everything else. True when the
    * queue took it.

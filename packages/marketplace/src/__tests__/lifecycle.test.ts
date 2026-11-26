@@ -12,11 +12,11 @@ import { TENANT, createHarness, deliverIfood, ifoodEvent, ifoodPlaced, type Harn
  * The engine's half of FUT-4653's inbound rows (contract §3 R-in, R-echo,
  * R-note, R-switch, R-unknown; §4.1-4.3): an iFood DSP or CON is a LIFECYCLE
  * event, and with the connection's switch ON and a host that binds
- * `onLifecycle` the engine asks the host to move the pedido forward. The rules
+ * `onLifecycle` the engine asks the host to move the order forward. The rules
  * the engine owns (the acceptance's state, a standing cancellation request,
  * the echo of a step we informed, the note of what the marketplace said, the
  * deferral of an event whose order is not here yet) are pinned here; where the
- * pedido moves is the host's and is not asserted.
+ * order moves is the host's and is not asserted.
  */
 
 const DSP = "DSP";
@@ -101,7 +101,7 @@ describe("the rules the engine owns before it asks the host", () => {
     expect(statusRows(h)).toHaveLength(0);
   });
 
-  it("acts on an order whose own cancellation request FAILED: it is still the store's pedido", async () => {
+  it("acts on an order whose own cancellation request FAILED: it is still the store's order", async () => {
     const h = await harness();
     const orderId = await acceptedOrder(h);
     h.patchAcceptance(orderId, { cancellationStatus: "FAILED" });

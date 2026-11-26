@@ -352,7 +352,7 @@ nothing, so the order stays ACCEPTED here while cancelled on Rappi. The take
 the accept queued is then answered 400, so the order shows "não confirmou"
 with the portal link and a person settles it there.
 
-## Following and informing a pedido's status (FUT-4653)
+## Following and informing an order's status (FUT-4653)
 
 Two directions, both forward-only and neither ever refused, reverted or waited on.
 
@@ -361,7 +361,7 @@ normalize to `NormalizedEvent.lifecycle` (`"DISPATCHED"` or `"CONCLUDED"`).
 iFood's codes are ESTIMATED (its portal refused our reader, 2026-11-25); Rappi
 maps none (its `event` values are undocumented). With the connection's
 `followStatus` ON (default; `marketplace_integrations.follow_status`) and a host
-that binds `order.onLifecycle`, the engine asks the host to move the pedido
+that binds `order.onLifecycle`, the engine asks the host to move the order
 forward, after four rules of its own, each ending the delivery IGNORED with a
 reason:
 
@@ -384,12 +384,12 @@ settings built by hand without `followStatus`: byte-for-byte the old answer
 (`no order body on <type>`).
 
 **Outbound.** The host calls `engine.informStatus({ clientId, orderId, step,
-at, delayMs? })` when a pedido reaches `READY`, `DISPATCHED` or `HANDED_OVER`:
+at, delayMs? })` when an order reaches `READY`, `DISPATCHED` or `HANDED_OVER`:
 one enqueue of `marketplace.outbound` (action `status`), no statement, never
 throws. The job asks, in order, stopping at the first no, with no row and no
 call: acceptance ACCEPTED and no cancellation request standing; the adapter
 states the step (`capabilities.statusSteps`) and takes it for this order
-(`statusSupported`); `order.statusHolds` says the pedido still holds it; no
+(`statusSupported`); `order.statusHolds` says the order still holds it; no
 status row exists for (order, step) and the marketplace has not CONCLUDED;
 then it claims the row (STORE, SENDING, unique per (order, step)) and calls
 `informStatus`. 2xx is SENT; a final 4xx FAILED (error log, never retried); a

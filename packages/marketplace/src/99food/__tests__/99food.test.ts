@@ -267,6 +267,7 @@ describe("the 99Food adapter", () => {
       perOrderAppLink: false,
       confirmTakesPreparationTime: true,
       cancellationAnswerWindowMs: 300_000,
+      statusSteps: ["READY", "DISPATCHED", "HANDED_OVER"],
     });
     expect(subject.cancellationReasons()).toHaveLength(11);
     expect(subject.cancellationReasons().filter((reason) => reason.itemUnavailable).map((r) => r.code)).toEqual([

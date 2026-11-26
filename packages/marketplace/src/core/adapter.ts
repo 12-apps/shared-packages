@@ -96,8 +96,8 @@ export interface MarketplaceCapabilities {
 }
 
 /**
- * A step of the pedido the store tells the marketplace about (FUT-4653): the
- * pedido is ready for pickup, the courier left, the pedido was handed over.
+ * A step of the order the store tells the marketplace about (FUT-4653): the
+ * order is ready for pickup, the courier left, the order was handed over.
  */
 export type StatusStep = "READY" | "DISPATCHED" | "HANDED_OVER";
 
@@ -206,7 +206,7 @@ export interface MarketplaceAdapter {
    */
   statusSupported?(facts: StatusFacts): boolean;
   /**
-   * OPTIONAL. Tell the marketplace the pedido reached a step (FUT-4653). Called
+   * OPTIONAL. Tell the marketplace the order reached a step (FUT-4653). Called
    * only from the `marketplace.outbound` job, action `status`. `unsupported`
    * (no endpoint for this step and this kind of order) ends the job with no
    * row. Absent: the marketplace is told nothing.

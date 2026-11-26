@@ -72,7 +72,7 @@ export function verifyOpenDeliverySignature(
  * - `CANCELLED` is a cancellation, whether the store asked for it or not.
  * - `CANCELLATION_REQUEST_DENIED` refuses the store's request.
  * - `DISPATCHED` and `CONCLUDED` are lifecycle events (FUT-4653): the engine
- *   asks the host to move the pedido forward, when the store follows them.
+ *   asks the host to move the order forward, when the store follows them.
  * - Everything else (`CONFIRMED`, `CANCELLATION_REQUESTED`, the
  *   consumer's `ORDER_CANCELLATION_REQUEST` handshake…) is understood and
  *   recorded, and acts on nothing: an IGNORED inbox row.

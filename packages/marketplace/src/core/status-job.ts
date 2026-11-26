@@ -7,13 +7,13 @@ import type { MarketplaceDeliveredBy } from "./types";
 
 /**
  * The status job's body (FUT-4653), `marketplace.outbound` with action
- * `status`: tell the marketplace the pedido reached a step.
+ * `status`: tell the marketplace the order reached a step.
  *
  * In order, stopping at the first rule that fails, with no row and no call:
  *
  * 1. the acceptance is ACCEPTED and no cancellation request stands;
  * 2. the adapter states the step and takes it for this kind of order;
- * 3. the host says the pedido still holds the step (a dispatch undone inside
+ * 3. the host says the order still holds the step (a dispatch undone inside
  *    the board's undo window sends nothing);
  * 4. no row exists for (order, step), and the marketplace has not CONCLUDED
  *    the order (a step it announced itself is in the same table);
@@ -23,7 +23,7 @@ import type { MarketplaceDeliveredBy } from "./types";
  *    retried; 408/425/429/5xx/timeout retried, the last attempt FAILED. A run
  *    on a SENDING row it owns (a retry, or the sweep's re-queue) calls again.
  *
- * Nothing here touches the pedido: a failed, refused or lost status call
+ * Nothing here touches the order: a failed, refused or lost status call
  * changes nothing in the host.
  */
 
@@ -75,7 +75,7 @@ async function adapterAndHostSkip(
     adapter.statusSupported?.({ step, deliveredBy: deliveredByOf(row) }) !== false;
   if (!takes) return `the marketplace does not take ${step} for this order`;
   const holds = ctx.ports.order.statusHolds;
-  if (!holds) return "the host binds no statusHolds, so it cannot say the pedido still holds the step";
+  if (!holds) return "the host binds no statusHolds, so it cannot say the order still holds the step";
   return (await holds.call(ctx.ports.order, payload.clientId, row.orderId, step)) ? null : `the order no longer holds ${step}`;
 }
 

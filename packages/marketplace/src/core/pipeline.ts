@@ -35,7 +35,7 @@ export function normalizeEvent(
 /** How a delivery ended. `duplicate` and `ignored` are both ordinary outcomes. */
 export type DeliveryOutcome =
   | { kind: "ingested"; orderId: string; unmappedSkus: string[] }
-  /** A lifecycle event moved the pedido forward, through the host's `onLifecycle` (FUT-4653). */
+  /** A lifecycle event moved the order forward, through the host's `onLifecycle` (FUT-4653). */
   | { kind: "moved"; orderId: string; lifecycle: MarketplaceLifecycle }
   | { kind: "cancelled" }
   | { kind: "cancellationFailed" }
@@ -164,7 +164,7 @@ async function applyEvent(
   }
 
   // A lifecycle event (dispatched, concluded) of an order we hold: with the
-  // connection's switch ON and a host that binds the hook, the pedido follows.
+  // connection's switch ON and a host that binds the hook, the order follows.
   // Anything else falls through to "understood, nothing to do", as before.
   const followed = await followLifecycle(ctx, inboxId, clientId, event, settings);
   if (followed) return followed;

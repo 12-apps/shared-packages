@@ -243,8 +243,8 @@ export interface MarketplaceOrderPort {
    * OPTIONAL. The marketplace announced a step of an order the engine holds
    * (`DISPATCHED`, `CONCLUDED`), the connection follows the marketplace's
    * status, and the order is ACCEPTED with no cancellation request standing.
-   * Move the pedido FORWARD to the step if it is not there yet, and never
-   * otherwise: answer `unchanged` for a pedido already there or past it, or
+   * Move the order FORWARD to the step if it is not there yet, and never
+   * otherwise: answer `unchanged` for an order already there or past it, or
    * one that has no such step. Idempotent by forward-only: a hook that throws
    * leaves the inbox row FAILED and the reconcile pass runs it again. Absent:
    * every lifecycle event is understood and ignored, as before FUT-4653.
@@ -256,7 +256,7 @@ export interface MarketplaceOrderPort {
     facts: MarketplaceLifecycleFacts,
   ): Promise<MarketplaceLifecycleAnswer>;
   /**
-   * OPTIONAL. Does the pedido still hold this step: the card is at it or past
+   * OPTIONAL. Does the order still hold this step: the card is at it or past
    * it, not canceled or failed. Asked by the status job right before it tells
    * the marketplace, so a step the store undid in the meantime is never sent.
    * Absent: the engine cannot tell, and sends nothing.

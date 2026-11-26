@@ -271,7 +271,7 @@ describe("the status job, in order", () => {
     expect(statusRows(h)).toHaveLength(1);
   });
 
-  it("[P18] a pedido of a marketplace the engine does not know sends nothing", async () => {
+  it("[P18] an order of a marketplace the engine does not know sends nothing", async () => {
     const h = createHarness({ statusHolds: () => true });
     const orderId = await acceptedOrder(h, "MERCHANT");
     h.patchAcceptance(orderId, { provider: "NOPE" });

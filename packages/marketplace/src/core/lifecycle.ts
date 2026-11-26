@@ -7,7 +7,7 @@ import type { MarketplaceDeliveredBy, MarketplaceLifecycle, NormalizedEvent } fr
 
 /**
  * Inbound lifecycle (FUT-4653): the marketplace says the order was dispatched
- * or concluded, and the pedido follows, FORWARD only.
+ * or concluded, and the order follows, FORWARD only.
  *
  * What the engine owns, in order, each stopping the event with a reason the
  * inbox row keeps:
@@ -24,7 +24,7 @@ import type { MarketplaceDeliveredBy, MarketplaceLifecycle, NormalizedEvent } fr
  *    of forward-only alone is the store's undo, where the echo would
  *    dispatch a card again with no courier.
  *
- * What the host owns (`onLifecycle`): whether the pedido can move, to where,
+ * What the host owns (`onLifecycle`): whether the order can move, to where,
  * and how. Whatever it answers, the step is NOTED as the marketplace's, so our
  * own job never informs it back and nothing is informed after a CONCLUDED.
  *
