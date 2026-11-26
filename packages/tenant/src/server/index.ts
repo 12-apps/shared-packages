@@ -40,7 +40,7 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   /** The host's tenant port, as given. */
   port: TenantPort<S, Tx>;
   /** The tenant tree, read and moved through the port's tree methods. */
-  tree: TenantTree;
+  tree: TenantTree<Tx>;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
 }

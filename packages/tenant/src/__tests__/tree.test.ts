@@ -19,13 +19,22 @@ import {
  * re-pointed), and it counts every port call, so "one port call" is asserted
  * rather than assumed.
  */
+interface FakeTx {
+  label: string;
+}
+
+/** The caller's transaction: every move must hand it to the port. */
+const TX: FakeTx = { label: 'caller-tx' };
+
 function memoryHost(nodes: TenantTreeNode[]) {
   const rows = new Map(nodes.map((node) => [node.id, { ...node }]));
   const calls: string[] = [];
   const moves: TenantTreeMove[] = [];
-  const port: TenantTreePort = {
-    treeNode: async (id) => {
+  const txs: Array<FakeTx | undefined> = [];
+  const port: TenantTreePort<FakeTx> = {
+    treeNode: async (id, tx) => {
       calls.push('treeNode');
+      txs.push(tx);
       const row = rows.get(id);
       return row ? { ...row } : null;
     },
@@ -42,9 +51,10 @@ function memoryHost(nodes: TenantTreeNode[]) {
       if (!row) return [];
       return [...rows.values()].filter((node) => node.path.startsWith(row.path)).map((node) => ({ ...node }));
     },
-    moveSubtree: async (move) => {
+    moveSubtree: async (move, tx) => {
       calls.push('moveSubtree');
       moves.push(move);
+      txs.push(tx);
       const top = rows.get(move.id);
       const parent = move.parentId === null ? null : rows.get(move.parentId);
       if (!top || top.path !== move.fromPath) return 0;
@@ -59,7 +69,7 @@ function memoryHost(nodes: TenantTreeNode[]) {
       return written;
     },
   };
-  return { port, rows, calls, moves };
+  return { port, rows, calls, moves, txs };
 }
 
 /** A chain ids[0] -> ids[1] -> …, each the parent of the next. */
@@ -185,7 +195,7 @@ describe('the reads, each ONE port call at any depth', () => {
 describe('a tenant cannot become its own ancestor', () => {
   it('refuses a tenant as its own parent, and writes nothing', async () => {
     const host = memoryHost(chainNodes(['a', 'b']));
-    expect((await refusal(createTenantTree(host.port).move('a', 'a'))).code).toBe('cycle');
+    expect((await refusal(createTenantTree(host.port).move('a', 'a', TX))).code).toBe('cycle');
     expect(host.moves).toEqual([]);
   });
 
@@ -193,7 +203,7 @@ describe('a tenant cannot become its own ancestor', () => {
     const host = memoryHost(chainNodes(DEEP));
     const tree = createTenantTree(host.port);
     for (const below of ['t1', 't5', 't11']) {
-      expect((await refusal(tree.move('t0', below))).code).toBe('cycle');
+      expect((await refusal(tree.move('t0', below, TX))).code).toBe('cycle');
     }
     expect(host.moves).toEqual([]);
     expect(host.rows.get('t0')?.path).toBe('/t0/');
@@ -203,46 +213,56 @@ describe('a tenant cannot become its own ancestor', () => {
 describe('a subtree move', () => {
   it('rewrites the whole subtree with ONE write, planned with both paths', async () => {
     const host = memoryHost([...chainNodes(['r', 'u', 'v', 'w']), { id: 's', parentId: null, path: '/s/' }]);
-    const written = await createTenantTree(host.port).move('u', 's');
+    const written = await createTenantTree(host.port).move('u', 's', TX);
     expect(written).toBe(3);
     expect(host.calls.filter((call) => call === 'moveSubtree')).toHaveLength(1);
     expect(host.moves).toEqual([{ id: 'u', parentId: 's', parentPath: '/s/', fromPath: '/r/u/', toPath: '/s/u/' }]);
     expect(host.rows.get('u')).toEqual({ id: 'u', parentId: 's', path: '/s/u/' });
     expect(host.rows.get('w')).toEqual({ id: 'w', parentId: 'v', path: '/s/u/v/w/' });
     expect(host.rows.get('r')).toEqual({ id: 'r', parentId: null, path: '/r/' });
+    // The plan's two reads and the write all ran in the caller's transaction.
+    expect(host.txs).toEqual([TX, TX, TX]);
+  });
+
+  it('reads outside any transaction unless given one', async () => {
+    const host = memoryHost(chainNodes(['r', 'u']));
+    const tree = createTenantTree(host.port);
+    await tree.parentOf('u');
+    await tree.parentOf('u', TX);
+    expect(host.txs).toEqual([undefined, TX]);
   });
 
   it('makes a unit a standalone root', async () => {
     const host = memoryHost(chainNodes(['r', 'u', 'v']));
-    expect(await createTenantTree(host.port).move('u', null)).toBe(2);
+    expect(await createTenantTree(host.port).move('u', null, TX)).toBe(2);
     expect(host.moves[0]).toEqual({ id: 'u', parentId: null, parentPath: null, fromPath: '/r/u/', toPath: '/u/' });
     expect(host.rows.get('v')).toEqual({ id: 'v', parentId: 'u', path: '/u/v/' });
   });
 
   it('moves a deep subtree down a deep chain', async () => {
     const host = memoryHost([...chainNodes(DEEP), ...chainNodes(['x0', 'x1', 'x2'])]);
-    expect(await createTenantTree(host.port).move('x1', 't11')).toBe(2);
+    expect(await createTenantTree(host.port).move('x1', 't11', TX)).toBe(2);
     expect(host.rows.get('x2')?.path).toBe(`/${DEEP.join('/')}/x1/x2/`);
     expect(depthOf(host.rows.get('x2')?.path ?? '')).toBe(13);
   });
 
   it('writes nothing for a tenant already where it is asked to go', async () => {
     const host = memoryHost(chainNodes(['r', 'u']));
-    expect(await createTenantTree(host.port).move('u', 'r')).toBe(0);
+    expect(await createTenantTree(host.port).move('u', 'r', TX)).toBe(0);
     expect(host.moves).toEqual([]);
   });
 
   it('refuses, by name, when the host finds the tree changed under the plan', async () => {
     const host = memoryHost([...chainNodes(['r', 'u']), { id: 's', parentId: null, path: '/s/' }]);
     host.port.moveSubtree = async () => 0;
-    expect((await refusal(createTenantTree(host.port).move('u', 's'))).code).toBe('moved');
+    expect((await refusal(createTenantTree(host.port).move('u', 's', TX))).code).toBe('moved');
   });
 
   it('refuses an unknown tenant or parent before writing', async () => {
     const host = memoryHost(chainNodes(['r']));
     const tree = createTenantTree(host.port);
-    expect((await refusal(tree.move('ghost', 'r'))).code).toBe('unknown-tenant');
-    expect((await refusal(tree.move('r', 'ghost'))).code).toBe('unknown-tenant');
+    expect((await refusal(tree.move('ghost', 'r', TX))).code).toBe('unknown-tenant');
+    expect((await refusal(tree.move('r', 'ghost', TX))).code).toBe('unknown-tenant');
     expect(host.moves).toEqual([]);
   });
 });

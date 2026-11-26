@@ -32,32 +32,43 @@ export {
   type TenantTreeErrorCode,
 } from './path';
 
-/** The tree's half of the port. */
-export type TenantTreePort = Pick<
-  TenantPort,
+/** The tree's half of the port. `Tx` is the host's transaction client. */
+export type TenantTreePort<Tx = unknown> = Pick<
+  TenantPort<string, Tx>,
   'treeNode' | 'treeAncestors' | 'treeDescendants' | 'moveSubtree'
 >;
 
-export interface TenantTree {
+/**
+ * Every read takes the host's transaction optionally (to read what a write in
+ * it will see); the move takes it REQUIRED: the package never opens one, and
+ * never writes outside the caller's.
+ */
+export interface TenantTree<Tx = unknown> {
   /** The tenant directly above `id`, or null for a root. One port call. */
-  parentOf(id: string): Promise<string | null>;
+  parentOf(id: string, tx?: Tx): Promise<string | null>;
   /** The root of `id`'s tree (`id` itself for a root). One port call. */
-  rootOf(id: string): Promise<string>;
+  rootOf(id: string, tx?: Tx): Promise<string>;
   /** Every tenant above `id`, nearest first; empty for a root. One port call. */
-  ancestorsOf(id: string): Promise<TenantTreeNode[]>;
+  ancestorsOf(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
   /** Every tenant below `id` at any depth, shallowest first; `id` excluded. One port call. */
-  descendantsOf(id: string): Promise<TenantTreeNode[]>;
+  descendantsOf(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
   /**
    * Move `id`, with everything below it, under `parentId` (null: make it a
-   * root). Refuses a cycle before anything is written; answers the rows the
-   * host rewrote. Throws `moved` when the tree changed under the plan.
+   * root), inside the caller's transaction: the plan's two reads and the
+   * write all run in `tx`. Refuses a cycle before anything is written; answers
+   * the rows the host rewrote. Throws `moved` when the tree changed under the
+   * plan.
    */
-  move(id: string, parentId: string | null): Promise<number>;
+  move(id: string, parentId: string | null, tx: Tx): Promise<number>;
 }
 
-async function nodeOf(port: TenantTreePort, id: string): Promise<{ node: TenantTreeNode; ids: string[] }> {
+async function nodeOf<Tx>(
+  port: TenantTreePort<Tx>,
+  id: string,
+  tx: Tx | undefined,
+): Promise<{ node: TenantTreeNode; ids: string[] }> {
   assertSegment(id);
-  const node = await port.treeNode(id);
+  const node = await port.treeNode(id, tx);
   if (node === null) throw new TenantTreeError('unknown-tenant', `no tenant "${id}"`);
   return { node, ids: validateNode(node) };
 }
@@ -76,20 +87,20 @@ function checked(id: string, nodes: readonly TenantTreeNode[]): TenantTreeNode[]
   return [...nodes].sort(byDepth);
 }
 
-export function createTenantTree(port: TenantTreePort): TenantTree {
+export function createTenantTree<Tx = unknown>(port: TenantTreePort<Tx>): TenantTree<Tx> {
   return {
-    async parentOf(id) {
-      return (await nodeOf(port, id)).node.parentId;
+    async parentOf(id, tx) {
+      return (await nodeOf(port, id, tx)).node.parentId;
     },
 
-    async rootOf(id) {
-      const { ids } = await nodeOf(port, id);
+    async rootOf(id, tx) {
+      const { ids } = await nodeOf(port, id, tx);
       return ids[0] as string;
     },
 
-    async ancestorsOf(id) {
+    async ancestorsOf(id, tx) {
       assertSegment(id);
-      const nodes = checked(id, await port.treeAncestors(id));
+      const nodes = checked(id, await port.treeAncestors(id, tx));
       const self = nodes[nodes.length - 1] as TenantTreeNode;
       // Exactly the ids the tenant's own path names above it, no more, no fewer.
       const above = validateNode(self).slice(0, -1);
@@ -100,9 +111,9 @@ export function createTenantTree(port: TenantTreePort): TenantTree {
       return ancestors.reverse();
     },
 
-    async descendantsOf(id) {
+    async descendantsOf(id, tx) {
       assertSegment(id);
-      const nodes = checked(id, await port.treeDescendants(id));
+      const nodes = checked(id, await port.treeDescendants(id, tx));
       const self = nodes[0] as TenantTreeNode;
       if (self.id !== id || nodes.some((node) => !isWithin(node.path, self.path))) {
         throw new TenantTreeError('corrupt-path', `the descendants read for "${id}" left "${self.path}"`);
@@ -110,12 +121,12 @@ export function createTenantTree(port: TenantTreePort): TenantTree {
       return nodes.slice(1);
     },
 
-    async move(id, parentId) {
-      const { node } = await nodeOf(port, id);
+    async move(id, parentId, tx) {
+      const { node } = await nodeOf(port, id, tx);
       let parentPath: string | null = null;
       if (parentId !== null) {
         if (parentId === id) throw new TenantTreeError('cycle', `"${id}" cannot be its own parent`);
-        const parent = (await nodeOf(port, parentId)).node;
+        const parent = (await nodeOf(port, parentId, tx)).node;
         if (isWithin(parent.path, node.path)) {
           throw new TenantTreeError('cycle', `"${id}" cannot move under "${parentId}", which sits below it`);
         }
@@ -129,7 +140,7 @@ export function createTenantTree(port: TenantTreePort): TenantTree {
         toPath: movedPath(id, parentPath),
       };
       if (plan.toPath === plan.fromPath) return 0; // already there
-      const written = await port.moveSubtree(plan);
+      const written = await port.moveSubtree(plan, tx);
       if (written === 0) {
         throw new TenantTreeError('moved', `the tree changed while "${id}" was moving; nothing was written`);
       }

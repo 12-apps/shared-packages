@@ -78,24 +78,28 @@ export interface TenantPort<S extends string = string, Tx = unknown> {
   clearProfile(tx: Tx, id: string): Promise<void>;
   /** The tenant's IANA time zone (`America/Sao_Paulo`): reminders and purge dates are computed in it. */
   timeZone(id: string): Promise<string>;
-  /** The tree: one tenant's node, ONE read. Null when none exists. */
-  treeNode(id: string): Promise<TenantTreeNode | null>;
+  /**
+   * The tree: one tenant's node, ONE read. Null when none exists. Read inside
+   * `tx` when one is given, so a move's plan sees what its write will.
+   */
+  treeNode(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
   /**
    * The tree: the tenant and every tenant above it, in ONE read (the ids are
    * the segments of its own path). Any order; empty when the tenant is unknown.
    */
-  treeAncestors(id: string): Promise<TenantTreeNode[]>;
+  treeAncestors(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
   /**
    * The tree: the tenant and every tenant below it at any depth, in ONE
    * indexed prefix read on the path. Any order; empty when the tenant is unknown.
    */
-  treeDescendants(id: string): Promise<TenantTreeNode[]>;
+  treeDescendants(id: string, tx?: Tx): Promise<TenantTreeNode[]>;
   /**
-   * The tree: apply a planned move in ONE statement and answer the rows
+   * The tree: apply a planned move in ONE statement, inside the caller's
+   * transaction (required: a write never runs outside it), and answer the rows
    * written. 0 means the tree changed since the plan (the subtree is no longer
    * at `fromPath`, or the parent no longer at `parentPath`): nothing written.
    */
-  moveSubtree(move: TenantTreeMove): Promise<number>;
+  moveSubtree(move: TenantTreeMove, tx: Tx): Promise<number>;
 }
 
 /** The port's members, in a fixed order: what startup validation checks. */

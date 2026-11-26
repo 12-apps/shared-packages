@@ -73,10 +73,10 @@ const port: TenantPort<Status, Tx> = {
   setStatusIf: (id, from, to) => …,  // compare-and-set: true only when the row moved
   clearProfile: (tx, id) => …,       // erase the row's profile inside the purge's transaction
   timeZone: (id) => …,               // IANA zone
-  treeNode: (id) => …,               // { id, parentId, path } | null — one read
-  treeAncestors: (id) => …,          // the node and every node above it — one read
-  treeDescendants: (id) => …,        // the node and every node below it — one read
-  moveSubtree: (move) => …,          // apply a planned move — one statement, rows written
+  treeNode: (id, tx?) => …,          // { id, parentId, path } | null — one read
+  treeAncestors: (id, tx?) => …,     // the node and every node above it — one read
+  treeDescendants: (id, tx?) => …,   // the node and every node below it — one read
+  moveSubtree: (move, tx) => …,      // apply a planned move in tx — one statement, rows written
 };
 ```
 
@@ -112,8 +112,9 @@ path; you store it and apply what it plans.
   writer can store a cycle.
 
 `tenant.tree` (`createApiTenant`) answers `parentOf`, `rootOf`, `ancestorsOf`,
-`descendantsOf` (one port call each, at any depth) and `move(id, parentId)`,
-which refuses a cycle (`TenantTreeError`, code `cycle`) before anything is
+`descendantsOf` (one port call each, at any depth; each takes your transaction
+optionally) and `move(id, parentId, tx)`, which runs its reads and its write in
+your transaction (required) and refuses a cycle (`TenantTreeError`, code `cycle`) before anything is
 written.
 
 A grant across a tree is your authorization's business, not the package's.
