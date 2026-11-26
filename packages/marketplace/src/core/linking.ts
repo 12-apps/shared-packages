@@ -1,6 +1,7 @@
 import { listMarketplaceIntegrations, readOutboundConnection, type MarketplaceIntegrationView } from "./integration";
 import { appCredentialsOf, cacheLinkToken, linkTokenKey, sealLink } from "./link-store";
 import type { LinkCallContext, LinkedMerchant, MarketplaceLinking } from "./linking-port";
+import { MarketplaceMerchantTakenError, guardMerchantClaim, isUniqueViolation, merchantHeldElsewhere } from "./merchant-claim";
 import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -51,6 +52,7 @@ export interface LinkPendingView {
 
 interface AttemptRow {
   environment: string;
+  /** Sealed; a new `start` seals a new one, so it tells this attempt from a later one. */
   verifier: string;
   userCode: string;
   verificationUrl: string;
@@ -129,15 +131,6 @@ export async function startLink(
   return { kind: "started", pending: pendingOf(row) };
 }
 
-/** Whether another store's live connection already holds this merchant. */
-async function merchantTaken(db: MarketplaceDb, clientId: string, provider: string, merchantId: string): Promise<boolean> {
-  const rows = (await db.marketplaceIntegration.findMany({
-    where: { provider, externalMerchantId: merchantId, archivedAt: null },
-    select: { clientId: true },
-  })) as { clientId: string }[];
-  return rows.some((row) => row.clientId !== clientId);
-}
-
 /**
  * Which merchant a fresh link selects: the only one the grant covers, else
  * the one the connection already named if the grant still covers it, else
@@ -153,23 +146,36 @@ async function chooseMerchant(
   const candidate =
     merchants.length === 1 ? merchants[0]!.id : merchants.some((merchant) => merchant.id === current) ? current : null;
   if (candidate === null) return null;
-  return (await merchantTaken(db, input.clientId, input.provider, candidate)) ? null : candidate;
+  return (await merchantHeldElsewhere(db, input.clientId, input.provider, candidate)) ? null : candidate;
 }
 
-/** Save the linked connection, unarchiving it (with its audit line) when the store had disconnected. */
+/** A link to save: its tokens, the merchants its grant covers, and the sealed verifier of the attempt it used. */
+interface LinkToSave {
+  environment: Environment;
+  refreshToken: string;
+  merchants: readonly LinkedMerchant[] | null;
+  verifier: string;
+}
+
+/**
+ * Save the linked connection, unarchiving it (with its audit line) when the
+ * store had disconnected, and remove the attempt it used: only that one, so a
+ * `start` that landed meanwhile keeps its code. Answers the sealed blob saved.
+ */
 async function saveLink(
   ctx: EngineContext,
   input: { clientId: string; provider: string; actorId: string | null; enabled?: boolean },
-  link: { environment: Environment; refreshToken: string; merchants: readonly LinkedMerchant[] | null },
-): Promise<void> {
+  link: LinkToSave,
+): Promise<string> {
   const now = ctx.ports.clock.now();
+  const credentials = sealLink(ctx, link.refreshToken);
   await ctx.ports.transaction(async (db) => {
     const existing = (await db.marketplaceIntegration.findUnique({
       where: keyOf(input.clientId, input.provider),
       select: { archivedAt: true, externalMerchantId: true },
     })) as { archivedAt: Date | null; externalMerchantId: string | null } | null;
     const data = {
-      credentials: sealLink(ctx, link.refreshToken),
+      credentials,
       authMode: "LINKED",
       environment: link.environment,
       status: "VERIFIED",
@@ -196,8 +202,29 @@ async function saveLink(
         db,
       );
     }
-    await db.marketplaceLinkAttempt!.deleteMany({ where: { clientId: input.clientId, provider: input.provider } });
+    await db.marketplaceLinkAttempt!.deleteMany({ where: { clientId: input.clientId, provider: input.provider, verifier: link.verifier } });
   });
+  return credentials;
+}
+
+/**
+ * {@link saveLink}, and once more with no merchant chosen when another
+ * store's write of the same merchant won the race (the unique index refused
+ * this one): the code is spent, so the tokens are kept whatever happens to the
+ * merchant, and the store chooses one afterwards.
+ */
+async function saveLinkKeepingTokens(
+  ctx: EngineContext,
+  input: { clientId: string; provider: string; actorId: string | null; enabled?: boolean },
+  link: LinkToSave,
+): Promise<string> {
+  try {
+    return await saveLink(ctx, input, link);
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    ctx.ports.logger.warn(`marketplace.link: ${input.provider} merchant of ${input.clientId} taken meanwhile; none chosen`);
+    return saveLink(ctx, input, { ...link, merchants: [] });
+  }
 }
 
 /** The connection as every read surface sees it, after a link wrote it. */
@@ -227,7 +254,7 @@ export async function finishLink(
 ): Promise<LinkFinished | LinkFailure> {
   const opened = await openAttempt(ctx, input);
   if ("kind" in opened) return opened;
-  const { ready, environment, verifier } = opened;
+  const { ready, environment, verifier, sealedVerifier } = opened;
   const exchanged = await ready.linking.exchange(ready.call, { authorizationCode: input.authorizationCode.trim(), verifier });
   if (exchanged.kind === "retry") return exchanged;
   if (exchanged.kind === "refused") return refused("CODE_REFUSED", exchanged.status, exchanged.message);
@@ -240,7 +267,7 @@ export async function finishLink(
   if (listed.kind !== "ok") {
     ctx.ports.logger.warn(`marketplace.link: ${input.provider} merchants of ${input.clientId} not listed (${listed.kind})`);
   }
-  await saveLink(ctx, input, { environment, refreshToken: grant.refreshToken, merchants });
+  await saveLinkKeepingTokens(ctx, input, { environment, refreshToken: grant.refreshToken, merchants, verifier: sealedVerifier });
   cacheLinkToken(ctx, linkTokenKey(input.provider, environment, input.clientId), grant);
   ctx.ports.publishChanged(input.clientId);
   return { kind: "linked", integration: await viewOf(ctx, input.clientId, input.provider), merchants };
@@ -252,7 +279,7 @@ type Ready = NonNullable<Awaited<ReturnType<typeof linkingOf>>>;
 async function openAttempt(
   ctx: EngineContext,
   input: { clientId: string; provider: MarketplaceProvider },
-): Promise<{ ready: Ready; environment: Environment; verifier: string } | LinkFailure> {
+): Promise<{ ready: Ready; environment: Environment; verifier: string; sealedVerifier: string } | LinkFailure> {
   const attempts = (await ctx.ports.db()).marketplaceLinkAttempt;
   if (!attempts) return refused("UNAVAILABLE");
   const attempt = (await attempts.findUnique({ where: keyOf(input.clientId, input.provider) })) as AttemptRow | null;
@@ -261,7 +288,7 @@ async function openAttempt(
   const ready = await linkingOf(ctx, input.provider, environment);
   if (!ready) return refused("UNAVAILABLE");
   if (attempt.expiresAt.getTime() <= ready.call.now.getTime()) return refused("LINK_EXPIRED");
-  return { ready, environment, verifier: ctx.ports.secrets.open(attempt.verifier) };
+  return { ready, environment, verifier: ctx.ports.secrets.open(attempt.verifier), sealedVerifier: attempt.verifier };
 }
 
 /** A linked connection's call context and a live access token, through its own grant. */
@@ -316,11 +343,21 @@ export async function selectLinkedMerchant(
   if (!Array.isArray(merchants)) return merchants;
   if (!merchants.some((merchant) => merchant.id === input.merchantId)) return refused("UNKNOWN_MERCHANT");
   const db = await ctx.ports.db();
-  if (await merchantTaken(db, input.clientId, input.provider, input.merchantId)) return refused("MERCHANT_TAKEN");
-  await db.marketplaceIntegration.updateMany({
-    where: { clientId: input.clientId, provider: input.provider, authMode: "LINKED", archivedAt: null },
-    data: { externalMerchantId: input.merchantId },
-  });
+  if (await merchantHeldElsewhere(db, input.clientId, input.provider, input.merchantId)) return refused("MERCHANT_TAKEN");
+  // A race lost between the check and the write: the unique index refuses it, read as the same refusal.
+  const write = () =>
+    db.marketplaceIntegration.updateMany({
+      where: { clientId: input.clientId, provider: input.provider, authMode: "LINKED", archivedAt: null },
+      data: { externalMerchantId: input.merchantId },
+    });
+  const taken = await guardMerchantClaim(ctx, { ...input, merchantId: input.merchantId }, write).then(
+    () => false,
+    (error: unknown) => {
+      if (error instanceof MarketplaceMerchantTakenError) return true;
+      throw error;
+    },
+  );
+  if (taken) return refused("MERCHANT_TAKEN");
   ctx.ports.publishChanged(input.clientId);
   return { kind: "selected", integration: await viewOf(ctx, input.clientId, input.provider) };
 }

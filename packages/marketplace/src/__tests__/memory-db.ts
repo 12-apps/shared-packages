@@ -79,9 +79,12 @@ class UniqueViolation extends Error {
   code = "P2002";
 }
 
+/** A unique index: its columns, and for a partial one the rows it covers. */
+type UniqueSpec = readonly string[] | { columns: readonly string[]; where: (row: Row) => boolean };
+
 interface TableSpec {
   defaults: () => Row;
-  unique: readonly (readonly string[])[];
+  unique: readonly UniqueSpec[];
 }
 
 /** One table: rows plus the unique indexes the migration declares. */
@@ -94,9 +97,11 @@ class MemoryTable {
   ) {}
 
   private assertUnique(candidate: Row, except?: Row): void {
-    for (const columns of this.spec.unique) {
+    for (const unique of this.spec.unique) {
+      const { columns, where } = "columns" in unique ? unique : { columns: unique, where: () => true };
+      if (!where(candidate)) continue;
       const clash = this.rows.find(
-        (row) => row !== except && columns.every((column) => same(row[column], candidate[column])),
+        (row) => row !== except && where(row) && columns.every((column) => same(row[column], candidate[column])),
       );
       if (clash) throw new UniqueViolation(`${this.name}: unique (${columns.join(", ")})`);
     }
@@ -111,6 +116,14 @@ class MemoryTable {
       const right = b[key] instanceof Date ? (b[key] as Date).getTime() : (b[key] as number | string);
       return left < right ? -sign : left > right ? sign : 0;
     });
+  }
+
+  /** Apply an update unless the row it makes breaks a unique index, as Postgres refuses it. */
+  private applyChecked(row: Row, data: Row): void {
+    const next = { ...row };
+    applyData(next, data);
+    this.assertUnique(next, row);
+    applyData(row, data);
   }
 
   /** Put the rows back as a snapshot had them. */
@@ -145,14 +158,14 @@ class MemoryTable {
     const { where, data } = args as { where: Where; data: Row };
     const row = this.rows.find((candidate) => matches(candidate, where));
     if (!row) throw new Error(`${this.name}: no row to update`);
-    applyData(row, data);
+    this.applyChecked(row, data);
     return { ...row };
   }
 
   async updateMany(args: unknown): Promise<{ count: number }> {
     const { where, data } = args as { where: Where; data: Row };
     const hit = this.rows.filter((row) => matches(row, where));
-    for (const row of hit) applyData(row, data);
+    for (const row of hit) this.applyChecked(row, data);
     return { count: hit.length };
   }
 
@@ -160,7 +173,7 @@ class MemoryTable {
     const { where, create, update } = args as { where: Where; create: Row; update: Row };
     const row = this.rows.find((candidate) => matches(candidate, where));
     if (!row) return this.create({ data: create });
-    applyData(row, update);
+    this.applyChecked(row, update);
     return { ...row };
   }
 
@@ -191,7 +204,11 @@ export function createMemoryDb() {
         archivedAt: null,
         authMode: "CREDENTIALS",
       }),
-      unique: [["clientId", "provider"]],
+      unique: [
+        ["clientId", "provider"],
+        // marketplace_integrations_live_merchant_key: one live connection per merchant (FUT-5613).
+        { columns: ["provider", "externalMerchantId"], where: (row) => (row.archivedAt ?? null) === null && (row.externalMerchantId ?? null) !== null },
+      ],
     }),
     marketplaceLinkAttempt: new MemoryTable("attempt", {
       defaults: () => ({ environment: "PRODUCTION", createdAt: EPOCH, updatedAt: EPOCH }),

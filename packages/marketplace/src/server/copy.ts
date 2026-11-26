@@ -2,8 +2,12 @@ import type { BulkProblemCode } from "../core/bulk";
 import type { DecisionProblemCode } from "../core/cancellation";
 import type { LinkRefusalCode } from "../core/linking";
 
-/** Every problem code a route can answer, decisions and bulk writes alike. */
-export type MarketplaceProblemCode = DecisionProblemCode | BulkProblemCode;
+/**
+ * Every problem code a route words from `problems`, decisions and bulk writes
+ * alike. MERCHANT_TAKEN is worded by `link.problems` instead (FUT-5613), so a
+ * host's own pack written against 1.x still compiles.
+ */
+export type MarketplaceProblemCode = DecisionProblemCode | Exclude<BulkProblemCode, "MERCHANT_TAKEN">;
 
 /**
  * Every sentence the marketplace routes answer with. Required, no defaults

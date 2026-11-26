@@ -1,5 +1,6 @@
 import type { AdapterGrant, MarketplaceCredentials } from "./adapter";
 import { appCredentialsOf, linkGrant, openLinkRefreshToken, type MarketplaceAuthMode } from "./link-store";
+import { assertMerchantFree } from "./merchant-claim";
 import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -149,12 +150,16 @@ export interface SaveMarketplaceIntegrationInput {
  * Re-entering credentials resets `status` to UNVERIFIED. The stored status is a
  * claim about a specific secret; carrying VERIFIED across a credential change
  * would assert that a probe which never ran had passed.
+ *
+ * A merchant id another store's live connection holds is refused with
+ * `MarketplaceMerchantTakenError`: the app's webhook routes by it.
  */
 export async function saveMarketplaceIntegration(
   ctx: EngineContext,
   input: SaveMarketplaceIntegrationInput,
   db: MarketplaceDb,
 ): Promise<MarketplaceIntegrationView> {
+  await assertMerchantFree(db, input.clientId, input.provider, input.externalMerchantId);
   const sealed = input.credentials
     ? ctx.ports.secrets.seal(JSON.stringify(input.credentials))
     : undefined;
@@ -315,28 +320,6 @@ function openCredentials(
     clientSecret: String(record.clientSecret ?? ""),
     webhookSecret: record.webhookSecret ? String(record.webhookSecret) : null,
   };
-}
-
-/**
- * Which tenant a delivery belongs to, resolved from the merchant id the
- * marketplace names.
- *
- * Matched against the column OUTSIDE the ciphertext, which is the whole reason
- * `externalMerchantId` lives there: attributing a delivery must not require
- * decrypting every store's secrets to find the match.
- */
-export async function resolveTenantByMerchant(
-  ctx: EngineContext,
-  provider: MarketplaceProvider,
-  externalMerchantId: string,
-): Promise<string | null> {
-  const db = await ctx.ports.db();
-  const rows = (await db.marketplaceIntegration.findMany({
-    where: { provider, externalMerchantId, archivedAt: null },
-    select: { clientId: true },
-    take: 1,
-  })) as { clientId: string }[];
-  return rows[0]?.clientId ?? null;
 }
 
 /** Stamp the connection's liveness marker. Best-effort; never blocks ingestion. */

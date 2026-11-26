@@ -52,7 +52,6 @@ import { ingestMarketplaceOrder, type IngestResult, type IngestSettings } from "
 import {
   listMarketplaceIntegrations,
   resolveIngestionTarget,
-  resolveTenantByMerchant,
   saveMarketplaceIntegration,
   type IngestionTarget,
   type MarketplaceIntegrationView,
@@ -69,6 +68,7 @@ import {
   type LinkPendingView,
 } from "./linking";
 import type { LinkedMerchant } from "./linking-port";
+import { guardMerchantClaim, resolveTenantByMerchant } from "./merchant-claim";
 import { listMarketplaceMenuLinks, type MarketplaceMenuLinkView } from "./menu-links";
 import { runOutbound, type OutboundAttempt, type OutboundOutcome } from "./outbound";
 import { informStatus, type InformStatusInput } from "./status-inform";
@@ -142,7 +142,7 @@ export interface MarketplaceEngine {
     clientId: string,
     options?: { providers?: readonly string[]; includeArchived?: boolean },
   ): Promise<MarketplaceIntegrationView[]>;
-  /** Create or patch ONE connection (the bulk call's single-row form, with no audit). */
+  /** Create or patch ONE connection (the bulk call's single-row form, with no audit). Throws MarketplaceMerchantTakenError. */
   saveIntegration(input: SaveMarketplaceIntegrationInput): Promise<MarketplaceIntegrationView>;
   /** Create, patch, archive or unarchive many connections, all-or-nothing. */
   upsertIntegrations(input: {
@@ -343,7 +343,10 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     deliver: (input) => processDelivery(ctx, input),
 
     integrations: (clientId, options) => listMarketplaceIntegrations(ctx, clientId, options),
-    saveIntegration: async (input) => saveMarketplaceIntegration(ctx, input, await ports.db()),
+    saveIntegration: (input) =>
+      guardMerchantClaim(ctx, { ...input, merchantId: input.externalMerchantId }, async () =>
+        saveMarketplaceIntegration(ctx, input, await ports.db()),
+      ),
     upsertIntegrations: (input) => upsertIntegrations(ctx, input),
     linkState: (input) => linkState(ctx, input),
     startLink: (input) => startLink(ctx, input),

@@ -206,6 +206,46 @@ describe("the engine's migration", () => {
     await db.close();
   });
 
+  it("holds a merchant to one LIVE connection per marketplace: archived rows and rows with no merchant are outside it (FUT-5613)", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    const connection = (id: string, client: string, merchant: string | null, archived = false) =>
+      `INSERT INTO marketplace_integrations (id, client_id, provider, credentials, external_merchant_id, archived_at, updated_at)
+       VALUES ('${id}', '${client}', 'IFOOD', '', ${merchant === null ? "NULL" : `'${merchant}'`}, ${archived ? "now()" : "NULL"}, now())`;
+    await expect(db.exec(connection("a", "t-a", "m-1"))).resolves.toBeDefined();
+    await expect(db.exec(connection("b", "t-b", "m-1"))).rejects.toThrow(/live_merchant_key/);
+    await expect(db.exec(connection("c", "t-c", "m-1", true))).resolves.toBeDefined();
+    await expect(db.exec(connection("d", "t-d", null))).resolves.toBeDefined();
+    await expect(db.exec(connection("e", "t-e", null))).resolves.toBeDefined();
+    await expect(db.exec("UPDATE marketplace_integrations SET archived_at = NULL WHERE id = 'c'")).rejects.toThrow(/live_merchant_key/);
+    await db.close();
+  });
+
+  it("completes on a host whose live connections already share a merchant: no index, no row rewritten (FUT-5613)", async () => {
+    const db = new PGlite();
+    await db.exec(PREDECESSOR);
+    const { before, target } = migrationsUpTo("20261127090000_marketplace_app_link");
+    for (const sql of before) await db.exec(sql);
+    for (const [id, client] of [["i1", "t-1"], ["i2", "t-2"]]) {
+      await db.exec(
+        `INSERT INTO marketplace_integrations (id, client_id, provider, credentials, external_merchant_id, updated_at) VALUES ('${id}', '${client}', 'IFOOD', '', 'm-1', now())`,
+      );
+    }
+
+    await expect(db.exec(target)).resolves.toBeDefined();
+
+    const index = await db.query("SELECT 1 FROM pg_indexes WHERE indexname = 'marketplace_integrations_live_merchant_key'");
+    expect(index.rows).toEqual([]);
+    const rows = await db.query<{ id: string; external_merchant_id: string; archived_at: Date | null }>(
+      "SELECT id, external_merchant_id, archived_at FROM marketplace_integrations ORDER BY id",
+    );
+    expect(rows.rows).toEqual([
+      { id: "i1", external_merchant_id: "m-1", archived_at: null },
+      { id: "i2", external_merchant_id: "m-1", archived_at: null },
+    ]);
+    await db.close();
+  });
+
   it("runs the status claim on real Postgres: the second claim of a step loses, the stamp is predicated", async () => {
     const db = new PGlite();
     await applyAll(db);

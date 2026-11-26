@@ -86,6 +86,9 @@ model MarketplaceIntegration {
 
   @@unique([clientId, provider])
   @@index([provider, externalMerchantId])
+  // One LIVE connection per (provider, externalMerchantId) is a partial unique index
+  // (WHERE archived_at IS NULL), which Prisma cannot express, as
+  // marketplace_integrations_live_merchant_key (migration 20261127090000, FUT-5613).
   @@map("marketplace_integrations")
 }
 

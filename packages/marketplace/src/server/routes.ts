@@ -61,7 +61,7 @@ function problemsOut(copy: MarketplaceServerCopy, problems: readonly (BulkProble
     const host = "host" in problem ? problem.host : undefined;
     return {
       ...problem,
-      message: host?.message ?? copy.problems[problem.code],
+      message: host?.message ?? (problem.code === "MERCHANT_TAKEN" ? (copy.link?.problems.MERCHANT_TAKEN ?? problem.code) : copy.problems[problem.code]),
       ...(host ? { hostCode: host.code, details: host.details } : {}),
     };
   });

@@ -121,6 +121,7 @@ export type {
   MarketplaceIntegrationView,
   SaveMarketplaceIntegrationInput,
 } from "./core/integration";
+export { MarketplaceMerchantTakenError } from "./core/merchant-claim";
 export type { MarketplaceMenuLinkView } from "./core/menu-links";
 export {
   OutboundRetryError,

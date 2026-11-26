@@ -258,7 +258,7 @@ export const MARKETPLACE_MCP_TOOLS = [
     method: "PUT",
     path: BASE,
     summary:
-      "Create, update, archive or unarchive one or many marketplace connections in one all-or-nothing call. A row is keyed by `provider`; `operation` is `upsert` (default: any subset of the settings; omitting `credentials` keeps the stored secrets, sending them resets the status to UNVERIFIED), `archive` or `unarchive` (reversible, audited, with an optional `reason`). Any problem writes nothing and every problem comes back with its path. `validateOnly: true` checks without writing.",
+      "Create, update, archive or unarchive one or many marketplace connections in one all-or-nothing call. A row is keyed by `provider`; `operation` is `upsert` (default: any subset of the settings; omitting `credentials` keeps the stored secrets, sending them resets the status to UNVERIFIED), `archive` or `unarchive` (reversible, audited, with an optional `reason`). An `externalMerchantId` another store's live connection holds is refused `MERCHANT_TAKEN` at that field (an unarchive reviving one, at `provider`). Any problem writes nothing and every problem comes back with its path. `validateOnly: true` checks without writing.",
     tags: ["marketplace"],
     params: marketplaceParams,
     body: upsertMarketplaceIntegrationsBody,
