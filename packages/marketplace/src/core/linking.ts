@@ -267,8 +267,8 @@ export async function finishLink(
   if (listed.kind !== "ok") {
     ctx.ports.logger.warn(`marketplace.link: ${input.provider} merchants of ${input.clientId} not listed (${listed.kind})`);
   }
-  await saveLinkKeepingTokens(ctx, input, { environment, refreshToken: grant.refreshToken, merchants, verifier: sealedVerifier });
-  cacheLinkToken(ctx, linkTokenKey(input.provider, environment, input.clientId), grant);
+  const sealed = await saveLinkKeepingTokens(ctx, input, { environment, refreshToken: grant.refreshToken, merchants, verifier: sealedVerifier });
+  await cacheLinkToken(ctx, { ...input, sealed }, linkTokenKey(input.provider, environment, input.clientId), grant);
   ctx.ports.publishChanged(input.clientId);
   return { kind: "linked", integration: await viewOf(ctx, input.clientId, input.provider), merchants };
 }

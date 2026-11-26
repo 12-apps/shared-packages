@@ -366,5 +366,6 @@ export async function readOutboundConnection(
   const app = await appCredentialsOf(ctx, provider, environment);
   if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
   const refreshToken = openLinkRefreshToken(ctx, row.credentials);
-  return { environment, credentials: app, grant: linkGrant(ctx, { clientId, provider, environment, refreshToken, app }) };
+  const link = { clientId, provider, environment, refreshToken, app, sealed: row.credentials };
+  return { environment, credentials: app, grant: linkGrant(ctx, link) };
 }

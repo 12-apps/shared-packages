@@ -48,8 +48,29 @@ export async function appCredentialsOf(
 export const linkTokenKey = (provider: string, environment: string, clientId: string): string =>
   `LINK:${provider}:${environment}:${clientId}`;
 
-/** Put a fresh access token in the cache. */
-export function cacheLinkToken(ctx: EngineContext, key: string, grant: LinkGrant): void {
+/** The row a token belongs to, and the sealed blob it was read with: the compare-and-set's version. */
+interface LinkVersion {
+  clientId: string;
+  provider: string;
+  sealed: string;
+}
+
+/**
+ * Put a fresh access token in the cache, only while the connection still
+ * holds the blob it was bought with: a grant a re-link replaced caches nothing.
+ */
+export async function cacheLinkToken(ctx: EngineContext, link: LinkVersion, key: string, grant: LinkGrant): Promise<boolean> {
+  const db = await ctx.ports.db();
+  const row = (await db.marketplaceIntegration.findUnique({
+    where: { clientId_provider: { clientId: link.clientId, provider: link.provider } },
+    select: { credentials: true },
+  })) as { credentials: string } | null;
+  if (row?.credentials !== link.sealed) return false;
+  setToken(ctx, key, grant);
+  return true;
+}
+
+function setToken(ctx: EngineContext, key: string, grant: LinkGrant): void {
   const expiresAt = ctx.ports.clock.now().getTime() + Math.max(grant.expiresInSeconds, 1) * 1000;
   ctx.tokens.set(key, { token: grant.accessToken, expiresAt });
 }
@@ -58,7 +79,7 @@ export function cacheLinkToken(ctx: EngineContext, key: string, grant: LinkGrant
 const inflight = new WeakMap<AdapterTokenCache, Map<string, Promise<{ token: string } | OutboundResult>>>();
 
 /** Who a grant is for. */
-interface LinkedConnection {
+interface LinkedConnection extends LinkVersion {
   clientId: string;
   provider: MarketplaceProvider;
   environment: "SANDBOX" | "PRODUCTION";
@@ -66,27 +87,33 @@ interface LinkedConnection {
   app: MarketplaceCredentials;
 }
 
-/** Store a rotated refresh token back on the live connection. */
-async function storeRotated(ctx: EngineContext, link: LinkedConnection, refreshToken: string): Promise<void> {
+/** Store a rotated refresh token back on the live connection, unless a re-link replaced the blob it was read with. */
+async function storeRotated(ctx: EngineContext, link: LinkedConnection, refreshToken: string): Promise<boolean> {
   const db = await ctx.ports.db();
-  await db.marketplaceIntegration.updateMany({
-    where: { clientId: link.clientId, provider: link.provider, authMode: "LINKED", archivedAt: null },
+  const { count } = await db.marketplaceIntegration.updateMany({
+    where: { clientId: link.clientId, provider: link.provider, authMode: "LINKED", archivedAt: null, credentials: link.sealed },
     data: { credentials: sealLink(ctx, refreshToken) },
   });
+  return count > 0;
 }
 
 /**
  * The marketplace no longer honours the refresh token: the store must link
- * again. The connection reads FAILED, which is what the screen shows.
+ * again. The connection reads FAILED, which is what the screen shows; a
+ * connection linked again since the token was read is left alone.
  */
-async function markLinkFailed(ctx: EngineContext, link: LinkedConnection): Promise<void> {
+async function markLinkFailed(ctx: EngineContext, link: LinkedConnection): Promise<boolean> {
   const db = await ctx.ports.db();
-  await db.marketplaceIntegration.updateMany({
-    where: { clientId: link.clientId, provider: link.provider, authMode: "LINKED" },
+  const { count } = await db.marketplaceIntegration.updateMany({
+    where: { clientId: link.clientId, provider: link.provider, authMode: "LINKED", credentials: link.sealed },
     data: { status: "FAILED" },
   });
-  ctx.ports.publishChanged(link.clientId);
+  if (count > 0) ctx.ports.publishChanged(link.clientId);
+  return count > 0;
 }
+
+/** What a refresh that lost the race to a re-link answers: the caller reads the new link and tries again. */
+const RELINKED: OutboundResult = { kind: "retry", reason: "the connection was linked again during the refresh" };
 
 async function refreshOnce(ctx: EngineContext, link: LinkedConnection, key: string): Promise<{ token: string } | OutboundResult> {
   const linking = ctx.registry.get(link.provider)?.linking;
@@ -96,22 +123,22 @@ async function refreshOnce(ctx: EngineContext, link: LinkedConnection, key: stri
     { refreshToken: link.refreshToken },
   );
   if (answer.kind === "retry") return answer;
-  if (answer.kind === "refused") {
-    await markLinkFailed(ctx, link);
-    return { ...answer, own: true };
-  }
-  cacheLinkToken(ctx, key, answer.value);
+  if (answer.kind === "refused") return (await markLinkFailed(ctx, link)) ? { ...answer, own: true } : RELINKED;
   const rotated = answer.value.refreshToken;
-  if (rotated !== null && rotated !== link.refreshToken) {
-    // The new token is already in hand; a failed write costs a re-link only if
-    // the marketplace also revoked the old one, so it is logged, never thrown.
-    await storeRotated(ctx, link, rotated).catch((error: unknown) =>
-      ctx.ports.logger.error(
-        `marketplace.link: ${link.provider} rotated refresh token of ${link.clientId} not stored: ` +
-          (error instanceof Error ? error.message : String(error)),
-      ),
-    );
+  if (rotated === null || rotated === link.refreshToken) {
+    return (await cacheLinkToken(ctx, link, key, answer.value)) ? { token: answer.value.accessToken } : RELINKED;
   }
+  // The new token is already in hand; a failed write costs a re-link only if
+  // the marketplace also revoked the old one, so it is logged, never thrown.
+  const stored = await storeRotated(ctx, link, rotated).catch((error: unknown) => {
+    ctx.ports.logger.error(
+      `marketplace.link: ${link.provider} rotated refresh token of ${link.clientId} not stored: ` +
+        (error instanceof Error ? error.message : String(error)),
+    );
+    return null;
+  });
+  if (stored === false) return RELINKED;
+  setToken(ctx, key, answer.value);
   return { token: answer.value.accessToken };
 }
 
