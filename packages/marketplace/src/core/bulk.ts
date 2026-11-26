@@ -67,7 +67,7 @@ function unknownProviders(ctx: EngineContext, rows: readonly { provider: string 
   );
 }
 
-const SETTING_KEYS = ["enabled", "environment", "externalMerchantId", "autoAccept", "ackSlaSeconds", "credentials"] as const;
+const SETTING_KEYS = ["enabled", "environment", "externalMerchantId", "autoAccept", "followStatus", "ackSlaSeconds", "credentials"] as const;
 
 function integrationRowProblems(
   row: IntegrationRowInput,

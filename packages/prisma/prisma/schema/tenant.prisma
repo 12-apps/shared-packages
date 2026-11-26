@@ -1,0 +1,88 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/tenant — the host's multi-file schema folder holds a COPY of
+// this file, written by `pnpm --filter @12-apps/tenant prisma:sync`.
+//
+// COPIED, never symlinked (the entity-lifecycle doctrine): `npm pack` silently
+// drops symlinked entries, `turbo prune` dangles a link whose owner is not a
+// declared dependency, and Prisma silently SKIPS a symlinked migration
+// directory — a green deploy that applied no schema.
+//
+// Deliberately self-contained (the @12-apps/auth doctrine): every tenant
+// reference is a `tenant_id` String column — NO foreign key into any host table
+// — so these models work in a repo whose tenant table is called anything, or
+// is in another database. The tenant row itself, its slugs and its domains
+// stay the host's: Prisma refuses two models on one table, so the package
+// reaches the row only through the tenant port (`TenantPort`).
+//
+// Statuses are Strings + DB CHECK (the house style), never a Prisma enum.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A tenant's close: one row while the tenant is closing, kept once the purge
+/// ran (`purged_at`). When it was confirmed and by whom, the reason the person
+/// typed, the status the close started from, when the data is purged, the two
+/// reminder stamps the sweep writes only AFTER the notice is recorded (so
+/// neither reminder is sent twice), and the host's after-close hook's outcome.
+/// Reopening deletes the row.
+model TenantClosing {
+  /// The host's tenant id, opaque. See the header — no FK.
+  tenantId           String    @id @map("tenant_id")
+  requestedAt        DateTime  @map("requested_at")
+  /// Who confirmed, the host's user id; null for a platform actor with no user
+  /// row. That null IS the platform actor: no separate actor column. No FK.
+  requestedById      String?   @map("requested_by_id")
+  reason             String
+  /// The host status the close started from (any value of its status set, a
+  /// suspended one included); reopening restores it. Null on a row copied
+  /// from before this column existed, which reopens to the active status.
+  priorStatus        String?   @map("prior_status")
+  purgeAt            DateTime  @map("purge_at")
+  remindedWeekAt     DateTime? @map("reminded_week_at")
+  remindedDayAt      DateTime? @map("reminded_day_at")
+  purgedAt           DateTime? @map("purged_at")
+  /// The host's after-close hook went through (a billing cancel, say); null
+  /// until then, and the sweep retries it.
+  afterCloseDoneAt   DateTime? @map("after_close_done_at")
+  /// The last time the after-close hook threw: the retry is due, and the
+  /// failure is audited.
+  afterCloseFailedAt DateTime? @map("after_close_failed_at")
+  /// Object-storage keys the purge still has to delete: recorded before the
+  /// rows naming them go, emptied as each set is confirmed gone; the sweep
+  /// retries what is left.
+  imageKeysOwed      String[]  @default([]) @map("image_keys_owed")
+  /// The pass that emptied `image_keys_owed`.
+  imagesErasedAt     DateTime? @map("images_erased_at")
+
+  @@index([purgeAt])
+  @@map("tenant_closings")
+}
+
+/// One data export: the archive a person with the close permission asks for,
+/// built by a job, kept PRIVATE in storage under `storageKey`, and handed out
+/// until `expiresAt`. At most one PREPARING row per tenant (a partial unique
+/// index, in the migration): a second request answers the running one.
+model TenantDataExport {
+  id            String    @id
+  /// The host's tenant id, opaque. See the header — no FK.
+  tenantId      String    @map("tenant_id")
+  /// Who asked, and whom the link is mailed to. No FK.
+  requestedById String    @map("requested_by_id")
+  /// PREPARING | READY | FAILED (CHECK).
+  status        String
+  requestedAt   DateTime  @map("requested_at")
+  /// When a build last started: the sweep re-runs a PREPARING row whose build
+  /// went quiet.
+  startedAt     DateTime? @map("started_at")
+  readyAt       DateTime? @map("ready_at")
+  expiresAt     DateTime? @map("expires_at")
+  storageKey    String?   @map("storage_key")
+  sizeBytes     Int?      @map("size_bytes")
+  attempts      Int       @default(0)
+  /// The link was mailed.
+  notifiedAt    DateTime? @map("notified_at")
+  /// The stored archive was deleted after `expiresAt`.
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@index([tenantId, requestedAt])
+  @@index([status, requestedAt])
+  @@map("tenant_data_exports")
+}

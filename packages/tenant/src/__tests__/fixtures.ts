@@ -1,4 +1,4 @@
-import { TENANT_COPY_KEYS, type TenantCopyPack, type TenantCoreConfig } from '../config';
+import { TENANT_COPY_SHAPE, type TenantCopyPack, type TenantCoreConfig } from '../config';
 import type { TenantPort, TenantRecord } from '../port';
 import type { TenantServerConfig } from '../server';
 
@@ -9,12 +9,18 @@ import type { TenantServerConfig } from '../server';
  * have quietly assumed.
  */
 
-export type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
+type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
 
+/** A text key reads `<locale>: <key>.`; a sentence key echoes its arguments. */
 function pack(prefix: string): TenantCopyPack {
   return Object.fromEntries(
-    TENANT_COPY_KEYS.map((key) => [key, `${prefix}: ${key} sentence.`]),
-  ) as TenantCopyPack;
+    Object.entries(TENANT_COPY_SHAPE).map(([key, kind]) => [
+      key,
+      kind === 'text'
+        ? `${prefix}: ${key}.`
+        : (...args: unknown[]) => `${prefix}: ${key}(${args.join(', ')}).`,
+    ]),
+  ) as unknown as TenantCopyPack;
 }
 
 export function coreConfig(): TenantCoreConfig<ClinicStatus> {
@@ -24,6 +30,7 @@ export function coreConfig(): TenantCoreConfig<ClinicStatus> {
       active: 'OPEN',
       closing: 'WINDING_DOWN',
       closed: 'SHUT',
+      closableFrom: ['OPEN', 'ON_HOLD'],
     },
     ids: {
       refusals: {
@@ -31,6 +38,16 @@ export function coreConfig(): TenantCoreConfig<ClinicStatus> {
         closed: 'CLINIC_SHUT',
         readOnly: 'CLINIC_READ_ONLY',
         gone: 'CLINIC_GONE',
+        reasonTooShort: 'CLINIC_REASON_TOO_SHORT',
+        nameMismatch: 'CLINIC_NAME_MISMATCH',
+        alreadyClosing: 'CLINIC_ALREADY_WINDING_DOWN',
+        notActive: 'CLINIC_NOT_OPEN',
+        closingBlocked: 'CLINIC_CLOSE_BLOCKED',
+        purged: 'CLINIC_PURGED',
+        notClosing: 'CLINIC_NOT_WINDING_DOWN',
+        exportNeedsPerson: 'CLINIC_EXPORT_NEEDS_PERSON',
+        exportNotFound: 'CLINIC_EXPORT_NOT_FOUND',
+        exportExpired: 'CLINIC_EXPORT_EXPIRED',
       },
       audit: {
         closeScheduled: 'clinic_close.scheduled',
@@ -44,6 +61,7 @@ export function coreConfig(): TenantCoreConfig<ClinicStatus> {
         closingScheduled: 'clinic.closing_scheduled',
         closingWeek: 'clinic.closing_week',
         closingDay: 'clinic.closing_day',
+        reopened: 'clinic.reopened',
         exportReady: 'clinic.export_ready',
       },
       permissions: { close: 'clinic:close' },
@@ -55,15 +73,42 @@ export function coreConfig(): TenantCoreConfig<ClinicStatus> {
   };
 }
 
-const TENANTS: TenantRecord<ClinicStatus>[] = [{ id: 't-1', slug: 'north', status: 'OPEN' }];
+/** The host's transaction client, as the fake port sees it. */
+export interface FakeTx {
+  label: string;
+}
 
-export function fakePort(): TenantPort<ClinicStatus, { label: string }> {
+/** Every call the fake port received: its name and its arguments, the tx included. */
+export type PortCall = readonly [string, ...unknown[]];
+
+/**
+ * A port over one in-memory row that records every call. `setStatusIf` is a
+ * real compare-and-set: it moves the row only while it is in `from`.
+ */
+function fakePort(calls: PortCall[]): TenantPort<ClinicStatus, FakeTx> {
+  const rows: TenantRecord<ClinicStatus>[] = [{ id: 't-1', slug: 'north', status: 'OPEN' }];
   return {
-    bySlug: async (slug) => TENANTS.find((row) => row.slug === slug) ?? null,
-    byId: async (id) => TENANTS.find((row) => row.id === id) ?? null,
-    setStatusIf: async () => false,
-    clearProfile: async () => undefined,
-    timeZone: async () => 'Europe/London',
+    bySlug: async (slug) => {
+      calls.push(['bySlug', slug]);
+      return rows.find((row) => row.slug === slug) ?? null;
+    },
+    byId: async (id, tx) => {
+      calls.push(['byId', id, tx]);
+      return rows.find((row) => row.id === id) ?? null;
+    },
+    setStatusIf: async (id, from, to, tx) => {
+      calls.push(['setStatusIf', id, from, to, tx]);
+      const row = rows.find((candidate) => candidate.id === id && candidate.status === from);
+      if (row) row.status = to;
+      return row !== undefined;
+    },
+    clearProfile: async (tx, id) => {
+      calls.push(['clearProfile', tx, id]);
+    },
+    timeZone: async (id) => {
+      calls.push(['timeZone', id]);
+      return 'Europe/London';
+    },
     treeNode: async () => null,
     treeAncestors: async () => [],
     treeDescendants: async () => [],
@@ -71,8 +116,8 @@ export function fakePort(): TenantPort<ClinicStatus, { label: string }> {
   };
 }
 
-export function serverConfig(): TenantServerConfig<ClinicStatus, { label: string }> {
-  return { ...coreConfig(), port: fakePort() };
+export function serverConfig(calls: PortCall[] = []): TenantServerConfig<ClinicStatus, FakeTx> {
+  return { ...coreConfig(), port: fakePort(calls) };
 }
 
 /**

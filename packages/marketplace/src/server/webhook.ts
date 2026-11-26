@@ -99,7 +99,9 @@ async function handleWebhook(config: MarketplaceApiConfig, request: WireRequest<
     payload,
     // A DISABLED connection still stores its deliveries and ingests nothing;
     // the retry sweep ingests them if the store turns it back on.
-    settings: target.enabled ? { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds } : null,
+    settings: target.enabled
+      ? { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds, followStatus: target.followStatus }
+      : null,
   });
   if (outcome.kind === "failed") {
     return { status: 500, body: { received: true, error: outcome.reason } };

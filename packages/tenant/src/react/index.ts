@@ -8,7 +8,7 @@
  * refusal an answer is); the screens arrive with the lifecycle slice.
  */
 import type { TenantCoreConfig } from '../config';
-import { createReadings, type TenantReadings } from '../core';
+import { createReadings, frozenCopy, type DeepReadonly, type TenantReadings } from '../core';
 import { validateCoreConfig } from '../validate';
 
 export { TenantConfigError } from '../validate';
@@ -17,12 +17,12 @@ export { TenantConfigError } from '../validate';
 export type TenantWebConfig<S extends string = string> = TenantCoreConfig<S>;
 
 export interface WebTenant<S extends string = string> extends TenantReadings<S> {
-  /** The validated config, frozen. */
-  config: Readonly<TenantWebConfig<S>>;
+  /** The validated config, a deep-frozen copy. */
+  config: DeepReadonly<TenantWebConfig<S>>;
 }
 
 export function createWebTenant<S extends string>(config: TenantWebConfig<S>): WebTenant<S> {
   validateCoreConfig(config);
-  const frozen = Object.freeze({ ...config });
-  return { ...createReadings(frozen), config: frozen };
+  const data = frozenCopy({ statuses: config.statuses, ids: config.ids, copy: config.copy });
+  return { ...createReadings(data), config: data };
 }

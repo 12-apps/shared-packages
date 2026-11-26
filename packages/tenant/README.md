@@ -6,17 +6,21 @@ with its own vocabulary, ids, copy and a port onto its own tenant row.
 
 This first release ships the **contract** every later behaviour extends:
 
-- the config types: the host's full status set, the id set (refusal codes,
-  audit action ids, notification type ids, permission ids) and whole-sentence
-  copy packs per locale;
+- the config types: the host's full status set (with the statuses a close may
+  start from), the id set (refusal codes, audit action ids, notification type
+  ids, permission ids) and whole-sentence copy packs per locale. Every id and
+  sentence the later behaviours need is required already, so a later release
+  never adds a required piece to a host's config;
 - the **tenant port** the package reaches the host's tenant row through:
-  `bySlug`, `byId`, `setStatusIf(id, from, to)`, `clearProfile(tx, id)`,
-  `timeZone(id)`, and the tree's `treeNode`, `treeAncestors`, `treeDescendants`,
-  `moveSubtree`;
+  `bySlug`, `byId(id, tx?)`, `setStatusIf(id, from, to, tx)`,
+  `clearProfile(tx, id)`, `timeZone(id)`, and the tree's `treeNode`,
+  `treeAncestors`, `treeDescendants`, `moveSubtree(move, tx)`. Its writes run on
+  the caller's transaction;
 - the **tenant tree**: a tenant under a parent, any depth, on a materialized
   path the package computes and validates; `parentOf`, `rootOf`, `ancestorsOf`,
   `descendantsOf` (one port call each) and a subtree `move` that refuses a cycle;
-- `createApiTenant` and `createWebTenant`, which validate all of it at startup;
+- `createApiTenant` and `createWebTenant`, which validate all of it at startup
+  and keep a deep-frozen copy of the data;
 - the package's own tables, `tenant_closings` and `tenant_data_exports`, as a
   Prisma partial with its own migration.
 
@@ -40,13 +44,16 @@ in later releases on top of the same config. How to adopt it: [ADOPTING.md](./AD
   the package was extracted from, and must find nothing.
 - **Copy is config, as whole sentences.** No copy ships with the package. A noun
   alone is not enough: in a gendered language the noun changes the rest of the
-  sentence.
+  sentence. A sentence that carries a value (a count, a name, a day) is a
+  function the host writes, so plurals and word order stay the host's.
 - **Ids are config.** Refusal codes, audit action ids, notification type ids and
   permission ids are the host's, so its clients and its stored rows never change.
 - **Required config, never defaults.** A missing piece throws a
   `TenantConfigError` naming the key, at startup.
 - **The tenant row stays the host's.** The package never maps it; its own tables
-  are keyed by an opaque `tenant_id` with no foreign key.
+  are keyed by an opaque `tenant_id` with no foreign key. `bySlug` resolves the
+  tenant's CURRENT slug only; former slugs a host keeps are the address
+  behaviour's, through a port of its own.
 
 ## Tables
 

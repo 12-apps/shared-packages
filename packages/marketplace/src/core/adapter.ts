@@ -1,7 +1,12 @@
 import type { MarketplaceCatalogue } from "./catalogue-port";
 import type { CatalogueReader } from "./catalogue-read-port";
 import type { MarketplaceAvailability } from "./pause-port";
-import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
+import type {
+  MarketplaceDeliveredBy,
+  MarketplaceProvider,
+  NormalizedEvent,
+  NormalizedMarketplaceOrder,
+} from "./types";
 
 /**
  * The adapter port: everything one marketplace is, behind one shape.
@@ -83,6 +88,23 @@ export interface MarketplaceCapabilities {
    * the request as TIMEOUT. Absent: only the 24-hour give-up applies.
    */
   cancellationAnswerWindowMs?: number;
+  /**
+   * OPTIONAL. The steps this marketplace can be told about (`informStatus`).
+   * Absent or empty: the engine tells it nothing.
+   */
+  statusSteps?: readonly StatusStep[];
+}
+
+/**
+ * A step of the order the store tells the marketplace about (FUT-4653): the
+ * order is ready for pickup, the courier left, the order was handed over.
+ */
+export type StatusStep = "READY" | "DISPATCHED" | "HANDED_OVER";
+
+/** What a status call is told about the order: who carries it (null: a take-out, or unstated). */
+export interface StatusFacts {
+  step: StatusStep;
+  deliveredBy: MarketplaceDeliveredBy | null;
 }
 
 /** One reason a store may give for refusing or cancelling an order. */
@@ -176,6 +198,24 @@ export interface MarketplaceAdapter {
     order: OutboundOrderRef,
     input: CancellationRequestInput,
   ): Promise<OutboundResult>;
+  /**
+   * OPTIONAL. Whether this marketplace takes this step for this kind of order,
+   * answered offline, with no call: the job asks it BEFORE it claims anything
+   * (an unsupported step leaves no row). Absent: every step in
+   * `capabilities.statusSteps` is taken for every order.
+   */
+  statusSupported?(facts: StatusFacts): boolean;
+  /**
+   * OPTIONAL. Tell the marketplace the order reached a step (FUT-4653). Called
+   * only from the `marketplace.outbound` job, action `status`. `unsupported`
+   * (no endpoint for this step and this kind of order) ends the job with no
+   * row. Absent: the marketplace is told nothing.
+   */
+  informStatus?(
+    ctx: AdapterCallContext,
+    order: OutboundOrderRef,
+    facts: StatusFacts,
+  ): Promise<OutboundResult | { kind: "unsupported" }>;
   /**
    * OPTIONAL. Fetch the order an event announced with `orderToFetch` (a
    * marketplace whose events carry no order body). Called only from the

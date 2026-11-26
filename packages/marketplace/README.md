@@ -352,6 +352,62 @@ nothing, so the order stays ACCEPTED here while cancelled on Rappi. The take
 the accept queued is then answered 400, so the order shows "não confirmou"
 with the portal link and a person settles it there.
 
+## Following and informing an order's status (FUT-4653)
+
+Two directions, both forward-only and neither ever refused, reverted or waited on.
+
+**Inbound.** An iFood `DSP`/`CON` and an Open Delivery `DISPATCHED`/`CONCLUDED`
+normalize to `NormalizedEvent.lifecycle` (`"DISPATCHED"` or `"CONCLUDED"`).
+iFood's codes are ESTIMATED (its portal refused our reader, 2026-11-25); Rappi
+maps none (its `event` values are undocumented). With the connection's
+`followStatus` ON (default; `marketplace_integrations.follow_status`) and a host
+that binds `order.onLifecycle`, the engine asks the host to move the order
+forward, after four rules of its own, each ending the delivery IGNORED with a
+reason:
+
+1. no acceptance yet: DEFERRED (PENDING, one attempt counted,
+   `lifecycle before its order`), so the reconcile pass applies it after the
+   order's own event ingests; retired after `maxInboxAttempts`;
+2. the acceptance is not ACCEPTED (`the order is AWAITING, not ACCEPTED`);
+3. a cancellation request is PENDING or REQUESTED;
+4. the event echoes a step we informed (`echo of our DISPATCHED`; a CONCLUDED
+   after our HANDED_OVER): without this, a store that dispatched, told iFood and
+   dragged the bag back would have it dispatched again by iFood's own echo.
+
+Whatever the host answers, the marketplace's word is NOTED (a
+`marketplace_status_updates` row) so our own job never informs it back. The
+host answers `"moved"`, `"unchanged"` or `{ kind: "unchanged", reason }` (its
+reason becomes the inbox's; a bag whose store never named a courier is the
+host's rule, not the engine's). The facts it gets are `{ deliveredBy }`
+(`MERCHANT`, `MARKETPLACE`, null for a take-out). Switch OFF, no hook, or
+settings built by hand without `followStatus`: byte-for-byte the old answer
+(`no order body on <type>`).
+
+**Outbound.** The host calls `engine.informStatus({ clientId, orderId, step,
+at, delayMs? })` when an order reaches `READY`, `DISPATCHED` or `HANDED_OVER`:
+one enqueue of `marketplace.outbound` (action `status`), no statement, never
+throws. The job asks, in order, stopping at the first no, with no row and no
+call: acceptance ACCEPTED and no cancellation request standing; the adapter
+states the step (`capabilities.statusSteps`) and takes it for this order
+(`statusSupported`); `order.statusHolds` says the order still holds it; no
+status row exists for (order, step) and the marketplace has not CONCLUDED;
+then it claims the row (STORE, SENDING, unique per (order, step)) and calls
+`informStatus`. 2xx is SENT; a final 4xx FAILED (error log, never retried); a
+5xx or timeout is retried (3 attempts, exponential from 30 s) and the last is
+FAILED. A SENDING row left by a dead job is re-queued by the outbound sweep
+after 10 minutes and failed after 24 hours.
+
+| step | iFood (ESTIMATED) | 99Food (Open Delivery v1.7.1) | Rappi |
+|---|---|---|---|
+| READY | `POST /orders/{id}/readyToPickup`, not for a merchant bag | `POST /v1/orders/{id}/readyForPickup` | `POST /orders/{id}/ready-for-pickup` (ESTIMATED verb; MANUAL-notification stores only) |
+| DISPATCHED | `POST /orders/{id}/dispatch`, merchant bag only | `POST /v1/orders/{id}/dispatch`, merchant bag only | none |
+| HANDED_OVER | none | merchant bag `delivered`, take-out `pickedUp`, fleet none | none |
+
+Sources: Open Delivery `openapi.yaml` (read 2026-11-25), Rappi's portal
+"Managing User Orders" (read 2026-11-25); iFood's developer portal answered 403,
+so every iFood row but confirm and requestCancellation is ESTIMATED, in
+`src/ifood/outbound.ts` and `src/ifood/normalize.ts` only.
+
 ## Pausing a store (FUT-4851)
 
 When the store's kitchen passes its cap, the host closes the store on every

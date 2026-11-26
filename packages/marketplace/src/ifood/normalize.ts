@@ -1,4 +1,5 @@
 import type {
+  MarketplaceLifecycle,
   MarketplaceDeliveredBy,
   MarketplaceDiscountSponsor,
   MarketplaceOrderType,
@@ -38,6 +39,21 @@ const ORDER_PLACED = new Set(["PLC", "PLACED", "ORDER_PLACED"]);
 const ORDER_CANCELLED = new Set(["CAN", "CANCELLED", "ORDER_CANCELLED"]);
 /** iFood refused the store's own cancellation request. */
 const CANCELLATION_REQUEST_FAILED = new Set(["CARF", "CANCELLATION_REQUEST_FAILED"]);
+
+/**
+ * The lifecycle events (FUT-4653): the order left (`DSP`) and the order is
+ * finished (`CON`). ESTIMATED: iFood's portal refused our reader (Cloudflare
+ * 403, https://developer.ifood.com.br, 2026-11-25), so these codes and their
+ * long forms are the ones iFood's event stream is commonly documented with,
+ * not read off a page. They sit here beside the sets above so homologation
+ * corrects one place.
+ */
+const LIFECYCLE_OF: Readonly<Record<string, MarketplaceLifecycle>> = {
+  DSP: "DISPATCHED",
+  DISPATCHED: "DISPATCHED",
+  CON: "CONCLUDED",
+  CONCLUDED: "CONCLUDED",
+};
 
 /**
  * Verify a delivery against the merchant's webhook secret: iFood signs the raw
@@ -257,5 +273,6 @@ export function normalizeIfoodEvent(
     order: placed ? readOrder(payload, externalOrderId, options.missingStreetNumber) : null,
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : refusedRequest ? "FAILED" : null,
+    ...(LIFECYCLE_OF[eventType.toUpperCase()] ? { lifecycle: LIFECYCLE_OF[eventType.toUpperCase()] } : {}),
   };
 }

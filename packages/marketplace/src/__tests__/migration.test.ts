@@ -132,6 +132,52 @@ describe("the engine's migration", () => {
     await db.close();
   });
 
+  it("[O8] adds follow_status ON to every existing connection, and the status table with its guards (FUT-4653)", async () => {
+    const db = new PGlite();
+    await db.exec(PREDECESSOR);
+    // A connection the previous release wrote, before the column exists.
+    const migrations = migrationSql();
+    const last = migrations.pop() as string;
+    for (const sql of migrations) await db.exec(sql);
+    await db.exec(
+      `INSERT INTO marketplace_integrations (id, client_id, provider, credentials, updated_at) VALUES ('i1', 't', 'IFOOD', '', now())`,
+    );
+    await db.exec(last);
+
+    const flags = await db.query<{ follow_status: boolean }>("SELECT follow_status FROM marketplace_integrations");
+    expect(flags.rows).toEqual([{ follow_status: true }]);
+    expect(await columns(db, "marketplace_status_updates")).toEqual(
+      ["claim_key", "client_id", "created_at", "id", "order_id", "provider", "source", "state", "step", "updated_at"],
+    );
+    const row = (step: string, source = "STORE", state = "SENT") =>
+      `INSERT INTO marketplace_status_updates (id, client_id, order_id, provider, step, source, state, claim_key, updated_at)
+       VALUES ('s-${step}-${source}', 't', 'o1', 'IFOOD', '${step}', '${source}', '${state}', 'k', now())`;
+    await expect(db.exec(row("READY"))).resolves.toBeDefined();
+    await expect(db.exec(row("READY", "MARKETPLACE", "NOTED"))).rejects.toThrow(/order_id_step_key/);
+    await expect(db.exec(row("CONCLUDED", "MARKETPLACE", "NOTED"))).resolves.toBeDefined();
+    await expect(db.exec(row("PACKED"))).rejects.toThrow(/step_check/);
+    await expect(db.exec(row("DISPATCHED", "SOMEONE"))).rejects.toThrow(/source_check/);
+    await expect(db.exec(row("DISPATCHED", "STORE", "LOST"))).rejects.toThrow(/state_check/);
+    await db.close();
+  });
+
+  it("runs the status claim on real Postgres: the second claim of a step loses, the stamp is predicated", async () => {
+    const db = new PGlite();
+    await applyAll(db);
+    const { db: store } = pgliteDb(db);
+    const table = store.marketplaceStatusUpdate!;
+    const data = { clientId: "t", orderId: "o1", provider: "IFOOD", step: "DISPATCHED", source: "STORE", state: "SENDING", claimKey: "k1" };
+
+    await table.create({ data });
+    await expect(table.create({ data })).rejects.toMatchObject({ code: "P2002" });
+    expect(await table.updateMany({ where: { orderId: "o1", step: "DISPATCHED", state: "SENDING", claimKey: "k1" }, data: { state: "SENT" } })).toEqual({ count: 1 });
+    expect(await table.updateMany({ where: { orderId: "o1", step: "DISPATCHED", state: "SENDING" }, data: { state: "FAILED" } })).toEqual({ count: 0 });
+    expect(await table.findMany({ where: { orderId: "o1", step: { in: ["DISPATCHED", "CONCLUDED"] } } })).toEqual([
+      expect.objectContaining({ step: "DISPATCHED", state: "SENT" }),
+    ]);
+    await db.close();
+  });
+
   it("adopts the predecessor's table: adds the columns, drops the closed list, keeps the host's foreign key", async () => {
     const db = new PGlite();
     await db.exec(PREDECESSOR);

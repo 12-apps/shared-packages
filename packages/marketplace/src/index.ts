@@ -38,6 +38,8 @@ export {
   type MarketplaceHttpRequest,
   type MarketplaceHttpResponse,
   type OutboundOrderRef,
+  type StatusFacts,
+  type StatusStep,
   type OutboundResult,
 } from "./core/adapter";
 export {
@@ -59,6 +61,8 @@ export type {
   MarketplaceDb,
   MarketplaceEngineConfig,
   MarketplaceEnqueuePort,
+  MarketplaceLifecycleAnswer,
+  MarketplaceLifecycleFacts,
   MarketplaceLogger,
   MarketplaceOrderPort,
   MarketplaceOrderSummary,
@@ -76,6 +80,7 @@ export {
   type MarketplaceProvider,
   type NormalizedAddress,
   type NormalizedBuyer,
+  type MarketplaceLifecycle,
   type NormalizedEvent,
   type NormalizedMarketplaceOrder,
   type NormalizedOrderDiscount,
@@ -127,6 +132,7 @@ export {
   type OutboundJobPayload,
 } from "./core/outbound-queue";
 export type { DeliveryOutcome } from "./core/pipeline";
+export type { InformStatusInput } from "./core/status-inform";
 export {
   FetchOrderRetryError,
   MARKETPLACE_FETCH_ORDER_JOB,

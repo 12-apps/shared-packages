@@ -174,7 +174,7 @@ class MemoryTable {
 
 const EPOCH = new Date("2026-01-01T00:00:00.000Z");
 
-/** The seven tables, with the defaults and uniques of the shipped migration. */
+/** The eight tables, with the defaults and uniques of the shipped migration. */
 export function createMemoryDb() {
   const tables = {
     marketplaceIntegration: new MemoryTable("integration", {
@@ -183,6 +183,7 @@ export function createMemoryDb() {
         environment: "SANDBOX",
         externalMerchantId: null,
         autoAccept: false,
+        followStatus: true,
         ackSlaSeconds: 300,
         status: "UNVERIFIED",
         lastEventAt: null,
@@ -249,6 +250,10 @@ export function createMemoryDb() {
     marketplaceCatalogueCategory: new MemoryTable("category", {
       defaults: () => ({ externalId: null, claimedAt: null, createdAt: EPOCH }),
       unique: [["clientId", "provider", "name"]],
+    }),
+    marketplaceStatusUpdate: new MemoryTable("status", {
+      defaults: () => ({ createdAt: EPOCH, updatedAt: EPOCH }),
+      unique: [["orderId", "step"]],
     }),
     marketplaceStorePause: new MemoryTable("pause", {
       defaults: () => ({
