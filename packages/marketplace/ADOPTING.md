@@ -314,5 +314,7 @@ keeps selling the item alone.
 
 **The database.** Migration `20261126230000_marketplace_menu_link_variation`
 adds the nullable `marketplace_menu_links.variation_id`: additive, no foreign
-key, every existing link stays the item alone. A client generated before the
-migration reads every link as the item alone.
+key, every existing link stays the item alone. The engine selects the column,
+so a Prisma client generated before the migration throws on the unknown
+`variationId`: on the bump, sync the partial, run `prisma generate` and apply
+the migration together.

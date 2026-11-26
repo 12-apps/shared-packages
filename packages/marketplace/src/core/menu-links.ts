@@ -69,7 +69,8 @@ function toView(row: LinkRow): MarketplaceMenuLinkView {
     externalSku: row.externalSku,
     externalName: row.externalName ?? row.externalSku,
     menuItemId: row.menuItemId,
-    // A row of a host whose client predates the column reads as the item alone.
+    // A row with no variation key (a fake db) reads as the item alone. A Prisma client
+    // generated before the migration throws on `variationId` instead: sync, generate, migrate.
     variationId: row.menuItemId === null ? null : (row.variationId ?? null),
     lastSeenAt: row.lastSeenAt,
   };

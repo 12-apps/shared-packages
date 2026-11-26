@@ -132,6 +132,11 @@ describe("the variation migration", () => {
     );
 
     for (const sql of all) await pg.exec(sql);
+    const before = await pg.query<{ menu_item_id: string; variation_id: string | null }>(
+      "SELECT menu_item_id, variation_id FROM marketplace_menu_links WHERE id = 'l-1'",
+    );
+    expect(before.rows).toEqual([{ menu_item_id: "menu-1", variation_id: null }]);
+
     await pg.exec(`UPDATE marketplace_menu_links SET variation_id = 'var-1' WHERE id = 'l-1'`);
     const rows = await pg.query<{ menu_item_id: string; variation_id: string | null }>(
       "SELECT menu_item_id, variation_id FROM marketplace_menu_links",
