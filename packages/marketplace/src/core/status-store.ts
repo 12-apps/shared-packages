@@ -22,6 +22,8 @@ export interface StatusRow {
   step: StatusRowStep;
   source: "STORE" | "MARKETPLACE";
   state: StatusRowState;
+  /** Which run holds a SENDING claim. */
+  claimKey: string;
 }
 
 type StatusTable = NonNullable<MarketplaceDb["marketplaceStatusUpdate"]>;
@@ -39,7 +41,7 @@ export async function readStatusRows(
 ): Promise<StatusRow[]> {
   return (await table.findMany({
     where: { orderId, step: { in: [...steps] } },
-    select: { orderId: true, step: true, source: true, state: true },
+    select: { orderId: true, step: true, source: true, state: true, claimKey: true },
   })) as StatusRow[];
 }
 
@@ -49,7 +51,7 @@ export async function readStatusRows(
  */
 export async function insertStatusRow(
   table: StatusTable,
-  row: { clientId: string; orderId: string; provider: string; step: StatusRowStep; source: StatusRow["source"]; state: StatusRowState },
+  row: { clientId: string; orderId: string; provider: string; step: StatusRowStep; source: StatusRow["source"]; state: StatusRowState; claimKey: string },
 ): Promise<boolean> {
   try {
     await table.create({ data: row });
@@ -66,13 +68,17 @@ export async function noteMarketplaceStep(
   row: { clientId: string; orderId: string; provider: string; step: MarketplaceLifecycle },
 ): Promise<void> {
   const table = statusTable(await ctx.ports.db());
-  if (table) await insertStatusRow(table, { ...row, source: "MARKETPLACE", state: "NOTED" });
+  if (table) await insertStatusRow(table, { ...row, source: "MARKETPLACE", state: "NOTED", claimKey: "" });
 }
 
-/** Move a row this run owns from SENDING to its answer; predicated, so a settled row is never rewritten. */
+/**
+ * Move a row this run owns from SENDING to its answer; predicated on the state
+ * AND the run's claim key, so a settled row is never rewritten and a row
+ * another run holds is never settled by this one.
+ */
 export async function settleStatusRow(
   table: StatusTable,
-  where: { orderId: string; step: StatusRowStep },
+  where: { orderId: string; step: StatusRowStep; claimKey: string },
   state: "SENT" | "FAILED",
 ): Promise<number> {
   return (await table.updateMany({ where: { ...where, state: "SENDING" }, data: { state } })).count;

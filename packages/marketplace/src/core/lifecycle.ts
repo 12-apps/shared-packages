@@ -115,6 +115,11 @@ export async function followLifecycle(
   const ours = (await readStatusRows(table, held.orderId, [echo])).some((row) => row.source === "STORE");
   if (ours) return ignored(ctx, inboxId, `echo of our ${echo}`);
 
+  // Two statements, not one: the echo was read above and the marketplace's word is noted below. A
+  // genuine event judged "no echo" can lose the unique on its note to our own job claiming in
+  // between, and that job then sends a step the marketplace already has. Harmless (at worst a 4xx,
+  // FAILED and logged): the marketplace's state and ours already agree, and a stricter ordering
+  // would put a write before the host's answer on every event.
   const answer = await hook.call(ctx.ports.order, clientId, held.orderId, event, { deliveredBy: deliveredByOf(held) });
   await noteMarketplaceStep(ctx, { clientId, orderId: held.orderId, provider: event.provider, step: lifecycle });
   if (answer === "moved") {

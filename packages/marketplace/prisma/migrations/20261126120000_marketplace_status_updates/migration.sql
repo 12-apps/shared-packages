@@ -10,6 +10,8 @@
 -- `marketplace_status_updates` holds one row per (order, step): the claim that
 -- keeps a step from ever being sent twice, the marker an inbound echo is
 -- recognised by, and the note of what the marketplace itself announced.
+-- `claim_key` says WHICH run holds a SENDING claim, so two jobs for one step
+-- never both call the marketplace.
 
 ALTER TABLE "marketplace_integrations" ADD COLUMN IF NOT EXISTS "follow_status" BOOLEAN NOT NULL DEFAULT true;
 
@@ -21,6 +23,7 @@ CREATE TABLE IF NOT EXISTS "marketplace_status_updates" (
     "step" TEXT NOT NULL,
     "source" TEXT NOT NULL,
     "state" TEXT NOT NULL,
+    "claim_key" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

@@ -147,11 +147,11 @@ describe("the engine's migration", () => {
     const flags = await db.query<{ follow_status: boolean }>("SELECT follow_status FROM marketplace_integrations");
     expect(flags.rows).toEqual([{ follow_status: true }]);
     expect(await columns(db, "marketplace_status_updates")).toEqual(
-      ["client_id", "created_at", "id", "order_id", "provider", "source", "state", "step", "updated_at"],
+      ["claim_key", "client_id", "created_at", "id", "order_id", "provider", "source", "state", "step", "updated_at"],
     );
     const row = (step: string, source = "STORE", state = "SENT") =>
-      `INSERT INTO marketplace_status_updates (id, client_id, order_id, provider, step, source, state, updated_at)
-       VALUES ('s-${step}-${source}', 't', 'o1', 'IFOOD', '${step}', '${source}', '${state}', now())`;
+      `INSERT INTO marketplace_status_updates (id, client_id, order_id, provider, step, source, state, claim_key, updated_at)
+       VALUES ('s-${step}-${source}', 't', 'o1', 'IFOOD', '${step}', '${source}', '${state}', 'k', now())`;
     await expect(db.exec(row("READY"))).resolves.toBeDefined();
     await expect(db.exec(row("READY", "MARKETPLACE", "NOTED"))).rejects.toThrow(/order_id_step_key/);
     await expect(db.exec(row("CONCLUDED", "MARKETPLACE", "NOTED"))).resolves.toBeDefined();
@@ -166,11 +166,11 @@ describe("the engine's migration", () => {
     await applyAll(db);
     const { db: store } = pgliteDb(db);
     const table = store.marketplaceStatusUpdate!;
-    const data = { clientId: "t", orderId: "o1", provider: "IFOOD", step: "DISPATCHED", source: "STORE", state: "SENDING" };
+    const data = { clientId: "t", orderId: "o1", provider: "IFOOD", step: "DISPATCHED", source: "STORE", state: "SENDING", claimKey: "k1" };
 
     await table.create({ data });
     await expect(table.create({ data })).rejects.toMatchObject({ code: "P2002" });
-    expect(await table.updateMany({ where: { orderId: "o1", step: "DISPATCHED", state: "SENDING" }, data: { state: "SENT" } })).toEqual({ count: 1 });
+    expect(await table.updateMany({ where: { orderId: "o1", step: "DISPATCHED", state: "SENDING", claimKey: "k1" }, data: { state: "SENT" } })).toEqual({ count: 1 });
     expect(await table.updateMany({ where: { orderId: "o1", step: "DISPATCHED", state: "SENDING" }, data: { state: "FAILED" } })).toEqual({ count: 0 });
     expect(await table.findMany({ where: { orderId: "o1", step: { in: ["DISPATCHED", "CONCLUDED"] } } })).toEqual([
       expect.objectContaining({ step: "DISPATCHED", state: "SENT" }),

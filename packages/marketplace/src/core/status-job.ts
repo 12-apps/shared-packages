@@ -1,8 +1,8 @@
 import type { MarketplaceAdapter, OutboundOrderRef, OutboundResult, StatusStep } from "./adapter";
-import { readOutboundConnection } from "./integration";
+import { readOutboundConnection, type OutboundConnection } from "./integration";
 import { MARKETPLACE_OUTBOUND_JOB, type OutboundJobPayload } from "./outbound-queue";
 import type { EngineContext, MarketplaceDb } from "./ports";
-import { insertStatusRow, readStatusRows, settleStatusRow, statusTable } from "./status-store";
+import { insertStatusRow, readStatusRows, settleStatusRow, statusTable, type StatusRow } from "./status-store";
 import type { MarketplaceDeliveredBy } from "./types";
 
 /**
@@ -79,22 +79,24 @@ async function adapterAndHostSkip(
   return (await holds.call(ctx.ports.order, payload.clientId, row.orderId, step)) ? null : `the order no longer holds ${step}`;
 }
 
-/** Call the adapter with the opened connection, or answer why it cannot be made. */
-async function callAdapter(
+/** The opened connection, or why the store has none (disconnected, no secrets, secrets that do not open). */
+async function connectionOf(ctx: EngineContext, clientId: string, provider: string): Promise<OutboundConnection | string> {
+  try {
+    return (await readOutboundConnection(ctx, clientId, provider)) ?? "no credentials on file";
+  } catch (error) {
+    return `credentials do not open: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/** Call the adapter with the opened connection. */
+function callAdapter(
   ctx: EngineContext,
-  payload: OutboundJobPayload,
+  connection: OutboundConnection,
   adapter: MarketplaceAdapter,
   row: StatusJobRow,
   step: StatusStep,
   ref: OutboundOrderRef,
 ): Promise<OutboundResult | { kind: "unsupported" }> {
-  let connection;
-  try {
-    connection = (await readOutboundConnection(ctx, payload.clientId, row.provider)) ?? "no credentials on file";
-  } catch (error) {
-    connection = `credentials do not open: ${error instanceof Error ? error.message : String(error)}`;
-  }
-  if (typeof connection === "string") return { kind: "refused", status: 0, message: connection, own: true };
   const now = ctx.ports.clock.now();
   return adapter.informStatus!({ http: ctx.ports.http, tokens: ctx.tokens, now, ...connection }, ref, {
     step,
@@ -106,7 +108,7 @@ async function callAdapter(
 async function settle(
   ctx: EngineContext,
   db: MarketplaceDb,
-  where: { orderId: string; step: StatusStep },
+  where: { orderId: string; step: StatusStep; claimKey: string },
   result: OutboundResult | { kind: "unsupported" },
   deps: StatusJobDeps,
 ): Promise<StatusJobOutcome> {
@@ -129,6 +131,11 @@ async function settle(
   return { kind: "failed", action: "status", reason };
 }
 
+/** Whether a row is a SENDING claim of the run holding `key`. */
+function ownsClaim(found: StatusRow, key: string): boolean {
+  return found.source === "STORE" && found.state === "SENDING" && found.claimKey === key;
+}
+
 /**
  * Rules 4 and 5: why the step is not ours to send (a row stands, or the
  * marketplace concluded, or the claim was lost), or null once the row is ours.
@@ -138,14 +145,16 @@ async function claim(
   payload: OutboundJobPayload,
   row: StatusJobRow,
   step: StatusStep,
+  key: string,
 ): Promise<string | null> {
   const rows = await readStatusRows(table, row.orderId, [step, "CONCLUDED"]);
   if (rows.some((found) => found.step === "CONCLUDED" && found.source === "MARKETPLACE")) {
     return "the marketplace concluded this order";
   }
   const own = rows.find((found) => found.step === step);
-  // A SENDING row of ours is a retry (or the sweep's re-queue): it calls again.
-  if (own) return own.source === "STORE" && own.state === "SENDING" ? null : `${step} is already ${own.state}`;
+  // A SENDING row under THIS job's key is its own retry (or the sweep's re-claim of it): it
+  // calls again. Under any other key another move's job holds it, and sends nothing.
+  if (own) return ownsClaim(own, key) ? null : `${step} is already ${own.state}${own.state === "SENDING" ? ", held by another run" : ""}`;
   const claimed = await insertStatusRow(table, {
     clientId: payload.clientId,
     orderId: row.orderId,
@@ -153,6 +162,7 @@ async function claim(
     step,
     source: "STORE",
     state: "SENDING",
+    claimKey: key,
   });
   return claimed ? null : `another run holds the claim on ${step}`;
 }
@@ -173,14 +183,25 @@ export async function runStatus(
   const table = statusTable(db);
   if (!table) return skipped("the host has not composed the status model");
 
-  const unclaimed = await claim(table, payload, row, step);
+  // A store with no connection, or secrets that do not open, is not a failure of this step: it
+  // is asked before the claim so no row is left behind, and said at info (a disconnected store
+  // would otherwise log an error on every move).
+  const connection = await connectionOf(ctx, payload.clientId, row.provider);
+  if (typeof connection === "string") {
+    ctx.ports.logger.info(`${MARKETPLACE_OUTBOUND_JOB}: status ${step} for order ${row.orderId} not sent: ${connection}`);
+    return skipped(connection);
+  }
+  const key = payload.claimKey ?? "";
+  const unclaimed = await claim(table, payload, row, step, key);
   if (unclaimed) return skipped(unclaimed);
-  const result = await callAdapter(ctx, payload, adapter, row, step, deps.ref);
-  return settle(ctx, db, { orderId: row.orderId, step }, result, deps);
+  const result = await callAdapter(ctx, connection, adapter, row, step, deps.ref);
+  return settle(ctx, db, { orderId: row.orderId, step, claimKey: key }, result, deps);
 }
 
 /** The last attempt died without an answer: FAILED, never left SENDING. Best-effort. */
 export async function failStatusRow(ctx: EngineContext, payload: OutboundJobPayload): Promise<void> {
   const table = statusTable(await ctx.ports.db());
-  if (table && payload.step) await settleStatusRow(table, { orderId: payload.orderId, step: payload.step }, "FAILED");
+  if (table && payload.step) {
+    await settleStatusRow(table, { orderId: payload.orderId, step: payload.step, claimKey: payload.claimKey ?? "" }, "FAILED");
+  }
 }

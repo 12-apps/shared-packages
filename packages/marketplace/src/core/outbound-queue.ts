@@ -28,6 +28,11 @@ export interface OutboundJobPayload {
   action: OutboundAction;
   /** OPTIONAL. The step a `status` call tells the marketplace about; absent on every other action. */
   step?: StatusStep;
+  /**
+   * OPTIONAL. The key of the move (or of the sweep's re-claim) a `status` call
+   * belongs to: the owner of its SENDING claim. Absent on every other action.
+   */
+  claimKey?: string;
 }
 
 /** The dedupe key: at most one queued call per (order, action). */

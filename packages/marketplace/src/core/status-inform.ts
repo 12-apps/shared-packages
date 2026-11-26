@@ -27,7 +27,7 @@ export interface InformStatusInput {
  * would cost a statement on every move).
  */
 export async function informStatus(ctx: EngineContext, input: InformStatusInput): Promise<boolean> {
-  const payload = { clientId: input.clientId, orderId: input.orderId, action: "status" as const, step: input.step };
+  const payload = { clientId: input.clientId, orderId: input.orderId, action: "status" as const, step: input.step, claimKey: String(input.at.getTime()) };
   const options = {
     dedupeKey: statusDedupeKey(input.step, input.orderId, input.at),
     ...(input.delayMs === undefined ? {} : { delayMs: input.delayMs }),

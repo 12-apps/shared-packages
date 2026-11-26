@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { StatusStep } from "../core/adapter";
 import { OutboundRetryError } from "../core/outbound";
@@ -28,7 +28,13 @@ function ok() {
   return scriptedHttp((request) => (request.url.endsWith("/token") ? TOKEN : { status: 202, body: "" }));
 }
 
-const job = (orderId: string, step: StatusStep): OutboundJobPayload => ({ clientId: TENANT, orderId, action: "status", step });
+const job = (orderId: string, step: StatusStep, claimKey = "k1"): OutboundJobPayload => ({
+  clientId: TENANT,
+  orderId,
+  action: "status",
+  step,
+  claimKey,
+});
 
 async function acceptedOrder(
   h: Harness,
@@ -61,7 +67,7 @@ describe("informStatus: the host's one enqueue", () => {
     expect(h.enqueued).toEqual([
       {
         name: "marketplace.outbound",
-        payload: { clientId: TENANT, orderId: "o1", action: "status", step: "DISPATCHED" },
+        payload: { clientId: TENANT, orderId: "o1", action: "status", step: "DISPATCHED", claimKey: String(at.getTime()) },
         dedupeKey: `marketplace.outbound:status:DISPATCHED:o1:${at.getTime()}`,
         delayMs: 15_000,
       },
@@ -338,7 +344,7 @@ describe("how a call ends", () => {
     expect(h.logged.some((line) => line.level === "error")).toBe(true);
   });
 
-  it("no credentials on file: refused for good, FAILED, no call", async () => {
+  it("[N4] no credentials on file: skipped before any claim, said at info, no row, no call", async () => {
     const http = ok();
     const h = createHarness({ http, statusHolds: () => true });
     const orderId = await acceptedOrder(h, "MERCHANT");
@@ -346,9 +352,11 @@ describe("how a call ends", () => {
 
     const outcome = await h.engine.runOutbound(job(orderId, "DISPATCHED"), FIRST);
 
-    expect(outcome.kind).toBe("failed");
-    expect(statusRows(h)[0]).toMatchObject({ state: "FAILED" });
+    expect(outcome).toEqual({ kind: "skipped", reason: "no credentials on file" });
+    expect(statusRows(h)).toHaveLength(0);
     expect(http.requests).toHaveLength(0);
+    expect(h.logged.filter((line) => line.level === "error")).toHaveLength(0);
+    expect(h.logged.some((line) => line.level === "info" && line.message.includes("not sent"))).toBe(true);
   });
 
   it("a host with no status table composed sends nothing", async () => {
@@ -367,7 +375,7 @@ describe("how a call ends", () => {
 describe("[P13] the outbound sweep and a job that died after its claim", () => {
   async function stuck(h: Harness, ageMs: number, state = "SENDING"): Promise<string> {
     const orderId = await acceptedOrder(h, "MERCHANT");
-    await h.seedStatus({ orderId, step: "DISPATCHED", source: "STORE", state, ageMs });
+    await h.seedStatus({ orderId, step: "DISPATCHED", source: "STORE", state, ageMs, claimKey: "old" });
     return orderId;
   }
 
@@ -380,11 +388,15 @@ describe("[P13] the outbound sweep and a job that died after its claim", () => {
     const key = `marketplace.outbound:status:DISPATCHED:${orderId}:sweep:${h.clock.at.getTime()}`;
 
     expect(first.requeued).toBe(1);
+    const fresh = `sweep:${h.clock.at.getTime()}`;
     expect(h.enqueued).toEqual([
-      expect.objectContaining({ payload: { clientId: TENANT, orderId, action: "status", step: "DISPATCHED" }, dedupeKey: key }),
+      expect.objectContaining({
+        payload: { clientId: TENANT, orderId, action: "status", step: "DISPATCHED", claimKey: fresh },
+        dedupeKey: key,
+      }),
     ]);
-    h.setNow(new Date(h.clock.at.getTime() + 60_000));
-    expect((await h.engine.sweepOutbound()).requeued).toBe(1);
+    // The claim was taken over under the fresh key before the job was queued.
+    expect(statusRows(h)[0]).toMatchObject({ state: "SENDING", claimKey: fresh });
   });
 
   it("leaves a younger SENDING row, and a settled one, alone", async () => {
@@ -413,14 +425,87 @@ describe("[P13] the outbound sweep and a job that died after its claim", () => {
     expect(h.logged.some((line) => line.level === "error")).toBe(true);
   });
 
-  it("the re-queued job runs on the SENDING row it owns and sends", async () => {
+  it("the re-queued job runs under the fresh key and sends; the old job's late retry sends nothing", async () => {
     const http = ok();
     const h = createHarness({ http, statusHolds: () => true });
     const orderId = await stuck(h, OUTBOUND_STALE_MS + 1_000);
+    await h.engine.sweepOutbound();
+    const requeued = h.enqueued.at(-1)!.payload;
 
-    const outcome = await h.engine.runOutbound(job(orderId, "DISPATCHED"), FIRST);
+    const stale = await h.engine.runOutbound(job(orderId, "DISPATCHED", "old"), FIRST);
+    expect(stale.kind).toBe("skipped");
+    expect(http.requests).toHaveLength(0);
+    const outcome = await h.engine.runOutbound(requeued, FIRST);
 
     expect(outcome.kind).toBe("done");
     expect(statusRows(h)[0]).toMatchObject({ state: "SENT" });
+  });
+});
+
+describe("[B1] two jobs for one step never both call the marketplace", () => {
+  it("a dispatch, an undo and a second dispatch (two keys): the second job runs while the first call is in flight: ONE call", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const http = scriptedHttp(async (request) => {
+      if (request.url.endsWith("/token")) return TOKEN;
+      await gate;
+      return { status: 202, body: "" };
+    });
+    const h = createHarness({ http, statusHolds: () => true });
+    const orderId = await acceptedOrder(h, "MERCHANT");
+
+    const first = h.engine.runOutbound(job(orderId, "DISPATCHED", "move-1"), FIRST);
+    // The first job has claimed and is waiting on iFood.
+    await vi.waitFor(() => expect(statusRows(h)).toHaveLength(1));
+    const second = await h.engine.runOutbound(job(orderId, "DISPATCHED", "move-2"), FIRST);
+    release();
+
+    expect(second.kind).toBe("skipped");
+    expect((await first).kind).toBe("done");
+    expect(calls(http)).toHaveLength(1);
+    expect(statusRows(h)[0]).toMatchObject({ state: "SENT", claimKey: "move-1" });
+  });
+
+  it("after a 5xx on the first job, another move's job sends nothing while the first waits to retry", async () => {
+    const http = scriptedHttp([TOKEN, { status: 503, body: "busy" }, { status: 202, body: "" }]);
+    const h = createHarness({ http, statusHolds: () => true });
+    const orderId = await acceptedOrder(h, "MERCHANT");
+
+    await expect(h.engine.runOutbound(job(orderId, "DISPATCHED", "move-1"), FIRST)).rejects.toBeInstanceOf(OutboundRetryError);
+    const other = await h.engine.runOutbound(job(orderId, "DISPATCHED", "move-2"), FIRST);
+    expect(other.kind).toBe("skipped");
+    expect(calls(http)).toHaveLength(1);
+    // The first job's own retry (same key) still owns the claim and sends.
+    const retry = await h.engine.runOutbound(job(orderId, "DISPATCHED", "move-1"), { attempt: 2, maxAttempts: 3 });
+
+    expect(retry.kind).toBe("done");
+    expect(calls(http)).toHaveLength(2);
+    expect(statusRows(h)[0]).toMatchObject({ state: "SENT" });
+  });
+
+  it("a run that dies on its last attempt fails only the claim it holds, never another run's", async () => {
+    const h = createHarness({ http: ok(), statusHolds: () => true });
+    const orderId = await acceptedOrder(h, "MERCHANT");
+    await h.seedStatus({ orderId, step: "DISPATCHED", source: "STORE", state: "SENDING", claimKey: "move-1" });
+    h.interceptStatusTable({ failFirstRead: "database blip" });
+
+    const outcome = await h.engine.runOutbound(job(orderId, "DISPATCHED", "move-2"), LAST);
+
+    expect(outcome).toMatchObject({ kind: "failed", action: "status" });
+    expect(statusRows(h)[0]).toMatchObject({ state: "SENDING", claimKey: "move-1" });
+  });
+
+  it("an old payload without a claim key can neither re-enter nor settle a keyed claim", async () => {
+    const http = ok();
+    const h = createHarness({ http, statusHolds: () => true });
+    const orderId = await acceptedOrder(h, "MERCHANT");
+    await h.seedStatus({ orderId, step: "DISPATCHED", source: "STORE", state: "SENDING", claimKey: "move-1" });
+
+    const outcome = await h.engine.runOutbound({ clientId: TENANT, orderId, action: "status", step: "DISPATCHED" }, FIRST);
+
+    expect(outcome.kind).toBe("skipped");
+    expect(http.requests).toHaveLength(0);
   });
 });

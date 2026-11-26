@@ -71,6 +71,8 @@ interface OwedRow {
   provider: string;
   /** Only a status row has one. */
   step?: StatusRowStep;
+  /** Only a status row has one: the claim the sweep takes over. */
+  claimKey?: string;
 }
 
 const OWED_SELECT = { clientId: true, orderId: true, provider: true } as const;
@@ -88,6 +90,7 @@ async function requeue(ctx: EngineContext, rows: readonly OwedRow[], action: Out
       orderId: row.orderId,
       action,
       ...(row.step ? { step: row.step as StatusStep } : {}),
+      ...(row.claimKey === undefined ? {} : { claimKey: row.claimKey }),
     };
     if (await enqueueOutbound(ctx, payload, row.provider, sweepDedupeKey(action, row.orderId, now, row.step))) queued += 1;
   }
@@ -160,9 +163,21 @@ async function sweepStatus(ctx: EngineContext, now: Date): Promise<{ requeued: n
   if (givenUp > 0) ctx.ports.logger.error(`marketplace.outbound-sweep: gave up on ${givenUp} status call(s).`);
   const owed = (await table.findMany({
     where: { state: "SENDING", source: "STORE", updatedAt: { lt: stale, gte: giveUp } },
-    select: { clientId: true, orderId: true, provider: true, step: true },
+    select: { clientId: true, orderId: true, provider: true, step: true, claimKey: true },
   })) as OwedRow[];
-  return { requeued: await requeue(ctx, owed, "status", now), givenUp };
+  // The stale claim is TAKEN OVER under a fresh key, predicated on the old one, before the job
+  // is queued under the new: a job still alive under the old key can then settle or fail
+  // nothing, and a second sweep pass finds nothing to take.
+  const claimed: OwedRow[] = [];
+  for (const row of owed) {
+    const fresh = `sweep:${now.getTime()}`;
+    const taken = await table.updateMany({
+      where: { orderId: row.orderId, step: row.step, state: "SENDING", claimKey: row.claimKey, updatedAt: { lt: stale } },
+      data: { claimKey: fresh },
+    });
+    if (taken.count > 0) claimed.push({ ...row, claimKey: fresh });
+  }
+  return { requeued: await requeue(ctx, claimed, "status", now), givenUp };
 }
 
 /**

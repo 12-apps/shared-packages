@@ -274,9 +274,12 @@ export function createHarness(options: HarnessOptions = {}) {
     state: string;
     provider?: string;
     ageMs?: number;
+    claimKey?: string;
   }): Promise<void> {
-    const { ageMs, provider, ...row } = data;
-    await memory.db.marketplaceStatusUpdate!.create({ data: { clientId: TENANT, provider: provider ?? "IFOOD", ...row } });
+    const { ageMs, provider, claimKey, ...row } = data;
+    await memory.db.marketplaceStatusUpdate!.create({
+      data: { clientId: TENANT, provider: provider ?? "IFOOD", claimKey: claimKey ?? "seed", ...row },
+    });
     if (ageMs !== undefined) {
       const stored = memory.tables.marketplaceStatusUpdate.rows.find((r) => r.orderId === row.orderId && r.step === row.step);
       if (stored) stored.updatedAt = new Date(clock.at.getTime() - ageMs);
@@ -290,12 +293,18 @@ export function createHarness(options: HarnessOptions = {}) {
   function interceptStatusTable(behaviour: {
     rival?: { orderId: string; step: string; source: "STORE" | "MARKETPLACE"; state: string };
     failFirstStamp?: string;
+    failFirstRead?: string;
   }): void {
     const table = memory.tables.marketplaceStatusUpdate;
     const read = table.findMany.bind(table);
     const stamp = table.updateMany.bind(table);
-    const pending = { rival: behaviour.rival, stamp: behaviour.failFirstStamp };
+    const pending = { rival: behaviour.rival, stamp: behaviour.failFirstStamp, read: behaviour.failFirstRead };
     table.findMany = async (args: unknown) => {
+      const failure = pending.read;
+      if (failure !== undefined) {
+        pending.read = undefined;
+        throw new Error(failure);
+      }
       const rival = pending.rival;
       if (!rival) return read(args);
       pending.rival = undefined;

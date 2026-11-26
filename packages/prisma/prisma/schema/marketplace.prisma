@@ -436,11 +436,18 @@ model MarketplaceStatusUpdate {
   /// SENDING | SENT | FAILED | NOTED (CHECK).
   state  String
 
+  /// WHO holds a SENDING claim: the key of the move (or of the sweep's
+  /// re-claim) the status job carries. A run re-enters a SENDING row, and
+  /// stamps or fails it, only under its own key, so two jobs for one step
+  /// never both call the marketplace. Empty on a row the marketplace noted.
+  claimKey String @map("claim_key")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([orderId, step])
-  // The sweep reads only rows still SENDING (a partial index in the migration).
-  @@index([state, updatedAt])
+  // The sweep reads only rows still SENDING: a PARTIAL index, SQL-only in the
+  // migration (marketplace_status_updates_state_updated_at_idx, WHERE state =
+  // 'SENDING'), which Prisma cannot express, as marketplace_acceptances_cancellation_waiting_idx.
   @@map("marketplace_status_updates")
 }
