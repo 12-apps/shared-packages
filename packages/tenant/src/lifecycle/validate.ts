@@ -76,7 +76,8 @@ function validateNumbers(lifecycle: Bag): void {
   positiveInt(lifecycle.sweepBatch, 'lifecycle.sweepBatch');
 }
 
-function validateCopy(value: unknown, tags: readonly string[]): void {
+/** The lifecycle's copy extension: every key, for every tag of the base copy. */
+export function validateLifecycleCopy(value: unknown, tags: readonly string[]): void {
   const locales = bagAt(bagAt(value, 'lifecycle.copy').locales, 'lifecycle.copy.locales');
   const packs = new Map(tags.map((tag) => [tag, bagAt(locales[tag], `lifecycle.copy.locales.${tag}`)]));
   const sentences = tags.flatMap((tag) => TENANT_LIFECYCLE_COPY_KEYS.map((copyKey) => [tag, copyKey] as const));
@@ -122,7 +123,7 @@ export function validateLifecycle(value: unknown, tags: readonly string[], hasTr
     throw new TenantConfigError('lifecycle', 'must be the lifecycle config object, or be left out');
   }
   validateNumbers(value);
-  validateCopy(value.copy, tags);
+  validateLifecycleCopy(value.copy, tags);
   const db = bagAt(value.db, 'lifecycle.db');
   fnAt(db, 'transaction', 'lifecycle.db.transaction');
   fnAt(db, 'table', 'lifecycle.db.table');

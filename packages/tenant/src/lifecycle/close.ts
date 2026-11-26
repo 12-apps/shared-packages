@@ -33,9 +33,13 @@ export function payloadOf(
   purgeAt: Date,
   by: TenantCloseEntry | null,
   reason: string | null,
+  restored: string | null = null,
 ): TenantNoticePayload {
-  return { tenantId: tenant.id, name, slug: tenant.slug, purgeAt: purgeAt.toISOString(), by, reason };
+  return { tenantId: tenant.id, name, slug: tenant.slug, purgeAt: purgeAt.toISOString(), by, reason, restored };
 }
+
+/** Where `close` and `reopen` get their record: the caller, who read it through the port or its own lookup. */
+const CALLER_RECORD = 'close/reopen tenant (the caller\'s record, port.bySlug/byId)';
 
 /** The refusal for a tenant the close may not move, by the status the transaction reads. */
 async function notClosable<S extends string, Tx>(context: LifecycleContext<S, Tx>, id: string, tx: Tx): Promise<Error> {
@@ -84,7 +88,7 @@ export async function runAfterClose<S extends string, Tx>(
 ): Promise<boolean> {
   const { config } = context;
   try {
-    const node = context.tenant.tree === undefined ? null : await context.tenant.tree.nodeOf(tenant.id);
+    const node = (await context.tenant.tree?.nodeOf?.(tenant.id)) ?? null;
     await config.afterClose({ tenant, node, now });
   } catch (error) {
     config.onError(error, { act: 'afterClose', tenantId: tenant.id });
@@ -125,7 +129,7 @@ export async function closeTenant<S extends string, Tx>(
   await config.confirmDangerousAct(input.request, { tenantId: id, by: input.by });
   const reason = input.reason.trim();
   if (reason.length < config.minReasonLength) throw context.refuse('reasonTooShort');
-  const name = context.nameOf(input.tenant);
+  const name = context.nameOf(input.tenant, CALLER_RECORD);
   if (input.by === 'member' && !sameTenantName(input.typedName ?? '', name, config.nameLocale)) {
     throw context.refuse('nameMismatch');
   }
@@ -159,7 +163,7 @@ export async function reopenTenant<S extends string, Tx>(
   const { ids } = context.tenant.config;
   const statuses = context.tenant.config.statuses as unknown as TenantStatusSet<S>;
   const id = input.tenant.id;
-  const name = context.nameOf(input.tenant);
+  const name = context.nameOf(input.tenant, CALLER_RECORD);
   const row = await (await context.table()).findUnique({ where: { tenantId: id } });
   const prior = row?.priorStatus ?? null;
   const target = (
@@ -181,7 +185,7 @@ export async function reopenTenant<S extends string, Tx>(
   });
   await context.quietly('invalidate', id, () => config.invalidate(id));
   await context.quietly('notify', id, () =>
-    config.notify(ids.notifications.reopened, payloadOf(input.tenant, name, row?.purgeAt ?? new Date(), null, null)),
+    config.notify(ids.notifications.reopened, payloadOf(input.tenant, name, row?.purgeAt ?? new Date(), null, null, target)),
   );
   return { status: target, requestedAt: null, purgeAt: null };
 }

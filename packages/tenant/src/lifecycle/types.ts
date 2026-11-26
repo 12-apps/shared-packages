@@ -62,9 +62,21 @@ export type TenantClosingStamp = 'remindedWeekAt' | 'remindedDayAt' | 'purgedAt'
  */
 export interface TenantClosingTable {
   findUnique(args: { where: { tenantId: string } }): Promise<TenantClosingRow | null>;
-  findMany(args: { where: { purgedAt: null }; orderBy: { purgeAt: 'asc' }; take: number }): Promise<TenantClosingRow[]>;
+  /**
+   * A page of the rows not purged yet, oldest purge first, after the keyset
+   * `after` (the last row of the previous page) when given.
+   */
+  findMany(args: {
+    where: {
+      purgedAt: null;
+      OR?: [{ purgeAt: { gt: Date } }, { purgeAt: Date; tenantId: { gt: string } }];
+    };
+    orderBy: [{ purgeAt: 'asc' }, { tenantId: 'asc' }];
+    take: number;
+  }): Promise<TenantClosingRow[]>;
   create(args: { data: TenantClosingCreate }): Promise<unknown>;
-  deleteMany(args: { where: { tenantId: string } }): Promise<{ count: number }>;
+  /** A reopen deletes by tenant; the sweep deletes a stale row only while it is the one it read (`requestedAt`, not purged). */
+  deleteMany(args: { where: { tenantId: string; requestedAt?: Date; purgedAt?: null } }): Promise<{ count: number }>;
   updateMany(args: {
     where: { tenantId: string } & Partial<Record<TenantClosingStamp, null>>;
     data: Partial<Record<TenantClosingStamp, Date>>;
@@ -108,18 +120,37 @@ export interface TenantNoticePayload {
   by: TenantCloseEntry | null;
   /** The close's reason, on a platform close's scheduled notice only (the owner reads why). */
   reason: string | null;
+  /**
+   * The status a reopen restored, on the reopened notice; absent or null on
+   * the others. When it is not the active status (a tenant the platform
+   * closed while suspended), the notice reads the lifecycle extension's
+   * restored sentences, never "it is live again".
+   */
+  restored?: string | null;
 }
 
-/** The two sentences only a lifecycle host writes: the platform close's notice. */
+/**
+ * The sentences only a lifecycle host writes, on top of the base pack: the
+ * platform close's notice (with its reason, and without one), and the reopen
+ * notice of a tenant restored to a status other than active (it is not live
+ * again: a suspended tenant stays suspended).
+ */
 export interface TenantLifecycleCopyPack {
   readonly noticePlatformScheduledTitle: (name: string) => string;
   readonly noticePlatformScheduledBody: (name: string, purgeDay: string, reason: string) => string;
+  /** The platform close's body when the notice carries no reason. */
+  readonly noticePlatformScheduledBodyNoReason: (name: string, purgeDay: string) => string;
+  readonly noticeReopenedRestoredTitle: (name: string) => string;
+  readonly noticeReopenedRestoredBody: (name: string) => string;
 }
 
 /** The keys of the lifecycle's copy extension, in a fixed order. */
 export const TENANT_LIFECYCLE_COPY_KEYS = [
   'noticePlatformScheduledTitle',
   'noticePlatformScheduledBody',
+  'noticePlatformScheduledBodyNoReason',
+  'noticeReopenedRestoredTitle',
+  'noticeReopenedRestoredBody',
 ] as const satisfies readonly (keyof TenantLifecycleCopyPack)[];
 
 export interface TenantLifecycleConfig<S extends string = string, Tx = unknown> {

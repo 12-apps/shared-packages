@@ -48,6 +48,12 @@ export interface TenantTreeNode {
   parentId: string | null;
   /** `/<root id>/…/<own id>/`; a root's is `/<own id>/`. */
   path: string;
+  /**
+   * The tenant's status, when the host's read carries it. Optional for the
+   * tree alone; REQUIRED of `treeDescendants` once the lifecycle is wired, so
+   * the open-descendants blocker costs that one read and no read per unit.
+   */
+  status?: string;
 }
 
 /**

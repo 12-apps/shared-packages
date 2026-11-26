@@ -8,8 +8,8 @@ import type { TenantCopyPack } from '../config';
 import { closeTenant, reopenTenant } from './close';
 import { createContext, type LifecycleTenant } from './context';
 import { sweepTenants } from './sweep';
-import type { TenantLifecycle, TenantLifecycleConfig, TenantNoticePayload } from './types';
-import { validateLifecycle } from './validate';
+import type { TenantLifecycle, TenantLifecycleConfig, TenantLifecycleCopyPack, TenantNoticePayload } from './types';
+import { validateLifecycle, validateLifecycleCopy } from './validate';
 
 export { isTenantGone, purgeAtFor, reminderDue, sameTenantName, type TenantReminder } from './pure';
 export {
@@ -49,41 +49,52 @@ function dayOf(iso: string, locale: string, timeZone: string): string {
 
 type Words = { title: string; body: string };
 
+type Writer = (copy: TenantCopyPack, extra: TenantLifecycleCopyPack, name: string, day: string, payload: TenantNoticePayload) => Words;
+
+function scheduledWords(copy: TenantCopyPack, extra: TenantLifecycleCopyPack, name: string, day: string, payload: TenantNoticePayload): Words {
+  if (payload.by !== 'platform') return { title: copy.noticeScheduledTitle(name), body: copy.noticeScheduledBody(name, day) };
+  const reason = payload.reason?.trim() ?? '';
+  return {
+    title: extra.noticePlatformScheduledTitle(name),
+    body: reason === '' ? extra.noticePlatformScheduledBodyNoReason(name, day) : extra.noticePlatformScheduledBody(name, day, reason),
+  };
+}
+
 /**
  * The lifecycle's notice words alone, for a host whose notification
  * registry renders them apart from the lifecycle wiring (no hooks needed):
- * the tenant's copy packs plus the lifecycle's copy extension.
+ * the tenant's copy packs plus the lifecycle's copy extension, validated
+ * here as `createTenantLifecycle` validates it (every key, every locale of
+ * the base copy). A locale with no extension reads the default locale's,
+ * never the member's sentence in its place.
  */
 export function createNoticeWords(
   tenant: Pick<LifecycleTenant<string, unknown>, 'config' | 'copyFor'>,
   config: Pick<TenantLifecycleConfig, 'copy'>,
 ): TenantLifecycle['noticeWords'] {
   const { notifications } = tenant.config.ids;
+  const { statuses } = tenant.config;
   const { locales, defaultLocale } = tenant.config.copy;
-  type Writer = (copy: TenantCopyPack, name: string, day: string, payload: TenantNoticePayload, tag: string) => Words;
+  validateLifecycleCopy((config as { copy?: unknown }).copy, Object.keys(locales));
+  const extraFor = (tag: string): TenantLifecycleCopyPack =>
+    (config.copy.locales[tag] ?? config.copy.locales[defaultLocale]) as TenantLifecycleCopyPack;
   const writers = new Map<string, Writer>([
+    [notifications.closingScheduled, scheduledWords],
+    [notifications.closingWeek, (copy, _extra, name, day) => ({ title: copy.noticeWeekTitle(name), body: copy.noticeWeekBody(name, day) })],
+    [notifications.closingDay, (copy, _extra, name) => ({ title: copy.noticeDayTitle(name), body: copy.noticeDayBody(name) })],
     [
-      notifications.closingScheduled,
-      (copy, name, day, payload, tag) => {
-        const extra = config.copy.locales[tag];
-        if (payload.by !== 'platform' || extra === undefined) {
-          return { title: copy.noticeScheduledTitle(name), body: copy.noticeScheduledBody(name, day) };
-        }
-        return {
-          title: extra.noticePlatformScheduledTitle(name),
-          body: extra.noticePlatformScheduledBody(name, day, payload.reason ?? ''),
-        };
-      },
+      notifications.reopened,
+      (copy, extra, name, _day, payload) =>
+        payload.restored !== undefined && payload.restored !== null && payload.restored !== statuses.active
+          ? { title: extra.noticeReopenedRestoredTitle(name), body: extra.noticeReopenedRestoredBody(name) }
+          : { title: copy.noticeReopenedTitle(name), body: copy.noticeReopenedBody(name) },
     ],
-    [notifications.closingWeek, (copy, name, day) => ({ title: copy.noticeWeekTitle(name), body: copy.noticeWeekBody(name, day) })],
-    [notifications.closingDay, (copy, name) => ({ title: copy.noticeDayTitle(name), body: copy.noticeDayBody(name) })],
-    [notifications.reopened, (copy, name) => ({ title: copy.noticeReopenedTitle(name), body: copy.noticeReopenedBody(name) })],
   ]);
   return (typeId, payload, at) => {
     const write = writers.get(typeId);
     if (write === undefined) throw new RangeError(`@12-apps/tenant: "${typeId}" is not one of the lifecycle's notice types.`);
     const tag = at.locale !== null && Object.hasOwn(locales, at.locale) ? at.locale : defaultLocale;
-    return write(tenant.copyFor(tag), payload.name, dayOf(payload.purgeAt, tag, at.timeZone), payload, tag);
+    return write(tenant.copyFor(tag), extraFor(tag), payload.name, dayOf(payload.purgeAt, tag, at.timeZone), payload);
   };
 }
 

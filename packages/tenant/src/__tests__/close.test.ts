@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TenantConfigError, TenantLifecycleRefusal } from '../server';
+import { TenantConfigError, TenantLifecycleRefusal, createApiTenant } from '../server';
 import { DAY_MS, lifecycleHost, request } from './lifecycle-fixtures';
 
 /**
@@ -78,6 +78,7 @@ describe('a member closes', () => {
       purgeAt: state.purgeAt,
       by: 'member',
       reason: null,
+      restored: null,
     });
   });
 
@@ -173,9 +174,9 @@ describe('a member closes', () => {
 
   it('refuses, as a programming error, a port record with no name', async () => {
     const host = lifecycleHost();
-    await expect(memberClose(host, { tenant: { id: 't-1', slug: 'north', status: 'OPEN' } })).rejects.toBeInstanceOf(
-      TenantConfigError,
-    );
+    const error = await memberClose(host, { tenant: { id: 't-1', slug: 'north', status: 'OPEN' } }).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(TenantConfigError);
+    expect((error as TenantConfigError).message).toMatch(/caller's record/u);
   });
 });
 
@@ -232,6 +233,22 @@ describe('the tree blocker', () => {
     expect(refusal.kind).toBe('closingBlocked');
     (host.tenantOf('t-2') as { status: string }).status = 'WINDING_DOWN';
     expect(await lifecycle.blockers('t-1', NOW)).toEqual([]);
+  });
+
+  it('counts open units in ONE read, from the status the descendants read carries', async () => {
+    const host = lifecycleHost({ tree });
+    await host.tenant().lifecycle!.blockers('t-1', NOW);
+    expect(host.log).toEqual(['blockers', 'treeDescendants']);
+  });
+
+  it('names the tree port when its descendants read carries no status', async () => {
+    const host = lifecycleHost({ tree });
+    const tenant = createApiTenant({
+      ...host.config,
+      tree: { ...host.config.tree!, treeDescendants: async () => tree },
+      lifecycle: host.lifecycle,
+    });
+    await expect(tenant.lifecycle!.blockers('t-1', NOW)).rejects.toMatchObject({ key: 'tree.treeDescendants' });
   });
 
   it('hands the after-close hook the node, so a unit can leave its root alone', async () => {

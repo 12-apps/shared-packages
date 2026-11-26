@@ -68,11 +68,17 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
       const row = closingOf(where.tenantId);
       return row ? { ...row } : null;
     },
-    findMany: async ({ take }) => {
+    findMany: async ({ where, take }) => {
       log.push('findMany');
+      const [later, same] = where.OR ?? [];
+      const afterKey = (row: TenantClosingRow) =>
+        later === undefined || same === undefined
+          ? true
+          : row.purgeAt.getTime() > later.purgeAt.gt.getTime() ||
+            (row.purgeAt.getTime() === same.purgeAt.getTime() && row.tenantId > same.tenantId.gt);
       return state.closings
-        .filter((row) => row.purgedAt === null)
-        .sort((a, b) => a.purgeAt.getTime() - b.purgeAt.getTime())
+        .filter((row) => row.purgedAt === null && afterKey(row))
+        .sort((a, b) => a.purgeAt.getTime() - b.purgeAt.getTime() || (a.tenantId < b.tenantId ? -1 : a.tenantId > b.tenantId ? 1 : 0))
         .slice(0, take)
         .map((row) => ({ ...row }));
     },
@@ -91,7 +97,11 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
     deleteMany: async ({ where }) => {
       log.push('deleteMany');
       const before = state.closings.length;
-      state.closings = state.closings.filter((row) => row.tenantId !== where.tenantId);
+      const hit = (row: TenantClosingRow) =>
+        row.tenantId === where.tenantId &&
+        (where.requestedAt === undefined || row.requestedAt.getTime() === where.requestedAt.getTime()) &&
+        (where.purgedAt === undefined || row.purgedAt === null);
+      state.closings = state.closings.filter((row) => !hit(row));
       return { count: before - state.closings.length };
     },
     updateMany: async ({ where, data }) => {
@@ -132,7 +142,11 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
             treeDescendants: async (id) => {
               log.push('treeDescendants');
               const self = options.tree?.find((node) => node.id === id);
-              return self ? (options.tree ?? []).filter((node) => node.path.startsWith(self.path)) : [];
+              if (!self) return [];
+              // The host's ONE read carries each node's status (required with the lifecycle).
+              return (options.tree ?? [])
+                .filter((node) => node.path.startsWith(self.path))
+                .map((node) => ({ ...node, status: tenantOf(node.id)?.status }));
             },
             moveSubtree: async () => 0,
           },
@@ -150,10 +164,16 @@ export function lifecycleHost(options: { tree?: TenantTreeNode[] } = {}) {
         'en-GB': {
           noticePlatformScheduledTitle: (name) => `en-GB: platform title(${name}).`,
           noticePlatformScheduledBody: (name, day, reason) => `en-GB: platform body(${name}, ${day}, ${reason}).`,
+          noticePlatformScheduledBodyNoReason: (name, day) => `en-GB: platform body, no reason(${name}, ${day}).`,
+          noticeReopenedRestoredTitle: (name) => `en-GB: restored title(${name}).`,
+          noticeReopenedRestoredBody: (name) => `en-GB: restored body(${name}).`,
         },
         'pt-BR': {
           noticePlatformScheduledTitle: (name) => `pt-BR: platform title(${name}).`,
           noticePlatformScheduledBody: (name, day, reason) => `pt-BR: platform body(${name}, ${day}, ${reason}).`,
+          noticePlatformScheduledBodyNoReason: (name, day) => `pt-BR: platform body, no reason(${name}, ${day}).`,
+          noticeReopenedRestoredTitle: (name) => `pt-BR: restored title(${name}).`,
+          noticeReopenedRestoredBody: (name) => `pt-BR: restored body(${name}).`,
         },
       },
     },

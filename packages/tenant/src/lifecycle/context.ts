@@ -31,7 +31,8 @@ export interface LifecycleContext<S extends string, Tx> {
   /** Stamp `field` where still null, with the mirror's event, in one transaction. Answers the rows stamped. */
   stamp(tenantId: string, field: TenantClosingStamp, at: Date, event: TenantClosingEvent): Promise<number>;
   /** The record's name: a lifecycle host's port must return it. */
-  nameOf(record: TenantRecord<S>): string;
+  /** `source` names where the record came from, for the error a missing name throws. */
+  nameOf(record: TenantRecord<S>, source: string): string;
   /** Whether `status` is closing or closed. */
   isGone(status: string): boolean;
   /** The tenant's open blockers, counted on `tx` when given. */
@@ -46,13 +47,17 @@ async function openDescendants<S extends string, Tx>(
 ): Promise<number> {
   const { tree } = context.tenant;
   if (tree === undefined) return 0;
+  // ONE read: the host's descendants read carries each node's status (required with the lifecycle).
   const below = await tree.descendantsOf(tenantId, tx);
-  let open = 0;
-  for (const node of below) {
-    const record = await context.tenant.byId(node.id, tx);
-    if (record !== null && !context.isGone(record.status)) open += 1;
-  }
-  return open;
+  return below.filter((node) => {
+    if (typeof node.status !== 'string') {
+      throw new TenantConfigError(
+        'tree.treeDescendants',
+        `returned tenant "${node.id}" with no status, which the lifecycle's open-descendants blocker needs`,
+      );
+    }
+    return !context.isGone(node.status);
+  }).length;
 }
 
 export function createContext<S extends string, Tx>(
@@ -92,9 +97,9 @@ export function createContext<S extends string, Tx>(
         if (count > 0 && config.mirror !== undefined) await config.mirror.event(tx, tenantId, event);
         return count;
       }),
-    nameOf: (record) => {
+    nameOf: (record, source) => {
       if (typeof record.name !== 'string') {
-        throw new TenantConfigError('port.byId', `returned tenant "${record.id}" with no name, which the lifecycle needs`);
+        throw new TenantConfigError(source, `gave tenant "${record.id}" with no name, which the lifecycle needs`);
       }
       return record.name;
     },

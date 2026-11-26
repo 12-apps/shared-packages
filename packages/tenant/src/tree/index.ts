@@ -41,8 +41,13 @@ export {
  * never writes outside the caller's.
  */
 export interface TenantTree<Tx = unknown> {
-  /** The tenant's own node, validated, or null when the tree knows no such tenant. One port call. */
-  nodeOf(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
+  /**
+   * The tenant's own node, validated, or null when the tree knows no such
+   * tenant. One port call. Optional on the type (added in a minor: a host
+   * typing a `TenantTree` of its own keeps compiling); `createTenantTree`
+   * always provides it.
+   */
+  nodeOf?(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
   /** The tenant directly above `id`, or null for a root. One port call. */
   parentOf(id: string, tx?: Tx): Promise<string | null>;
   /** The root of `id`'s tree (`id` itself for a root). One port call. */

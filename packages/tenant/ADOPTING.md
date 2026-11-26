@@ -259,7 +259,8 @@ const tenant = createApiTenant({
   lifecycle: {
     graceDays: 30, reminderDays: { week: 7, day: 1 }, // integers, 0 < day < week < graceDays
     minReasonLength: 3, nameLocale: 'pt-BR', sweepBatch: 200,
-    copy: { locales: { 'pt-BR': { noticePlatformScheduledTitle, noticePlatformScheduledBody }, … } },
+    copy: { locales: { 'pt-BR': { noticePlatformScheduledTitle, noticePlatformScheduledBody,
+      noticePlatformScheduledBodyNoReason, noticeReopenedRestoredTitle, noticeReopenedRestoredBody }, … } },
     db: { transaction: (run) => prisma.$transaction(run), table: (tx) => (tx ?? prisma).tenantClosing },
     blockers: { kinds: [{ kind: 'patients', path: 'ward' }, …], read: (tenantId, { now, tx }) => … },
     openDescendants: { kind: 'units', path: 'units' }, // REQUIRED with `tree`, refused without
@@ -280,9 +281,14 @@ const tenant = createApiTenant({
   record that lacks a name is a programming error, thrown as a
   `TenantConfigError` on `port.byId` the first time the lifecycle needs it
   (never a notice with an empty name).
-- **The platform close's two sentences are a lifecycle extension**,
+- **The lifecycle's own sentences are a copy extension**,
   `lifecycle.copy.locales.<tag>`, required for every tag of `copy.locales`
-  and validated per key (`lifecycle.copy.locales.pt-BR.noticePlatformScheduledBody`).
+  and validated per key (`lifecycle.copy.locales.pt-BR.noticePlatformScheduledBody`):
+  the platform close's title and body (with its reason, and
+  `noticePlatformScheduledBodyNoReason` when the notice carries none), and
+  `noticeReopenedRestored*`, which a reopen notice reads when it restored a
+  status other than active (`payload.restored`): a tenant reopened to
+  suspended is not live again, and its notice must not say so.
   The base pack (`TENANT_COPY_SHAPE`) is unchanged. `blocker(kind, count,
   detail?)` takes the blocker's optional `detail` (an amount and a date).
 - **Two entries into one flow.** `close({ by: 'member', typedName, … })`
@@ -312,8 +318,16 @@ const tenant = createApiTenant({
   stamped only once `notify` answered true.
 - **Statement budget.** `state()` reads nothing for a live tenant and one row
   for a gone one. `blockers()` and the close add ONE `treeDescendants` read
-  (plus a `byId` per descendant) when a tree is wired. The sweep reads one
-  `byId` per row and stamps in a transaction of its own.
+  when a tree is wired: with the lifecycle, that read MUST return each node's
+  `status` (`TenantTreeNode.status`), or the blocker throws a
+  `TenantConfigError` on `tree.treeDescendants`. The sweep reads one `byId`
+  per row and stamps in a transaction of its own.
+- **Stale rows heal.** A closing row whose tenant is neither closing nor
+  closed (reopened by a release that wrote only your older table, say) is
+  deleted by the sweep, conditionally on its `requestedAt`, with
+  `mirror.deleted`, in one transaction. It takes no slot of `sweepBatch`:
+  the sweep pages on (keyset on `purgeAt`, `tenantId`) until `sweepBatch`
+  live tenants were swept or no row is left.
 - **Gates**: `createTenantGates(tenant, { admin: { prefix, closingWrites },
   public: { prefix, families }, lookup, holdsClose, locale })` and
   `mountTenantGates(app, gates)` from `@12-apps/tenant/hono`. `lookup` is your
@@ -323,7 +337,12 @@ const tenant = createApiTenant({
   (`TenantGateMiddleware`), so they fit whatever Hono version you resolve.
 - **Notice words without the hooks**: `createNoticeWords(tenant, { copy })`
   answers `noticeWords` alone, for a notification registry that renders the
-  lifecycle's notices apart from the module that wires its hooks.
+  lifecycle's notices apart from the module that wires its hooks. It
+  validates the extension as the lifecycle does, and a locale without one
+  reads the default locale's.
+- **`TenantTree.nodeOf` is optional on the type** (added in this minor, so a
+  host typing a tree of its own keeps compiling); `createTenantTree` always
+  provides it, and the lifecycle reads no node when it is absent.
 
 #### Moving an older closing table (expand and contract)
 

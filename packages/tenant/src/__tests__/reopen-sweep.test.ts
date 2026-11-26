@@ -44,6 +44,7 @@ describe('reopen', () => {
       restored: 'ON_HOLD',
     });
     expect(host.notices.map((notice) => notice.type)).toEqual(['clinic.reopened']);
+    expect(host.notices[0]?.payload.restored).toBe('ON_HOLD');
   });
 
   it('restores active when no prior status was recorded (a row copied from before the column)', async () => {
@@ -117,7 +118,7 @@ describe('the sweep', () => {
     expect(host.knobs.purgeCalls).toBe(stamped ? 1 : 2);
   });
 
-  it('skips a stale row of a tenant that is no longer closing, and one failure never stops the others', async () => {
+  it('drops a stale row of a tenant that is no longer closing, with its mirror, and purges nothing', async () => {
     const { host, lifecycle } = await closed('t-1');
     (host.tenantOf('t-1') as { status: string }).status = 'OPEN';
     expect(await lifecycle.sweep(new Date(PURGE.getTime() + 1))).toEqual({
@@ -126,17 +127,67 @@ describe('the sweep', () => {
       afterCloseRetried: 0,
     });
     expect(host.knobs.purgeCalls).toBe(0);
+    expect(host.state.closings).toEqual([]);
+    expect(host.state.mirror).toEqual({});
+  });
 
-    (host.tenantOf('t-1') as { status: string }).status = 'WINDING_DOWN';
-    host.state.closings.unshift({ ...host.closingOf('t-1')!, tenantId: 'ghost', purgeAt: new Date(0) });
+  it('keeps a stale row whose close was replaced since the read (the delete is conditional on requestedAt)', async () => {
+    const { host } = await closed('t-1');
+    (host.tenantOf('t-1') as { status: string }).status = 'OPEN';
+    const replaced = new Date(NOW.getTime() + 1000);
     const broken = host.build({
+      onError: () => undefined,
+      blockers: {
+        ...host.lifecycle.blockers,
+        read: async () => [],
+      },
+    });
+    // The row moves under the sweep: another close replaced it between the page read and the delete.
+    const realById = host.config.port.byId;
+    host.config.port.byId = async (id, tx) => {
+      const found = await realById(id, tx);
+      if (id === 't-1') host.closingOf('t-1')!.requestedAt = replaced;
+      return found;
+    };
+    await broken.lifecycle!.sweep(new Date(PURGE.getTime() + 1));
+    host.config.port.byId = realById;
+    expect(host.closingOf('t-1')?.requestedAt).toEqual(replaced);
+  });
+
+  it('never lets 250 stale rows ahead of a due tenant keep it waiting: one pass reaches it', async () => {
+    const { host, lifecycle } = await closed('t-1');
+    for (let index = 0; index < 250; index += 1) {
+      const id = `stale-${String(index).padStart(3, '0')}`;
+      host.state.tenants.push({ id, slug: id, status: 'OPEN', name: id });
+      host.state.closings.push({ ...host.closingOf('t-1')!, tenantId: id, purgeAt: new Date(index) });
+    }
+    const result = await lifecycle.sweep(new Date(PURGE.getTime() + 1));
+    expect(result.purged).toBe(1);
+    expect(host.state.closings.map((row) => row.tenantId)).toEqual(['t-1']);
+    expect(host.closingOf('t-1')?.purgedAt).not.toBeNull();
+  });
+
+  it('sweeps at most sweepBatch live tenants a pass, and one failure never stops the others', async () => {
+    const { host } = await closed('t-1');
+    host.state.closings.unshift({ ...host.closingOf('t-1')!, tenantId: 'ghost', purgeAt: new Date(0) });
+    host.state.tenants.push({ id: 'ghost', slug: 'ghost', status: 'SHUT', name: 'Ghost' });
+    const broken = host.build({
+      sweepBatch: 1,
       onPurgeDue: async (tenantId) => {
         if (tenantId === 't-1') throw new Error('disk full');
         return 'purged';
       },
     });
-    host.state.tenants.push({ id: 'ghost', slug: 'ghost', status: 'SHUT', name: 'Ghost' });
     expect((await broken.lifecycle!.sweep(new Date(PURGE.getTime() + 1))).purged).toBe(1);
+    expect(host.knobs.purgeCalls).toBe(0);
+    expect(host.errors).toEqual([]);
+    const wide = host.build({
+      onPurgeDue: async (tenantId) => {
+        if (tenantId === 't-1') throw new Error('disk full');
+        return 'purged';
+      },
+    });
+    await wide.lifecycle!.sweep(new Date(PURGE.getTime() + 1));
     expect(host.errors.map((entry) => `${entry.act}:${entry.tenantId}`)).toEqual(['sweep:t-1']);
   });
 
@@ -157,7 +208,20 @@ describe('createNoticeWords', () => {
     const words = createNoticeWords(createApiTenant(serverConfig()), {
       copy: {
         locales: {
-          'en-GB': { noticePlatformScheduledTitle: (name) => `t:${name}`, noticePlatformScheduledBody: (n, d, r) => `b:${n}:${d}:${r}` },
+          'en-GB': {
+            noticePlatformScheduledTitle: (name) => `t:${name}`,
+            noticePlatformScheduledBody: (n, d, r) => `b:${n}:${d}:${r}`,
+            noticePlatformScheduledBodyNoReason: (n, d) => `b0:${n}:${d}`,
+            noticeReopenedRestoredTitle: (n) => `rt:${n}`,
+            noticeReopenedRestoredBody: (n) => `rb:${n}`,
+          },
+          'pt-BR': {
+            noticePlatformScheduledTitle: (name) => `pt:${name}`,
+            noticePlatformScheduledBody: (n, d, r) => `pb:${n}:${d}:${r}`,
+            noticePlatformScheduledBodyNoReason: (n, d) => `pb0:${n}:${d}`,
+            noticeReopenedRestoredTitle: (n) => `prt:${n}`,
+            noticeReopenedRestoredBody: (n) => `prb:${n}`,
+          },
         },
       },
     });
@@ -167,6 +231,42 @@ describe('createNoticeWords', () => {
       body: 'b:North:26/12/2026:Audit',
     });
     expect(words('clinic.reopened', payload, { locale: null, timeZone: 'UTC' }).title).toBe('en-GB: noticeReopenedTitle(North).');
+  });
+
+  it('words a platform close with no reason through its own sentence, never "Motivo: ."', () => {
+    const host = lifecycleHost();
+    const words = host.tenant().lifecycle!.noticeWords;
+    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: PURGE.toISOString(), by: 'platform' as const, reason: null };
+    expect(words('clinic.closing_scheduled', payload, { locale: 'pt-BR', timeZone: 'UTC' }).body).toBe(
+      'pt-BR: platform body, no reason(Sul, 26/12/2026).',
+    );
+    expect(words('clinic.closing_scheduled', { ...payload, reason: '   ' }, { locale: 'pt-BR', timeZone: 'UTC' }).body).toBe(
+      'pt-BR: platform body, no reason(Sul, 26/12/2026).',
+    );
+  });
+
+  it('words a reopen that restored a status other than active through the restored sentences', () => {
+    const host = lifecycleHost();
+    const words = host.tenant().lifecycle!.noticeWords;
+    const payload = { tenantId: 't-2', name: 'Sul', slug: 'south', purgeAt: PURGE.toISOString(), by: null, reason: null };
+    expect(words('clinic.reopened', { ...payload, restored: 'ON_HOLD' }, { locale: 'pt-BR', timeZone: 'UTC' })).toEqual({
+      title: 'pt-BR: restored title(Sul).',
+      body: 'pt-BR: restored body(Sul).',
+    });
+    for (const restored of ['OPEN', null, undefined]) {
+      expect(words('clinic.reopened', { ...payload, restored }, { locale: 'pt-BR', timeZone: 'UTC' }).title).toBe(
+        'pt-BR: noticeReopenedTitle(Sul).',
+      );
+    }
+  });
+
+  it('validates the copy extension for every locale of the base copy, naming the missing one', () => {
+    const tenant = createApiTenant(serverConfig());
+    const one = { noticePlatformScheduledTitle: () => 'x', noticePlatformScheduledBody: () => 'x', noticePlatformScheduledBodyNoReason: () => 'x', noticeReopenedRestoredTitle: () => 'x', noticeReopenedRestoredBody: () => 'x' };
+    expect(() => createNoticeWords(tenant, { copy: { locales: { 'en-GB': one } } })).toThrow(/lifecycle\.copy\.locales\.pt-BR/u);
+    expect(() =>
+      createNoticeWords(tenant, { copy: { locales: { 'en-GB': one, 'pt-BR': { ...one, noticeReopenedRestoredBody: 'text' } } } } as never),
+    ).toThrow(/noticeReopenedRestoredBody/u);
   });
 });
 
