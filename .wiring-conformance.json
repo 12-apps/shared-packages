@@ -957,7 +957,7 @@
   },
   "@12-apps/tenant :: email": {
     "kind": "exempt",
-    "why": "sends no mail yet; when it does, every subject and body is a whole sentence from the host's copy pack, never a template of its own"
+    "why": "sends no mail itself: the lifecycle hands each notice to the host's notify hook, and every subject and body is a whole sentence from the host's copy pack (noticeWords), never a template of its own"
   },
   "@12-apps/tenant :: env": {
     "kind": "exempt",
@@ -965,11 +965,11 @@
   },
   "@12-apps/tenant :: http": {
     "kind": "exempt",
-    "why": "ships no route yet: createApiTenant returns an empty route list in this slice, and the close, reopen and export routes arrive with the lifecycle slice that serves them"
+    "why": "ships no route: createApiTenant returns an empty route list; the host keeps its own close, reopen and export route modules and calls tenant.lifecycle from them, and the gates mount as middleware (mountTenantGates), not as routes"
   },
   "@12-apps/tenant :: jobs": {
     "kind": "exempt",
-    "why": "runs nothing on a cadence yet: the reminder and purge sweep and the export build arrive with the lifecycle, purge and export slices"
+    "why": "runs nothing on a cadence itself: the host schedules lifecycle.sweep (reminders, the after-close retry, the purge) on its own job runner; the export build arrives with the export slice"
   },
   "@12-apps/tenant :: mcp": {
     "kind": "exempt",

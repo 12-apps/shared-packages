@@ -7,8 +7,8 @@ Two halves, one factory each, one config object each. Nothing is optional.
 import { createApiTenant } from '@12-apps/tenant/server';
 import { mountTenant } from '@12-apps/tenant/hono';
 
-const tenant = createApiTenant({ statuses, ids, copy, port });
-mountTenant(app, tenant); // mounts nothing yet: the routes arrive with the lifecycle
+const tenant = createApiTenant({ statuses, ids, copy, port }); // + tree, slugs, lifecycle: each opt-in
+mountTenant(app, tenant); // mounts nothing: hosts keep their own route modules
 
 // frontend
 import { createWebTenant } from '@12-apps/tenant/react';
@@ -92,8 +92,8 @@ const copy = { locales: { 'pt-BR': ptBR, 'en-US': enUS }, defaultLocale: 'pt-BR'
 
 ```ts
 const port: TenantPort<Status, Tx> = {
-  bySlug: (slug) => …,                   // the CURRENT slug only: { id, slug, status } | null
-  byId: (id, tx) => …,                   // on tx when given: { id, slug, status } | null
+  bySlug: (slug) => …,                   // the CURRENT slug only: { id, slug, status, name? } | null
+  byId: (id, tx) => …,                   // on tx when given: { id, slug, status, name? } | null
   setStatusIf: (id, from, to, tx) => …,  // compare-and-set ON tx: true only when the row moved
   clearProfile: (tx, id) => …,           // erase the row's profile, on tx
   timeZone: (id) => …,                   // IANA zone
@@ -247,6 +247,114 @@ two members and the memory are checked at startup (`slugs.port.current`,
   than the port's record uses `remember` throughout).
 - **One memory per channel per process**, shared by everything that reads
   under that channel. Two memories on one channel each open a listener.
+
+### Lifecycle (opt-in): close, reopen, the sweep, the gates
+
+Additive: a host that passes no `lifecycle` boots unchanged and gets no
+`tenant.lifecycle`.
+
+```ts
+const tenant = createApiTenant({
+  statuses, ids, copy, port, tree, // tree optional
+  lifecycle: {
+    graceDays: 30, reminderDays: { week: 7, day: 1 }, // integers, 0 < day < week < graceDays
+    minReasonLength: 3, nameLocale: 'pt-BR', sweepBatch: 200,
+    copy: { locales: { 'pt-BR': { noticePlatformScheduledTitle, noticePlatformScheduledBody,
+      noticePlatformScheduledBodyNoReason, noticeReopenedRestoredTitle, noticeReopenedRestoredBody }, … } },
+    db: { transaction: (run) => prisma.$transaction(run), table: (tx) => (tx ?? prisma).tenantClosing },
+    blockers: { kinds: [{ kind: 'patients', path: 'ward' }, …], read: (tenantId, { now, tx }) => … },
+    openDescendants: { kind: 'units', path: 'units' }, // REQUIRED with `tree`, refused without
+    confirmDangerousAct: (request, { tenantId, by }) => …, // throws to refuse (a PIN check)
+    afterClose: ({ tenant, node, now }) => …, // throws = failed: stamped, audited, retried by the sweep
+    invalidate: (tenantId) => …,
+    notify: (typeId, payload) => …,           // resolves true only once RECORDED
+    onPurgeDue: (tenantId, { now }) => …,      // 'purged' | 'already' | 'skipped'
+    audit: (tx, action, event) => …,           // on tx; action = ids.audit[event.act]
+    locale: () => …, onError: (error, { act, tenantId }) => …,
+    mirror,                                   // optional: an older table you are moving (below)
+  },
+});
+```
+
+- **Your port MUST return `name` from `bySlug` and `byId`** once the lifecycle
+  is wired. `TenantRecord.name` stays optional for hosts without it; with it, a
+  record that lacks a name is a programming error, thrown as a
+  `TenantConfigError` on `port.byId` the first time the lifecycle needs it
+  (never a notice with an empty name).
+- **The lifecycle's own sentences are a copy extension**,
+  `lifecycle.copy.locales.<tag>`, required for every tag of `copy.locales`
+  and validated per key (`lifecycle.copy.locales.pt-BR.noticePlatformScheduledBody`):
+  the platform close's title and body (with its reason, and
+  `noticePlatformScheduledBodyNoReason` when the notice carries none), and
+  `noticeReopenedRestored*`, which a reopen notice reads when it restored a
+  status other than active (`payload.restored`): a tenant reopened to
+  suspended is not live again, and its notice must not say so.
+  The base pack (`TENANT_COPY_SHAPE`) is unchanged. `blocker(kind, count,
+  detail?)` takes the blocker's optional `detail` (an amount and a date).
+- **Two entries into one flow.** `close({ by: 'member', typedName, … })`
+  starts from `statuses.active` only and checks the typed name in
+  `nameLocale`; `close({ by: 'platform', … })` starts from any of
+  `statuses.closableFrom`, asks no name, writes `requested_by_id` null (your
+  audit line says who) and hands the reason to the scheduled notice
+  (`payload.reason`, words from `noticePlatformScheduled*`). Both record
+  `prior_status`; `reopen` restores it (or `active` when it is null or not a
+  live status).
+- **The order of a close**: `confirmDangerousAct`, the reason, the name, then
+  ONE transaction (`setStatusIf`, your blockers read again ON `tx` plus the
+  open-descendants count, the row replaced, `mirror.replaced`, `audit`). A
+  blocker found there rolls the move back (409 `closingBlocked`, `details:
+  { pending }`). After the commit, never inside it: `afterClose` (with the
+  tenant's tree node, so a unit can skip its root's billing), `invalidate`,
+  `notify`. A hook that throws goes to `onError` and never undoes the close.
+- **Refusals** are `TenantLifecycleRefusal { kind, code, status, details }`,
+  `code` from your `ids.refusals`, the message from `copyFor(locale())`. The
+  statuses are fixed: 403 closing/readOnly/closed, 409 gone, alreadyClosing,
+  notActive, closingBlocked, purged, notClosing, 422 reasonTooShort,
+  nameMismatch.
+- **Schedule `tenant.lifecycle.sweep(now)`** on your own job runner (hourly is
+  plenty). Per row: skip a tenant no longer closing or closed; retry
+  `afterClose` while it has not gone through; once due, `onPurgeDue` and stamp
+  `purged_at` on `purged` or `already`; before that, send the reminder due,
+  stamped only once `notify` answered true.
+- **Statement budget.** `state()` reads nothing for a live tenant and one row
+  for a gone one. `blockers()` and the close add ONE `treeDescendants` read
+  when a tree is wired: with the lifecycle, that read MUST return each node's
+  `status` (`TenantTreeNode.status`), or the blocker throws a
+  `TenantConfigError` on `tree.treeDescendants`. The sweep reads one `byId`
+  per row and stamps in a transaction of its own.
+- **Stale rows heal.** A closing row whose tenant is neither closing nor
+  closed (reopened by a release that wrote only your older table, say) is
+  deleted by the sweep, conditionally on its `requestedAt`, with
+  `mirror.deleted`, in one transaction. It takes no slot of `sweepBatch`:
+  the sweep pages on (keyset on `purgeAt`, `tenantId`) until `sweepBatch`
+  live tenants were swept or no row is left.
+- **Gates**: `createTenantGates(tenant, { admin: { prefix, closingWrites },
+  public: { prefix, families }, lookup, holdsClose, locale })` and
+  `mountTenantGates(app, gates)` from `@12-apps/tenant/hono`. `lookup` is your
+  kept slug lookup (the status rides it: an open tenant pays nothing more); a
+  family's `fixedWords` are never looked up; `slugAfter` names words after
+  which the next segment is the slug. The middlewares are typed structurally
+  (`TenantGateMiddleware`), so they fit whatever Hono version you resolve.
+- **Notice words without the hooks**: `createNoticeWords(tenant, { copy })`
+  answers `noticeWords` alone, for a notification registry that renders the
+  lifecycle's notices apart from the module that wires its hooks. It
+  validates the extension as the lifecycle does, and a locale without one
+  reads the default locale's.
+- **`TenantTree.nodeOf` is optional on the type** (added in this minor, so a
+  host typing a tree of its own keeps compiling); `createTenantTree` always
+  provides it, and the lifecycle reads no node when it is absent.
+
+#### Moving an older closing table (expand and contract)
+
+Pass `mirror: { replaced, event, deleted }`: each runs on the package's own
+transaction, so the two tables never disagree. `deleted(tx, tenantId, requestedAt?)`
+hands you the deleted row's `requestedAt`: delete your old row only while it
+is that same close, so a re-close your previous release wrote meanwhile
+survives (absent when the package read no row: delete by tenant). Write each stamp where it is
+still null, as the package does. Rows your PREVIOUS release wrote only into
+the old table (during a rolling deploy) are not in `tenant_closings`: before
+each sweep, catch them up with one upsert (`INSERT … SELECT … ON CONFLICT
+(tenant_id) DO UPDATE`), and backfill once with a data-only migration.
 
 ### The schema and the migration
 

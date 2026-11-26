@@ -24,6 +24,14 @@ export interface TenantRecord<S extends string = string> {
   slug: string;
   /** The tenant row's current status: any value of the host's status set. */
   status: S;
+  /**
+   * The tenant's display name. Optional for the port as a whole, REQUIRED of
+   * `bySlug` and `byId` once the host wires the lifecycle
+   * (`createApiTenant({ lifecycle })`): its notices and the member close's
+   * typed-name check read it, and a record without it there is refused as a
+   * programming error (`TenantConfigError` on `port.bySlug`/`port.byId`).
+   */
+  name?: string;
 }
 
 /**
@@ -40,6 +48,12 @@ export interface TenantTreeNode {
   parentId: string | null;
   /** `/<root id>/…/<own id>/`; a root's is `/<own id>/`. */
   path: string;
+  /**
+   * The tenant's status, when the host's read carries it. Optional for the
+   * tree alone; REQUIRED of `treeDescendants` once the lifecycle is wired, so
+   * the open-descendants blocker costs that one read and no read per unit.
+   */
+  status?: string;
 }
 
 /**

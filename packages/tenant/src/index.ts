@@ -65,3 +65,23 @@ export {
 } from './slugs';
 export { TenantConfigError, validateCoreConfig, validatePort, validateSlugs, validateTreePort } from './validate';
 export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';
+export {
+  TENANT_LIFECYCLE_COPY_KEYS,
+  TENANT_REFUSAL_STATUS,
+  isTenantGone,
+  purgeAtFor,
+  reminderDue,
+  sameTenantName,
+  type GateRefusal,
+  type TenantAuditEvent,
+  type TenantBlocker,
+  type TenantBlockerCount,
+  type TenantBlockerKind,
+  type TenantCloseEntry,
+  type TenantClosingEvent,
+  type TenantClosingState,
+  type TenantLifecycleCopyPack,
+  type TenantLifecycleRefusalKind,
+  type TenantNoticePayload,
+  type TenantReminder,
+} from './lifecycle';

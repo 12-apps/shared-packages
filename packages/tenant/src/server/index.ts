@@ -18,6 +18,9 @@ import type { TenantPort, TenantRecord, TenantTreePort } from '../port';
 import { createTenantSlugs, type KeptMemory, type TenantSlugPort, type TenantSlugRecord, type TenantSlugs } from '../slugs';
 import { createTenantTree, type TenantTree } from '../tree';
 import { validateCoreConfig, validatePort, validateSlugs, validateTreePort } from '../validate';
+import { createTenantLifecycle, type TenantLifecycle, type TenantLifecycleConfig } from '../lifecycle';
+
+export * from '../lifecycle';
 
 export { TenantConfigError } from '../validate';
 export {
@@ -80,6 +83,12 @@ export interface TenantServerConfig<
    * resolves slugs itself and `tenant.slugs` is absent.
    */
   slugs?: TenantSlugsConfig<R>;
+  /**
+   * The closing lifecycle (close, reopen, the sweep). Left out, the host runs
+   * its own and `tenant.lifecycle` is absent. Given, the port's `bySlug` and
+   * `byId` MUST return each tenant's `name`.
+   */
+  lifecycle?: TenantLifecycleConfig<S, Tx>;
 }
 
 export interface ApiTenant<S extends string = string, Tx = unknown, R extends TenantSlugRecord = TenantSlugRecord>
@@ -92,6 +101,8 @@ export interface ApiTenant<S extends string = string, Tx = unknown, R extends Te
   tree?: TenantTree<Tx>;
   /** Slug resolution through `config.slugs`; absent when none was given. */
   slugs?: TenantSlugs<R>;
+  /** The closing lifecycle through `config.lifecycle`; absent when none was given. */
+  lifecycle?: TenantLifecycle<S>;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
   /** The tenant, read through the port, on `tx` when given. */
@@ -117,7 +128,7 @@ export function createApiTenant<S extends string, Tx = unknown, R extends Tenant
   const data = frozenCopy({ statuses: config.statuses, ids: config.ids, copy: config.copy });
   const known = new Set<string>(data.statuses.all);
   const { port } = config;
-  return {
+  const tenant: ApiTenant<S, Tx, R> = {
     ...createReadings(data),
     config: data,
     port,
@@ -136,4 +147,7 @@ export function createApiTenant<S extends string, Tx = unknown, R extends Tenant
       return port.setStatusIf(id, from, to, tx);
     },
   };
+  if (config.lifecycle === undefined) return tenant;
+  // Validated by the factory, before anything is returned.
+  return { ...tenant, lifecycle: createTenantLifecycle(tenant, config.lifecycle) };
 }
