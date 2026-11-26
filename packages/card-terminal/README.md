@@ -249,6 +249,36 @@ sale with a capture a person picked (`chooseSale`), first ask
 the flag, unacknowledged. A person's second pick confirms it, and `pickHold`
 answers null; your bind then clears the flag.
 
+### Bind inside the caller's claim (`captureBindSql`, `explainUnbound`)
+
+`ledger.bind` reads, decides and writes: two to four round trips per capture.
+A host that settles a sale in ONE claim statement composes the bind into it
+instead: `captureBindSql` answers the same decision as `bindDecision`, stated
+as the predicate of one Postgres `UPDATE … RETURNING`, to be used as a
+data-modifying CTE after the payment row in the same statement:
+
+```ts
+const bind = captureBindSql(
+  { clientId, transactionCode, orderId, paymentIdSql: '(SELECT id FROM paid)', now, param },
+  { holds: true },
+);
+// WITH paid AS (INSERT INTO payments … RETURNING id), bound AS (${bind.text}) SELECT …
+```
+
+`param` binds a value in the caller's statement and answers its placeholder.
+The capture must already be recorded (`record` / `recordFromDevice`): a CTE
+does not see a sibling CTE's insert. No row returned means nothing was bound;
+`explainUnbound(current, target)` on the capture read afterwards answers
+`replay` (this sale's payment already holds it), `missing`, or the bind's
+refusal code.
+
+### A door charge with no till (`planDoorSettlement`)
+
+One capture against what a sale owes, where no till can hand change back:
+`EXACT` settles the due; `SHORT` settles what was captured and names the
+shortfall for the caller to park; `EXCESS` settles the due and names the
+excess the caller records as owed back to the card. Pure; nothing is written.
+
 ### Upgrading to 1.2.0 (held captures)
 
 Nothing built on the factories (`createTerminalCaptureLedger`,

@@ -168,3 +168,12 @@ export {
   type TypedCaptureInput,
   type TypedClaim,
 } from './typed-booking';
+export {
+  captureBindSql,
+  explainUnbound,
+  type CaptureBindSql,
+  type CaptureBindSqlInput,
+  type CaptureBindSqlOptions,
+  type SqlParam,
+} from './bind-fragment';
+export { planDoorSettlement, type DoorCapture, type DoorSettlement } from './door-settlement';
