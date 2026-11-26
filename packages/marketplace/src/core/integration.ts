@@ -1,4 +1,5 @@
-import type { MarketplaceCredentials } from "./adapter";
+import type { AdapterGrant, MarketplaceCredentials } from "./adapter";
+import { appCredentialsOf, linkGrant, openLinkRefreshToken, type MarketplaceAuthMode } from "./link-store";
 import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -37,6 +38,12 @@ export interface MarketplaceIntegrationView {
   lastVerifiedAt: Date | null;
   /** Archived connections ingest nothing; null while live. */
   archivedAt: Date | null;
+  /**
+   * How the connection authenticates (FUT-5613): CREDENTIALS, the store's own
+   * app; LINKED, the software's app the store authorized. Always set by this
+   * version; optional in the type so a view built by hand against 1.x compiles.
+   */
+  authMode?: MarketplaceAuthMode;
 }
 
 interface IntegrationRow {
@@ -52,6 +59,7 @@ interface IntegrationRow {
   lastEventAt: Date | null;
   lastVerifiedAt: Date | null;
   archivedAt: Date | null;
+  authMode?: string;
 }
 
 const VIEW_SELECT = {
@@ -67,6 +75,7 @@ const VIEW_SELECT = {
   lastEventAt: true,
   lastVerifiedAt: true,
   archivedAt: true,
+  authMode: true,
 } as const;
 
 function toView(row: IntegrationRow): MarketplaceIntegrationView {
@@ -83,6 +92,7 @@ function toView(row: IntegrationRow): MarketplaceIntegrationView {
     lastEventAt: row.lastEventAt,
     lastVerifiedAt: row.lastVerifiedAt,
     archivedAt: row.archivedAt ?? null,
+    authMode: row.authMode === "LINKED" ? "LINKED" : "CREDENTIALS",
   };
 }
 
@@ -157,7 +167,8 @@ export async function saveMarketplaceIntegration(
     ...(input.autoAccept === undefined ? {} : { autoAccept: input.autoAccept }),
     ...(input.followStatus === undefined ? {} : { followStatus: input.followStatus }),
     ...(input.ackSlaSeconds === undefined ? {} : { ackSlaSeconds: input.ackSlaSeconds }),
-    ...(sealed === undefined ? {} : { credentials: sealed, status: "UNVERIFIED" }),
+    // Typed credentials make the connection the store's own app again.
+    ...(sealed === undefined ? {} : { credentials: sealed, status: "UNVERIFIED", authMode: "CREDENTIALS" }),
   };
   const row = (await db.marketplaceIntegration.upsert({
     where: { clientId_provider: { clientId: input.clientId, provider: input.provider } },
@@ -230,8 +241,12 @@ export async function resolveIngestionTarget(
       credentials: true,
       archivedAt: true,
       externalMerchantId: true,
+      authMode: true,
+      environment: true,
     },
   })) as {
+    authMode?: string;
+    environment?: string;
     externalMerchantId: string | null;
     enabled: boolean;
     autoAccept: boolean;
@@ -251,10 +266,31 @@ export async function resolveIngestionTarget(
     // An unopenable blob must not read as "no secret configured" — that would
     // turn a key-rotation problem into an endpoint that accepts unsigned
     // deliveries. The secrets port throws instead, and the caller answers 401.
-    webhookSecret:
-      row.credentials === "" ? null : openCredentials(ctx, row.credentials).webhookSecret,
+    webhookSecret: await webhookSecretOf(ctx, provider, row),
   };
 }
+
+/**
+ * The key a connection's deliveries are verified against: the store's own,
+ * or, for a linked connection, the software's app's (FUT-5613). A linked
+ * connection whose app is no longer configured THROWS, like a blob that will
+ * not open: it must never read as "no secret, accept unsigned".
+ */
+async function webhookSecretOf(
+  ctx: EngineContext,
+  provider: MarketplaceProvider,
+  row: { credentials: string; authMode?: string; environment?: string },
+): Promise<string | null> {
+  if (row.authMode !== "LINKED") {
+    return row.credentials === "" ? null : openCredentials(ctx, row.credentials).webhookSecret;
+  }
+  const app = await appCredentialsOf(ctx, provider, environmentOf(row.environment));
+  if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
+  return app.webhookSecret;
+}
+
+const environmentOf = (value: string | undefined): "SANDBOX" | "PRODUCTION" =>
+  value === "PRODUCTION" ? "PRODUCTION" : "SANDBOX";
 
 /**
  * Open a stored credential set.
@@ -320,6 +356,8 @@ export async function markMarketplaceEventSeen(
 export interface OutboundConnection {
   environment: "SANDBOX" | "PRODUCTION";
   credentials: MarketplaceCredentials;
+  /** A linked connection's token source (FUT-5613); absent for the store's own credentials. */
+  grant?: AdapterGrant;
 }
 
 /**
@@ -336,11 +374,14 @@ export async function readOutboundConnection(
   const db = await ctx.ports.db();
   const row = (await db.marketplaceIntegration.findUnique({
     where: { clientId_provider: { clientId, provider } },
-    select: { environment: true, credentials: true },
-  })) as { environment: string; credentials: string } | null;
+    select: { environment: true, credentials: true, authMode: true },
+  })) as { environment: string; credentials: string; authMode?: string } | null;
   if (!row || row.credentials === "") return null;
-  return {
-    environment: row.environment === "PRODUCTION" ? "PRODUCTION" : "SANDBOX",
-    credentials: openCredentials(ctx, row.credentials),
-  };
+  const environment = environmentOf(row.environment);
+  if (row.authMode !== "LINKED") return { environment, credentials: openCredentials(ctx, row.credentials) };
+  // Linked: the software's app speaks for the store, with the store's refresh token.
+  const app = await appCredentialsOf(ctx, provider, environment);
+  if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
+  const refreshToken = openLinkRefreshToken(ctx, row.credentials);
+  return { environment, credentials: app, grant: linkGrant(ctx, { clientId, provider, environment, refreshToken, app }) };
 }

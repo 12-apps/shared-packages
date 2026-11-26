@@ -28,6 +28,7 @@ export {
   outboundResultOf,
   tokenGrantResultOf,
   type AdapterCallContext,
+  type AdapterGrant,
   type AdapterTokenCache,
   type CancellationReason,
   type CancellationRequestInput,
@@ -218,3 +219,14 @@ export {
   type StorePauseWanted,
 } from "./core/pause-store";
 export type { AvailabilitySweepResult } from "./core/pause-sweep";
+export type {
+  LinkCallContext,
+  LinkCode,
+  LinkGrant,
+  LinkResult,
+  LinkedMerchant,
+  MarketplaceAppCredentialsPort,
+  MarketplaceLinking,
+} from "./core/linking-port";
+export type { LinkFailure, LinkFinished, LinkPendingView, LinkRefusalCode } from "./core/linking";
+export type { MarketplaceAuthMode } from "./core/link-store";

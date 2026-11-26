@@ -38,8 +38,13 @@ export const IFOOD_PORTAL_URL = "https://portal.ifood.com.br/";
 /** A token is renewed this long before iFood says it expires. */
 const TOKEN_MARGIN_MS = 60_000;
 
-/** The token cache key: per environment and merchant app. */
-export const ifoodTokenKey = (ctx: AdapterCallContext): string => `IFOOD:${ctx.environment}:${ctx.credentials.clientId}`;
+/**
+ * The token cache key: per environment and merchant app, or, for a store
+ * linked through the software's app (FUT-5613), the store's own grant key, so
+ * deleting it after a 401 forgets that store's token and nobody else's.
+ */
+export const ifoodTokenKey = (ctx: AdapterCallContext): string =>
+  ctx.grant ? ctx.grant.key : `IFOOD:${ctx.environment}:${ctx.credentials.clientId}`;
 
 /** iFood's OAuth answer, read defensively: a missing field is "no token". */
 function tokenOf(body: string): { token: string; expiresInSeconds: number } | null {
@@ -55,10 +60,12 @@ function tokenOf(body: string): { token: string; expiresInSeconds: number } | nu
 
 /**
  * A bearer token for this merchant app, from the per-process cache or a fresh
- * client-credentials grant. Keyed by the app's client id, so two stores with
+ * client-credentials grant (or, linked, the store's grant). Keyed by the app's client id, so two stores with
  * two apps never share one. The token lives in memory only.
  */
 export async function bearer(ctx: AdapterCallContext): Promise<{ token: string } | OutboundResult> {
+  // A linked store: its refresh token buys the token, never a client-credentials grant.
+  if (ctx.grant) return ctx.grant.accessToken();
   const key = ifoodTokenKey(ctx);
   const cached = ctx.tokens.get(key);
   if (cached && cached.expiresAt > ctx.now.getTime() + TOKEN_MARGIN_MS) return { token: cached.token };

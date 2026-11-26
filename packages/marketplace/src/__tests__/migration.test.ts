@@ -35,6 +35,15 @@ function migrationSql(): string[] {
     .map((dir) => readFileSync(new URL(`${dir}/migration.sql`, MIGRATIONS), "utf8"));
 }
 
+/** The migrations before `name`, and `name`'s own SQL: a host whose last release stopped just before it. */
+function migrationsUpTo(name: string): { before: string[]; target: string } {
+  const dirs = readdirSync(MIGRATIONS).sort();
+  const index = dirs.indexOf(name);
+  if (index < 0) throw new Error(`no migration ${name}`);
+  const sql = migrationSql();
+  return { before: sql.slice(0, index), target: sql[index] as string };
+}
+
 async function applyAll(db: PGlite): Promise<void> {
   for (const sql of migrationSql()) await db.exec(sql);
 }
@@ -136,8 +145,7 @@ describe("the engine's migration", () => {
     const db = new PGlite();
     await db.exec(PREDECESSOR);
     // A connection the previous release wrote, before the column exists.
-    const migrations = migrationSql();
-    const last = migrations.pop() as string;
+    const { before: migrations, target: last } = migrationsUpTo("20261126120000_marketplace_status_updates");
     for (const sql of migrations) await db.exec(sql);
     await db.exec(
       `INSERT INTO marketplace_integrations (id, client_id, provider, credentials, updated_at) VALUES ('i1', 't', 'IFOOD', '', now())`,
@@ -158,6 +166,43 @@ describe("the engine's migration", () => {
     await expect(db.exec(row("PACKED"))).rejects.toThrow(/step_check/);
     await expect(db.exec(row("DISPATCHED", "SOMEONE"))).rejects.toThrow(/source_check/);
     await expect(db.exec(row("DISPATCHED", "STORE", "LOST"))).rejects.toThrow(/state_check/);
+    await db.close();
+  });
+
+  it("adds auth_mode CREDENTIALS to every existing connection, and the link table with its guards (FUT-5613)", async () => {
+    const db = new PGlite();
+    await db.exec(PREDECESSOR);
+    const { before, target } = migrationsUpTo("20261127090000_marketplace_app_link");
+    for (const sql of before) await db.exec(sql);
+    await db.exec(
+      `INSERT INTO marketplace_integrations (id, client_id, provider, credentials, updated_at) VALUES ('i1', 't', 'IFOOD', '', now())`,
+    );
+    await db.exec(target);
+
+    const modes = await db.query<{ auth_mode: string }>("SELECT auth_mode FROM marketplace_integrations");
+    expect(modes.rows).toEqual([{ auth_mode: "CREDENTIALS" }]);
+    await expect(db.exec("UPDATE marketplace_integrations SET auth_mode = 'LINKED'")).resolves.toBeDefined();
+    await expect(db.exec("UPDATE marketplace_integrations SET auth_mode = 'OTHER'")).rejects.toThrow(/auth_mode_check/);
+    expect(await columns(db, "marketplace_link_attempts")).toEqual([
+      "client_id",
+      "created_at",
+      "environment",
+      "expires_at",
+      "id",
+      "provider",
+      "updated_at",
+      "user_code",
+      "verification_url",
+      "verification_url_complete",
+      "verifier",
+    ]);
+    const attempt = (id: string, provider = "IFOOD", environment = "PRODUCTION") =>
+      `INSERT INTO marketplace_link_attempts (id, client_id, provider, environment, verifier, user_code, verification_url, verification_url_complete, expires_at, updated_at)
+       VALUES ('${id}', 't', '${provider}', '${environment}', 'sealed', 'ABCD-EFGH', 'https://p/', 'https://p/?c=1', now(), now())`;
+    await expect(db.exec(attempt("l1"))).resolves.toBeDefined();
+    await expect(db.exec(attempt("l2"))).rejects.toThrow(/client_id_provider_key/);
+    await expect(db.exec(attempt("l3", "ifood"))).rejects.toThrow(/provider_shape/);
+    await expect(db.exec(attempt("l4", "RAPPI", "STAGING"))).rejects.toThrow(/environment_check/);
     await db.close();
   });
 

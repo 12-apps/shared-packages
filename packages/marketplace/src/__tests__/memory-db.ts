@@ -189,7 +189,12 @@ export function createMemoryDb() {
         lastEventAt: null,
         lastVerifiedAt: null,
         archivedAt: null,
+        authMode: "CREDENTIALS",
       }),
+      unique: [["clientId", "provider"]],
+    }),
+    marketplaceLinkAttempt: new MemoryTable("attempt", {
+      defaults: () => ({ environment: "PRODUCTION", createdAt: EPOCH, updatedAt: EPOCH }),
       unique: [["clientId", "provider"]],
     }),
     marketplaceMenuLink: new MemoryTable("link", {

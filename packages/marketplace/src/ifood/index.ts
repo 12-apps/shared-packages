@@ -2,6 +2,7 @@ import type { CancellationReason, MarketplaceAdapter } from "../core/adapter";
 import { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from "./copy";
 import { IFOOD_CATALOGUE } from "./catalogue";
 import { IFOOD_CATALOGUE_READER } from "./catalogue-read";
+import { IFOOD_LINKING } from "./linking";
 import { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodInformStatus, ifoodRequestCancellation, ifoodStatusSupported } from "./outbound";
 import { IFOOD_AVAILABILITY } from "./pause";
@@ -79,6 +80,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
     informStatus: ifoodInformStatus,
     // The Merchant API's interruptions: an id and an end per closure (FUT-4851).
     availability: IFOOD_AVAILABILITY,
+    // The distributed-app authorization: a store links the software's own app (FUT-5613).
+    linking: IFOOD_LINKING,
     // No per-order deep link is known, so the portal, where a live order is
     // on the first screen.
     appLink: () => IFOOD_PORTAL_URL,
@@ -89,5 +92,6 @@ export { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from 
 export { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 export { IFOOD_CATALOGUE, ifoodItemBody, ifoodItemId, ifoodProductId } from "./catalogue";
 export { IFOOD_CATALOGUE_READER } from "./catalogue-read";
+export { IFOOD_LINKING } from "./linking";
 export { IFOOD_IMAGE_BASE_URL } from "./catalogue-snapshot";
 export { IFOOD_AVAILABILITY, ifoodLocalTime, ifoodPause, ifoodResume } from "./pause";

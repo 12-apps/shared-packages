@@ -2,6 +2,7 @@ import type { AdapterRegistry } from "./registry";
 import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp, StatusStep } from "./adapter";
 import type { CatalogueImage, CatalogueItem } from "./catalogue-port";
 import type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
+import type { MarketplaceAppCredentialsPort } from "./linking-port";
 import type { NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 export type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
@@ -93,6 +94,16 @@ export interface MarketplaceDb {
     findMany(args: unknown): Promise<unknown[]>;
     create(args: unknown): Promise<unknown>;
     updateMany(args: unknown): Promise<{ count: number }>;
+  };
+  /**
+   * OPTIONAL in the type, so a host on 1.x that has not yet composed the
+   * linking model still compiles; linking reports itself unavailable without
+   * it (FUT-5613, migration `20261127090000_marketplace_app_link`).
+   */
+  marketplaceLinkAttempt?: {
+    findUnique(args: unknown): Promise<unknown>;
+    upsert(args: unknown): Promise<unknown>;
+    deleteMany(args: unknown): Promise<{ count: number }>;
   };
 }
 
@@ -375,6 +386,13 @@ export interface MarketplacePorts {
    * catalogue. Absent: every catalogue call answers `UNSUPPORTED`.
    */
   catalogue?: MarketplaceCataloguePort;
+  /**
+   * OPTIONAL. The software's OWN app on each marketplace (client id, secret,
+   * webhook key), per environment, for linking a store without its own
+   * credentials (FUT-5613). Absent, or null for a marketplace: linking is
+   * unavailable there, and a store's own credentials keep working unchanged.
+   */
+  appCredentials?: MarketplaceAppCredentialsPort;
   /** The acceptance window a connection gets when it does not state its own. */
   defaultAckSlaSeconds: number;
   /** How many stored deliveries one reconciliation pass re-runs. */

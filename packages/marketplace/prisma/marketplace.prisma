@@ -67,6 +67,12 @@ model MarketplaceIntegration {
   /// and carrying VERIFIED across a rotation asserts a probe that never ran.
   status String @default("UNVERIFIED")
 
+  /// CREDENTIALS | LINKED (CHECK). CREDENTIALS: the store's own app, its
+  /// client id and secret in `credentials`. LINKED: the store authorized the
+  /// software's own app (FUT-5613); `credentials` holds only its refresh token,
+  /// and the app's credentials are the host's configuration.
+  authMode String @default("CREDENTIALS") @map("auth_mode")
+
   lastEventAt    DateTime? @map("last_event_at")
   lastVerifiedAt DateTime? @map("last_verified_at")
 
@@ -450,4 +456,36 @@ model MarketplaceStatusUpdate {
   // migration (marketplace_status_updates_state_updated_at_idx, WHERE state =
   // 'SENDING'), which Prisma cannot express, as marketplace_acceptances_cancellation_waiting_idx.
   @@map("marketplace_status_updates")
+}
+
+/// One store's linking in progress through the software's own app (FUT-5613):
+/// the code it types on the marketplace's portal, and the VERIFIER the exchange
+/// needs, sealed by the host's secrets port and never sent to a browser.
+///
+/// At most one per (store, marketplace): starting again replaces it. The row
+/// is short-lived by nature (the marketplace's code lives ten minutes) and is
+/// removed by the exchange that uses it; it is not a connection and never
+/// reads as one.
+model MarketplaceLinkAttempt {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  provider String
+
+  /// SANDBOX | PRODUCTION (CHECK): the app the code was asked of.
+  environment String @default("PRODUCTION")
+
+  /// The verifier, sealed. Opened only by the exchange.
+  verifier String
+
+  /// What the screen shows again after a reload: the code and the portal links.
+  userCode                String @map("user_code")
+  verificationUrl         String @map("verification_url")
+  verificationUrlComplete String @map("verification_url_complete")
+  expiresAt               DateTime @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider])
+  @@map("marketplace_link_attempts")
 }
