@@ -12,6 +12,7 @@ import {
   type TenantIds,
 } from './config';
 import { TENANT_PORT_METHODS, TENANT_TREE_PORT_METHODS, type TenantPort, type TenantTreePort } from './port';
+import { TENANT_SLUG_PORT_METHODS } from './slugs/port';
 
 /** Thrown at startup when the config is missing a piece or carries a bad one. */
 export class TenantConfigError extends Error {
@@ -220,4 +221,27 @@ export function validateTreePort(value: unknown): asserts value is TenantTreePor
       throw new TenantConfigError(`tree.${method}`, 'must be a function');
     }
   }
+}
+
+/** A member that must be present and a function, named by its dotted key. */
+function requireMethod(bag: Bag, method: string, key: string): void {
+  if (bag[method] === undefined || bag[method] === null) {
+    throw new TenantConfigError(key, 'is required and missing');
+  }
+  if (typeof bag[method] !== 'function') throw new TenantConfigError(key, 'must be a function');
+}
+
+/**
+ * Slug resolution, when the host opts in: the slug port (both members) and a
+ * kept memory (`createKeptMemory`, validated when it was made). Left out
+ * (`undefined`), there is nothing to check.
+ */
+export function validateSlugs(value: unknown): void {
+  if (value === null || !isBag(value)) {
+    throw new TenantConfigError('slugs', 'must be the slug config object ({ port, memory }), or be left out');
+  }
+  const port = requireBag(value.port, 'slugs.port');
+  for (const method of TENANT_SLUG_PORT_METHODS) requireMethod(port, method, `slugs.port.${method}`);
+  const memory = requireBag(value.memory, 'slugs.memory');
+  requireMethod(memory, 'read', 'slugs.memory.read');
 }

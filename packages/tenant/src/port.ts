@@ -72,8 +72,9 @@ export interface TenantTreeMove {
 export interface TenantPort<S extends string = string, Tx = unknown> {
   /**
    * The tenant whose CURRENT slug is `slug`, or null when none is. A former
-   * slug the host still keeps for redirects does not resolve here: kept slugs
-   * are the address slice's, through a port of their own.
+   * slug the host still keeps does not resolve here: kept slugs, tree-aware
+   * lookups and the resolution cache go through `TenantSlugPort`
+   * (`createApiTenant({ slugs })`, or `createTenantSlugs`).
    */
   bySlug(slug: string): Promise<TenantRecord<S> | null>;
   /**
