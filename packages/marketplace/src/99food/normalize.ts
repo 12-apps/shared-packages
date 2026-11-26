@@ -8,6 +8,7 @@ import {
   verifyHmacSha256Hex,
 } from "../core/payload-read";
 import type {
+  MarketplaceLifecycle,
   MarketplaceDeliveredBy,
   MarketplaceOrderType,
   NormalizedAddress,
@@ -39,6 +40,8 @@ export const NINETY_NINE_FOOD_PROVIDER = "NINETY_NINE_FOOD";
 const CREATED = "CREATED";
 /** The order is cancelled: the store's request was granted, or a mandatory cancellation. */
 const CANCELLED = "CANCELLED";
+/** The order left (DISPATCHED) and the order is finished (CONCLUDED): the lifecycle events (FUT-4653). */
+const LIFECYCLE_OF: Readonly<Record<string, MarketplaceLifecycle>> = { DISPATCHED: "DISPATCHED", CONCLUDED: "CONCLUDED" };
 /** The marketplace refused the store's own cancellation request. */
 const CANCELLATION_REQUEST_DENIED = "CANCELLATION_REQUEST_DENIED";
 
@@ -68,7 +71,9 @@ export function verifyOpenDeliverySignature(
  * - `CREATED` announces an order: `orderToFetch`, the body is the fetch job's.
  * - `CANCELLED` is a cancellation, whether the store asked for it or not.
  * - `CANCELLATION_REQUEST_DENIED` refuses the store's request.
- * - Everything else (`CONFIRMED`, `CANCELLATION_REQUESTED`, `DISPATCHED`, the
+ * - `DISPATCHED` and `CONCLUDED` are lifecycle events (FUT-4653): the engine
+ *   asks the host to move the order forward, when the store follows them.
+ * - Everything else (`CONFIRMED`, `CANCELLATION_REQUESTED`, the
  *   consumer's `ORDER_CANCELLATION_REQUEST` handshake…) is understood and
  *   recorded, and acts on nothing: an IGNORED inbox row.
  *
@@ -93,6 +98,7 @@ export function normalizeOpenDeliveryEvent(payload: unknown): NormalizedEvent | 
     orderToFetch: eventType === CREATED,
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : denied ? "FAILED" : null,
+    ...(LIFECYCLE_OF[eventType] ? { lifecycle: LIFECYCLE_OF[eventType] } : {}),
   };
 }
 

@@ -41,6 +41,12 @@ export interface IngestResult {
 export interface IngestSettings {
   autoAccept: boolean;
   ackSlaSeconds: number;
+  /**
+   * OPTIONAL. The connection's switch for following the marketplace's status
+   * (FUT-4653). Absent is OFF: a host that builds settings by hand keeps the
+   * behaviour it had before the switch existed.
+   */
+  followStatus?: boolean;
 }
 
 /**

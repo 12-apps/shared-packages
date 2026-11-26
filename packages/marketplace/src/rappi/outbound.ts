@@ -7,6 +7,7 @@ import {
   type MarketplaceHttpResponse,
   type OutboundOrderRef,
   type OutboundResult,
+  type StatusFacts,
 } from "../core/adapter";
 import { RAPPI_PROVIDER } from "./normalize";
 
@@ -110,12 +111,12 @@ export async function bearer(
 async function putOrder(
   ctx: AdapterCallContext,
   hosts: RappiHosts,
-  request: { externalOrderId: string; action: string; body?: unknown },
+  request: { externalOrderId: string; action: string; body?: unknown; method?: "PUT" | "POST" },
 ): Promise<MarketplaceHttpResponse | Exclude<OutboundResult, { kind: "accepted" }>> {
   const auth = await bearer(ctx, hosts);
   if (!("token" in auth)) return auth;
   const response = await ctx.http({
-    method: "PUT",
+    method: request.method ?? "PUT",
     url: `${trimmed(hosts.api[ctx.environment])}/orders/${encodeURIComponent(request.externalOrderId)}/${request.action}`,
     headers: {
       "x-authorization": `Bearer ${auth.token}`,
@@ -178,6 +179,34 @@ export function rappiReject(
   };
   return answered(async () => {
     const response = await putOrder(ctx, hosts, { externalOrderId: order.externalOrderId, action: "reject", body });
+    return "kind" in response ? response : outboundResultOf(response);
+  });
+}
+
+/**
+ * What Rappi is told per step (FUT-4653). READY only: `POST {api}/orders/{id}/ready-for-pickup`
+ * (Rappi's dev portal, https://dev-portal.rappi.com/, "Managing User Orders",
+ * read 2026-11-25), which the portal says is for a store on MANUAL
+ * notification (Rappi recommends Automatic): any other store's call may be
+ * refused, which ends FAILED and logged, never retried. ESTIMATED: the verb is
+ * POST in the portal while the other order calls here are PUT. No endpoint
+ * was found for DISPATCHED (Rappi's own couriers carry the order) nor for
+ * HANDED_OVER, so those are unsupported.
+ */
+export function rappiStatusSupported(facts: StatusFacts): boolean {
+  return facts.step === "READY";
+}
+
+/** Tell Rappi a step happened. `unsupported` for every step but READY. */
+export function rappiInformStatus(
+  ctx: AdapterCallContext,
+  hosts: RappiHosts,
+  order: OutboundOrderRef,
+  facts: StatusFacts,
+): Promise<OutboundResult | { kind: "unsupported" }> {
+  if (facts.step !== "READY") return Promise.resolve({ kind: "unsupported" });
+  return answered(async () => {
+    const response = await putOrder(ctx, hosts, { externalOrderId: order.externalOrderId, action: "ready-for-pickup", method: "POST" });
     return "kind" in response ? response : outboundResultOf(response);
   });
 }

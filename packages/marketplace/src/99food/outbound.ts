@@ -8,6 +8,7 @@ import {
   type MarketplaceHttpResponse,
   type OutboundOrderRef,
   type OutboundResult,
+  type StatusFacts,
 } from "../core/adapter";
 import { NINETY_NINE_FOOD_PROVIDER, normalizeOpenDeliveryOrder } from "./normalize";
 
@@ -221,5 +222,59 @@ export function openDeliveryRequestCancellation(
     // Open Delivery's 400 is a malformed request (a bad id or body: ours);
     // its 422 is the business answer and stays a refusal.
     return result.kind === "refused" && result.status === 400 ? { ...result, own: true } : result;
+  });
+}
+
+/**
+ * What 99Food is told per step (FUT-4653), from Open Delivery v1.7.1's
+ * `openapi.yaml` (https://abrasel-nacional.github.io/opendelivery/openapi.yaml,
+ * read 2026-11-25, paths at lines 1605-1890):
+ *
+ * - READY: `POST /v1/orders/{id}/readyForPickup`, "ready for pickup by the
+ *   customer or delivery person"; 202. Every kind of order.
+ * - DISPATCHED: `POST /v1/orders/{id}/dispatch`, body `OrderDispatched`
+ *   (`deliveryTrackingInfo` optional, sent empty), and "a DISPATCHED event is
+ *   expected after this action". Only where the logistics is the merchant's.
+ * - HANDED_OVER: the merchant's bag `POST /v1/orders/{id}/delivered`; a
+ *   take-out `POST /v1/orders/{id}/pickedUp`. Both optional in the spec. The
+ *   marketplace's own fleet: none.
+ *
+ * The kind of order is `deliveredBy` (null: a take-out). That a take-out's
+ * order states no `deliveredBy` is how 99Food's order reads (ESTIMATED: an
+ * order that merely omits it reads as a take-out here).
+ */
+const STATUS_PATH: Readonly<Record<string, (facts: StatusFacts) => { action: string; body?: unknown } | null>> = {
+  READY: () => ({ action: "readyForPickup" }),
+  DISPATCHED: (facts) => (facts.deliveredBy === "MERCHANT" ? { action: "dispatch", body: {} } : null),
+  HANDED_OVER: (facts) =>
+    facts.deliveredBy === "MERCHANT"
+      ? { action: "delivered", body: {} }
+      : facts.deliveredBy === null
+        ? { action: "pickedUp", body: {} }
+        : null,
+};
+
+/** Whether 99Food takes this step for this kind of order: answered offline. */
+export function openDeliveryStatusSupported(facts: StatusFacts): boolean {
+  return STATUS_PATH[facts.step]?.(facts) != null;
+}
+
+/** Tell 99Food a step happened. `unsupported` when the spec has no call for it. */
+export function openDeliveryInformStatus(
+  ctx: AdapterCallContext,
+  bases: NinetyNineFoodApiBaseUrls,
+  order: OutboundOrderRef,
+  facts: StatusFacts,
+): Promise<OutboundResult | { kind: "unsupported" }> {
+  const path = STATUS_PATH[facts.step]?.(facts) ?? null;
+  if (path === null) return Promise.resolve({ kind: "unsupported" });
+  return answered(async () => {
+    const response = await callOrder(ctx, bases, {
+      method: "POST",
+      externalOrderId: order.externalOrderId,
+      action: path.action,
+      ...(path.body === undefined ? {} : { body: path.body }),
+    });
+    return "kind" in response ? response : outboundResultOf(response);
   });
 }

@@ -1,7 +1,10 @@
 import type { AdapterRegistry } from "./registry";
-import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp } from "./adapter";
+import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp, StatusStep } from "./adapter";
 import type { CatalogueImage, CatalogueItem } from "./catalogue-port";
-import type { NormalizedMarketplaceOrder } from "./types";
+import type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
+import type { NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
+
+export type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
 
 /**
  * What the engine needs FROM its host, and nothing more.
@@ -79,6 +82,16 @@ export interface MarketplaceDb {
     findFirst(args: unknown): Promise<unknown>;
     findMany(args: unknown): Promise<unknown[]>;
     upsert(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<{ count: number }>;
+  };
+  /**
+   * OPTIONAL in the type, so a host on 1.x that has not yet composed the
+   * status model still compiles; the lifecycle and status paths do nothing
+   * without it (FUT-4653, migration `20261126120000_marketplace_status_updates`).
+   */
+  marketplaceStatusUpdate?: {
+    findMany(args: unknown): Promise<unknown[]>;
+    create(args: unknown): Promise<unknown>;
     updateMany(args: unknown): Promise<{ count: number }>;
   };
 }
@@ -226,6 +239,29 @@ export interface MarketplaceOrderPort {
    * marketplace's: a person finishes it there, through the adapter's app link.
    */
   onCancellationFailed?(clientId: string, orderId: string, reason: CancellationFailureReason): Promise<void>;
+  /**
+   * OPTIONAL. The marketplace announced a step of an order the engine holds
+   * (`DISPATCHED`, `CONCLUDED`), the connection follows the marketplace's
+   * status, and the order is ACCEPTED with no cancellation request standing.
+   * Move the order FORWARD to the step if it is not there yet, and never
+   * otherwise: answer `unchanged` for an order already there or past it, or
+   * one that has no such step. Idempotent by forward-only: a hook that throws
+   * leaves the inbox row FAILED and the reconcile pass runs it again. Absent:
+   * every lifecycle event is understood and ignored, as before FUT-4653.
+   */
+  onLifecycle?(
+    clientId: string,
+    orderId: string,
+    event: NormalizedEvent,
+    facts: MarketplaceLifecycleFacts,
+  ): Promise<MarketplaceLifecycleAnswer>;
+  /**
+   * OPTIONAL. Does the order still hold this step: the card is at it or past
+   * it, not canceled or failed. Asked by the status job right before it tells
+   * the marketplace, so a step the store undid in the meantime is never sent.
+   * Absent: the engine cannot tell, and sends nothing.
+   */
+  statusHolds?(clientId: string, orderId: string, step: StatusStep): Promise<boolean>;
   /** Queue facts for a batch of orders, keyed by id. Missing ids are dropped. */
   summarize(
     clientId: string,
@@ -253,7 +289,7 @@ export interface MarketplaceEnqueuePort {
   enqueue(
     name: string,
     payload: unknown,
-    options?: { dedupeKey?: string },
+    options?: { dedupeKey?: string; delayMs?: number },
   ): Promise<{ enqueued: boolean; reason?: string }>;
 }
 

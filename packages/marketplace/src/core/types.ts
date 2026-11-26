@@ -136,6 +136,14 @@ export interface NormalizedMarketplaceOrder {
  */
 export type CancellationOutcome = "CONFIRMED" | "FAILED";
 
+/**
+ * A step of the order's life a marketplace announces about an order it
+ * already has (FUT-4653): the courier left (`DISPATCHED`) or the order is
+ * finished (`CONCLUDED`). An event that names one moves nothing by itself; the
+ * engine asks the host to move the order forward (`onLifecycle`).
+ */
+export type MarketplaceLifecycle = "DISPATCHED" | "CONCLUDED";
+
 /** What an adapter makes of one inbound delivery. */
 export interface NormalizedEvent {
   provider: MarketplaceProvider;
@@ -167,4 +175,10 @@ export interface NormalizedEvent {
    * the event. Ignored when `order` is present.
    */
   orderToFetch?: boolean;
+  /**
+   * OPTIONAL. The lifecycle step this event announces about an order the
+   * engine already has. Absent or null: the event names none. An event that
+   * names one carries no order body.
+   */
+  lifecycle?: MarketplaceLifecycle | null;
 }

@@ -6,7 +6,8 @@ import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { connectionMerchantId, resolveIngestionTarget } from "./integration";
 import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest, markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
-import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
+import type { MarketplaceLifecycle, MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
+import { followLifecycle } from "./lifecycle";
 
 /**
  * One delivery, start to finish: normalize → inbox → ingest.
@@ -34,6 +35,8 @@ export function normalizeEvent(
 /** How a delivery ended. `duplicate` and `ignored` are both ordinary outcomes. */
 export type DeliveryOutcome =
   | { kind: "ingested"; orderId: string; unmappedSkus: string[] }
+  /** A lifecycle event moved the order forward, through the host's `onLifecycle` (FUT-4653). */
+  | { kind: "moved"; orderId: string; lifecycle: MarketplaceLifecycle }
   | { kind: "cancelled" }
   | { kind: "cancellationFailed" }
   /** Recorded; the order body is fetched by the `marketplace.fetch-order` job. */
@@ -160,6 +163,23 @@ async function applyEvent(
     return { kind: "awaitingOrder" };
   }
 
+  // A lifecycle event (dispatched, concluded) of an order we hold: with the
+  // connection's switch ON and a host that binds the hook, the order follows.
+  // Anything else falls through to "understood, nothing to do", as before.
+  const followed = await followLifecycle(ctx, inboxId, clientId, event, settings);
+  if (followed) return followed;
+  return ingestOrIgnore(ctx, inboxId, clientId, event, settings, now);
+}
+
+/** An event with no order body is understood and ignored; one that carries an order is ingested. */
+async function ingestOrIgnore(
+  ctx: EngineContext,
+  inboxId: string,
+  clientId: string,
+  event: NormalizedEvent,
+  settings: IngestSettings,
+  now: Date | undefined,
+): Promise<DeliveryOutcome> {
   if (!event.order) {
     // An event type this ingestion does not act on. Marketplaces emit a wide
     // stream (dispatched, concluded, driver assigned…) and most of it is not an
@@ -243,7 +263,7 @@ export async function reprocessStoredDelivery(
       input.id,
       input.clientId,
       event,
-      { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds },
+      { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds, followStatus: target.followStatus },
       undefined,
     );
   } catch (error) {

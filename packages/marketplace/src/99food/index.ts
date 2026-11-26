@@ -9,7 +9,9 @@ import { NINETY_NINE_FOOD_PROVIDER, normalizeOpenDeliveryEvent, verifyOpenDelive
 import {
   openDeliveryConfirm,
   openDeliveryFetchOrder,
+  openDeliveryInformStatus,
   openDeliveryRequestCancellation,
+  openDeliveryStatusSupported,
   type NinetyNineFoodApiBaseUrls,
 } from "./outbound";
 import { openDeliveryAvailability } from "./pause";
@@ -109,6 +111,8 @@ export function createNinetyNineFoodAdapter(config: NinetyNineFoodAdapterConfig)
       // `OrderConfirmed.preparationTime`, in minutes.
       confirmTakesPreparationTime: true,
       cancellationAnswerWindowMs: NINETY_NINE_FOOD_CANCELLATION_ANSWER_WINDOW_MS,
+      // Open Delivery's readyForPickup, dispatch and delivered / pickedUp (see `./outbound.ts`).
+      statusSteps: ["READY", "DISPATCHED", "HANDED_OVER"],
     },
     normalize: normalizeOpenDeliveryEvent,
     readSignature: (header) => header("x-app-signature"),
@@ -119,6 +123,8 @@ export function createNinetyNineFoodAdapter(config: NinetyNineFoodAdapterConfig)
     fetchOrder: (ctx, order) => openDeliveryFetchOrder(ctx, bases, order, normalizeOptions),
     confirm: (ctx, order, input) => openDeliveryConfirm(ctx, bases, order, input),
     requestCancellation: (ctx, order, input) => openDeliveryRequestCancellation(ctx, bases, order, input),
+    statusSupported: openDeliveryStatusSupported,
+    informStatus: (ctx, order, facts) => openDeliveryInformStatus(ctx, bases, order, facts),
     appLink: () => config.portalUrl,
     ...(config.pauseByStoreSwitch ? { availability: openDeliveryAvailability(bases) } : {}),
   };

@@ -13,11 +13,19 @@ import type {
   MarketplaceCataloguePort,
   MarketplaceRefusal,
   CancellationFailureReason,
+  MarketplaceLifecycleAnswer,
+  MarketplaceLifecycleFacts,
 } from "../core/ports";
-import type { NormalizedMarketplaceOrder } from "../core/types";
+import type { StatusStep } from "../core/adapter";
+import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
 import { createMemoryDb } from "./memory-db";
+
+/* eslint-disable test-flakiness/no-database-operations --
+   The seed helpers below write rows into the harness's OWN in-memory fake
+   (`createMemoryDb`), built per `createHarness` call: they are how a case puts
+   the engine in a state, not a database a case shares. */
 
 /**
  * A mounted engine over recording ports. Nothing reaches a network: `http` is
@@ -75,6 +83,13 @@ interface HarnessOptions {
   mayAutoAccept?: (clientId: string) => Promise<boolean>;
   /** The host's catalogue port, for the catalogue suites (FUT-4768). */
   catalogue?: MarketplaceCataloguePort;
+  /**
+   * The host's answers to lifecycle events (FUT-4653), one per call in order (the last repeats);
+   * an Error is thrown by the hook. Absent, `onLifecycle` is not bound.
+   */
+  lifecycle?: readonly (MarketplaceLifecycleAnswer | Error)[];
+  /** Whether the host says an order still holds a step; absent, `statusHolds` is not bound. */
+  statusHolds?: (step: StatusStep) => boolean | Promise<boolean>;
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -86,7 +101,7 @@ export function createHarness(options: HarnessOptions = {}) {
   const created: { clientId: string; order: NormalizedMarketplaceOrder; orderId: string }[] = [];
   const accepted: string[] = [];
   const refused: { orderId: string; reason: MarketplaceRefusal }[] = [];
-  const enqueued: { name: string; payload: OutboundJobPayload; dedupeKey?: string }[] = [];
+  const enqueued: { name: string; payload: OutboundJobPayload; dedupeKey?: string; delayMs?: number }[] = [];
   /** What the fake queue actually took (with `dedupeQueue`, a reused key is not here). */
   const queued: { name: string; payload: unknown; dedupeKey?: string }[] = [];
   const queueKeys = new Set<string>();
@@ -99,6 +114,8 @@ export function createHarness(options: HarnessOptions = {}) {
   const cancellationConfirmed: string[] = [];
   const autoAcceptAsked: string[] = [];
   const cancellationFailed: { orderId: string; reason: CancellationFailureReason }[] = [];
+  const lifecycleCalls: { orderId: string; event: NormalizedEvent; facts: MarketplaceLifecycleFacts }[] = [];
+  const holdsAsked: { orderId: string; step: StatusStep }[] = [];
   const cancellationHooks = options.cancellationHooks
     ? {
         onCancellationConfirmed: async (_clientId: string, orderId: string) => {
@@ -137,6 +154,24 @@ export function createHarness(options: HarnessOptions = {}) {
       summarize: async (_clientId, ids) =>
         new Map(ids.map((id) => [id, { buyerName: "Buyer", totalCents: 1000, unmappedLines: 0, createdAt: null }])),
       ...cancellationHooks,
+      ...(options.lifecycle
+        ? {
+            onLifecycle: async (_clientId: string, orderId: string, event: NormalizedEvent, facts: MarketplaceLifecycleFacts) => {
+              lifecycleCalls.push({ orderId, event, facts });
+              const answer = options.lifecycle![Math.min(lifecycleCalls.length - 1, options.lifecycle!.length - 1)]!;
+              if (answer instanceof Error) throw answer;
+              return answer;
+            },
+          }
+        : {}),
+      ...(options.statusHolds
+        ? {
+            statusHolds: async (_clientId: string, orderId: string, step: StatusStep) => {
+              holdsAsked.push({ orderId, step });
+              return options.statusHolds!(step);
+            },
+          }
+        : {}),
       ...(options.mayAutoAccept
         ? {
             mayAutoAccept: (clientId: string) => {
@@ -150,7 +185,7 @@ export function createHarness(options: HarnessOptions = {}) {
     http: http.http,
     enqueue: {
       enqueue: async (name, payload, opts) => {
-        enqueued.push({ name, payload: payload as OutboundJobPayload, dedupeKey: opts?.dedupeKey });
+        enqueued.push({ name, payload: payload as OutboundJobPayload, dedupeKey: opts?.dedupeKey, delayMs: opts?.delayMs });
         if (options.queueDown) return { enqueued: false, reason: "queue down" };
         const key = opts?.dedupeKey;
         if (options.dedupeQueue && key !== undefined) {
@@ -184,13 +219,17 @@ export function createHarness(options: HarnessOptions = {}) {
   });
 
   /** Connect a provider for the tenant, with credentials, enabled. */
-  async function connect(provider = "IFOOD", settings: { autoAccept?: boolean; webhookSecret?: string | null } = {}) {
+  async function connect(
+    provider = "IFOOD",
+    settings: { autoAccept?: boolean; webhookSecret?: string | null; followStatus?: boolean } = {},
+  ) {
     await engine.saveIntegration({
       clientId: TENANT,
       provider,
       enabled: true,
       externalMerchantId: `merchant-${provider}`,
       autoAccept: settings.autoAccept ?? false,
+      ...(settings.followStatus === undefined ? {} : { followStatus: settings.followStatus }),
       credentials: { clientId: "app-id", clientSecret: "app-secret", webhookSecret: settings.webhookSecret ?? null },
     });
   }
@@ -207,6 +246,79 @@ export function createHarness(options: HarnessOptions = {}) {
     Object.assign(row, data);
   }
 
+  /** Make this a host that has not composed the status model. */
+  function dropStatusTable(): void {
+    delete (memory.db as { marketplaceStatusUpdate?: unknown }).marketplaceStatusUpdate;
+  }
+
+  /** Move the engine's clock. */
+  function setNow(at: Date): void {
+    clock.at = at;
+  }
+
+  /** Write an inbox row straight to the table: a delivery recorded whose process died before processing it. */
+  async function seedInbox(data: Record<string, unknown>): Promise<void> {
+    await memory.db.marketplaceInboxEvent.create({ data });
+  }
+
+  /** Write an acceptance row straight to the table (an order of a marketplace the test did not ingest). */
+  async function seedAcceptance(data: Record<string, unknown>): Promise<void> {
+    await memory.db.marketplaceAcceptance.create({ data: { createdAt: clock.at, ...data } });
+  }
+
+  /** Write a status row straight to the table: a step we informed, or one the marketplace announced. */
+  async function seedStatus(data: {
+    orderId: string;
+    step: string;
+    source: "STORE" | "MARKETPLACE";
+    state: string;
+    provider?: string;
+    ageMs?: number;
+    claimKey?: string;
+  }): Promise<void> {
+    const { ageMs, provider, claimKey, ...row } = data;
+    await memory.db.marketplaceStatusUpdate!.create({
+      data: { clientId: TENANT, provider: provider ?? "IFOOD", claimKey: claimKey ?? "seed", ...row },
+    });
+    if (ageMs !== undefined) {
+      const stored = memory.tables.marketplaceStatusUpdate.rows.find((r) => r.orderId === row.orderId && r.step === row.step);
+      if (stored) stored.updatedAt = new Date(clock.at.getTime() - ageMs);
+    }
+  }
+
+  /**
+   * Make the status table lose a claim race: its first read answers "no row" while another
+   * run inserts one (`rival`); or make its first stamp throw (`failFirstStamp`).
+   */
+  function interceptStatusTable(behaviour: {
+    rival?: { orderId: string; step: string; source: "STORE" | "MARKETPLACE"; state: string };
+    failFirstStamp?: string;
+    failFirstRead?: string;
+  }): void {
+    const table = memory.tables.marketplaceStatusUpdate;
+    const read = table.findMany.bind(table);
+    const stamp = table.updateMany.bind(table);
+    const pending = { rival: behaviour.rival, stamp: behaviour.failFirstStamp, read: behaviour.failFirstRead };
+    table.findMany = async (args: unknown) => {
+      const failure = pending.read;
+      if (failure !== undefined) {
+        pending.read = undefined;
+        throw new Error(failure);
+      }
+      const rival = pending.rival;
+      if (!rival) return read(args);
+      pending.rival = undefined;
+      await seedStatus(rival);
+      return [];
+    };
+    table.updateMany = async (args: unknown) => {
+      const failure = pending.stamp;
+      if (failure === undefined) return stamp(args);
+      pending.stamp = undefined;
+      throw new Error(failure);
+    };
+  }
+
   /** Set columns on every integration row of the tenant. */
   function patchIntegration(data: Record<string, unknown>): void {
     for (const row of memory.tables.marketplaceIntegration.rows) Object.assign(row, data);
@@ -217,6 +329,12 @@ export function createHarness(options: HarnessOptions = {}) {
     memory,
     patchAcceptance,
     patchIntegration,
+    setNow,
+    dropStatusTable,
+    seedInbox,
+    seedAcceptance,
+    seedStatus,
+    interceptStatusTable,
     http,
     clock,
     created,
@@ -233,6 +351,8 @@ export function createHarness(options: HarnessOptions = {}) {
     admitted,
     cancellationConfirmed,
     cancellationFailed,
+    lifecycleCalls,
+    holdsAsked,
     connect,
     acceptance,
   };
@@ -271,6 +391,8 @@ export async function deliverIfood(h: Harness, payload: unknown) {
     clientId: TENANT,
     event,
     payload,
-    settings: target?.enabled ? { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds } : null,
+    settings: target?.enabled
+      ? { autoAccept: target.autoAccept, ackSlaSeconds: target.ackSlaSeconds, followStatus: target.followStatus }
+      : null,
   });
 }

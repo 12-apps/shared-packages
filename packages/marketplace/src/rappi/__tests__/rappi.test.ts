@@ -256,6 +256,7 @@ describe("the Rappi adapter", () => {
       perOrderAppLink: false,
       confirmTakesPreparationTime: true,
       cancellationAnswerWindowMs: RAPPI_CANCELLATION_ANSWER_WINDOW_MS,
+      statusSteps: ["READY"],
     });
     expect(rappi.appLink({ externalOrderId: "1", externalDisplayId: null })).toBe(PORTAL);
   });
