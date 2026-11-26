@@ -13,10 +13,22 @@ export interface PaymentListCredit {
    * `amountDueLabel`, the computer's "Resumo do pedido" column draws it under
    * "Total", then "A pagar" (`copy.amountDue`) and the amount due, so Total −
    * credit reads as what the button charges — while an ONLINE option is
-   * chosen. A door option or no choice charges the cart's total, so "Total"
-   * stands alone. Absent ⇒ "Total" alone.
+   * chosen. With `appliesAtDoor`, a DOOR option draws them too (the phone's
+   * "Resumo do pedido" sheet follows), the amount due being that option's
+   * `totalLabel`, else `amountDueLabel`. Without it, a door option or no
+   * choice charges the cart's total, so "Total" stands alone. Absent ⇒
+   * "Total" alone.
    */
-  credit?: { label: string; amountLabel: string };
+  credit?: {
+    label: string;
+    amountLabel: string;
+    /**
+     * Opt in to the credit rows under a DOOR option (cash, the courier's card
+     * machine, the waiter), for a host whose balance pays part of a door order
+     * too (FUT-3582). Default `false`: the rows are drawn for online only.
+     */
+    appliesAtDoor?: boolean;
+  };
 }
 
 /** The lines the computer's "Resumo do pedido" column draws above "Total". */
