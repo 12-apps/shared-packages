@@ -9,7 +9,7 @@ import type { TenantServerConfig } from '../server';
  * have quietly assumed.
  */
 
-export type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
+type ClinicStatus = 'OPEN' | 'WINDING_DOWN' | 'SHUT' | 'ON_HOLD' | 'AWAITING_REVIEW';
 
 function pack(prefix: string): TenantCopyPack {
   return Object.fromEntries(
@@ -57,7 +57,7 @@ export function coreConfig(): TenantCoreConfig<ClinicStatus> {
 
 const TENANTS: TenantRecord<ClinicStatus>[] = [{ id: 't-1', slug: 'north', status: 'OPEN' }];
 
-export function fakePort(): TenantPort<ClinicStatus, { label: string }> {
+function fakePort(): TenantPort<ClinicStatus, { label: string }> {
   return {
     bySlug: async (slug) => TENANTS.find((row) => row.slug === slug) ?? null,
     byId: async (id) => TENANTS.find((row) => row.id === id) ?? null,
