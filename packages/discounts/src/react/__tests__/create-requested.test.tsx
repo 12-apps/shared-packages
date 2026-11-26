@@ -46,6 +46,14 @@ function surface(transport: DiscountsTransport) {
 
 const TITLE = PT_BR_DISCOUNTS_WEB_COPY.form.createTitle;
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  const parts: { resolve?: () => void } = {};
+  const promise = new Promise<void>((resolve) => {
+    parts.resolve = resolve;
+  });
+  return { promise, resolve: () => parts.resolve?.() };
+}
+
 function Host({
   Screen,
   handled,
@@ -64,6 +72,9 @@ function Host({
       </button>
       <button type="button" onClick={() => setRequested(false)}>
         drop
+      </button>
+      <button type="button" onClick={() => setRequested(true)}>
+        ask
       </button>
       <Screen createRequested={requested} onCreateRequestHandled={handled} />
     </>
@@ -91,36 +102,45 @@ describe("the host's create request", () => {
   it("does not reopen nor report again while the request stays true", async () => {
     const handled = vi.fn();
     mount(surface(transportOf()).Screen, handled);
-    await screen.findByRole("dialog", { name: TITLE });
-    // Close it as the operator would, then re-render with the request still true.
-    fireEvent.keyDown(screen.getByRole("dialog", { name: TITLE }), { key: "Escape" });
+    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
+    // Effects flush inside the click's act: a reopening would show by now.
     fireEvent.click(screen.getByRole("button", { name: "rerender" }));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
     expect(handled).toHaveBeenCalledTimes(1);
   });
 
-  it("waits for the list, then opens once loaded", async () => {
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+  it("opens again for a new request once the host dropped the first", async () => {
     const handled = vi.fn();
-    mount(surface(transportOf(gate)).Screen, handled);
+    mount(surface(transportOf()).Screen, handled);
+    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "drop" }));
+    fireEvent.click(screen.getByRole("button", { name: "ask" }));
+    expect(await screen.findByRole("dialog", { name: TITLE })).toBeTruthy();
+    await waitFor(() => expect(handled).toHaveBeenCalledTimes(2));
+  });
+
+  it("waits for the list, then opens once loaded", async () => {
+    const gate = deferred();
+    const handled = vi.fn();
+    mount(surface(transportOf(gate.promise)).Screen, handled);
     expect(await screen.findByTestId("discounts-loading")).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
     expect(handled).not.toHaveBeenCalled();
-    release();
+    gate.resolve();
     expect(await screen.findByRole("dialog", { name: TITLE })).toBeTruthy();
     await waitFor(() => expect(handled).toHaveBeenCalledTimes(1));
   });
 
-  it("opens nothing without the request", async () => {
-    const handled = vi.fn();
-    mount(surface(transportOf()).Screen, handled, false);
-    await screen.findByText(PT_BR_DISCOUNTS_WEB_COPY.screen.title);
-    expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull();
-    expect(handled).not.toHaveBeenCalled();
+  it("opens nothing without the request props", async () => {
+    const { Screen } = surface(transportOf());
+    render(
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(PT_BR_DISCOUNTS_WEB_COPY.screen.title)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
   });
 });
