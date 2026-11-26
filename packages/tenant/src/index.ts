@@ -4,7 +4,8 @@
  *
  * Backend: `@12-apps/tenant/server` (`createApiTenant`). Hono mount:
  * `@12-apps/tenant/hono`. Frontend: `@12-apps/tenant/react`
- * (`createWebTenant`). Adoption contract: ADOPTING.md.
+ * (`createWebTenant`). Custom domains: the engine here, the pure half in
+ * `@12-apps/tenant/domains`, the screen in `@12-apps/tenant/domains/react`. Adoption contract: ADOPTING.md.
  */
 export {
   TENANT_COPY_KEYS,
@@ -63,6 +64,32 @@ export {
   type TenantSlugResolver,
   type TenantSlugs,
 } from './slugs';
+export {
+  TENANT_DOMAIN_PORT_METHODS,
+  TENANT_DOMAIN_QUOTA_METHODS,
+  TENANT_DOMAIN_RESOLVER_METHODS,
+  createApiTenantDomains,
+  createDnsChecks,
+  createTenantDomains,
+  createTlsAsk,
+  validateDomains,
+  type ApiTenantDomains,
+  type TenantDomainAnswer,
+  type TenantDomainContext,
+  type TenantDomainDnsChecks,
+  type TenantDomainDnsChecksConfig,
+  type TenantDomainOutcome,
+  type TenantDomainPort,
+  type TenantDomainQuota,
+  type TenantDomainResolver,
+  type TenantDomainResult,
+  type TenantDomains,
+  type TenantDomainsConfig,
+  type TenantDomainsServerConfig,
+  type TenantDomainTls,
+  type TenantDomainTlsAnswer,
+  type TenantDomainTlsConfig,
+} from './domains/server';
 export { TenantConfigError, validateCoreConfig, validatePort, validateSlugs, validateTreePort } from './validate';
 export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';
 export {

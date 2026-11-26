@@ -4,12 +4,14 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "description": "Domain-agnostic tenant behaviours: the lifecycle of a tenant (closing, reopening, the purge and the data export), configured by each host with its own status set, ids, copy packs and a required tenant port. The tenant row stays the host's: the package reads and writes it only through the port, and owns two tables of its own (tenant_closings, tenant_data_exports) keyed by an opaque tenant id with no foreign key. Backend factory (./server), Hono mount (./hono), frontend factory (./react) and the package-owned Prisma partial + migrations. Adoption contract in ADOPTING.md.",
+  "description": "Domain-agnostic tenant behaviours: the lifecycle of a tenant (closing, reopening, the purge and the data export), configured by each host with its own status set, ids, copy packs and a required tenant port. The tenant row stays the host's: the package reads and writes it only through the port, and owns two tables of its own (tenant_closings, tenant_data_exports) keyed by an opaque tenant id with no foreign key. Custom domains as an opt-in port (the engine in . and ./server, the pure half in ./domains, the screen in ./domains/react). Backend factory (./server), Hono mount (./hono), frontend factory (./react) and the package-owned Prisma partial + migrations. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
     "./hono": "./src/hono/index.ts",
     "./react": "./src/react/index.ts",
+    "./domains": "./src/domains/index.ts",
+    "./domains/react": "./src/domains/react/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./package.json": "./package.json"
   },
@@ -24,26 +26,47 @@
     "clean": "rm -rf node_modules coverage dist"
   },
   "peerDependencies": {
+    "@12-apps/ui": ">=6.119.0",
     "@12-apps/wiring": ">=1.3.0",
-    "hono": ">=4.0.0"
+    "@mui/icons-material": ">=6.0.0",
+    "hono": ">=4.0.0",
+    "react": ">=19.0.0"
   },
   "peerDependenciesMeta": {
+    "@12-apps/ui": {
+      "optional": true
+    },
     "@12-apps/wiring": {
       "optional": true
     },
+    "@mui/icons-material": {
+      "optional": true
+    },
     "hono": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/ui": "workspace:*",
     "@12-apps/wiring": "workspace:*",
     "@electric-sql/pglite": "^0.2.17",
+    "@mui/icons-material": "^6.5.0",
+    "@mui/material": "^6.5.0",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",
     "hono": "^4.6.0",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },

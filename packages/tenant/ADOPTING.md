@@ -356,6 +356,98 @@ the old table (during a rolling deploy) are not in `tenant_closings`: before
 each sweep, catch them up with one upsert (`INSERT … SELECT … ON CONFLICT
 (tenant_id) DO UPDATE`), and backfill once with a data-only migration.
 
+### Custom domains (opt-in)
+
+A tenant claims a hostname, proves it owns the zone with a TXT record, points
+the name here, and is then served on it, with a certificate the TLS ask
+allows. **Optional**, like the tree and slugs: a host that passes no `domains`
+boots unchanged and gets no `tenant.domains`. Nothing is added to the tenant
+port, and **the domain table stays yours**: the package maps no table, names
+no column and ships no migration.
+
+```ts
+import { createApiTenant } from '@12-apps/tenant/server';
+import { resolveTxt, resolve4, resolve6 } from 'node:dns/promises';
+
+const tenant = createApiTenant({
+  ...config,
+  port,
+  domains: {
+    port: domainPort,           // TenantDomainPort<Tx>: your rows, every member required
+    quota: domainQuota,         // TenantDomainQuota<Tx>: your plan
+    dns: {
+      // YOUR resolver, as lambdas, so your tests' mock of the DNS module applies.
+      resolver: { txt: (n) => resolveTxt(n), ipv4: (n) => resolve4(n), ipv6: (n) => resolve6(n) },
+      dnsTargets: () => readTargetsFromEnv(), // read on EVERY call; [] = unknown
+      recordPrefix: '_yourapp-verify',        // one DNS label
+    },
+    tls: {
+      servable: async (hostname) => …,        // { tenantId } of an ACTIVE domain of a live tenant, or null
+      entitled: async (tenantId) => …,        // the plan carries custom domains now
+    },
+  },
+});
+await tenant.domains?.run({ tenantId, actorId, via: 'panel' }, { operations: [{ operation: 'add', hostname: 'acme.com' }] });
+await tenant.domains?.ask('acme.com'); // 'allow' | 'unknown' | 'unentitled'
+```
+
+Every member is checked at startup, named: `domains`, `domains.port.<member>`,
+`domains.quota.<member>`, `domains.dns.resolver.txt|ipv4|ipv6`,
+`domains.dns.dnsTargets`, `domains.dns.recordPrefix`,
+`domains.tls.servable|entitled`. A host not on `createApiTenant` yet uses the
+pieces standalone, each checking its own: `createDnsChecks(dns)`,
+`createTenantDomains({ port, quota, dns: checks })`, `createTlsAsk(tls)`.
+
+- **The answer is copy-free.** `run` answers `{ ok: true, results, domains }`
+  (each result's `domainId` in `domains`, read once after the write) or
+  `{ ok: false, problems }`, each problem a KIND (`nameTaken`, `planLimit`,
+  `invalidHostname` with the typed `input`, …). You map each kind to your wire
+  code, your sentence and your status; the package makes up no id and no word.
+- **The statement budget.** `rows` once and `holders` once to plan;
+  `mayVerify` only when the call has a verify, `reserve` only when it claims or
+  restores; then ONE transaction: `holders` on `tx`, `used` on `tx` when the
+  limit is a number, the writes in call order, an `audit` per removal and
+  restore; then `rows` once for the answer. A port member that adds a read is a
+  defect. A problem found while planning writes nothing and asks no DNS;
+  `validateOnly` asks no DNS either.
+- **SERIALIZABLE, and `failure`.** `transaction` must run at serializable
+  isolation: it is what turns two concurrent claims into one winner. `failure`
+  classifies what the transaction threw: `'retry'` a serializable conflict
+  (nothing was written), `'taken'` a unique-index violation on a hostname,
+  `null` anything else, which the engine rethrows. Never answer `null` with a
+  guess.
+- **The token is yours.** `claim` mints the verification token and it must be
+  unguessable (a random UUID or better): it is what proves ownership. A zone
+  apex is claimed WITH its `www.` (one domain, one token, one quota unit).
+- **`archive` makes the domain unservable, not only archived**: a release that
+  cannot read your archive column (a rollback) must still never serve it. Set
+  the status your servable lookup refuses in the same write. `restore` brings
+  it back unverified, with the same token.
+- **The resolver must be yours.** The package imports no DNS module; it calls
+  the three functions you pass, so a test that mocks your DNS module mocks
+  every lookup. Pass lambdas (`(n) => resolveTxt(n)`) rather than the
+  functions themselves, so a mock that leaves one out fails only the test that
+  calls it.
+- **The TLS ask denies by default.** `ask` answers `allow` only when the name
+  is servable AND the tenant is entitled, so a downgrade stops renewal, not
+  just serving. Map `allow` to 200 and anything else to a refusal.
+- **The records.** `createDomainDns({ recordPrefix })` from
+  `@12-apps/tenant/domains` builds what a tenant publishes (one TXT at the
+  root, a pointing record per name and type); import it where both the screen
+  and the server read it, so the prefix lives once.
+- **The screen** (`@12-apps/tenant/domains/react`):
+  `createDomainsScreen({ copy: { locales, defaultLocale }, components: { ConfirmButton, Segmented } })`
+  checks every pack and both widgets at startup
+  (`domainsScreen.copy.locales.<tag>.records.<key>`,
+  `domainsScreen.components.ConfirmButton`). Each pack is
+  `{ records, pair, closeAlert }` (`TENANT_DOMAINS_COPY_SHAPE`): the two groups
+  stay apart because both say "remove" in different words. `DomainsCard`
+  takes this render's resolved pack and your writes (`{ writes: { errors,
+  isPending, dismiss }, run, remove }`, one write per domain, `remove`
+  rejecting with the refusal so the confirmation stays open); the test ids are
+  the ones a journey reads (`domains-card`, `domain-row`, `domain-verify`,
+  `domain-remove`, `domains-error`, `domain-restore`, …).
+
 ### The schema and the migration
 
 - Copy the partial into your schema folder with
