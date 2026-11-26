@@ -8,7 +8,9 @@
  *  - a balance the host holds (store credit) is drawn under "Total", then
  *    "A pagar" and the amount due — but ONLY while an online option is chosen,
  *    the only time the button charges the amount due. A door option or no
- *    choice charges the cart's total, so "Total" stands alone.
+ *    choice charges the cart's total, so "Total" stands alone — unless the
+ *    host opts in with `credit.appliesAtDoor` (FUT-3582), when a door option
+ *    draws the rows too.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -80,10 +82,22 @@ describe("store credit in the column", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, door: [door()] } });
     const drawn = await column();
     await within(drawn).findByTestId("list-summary-credit-row");
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     await waitFor(() => expect(within(drawn).getByTestId("list-pay").textContent).toBe("Enviar pedidoR$ 27,00"));
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
     expect(within(drawn).getByTestId("pay-bar-total").textContent).toBe("R$ 27,00");
+  });
+
+  it("a door choice with appliesAtDoor: the credit and the door remainder under Total", async () => {
+    const withTotal = { ...door(), totalLabel: "R$ 22,00" };
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, credit: { ...CREDIT, appliesAtDoor: true }, door: [withTotal, { ...door(), id: "card", label: "Maquininha" }] } });
+    const drawn = await column();
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
+    expect((await within(drawn).findByTestId("list-summary-credit-row")).textContent).toBe("Crédito da loja− R$ 5,00");
+    expect(within(drawn).getByTestId("list-summary-due-row").textContent).toBe("A pagarR$ 22,00");
+    // A door option with no totalLabel of its own falls back to the host's amount due.
+    fireEvent.click(await screen.findByTestId("list-door-card-radio"));
+    await waitFor(() => expect(within(drawn).getByTestId("list-summary-due-row").textContent).toBe("A pagarR$ 22,00"));
   });
 
   it("no choice: Total alone", async () => {
@@ -99,11 +113,19 @@ describe("store credit in the column", () => {
     expect((await within(drawn).findByTestId("list-summary-due-row")).textContent).toBe("A pagarR$ 22,00");
   });
 
+  it("a door choice with appliesAtDoor off: unchanged, Total alone", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, credit: { ...CREDIT, appliesAtDoor: false }, door: [door()] } });
+    const drawn = await column();
+    await within(drawn).findByTestId("list-summary-credit-row");
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
+    await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
+  });
+
   it("covered by the balance: 'A pagar R$ 0,00' for an online choice, Total alone for a door one", async () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...COVERED, door: [door()] } });
     const drawn = await column();
     expect((await within(drawn).findByTestId("list-summary-due-row")).textContent).toBe("A pagarR$ 0,00");
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
     expect(within(drawn).getByTestId("list-pay").textContent).toBe("Enviar pedidoR$ 27,00");
   });
