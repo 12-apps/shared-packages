@@ -133,9 +133,18 @@ export interface DiscountsWebConfig {
   bulkSlot?: BoundScreenProps["bulkSlot"];
 }
 
+/** What a host may pass the bound screen: its request to open the create dialog. */
+export type DiscountsScreenRequest = Pick<
+  BoundScreenProps,
+  "createRequested" | "onCreateRequestHandled"
+>;
+
 export interface WebDiscounts {
-  /** The whole promotions admin. */
-  Screen: ComponentType;
+  /**
+   * The whole promotions admin. Takes the host's create request, see
+   * {@link BoundScreenProps.createRequested}.
+   */
+  Screen: ComponentType<DiscountsScreenRequest>;
   /**
    * The form on its own, for a host embedding it somewhere of its own — an
    * onboarding step, a wizard. Already bound to the same client and copy.
@@ -196,7 +205,13 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   };
 
   return {
-    Screen: () => <DiscountsScreen {...screenProps} />,
+    Screen: ({ createRequested, onCreateRequestHandled }) => (
+      <DiscountsScreen
+        {...screenProps}
+        {...(createRequested !== undefined ? { createRequested } : {})}
+        {...(onCreateRequestHandled ? { onCreateRequestHandled } : {})}
+      />
+    ),
     DiscountForm: (props) => (
       <DiscountForm
         api={api}

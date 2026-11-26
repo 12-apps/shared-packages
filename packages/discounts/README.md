@@ -242,6 +242,12 @@ screen's `CardActionsProvider`, and handed `DiscountsBulkSlotProps`: `state` (`i
 done`), `undoable`, `retryable`, `canRetry` (false when a `+N dias` request's outcome is unknown: it must not be sent twice), `undo()`, `retry()`, `dismiss()`, the `copy` and the grid as `children`.
 Without a slot the three entries are not offered. Copy is `DiscountsWebCopy.bulk` (optional, filled in).
 
+**Opening the create dialog from the host.** `<discounts.Screen createRequested onCreateRequestHandled={drop} />`
+asks the screen for its "Novo desconto" dialog, the same one the header button opens. Once the list has loaded
+it opens and `onCreateRequestHandled` fires exactly once, so the host can drop whatever carried the request (a URL
+param). Re-renders while `createRequested` stays true neither reopen it nor call the handler again; without the
+props nothing changes.
+
 ## Whole days, in the store's zone — `storeTimeZone`
 
 > **Upgrading to this version: every host syncs the partial and runs migration
