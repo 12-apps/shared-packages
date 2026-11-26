@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @12-apps/marketplace — CANONICAL Prisma model partial.
 //
-// The seven tables the marketplace engine owns. A host does NOT copy these
+// The eight tables the marketplace engine owns. A host does NOT copy these
 // models by hand: it composes this file into its multi-file schema folder from
 // the `db` capability (`package.json` "wiring.db"), and discovers the
 // migrations beside it.
@@ -52,6 +52,11 @@ model MarketplaceIntegration {
   /// the channel does not want a second confirmation per order; a store still
   /// learning it does.
   autoAccept Boolean @default(false) @map("auto_accept")
+
+  /// Whether the marketplace's DISPATCHED and CONCLUDED events move the pedido
+  /// forward here (FUT-4653). Governs the INBOUND move only: telling the
+  /// marketplace what the store did is always on where it has an endpoint.
+  followStatus Boolean @default(true) @map("follow_status")
 
   /// How long this store may take to answer, in seconds. Per-connection because
   /// the marketplace's own cancellation window differs by merchant tier.
@@ -406,4 +411,36 @@ model MarketplaceStorePause {
   @@index([state, requestedAt])
   @@index([wanted, until])
   @@map("marketplace_store_pauses")
+}
+
+/// One step of a pedido, as the engine told the marketplace or the marketplace
+/// told the engine (FUT-4653).
+///
+/// `source` STORE: the engine tells (or is telling, or failed to tell) the
+/// marketplace the pedido reached `step` (READY, DISPATCHED, HANDED_OVER), and
+/// the row is both the claim that keeps a step from ever being sent twice and
+/// the marker an inbound echo is recognised by. `source` MARKETPLACE, state
+/// NOTED: the marketplace announced `step` (DISPATCHED, CONCLUDED) so the
+/// engine never informs it back. SENDING | SENT | FAILED | NOTED (CHECK).
+/// By-value `clientId` and `orderId`, no foreign key, as every table here.
+model MarketplaceStatusUpdate {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  orderId  String @map("order_id")
+  provider String
+
+  /// READY | DISPATCHED | HANDED_OVER | CONCLUDED (CHECK).
+  step   String
+  /// STORE | MARKETPLACE (CHECK).
+  source String
+  /// SENDING | SENT | FAILED | NOTED (CHECK).
+  state  String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([orderId, step])
+  // The sweep reads only rows still SENDING (a partial index in the migration).
+  @@index([state, updatedAt])
+  @@map("marketplace_status_updates")
 }

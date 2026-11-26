@@ -66,6 +66,7 @@
     "20261118180000_fiscal_contingency_blocks",
     "20261119180000_auth_account_deletion",
     "20261119190000_auth_account_mail_claim",
-    "20261125180000_marketplace_cancellation_failure_reason_widen"
+    "20261125180000_marketplace_cancellation_failure_reason_widen",
+    "20261126120000_marketplace_status_updates"
   ]
 }
