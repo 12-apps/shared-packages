@@ -41,6 +41,8 @@ export {
  * never writes outside the caller's.
  */
 export interface TenantTree<Tx = unknown> {
+  /** The tenant's own node, validated, or null when the tree knows no such tenant. One port call. */
+  nodeOf(id: string, tx?: Tx): Promise<TenantTreeNode | null>;
   /** The tenant directly above `id`, or null for a root. One port call. */
   parentOf(id: string, tx?: Tx): Promise<string | null>;
   /** The root of `id`'s tree (`id` itself for a root). One port call. */
@@ -86,6 +88,14 @@ function checked(id: string, nodes: readonly TenantTreeNode[]): TenantTreeNode[]
 
 export function createTenantTree<Tx = unknown>(port: TenantTreePort<Tx>): TenantTree<Tx> {
   return {
+    async nodeOf(id, tx) {
+      assertSegment(id);
+      const node = await port.treeNode(id, tx);
+      if (node === null) return null;
+      validateNode(node);
+      return node;
+    },
+
     async parentOf(id, tx) {
       return (await nodeOf(port, id, tx)).node.parentId;
     },

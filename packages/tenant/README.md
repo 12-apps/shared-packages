@@ -26,16 +26,18 @@ This first release ships the **contract** every later behaviour extends:
 - the package's own tables, `tenant_closings` and `tenant_data_exports`, as a
   Prisma partial with its own migration.
 
-The lifecycle (close, reopen, the sweep), the purge and the data export arrive
-in later releases on top of the same config. How to adopt it: [ADOPTING.md](./ADOPTING.md).
+The closing lifecycle (close and reopen as a dangerous act, the blockers, the
+sweep that reminds and purges, and the admin and public gates) is opt-in:
+`createApiTenant({ lifecycle })` and `createTenantGates`. The purge and the
+data export arrive in later releases on top of the same config. How to adopt it: [ADOPTING.md](./ADOPTING.md).
 
 ## Entry points
 
 | Import | What | Needs |
 |---|---|---|
-| `@12-apps/tenant` | config types, `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`), slug resolution (`createKeptMemory`, `createSlugResolver`, `createKeptSlugs`, `createTenantSlugs`, `TenantSlugPort`) | nothing |
-| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given, `tenant.slugs` when `slugs` is), and the slug resolution exports | nothing |
-| `@12-apps/tenant/hono` | `mountTenant(app, tenant)` | `hono` |
+| `@12-apps/tenant` | config types, the lifecycle's pure readings (`isTenantGone`, `sameTenantName`, `purgeAtFor`, `reminderDue`), `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`), slug resolution (`createKeptMemory`, `createSlugResolver`, `createKeptSlugs`, `createTenantSlugs`, `TenantSlugPort`) | nothing |
+| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given, `tenant.slugs` when `slugs` is, `tenant.lifecycle` when `lifecycle` is), `createTenantLifecycle`, `createTenantGates`, `TenantLifecycleRefusal`, and the slug resolution exports | nothing |
+| `@12-apps/tenant/hono` | `mountTenant(app, tenant)`, `mountTenantGates(app, gates)`, `tenantAdminGate`, `tenantPublicGate` | `hono` |
 | `@12-apps/tenant/react` | `createWebTenant` | nothing yet |
 | `@12-apps/tenant/manifest` | the wiring manifest (`db`) | `@12-apps/wiring` (types) |
 

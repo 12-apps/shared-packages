@@ -245,8 +245,12 @@ export interface TenantCopyPack {
   readonly refusalExportExpired: string;
   readonly pendingTitle: string;
   readonly pendingNone: string;
-  /** One line per kind of blocker; `kind` is one of the host's own blocker kinds. */
-  readonly blocker: (kind: string, count: number) => string;
+  /**
+   * One line per kind of blocker; `kind` is one of the host's own blocker
+   * kinds. `detail` is whatever the host's blocker read attached to it (an
+   * amount and a date, say), passed through as given.
+   */
+  readonly blocker: (kind: string, count: number, detail?: Readonly<Record<string, string | number>>) => string;
   /** The shortcut that resolves a blocker of that kind. */
   readonly shortcut: (kind: string) => string;
   readonly dataTitle: string;
