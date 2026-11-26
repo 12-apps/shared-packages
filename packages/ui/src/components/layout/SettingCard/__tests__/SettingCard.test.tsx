@@ -53,6 +53,29 @@ describe('SettingCard closed', () => {
     expect(screen.getByRole('button', { name: `${COPY.edit} Session timeout` })).toBeInTheDocument();
   });
 
+  it('keeps an action beside the heading independent from Edit, including in read-only mode', () => {
+    const onHelp = vi.fn();
+    renderCard({ disabled: true, titleAction: <button type="button" onClick={onHelp}>About this setting</button> });
+    const heading = screen.getByRole('heading', { name: 'Session timeout' });
+    const action = screen.getByRole('button', { name: 'About this setting' });
+    expect(heading.nextElementSibling).toBe(action);
+    fireEvent.click(action);
+    expect(onHelp).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('card-edit')).toBeDisabled();
+    expect(screen.getByTestId('card')).toHaveAttribute('data-state', 'closed');
+  });
+
+  it('shows the rich preview under the closed summary and removes it while editing', async () => {
+    renderCard({ closedPreview: <div data-testid="preview">Day and night colours</div> });
+    const preview = screen.getByTestId('preview');
+    expect(screen.getByTestId('card-summary')).not.toContainElement(preview);
+    expect(screen.getByTestId('card')).toContainElement(preview);
+    openCard();
+    await waitFor(() => expect(screen.queryByTestId('preview')).toBeNull());
+    fireEvent.click(screen.getByTestId('card-cancel'));
+    expect(await screen.findByTestId('preview')).toBeVisible();
+  });
+
   it('labels the section with its title', () => {
     renderCard();
 

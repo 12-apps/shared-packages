@@ -23,6 +23,7 @@ interface HeaderProps {
   title: string;
   headingLevel: SettingHeadingLevel;
   icon?: React.ReactNode;
+  titleAction?: React.ReactNode;
   status?: SettingStatus;
   /** Rendered at the row's far end — the Edit trigger, or a switch. */
   trailing?: React.ReactNode;
@@ -45,6 +46,7 @@ export const SettingHeader: React.FC<HeaderProps> = ({
   title,
   headingLevel,
   icon,
+  titleAction,
   status,
   trailing,
   labelFor,
@@ -69,6 +71,7 @@ export const SettingHeader: React.FC<HeaderProps> = ({
         >
           {title}
         </Box>
+        {titleAction}
         {status && (
           <Chip
             label={status.label}

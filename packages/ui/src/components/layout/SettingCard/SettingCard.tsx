@@ -9,7 +9,7 @@ import { FormHoldScope, useFormHoldRoot } from '../../form/FormHold/FormHold';
 
 import { useSettingCard } from './SettingCard.hooks';
 import { LearnMore, PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
-import { SETTING_CARD_OPEN_ATTR, actionsStyles, summaryStyles, surfaceStyles, withCallerSx } from './SettingCard.styles';
+import { SETTING_CARD_OPEN_ATTR, actionsStyles, surfaceStyles, withCallerSx } from './SettingCard.styles';
 import { useSummaryInfo } from './SettingCard.summary';
 import type { SettingCardCopy, SettingCardProps } from './SettingCard.types';
 
@@ -159,7 +159,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
   const titleId = `${baseId}-title`;
   const card = useSettingCard(props);
   const { open } = card;
-  const clamp = useSummaryInfo({ summary, show: !open, label: copy.moreInfo ?? title, dataTestId });
+  const clamp = useSummaryInfo({ summary, titleAction: props.titleAction, show: !open, label: copy.moreInfo ?? title, dataTestId });
 
   return (
     <Box
@@ -178,6 +178,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         title={title}
         headingLevel={headingLevel}
         icon={icon}
+        titleAction={props.titleAction}
         status={status}
         info={clamp.info}
         trailing={
@@ -195,12 +196,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         }
         dataTestId={dataTestId}
       />
-      {!open && summary != null && (
-        <Box component="p" ref={clamp.ref} sx={summaryStyles} data-testid={partTestId(dataTestId, 'summary')}>
-          {summary}
-        </Box>
-      )}
-      {open && (
+      {open ? (
         <OpenBody
           bodyRef={card.bodyRef}
           titleId={titleId}
@@ -216,6 +212,15 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         >
           {children}
         </OpenBody>
+      ) : (
+        <>
+          {summary != null && (
+            <Box ref={clamp.ref} sx={clamp.sx} data-testid={partTestId(dataTestId, 'summary')}>
+              {summary}
+            </Box>
+          )}
+          {props.closedPreview}
+        </>
       )}
     </Box>
   );

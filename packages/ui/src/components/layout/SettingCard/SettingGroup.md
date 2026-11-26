@@ -61,6 +61,7 @@ import { SettingGroup, SettingToggle } from '@12-apps/ui/layout/SettingCard';
 | `onChange` | `(checked: boolean) => void \| Promise<unknown>` | **required** | Persist the main switch — same async contract as [`SettingToggle`](./SettingToggle.md). |
 | `inactiveHint` | `string` | **required** | Why the rows are inactive. Shown only while they are. |
 | `children` | `ReactNode` | **required** | The dependent rows — `SettingToggle variant="row"`, fields, anything. |
+| `titleAction` | `ReactNode` | — | A separate action after the switch label. With this action the full summary is shown inline. |
 | `summary` | `ReactNode` | — | Explanation under the title. |
 | `disabled` | `boolean` | `false` | Disables the main switch; the rows are then inactive too. |
 | `formatError`, `icon`, `dataTestId`, `className`, `sx` | | | As on `SettingToggle`. Parts add `-dependents` and `-hint`. |

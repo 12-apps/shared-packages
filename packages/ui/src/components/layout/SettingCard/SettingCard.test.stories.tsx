@@ -85,6 +85,27 @@ export const OpensInPlace: Story = {
   },
 };
 
+export const TitleAction: Story = {
+  name: 'A separate action beside the title in read-only mode',
+  render: () => (
+    <Harness
+      disabled
+      titleAction={<button type="button">About this setting</button>}
+      closedPreview={<time dateTime="14:00">14:00 in Lisbon</time>}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const help = canvas.getByRole('button', { name: 'About this setting' });
+    await expect(canvas.getByRole('heading', { name: 'Time zone' }).nextElementSibling).toBe(help);
+    await userEvent.click(help);
+    await waitFor(() => expect(help).toHaveFocus());
+    await expect(canvas.getByText('14:00 in Lisbon')).toBeVisible();
+    await expect(canvas.getByTestId('tz-edit')).toBeDisabled();
+    await expect(canvas.getByTestId('tz')).toHaveAttribute('data-state', 'closed');
+  },
+};
+
 // 2. Focus management
 
 export const FocusRoundTrip: Story = {

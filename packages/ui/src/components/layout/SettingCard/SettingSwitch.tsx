@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
 import React, { useId } from 'react';
 
 import { Switch } from '../../form/Switch';
@@ -7,14 +6,13 @@ import { SR_ONLY_SX } from '../../form/Label/Label.styles';
 
 import { useAsyncSwitch } from './SettingCard.hooks';
 import { PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
-import { clampStyles, descriptionStyles } from './SettingCard.styles';
 import { useSummaryInfo } from './SettingCard.summary';
 import type { SettingToggleProps } from './SettingCard.types';
 
 /** Everything the switch-driven cards share, minus the surface each draws around it. */
 export type SettingSwitchBlockProps = Pick<
   SettingToggleProps,
-  'title' | 'headingLevel' | 'icon' | 'summary' | 'checked' | 'onChange' | 'copy' | 'formatError' | 'dataTestId'
+  'title' | 'titleAction' | 'headingLevel' | 'icon' | 'summary' | 'checked' | 'onChange' | 'copy' | 'formatError' | 'dataTestId'
 > & { disabled: boolean };
 
 /** The ids one switch block wires its label, description and failure line with. */
@@ -45,9 +43,8 @@ export const useSettingSwitchIds = (): SettingSwitchIds => {
  */
 export const SettingSwitchBlock: React.FC<
   SettingSwitchBlockProps & { ids: SettingSwitchIds; state: ReturnType<typeof useAsyncSwitch> }
-> = ({ title, headingLevel = 'h3', icon, summary, copy, disabled, dataTestId, ids, state }) => {
-  const theme = useTheme();
-  const clamp = useSummaryInfo({ summary, label: copy.moreInfo ?? title, dataTestId });
+> = ({ title, titleAction, headingLevel = 'h3', icon, summary, copy, disabled, dataTestId, ids, state }) => {
+  const clamp = useSummaryInfo({ summary, titleAction, label: copy.moreInfo ?? title, dataTestId });
   const { shown, saving, error, flip } = state;
   const describedBy = [summary != null ? ids.summaryId : null, error ? ids.errorId : null]
     .filter(Boolean)
@@ -74,6 +71,7 @@ export const SettingSwitchBlock: React.FC<
       <SettingHeader
         titleId={ids.titleId}
         title={title}
+        titleAction={titleAction}
         headingLevel={headingLevel}
         icon={icon}
         labelFor={ids.inputId}
@@ -83,10 +81,9 @@ export const SettingSwitchBlock: React.FC<
       />
       {summary != null && (
         <Box
-          component="p"
           ref={clamp.ref}
           id={ids.summaryId}
-          sx={{ ...descriptionStyles(theme), ...clampStyles }}
+          sx={clamp.sx}
           data-testid={partTestId(dataTestId, 'summary')}
         >
           {summary}

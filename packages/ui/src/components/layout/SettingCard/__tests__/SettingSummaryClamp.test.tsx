@@ -25,6 +25,21 @@ afterEach(() => {
 });
 
 describe('the summary clamp', () => {
+  it('accepts a rich summary in both editable and switch cards', () => {
+    const value = <div>Saved colours</div>;
+    render(
+      <>
+        <SettingCard title="Logo" copy={EN_US_SETTING_CARD_COPY} summary={value} onSave={vi.fn()} dataTestId="card">
+          Logo editor
+        </SettingCard>
+        <SettingToggle title="Night colours" copy={EN_US_SETTING_SWITCH_COPY} summary={value} checked onChange={vi.fn()} dataTestId="toggle" />
+      </>,
+    );
+    expect(screen.getByTestId('card-summary').tagName).toBe('DIV');
+    expect(screen.getByTestId('toggle-summary').tagName).toBe('DIV');
+    expect(screen.getByRole('switch')).toHaveAccessibleDescription('Saved colours');
+  });
+
   it('offers an [i] with the whole text when a switch summary is cut', async () => {
     stubLayout(true);
     render(
@@ -61,6 +76,21 @@ describe('the summary clamp', () => {
     const info = await screen.findByRole('button', { name: 'Show the full text' });
     expect(info).toHaveStyle({ minWidth: '2.5rem', minHeight: '2.5rem' });
     expect(info).toHaveStyle({ marginTop: '-0.75rem', marginBottom: '-0.75rem', marginLeft: '-0.5rem', marginRight: '-0.5rem' });
+  });
+
+  it('uses the supplied action beside the switch label and shows the full description', async () => {
+    stubLayout(true);
+    const onChange = vi.fn();
+    render(
+      <SettingToggle title="Pay on delivery" titleAction={<button type="button">Help</button>}
+        summary={LONG} copy={EN_US_SETTING_SWITCH_COPY} checked={false} onChange={onChange} dataTestId="toggle" />,
+    );
+    const help = screen.getByRole('button', { name: 'Help' });
+    expect(screen.getByTestId('toggle-title').nextElementSibling).toBe(help);
+    expect(screen.getByTestId('toggle-summary')).not.toHaveStyle({ overflow: 'hidden' });
+    fireEvent.click(help);
+    expect(onChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show the full text' })).toBeNull());
   });
 
   it('draws no [i] when the summary fits', async () => {
