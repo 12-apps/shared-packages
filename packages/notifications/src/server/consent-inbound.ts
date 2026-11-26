@@ -37,7 +37,7 @@ const accountsOf = (rows: readonly { userId: string | null }[]): string[] =>
  * `notifyGuest` to a number that holds no account, or whose account rows are
  * for another channel; a number's STOP is honoured whoever it reaches.
  */
-export async function stopGuest(
+async function stopGuest(
   store: ChannelConsentDelegate,
   input: {
     channel: string;

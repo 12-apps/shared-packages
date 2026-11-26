@@ -43,10 +43,10 @@ import {
 const GUEST_CHANNELS: readonly NotificationChannel[] = ['SMS', 'WHATSAPP'];
 
 /** A guest's caps subject: the number, apart from any account id. */
-export const guestCapsSubject = (destination: string): string => `guest:${destination}`;
+const guestCapsSubject = (destination: string): string => `guest:${destination}`;
 
 /** What the mount must have wired for a guest send to honour a STOP. */
-export interface GuestNotifyDeps extends NotificationRouterDeps {
+interface GuestNotifyDeps extends NotificationRouterDeps {
   guestDestination?: (phone: string) => string | null;
 }
 

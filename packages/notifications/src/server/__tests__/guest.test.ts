@@ -194,6 +194,32 @@ describe('the caps, for a guest', () => {
     expect(counts).toMatchObject({ [`recipient:guest:${GUEST_E164}`]: 2, 'recipient:guest:+5521998765432': 1, 'tenant:store-1': 3 });
   });
 
+  it('key the same number written two ways to ONE day and ONE STOP', async () => {
+    const SPACED = '+55 11 99999-0000';
+    const BARE = '5511999990000';
+    const db = createMemoryDb();
+    const sends: PhoneSend[] = [];
+    const api = mountGuest(db, sends);
+
+    expect((await tellGuest(api, '1', SPACED)).channels).toEqual(['SMS']);
+    expect((await tellGuest(api, '2', BARE)).channels).toEqual(['SMS']);
+    // The third send of the day is over the cap whichever spelling asks.
+    expect((await tellGuest(api, '3', SPACED)).channels).toEqual([]);
+    expect(db.rows.counters.filter((row) => row.scope === 'recipient')).toEqual([
+      expect.objectContaining({ subjectId: 'guest:+5511999990000', count: 2 }),
+    ]);
+
+    // A STOP from one spelling stops the other, on a fresh store with a clean day.
+    const stopDb = createMemoryDb();
+    const stopApi = mountGuest(stopDb, sends);
+    await consentOf(stopApi).applyInbound({ channel: 'SMS', from: BARE, optOut: true, at: AT, externalId: 'stop-b' });
+    expect((await tellGuest(stopApi, '4', SPACED)).channels).toEqual([]);
+    expect(stopDb.rows.consents).toEqual([
+      expect.objectContaining({ userId: null, destination: '+5511999990000', status: 'OPTED_OUT' }),
+    ]);
+    expect(sends.map((send) => send.phone)).toEqual(['+5511999990000', '+5511999990000']);
+  });
+
   it('leave an account\'s day untouched: a guest of the same number is counted apart', async () => {
     const db = createMemoryDb();
     const sends: PhoneSend[] = [];
