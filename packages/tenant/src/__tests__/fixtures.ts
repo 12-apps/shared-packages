@@ -71,18 +71,18 @@ export function serverConfig(): TenantServerConfig<ClinicStatus, { label: string
   return { ...coreConfig(), port: fakePort() };
 }
 
-/** A deep copy with the value at `path` replaced (or deleted, for `undefined`). */
-export function withValue(config: object, path: readonly string[], value: unknown): unknown {
-  const copy = structuredClone(
-    Object.fromEntries(Object.entries(config).filter(([key]) => key !== 'port')),
-  ) as Record<string, unknown>;
-  if ('port' in config) copy.port = { ...(config as { port: object }).port };
-  let cursor = copy;
-  for (const key of path.slice(0, -1)) cursor = cursor[key] as Record<string, unknown>;
-  const last = path[path.length - 1] as string;
-  if (value === undefined) delete cursor[last];
-  else cursor[last] = value;
-  return copy;
+/**
+ * A copy of `config` with the value at `keys` replaced, or left out for
+ * `undefined`. Functions (the port's members) are kept as they are.
+ */
+export function withValue(config: unknown, keys: readonly string[], value: unknown): unknown {
+  const [head, ...rest] = keys;
+  if (head === undefined) return value;
+  const bag = config as Record<string, unknown>;
+  const entries = Object.entries(bag).filter(([key]) => !(key === head && rest.length === 0 && value === undefined));
+  return Object.fromEntries(
+    entries.map(([key, child]) => [key, key === head ? withValue(child, rest, value) : child]),
+  );
 }
 
 /** Every leaf path of a plain object (arrays and functions count as leaves). */

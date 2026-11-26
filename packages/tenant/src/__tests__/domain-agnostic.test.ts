@@ -17,7 +17,8 @@ import { describe, expect, it } from 'vitest';
  * list of what is forbidden is not itself a finding.
  */
 
-const FORBIDDEN = [
+function forbiddenWords(): string[] {
+  return [
   ['lo', 'ja'],
   ['sto', 're'],
   ['ped', 'ido'],
@@ -27,6 +28,7 @@ const FORBIDDEN = [
   ['future', ' pay'],
   ['pala', 'dira'],
 ].map((parts) => parts.join(''));
+}
 
 /**
  * `\b` is ASCII-only in JavaScript, so a word ending in an accented letter
@@ -50,14 +52,15 @@ function sourceFiles(dir: string): string[] {
 
 describe('the domain-agnostic rule', () => {
   it('matches whole words in any case, and nothing inside a longer word', () => {
-    const word = FORBIDDEN[1] as string;
+    const forbidden = forbiddenWords();
+    const word = forbidden[1] as string;
     expect(wholeWord(word).test(word.toUpperCase())).toBe(true);
     expect(wholeWord(word).test(`the ${word}'s row`)).toBe(true);
     for (const innocent of ['restore', 'stored', 'restored', '@12-apps/storage', 'storage', 'datastore']) {
       expect(wholeWord(word).test(innocent)).toBe(false);
     }
-    expect(wholeWord(FORBIDDEN[3] as string).test(`o ${FORBIDDEN[3]}.`)).toBe(true);
-    expect(wholeWord(FORBIDDEN[3] as string).test(`${FORBIDDEN[3]}s`)).toBe(false);
+    expect(wholeWord(forbidden[3] as string).test(`o ${forbidden[3]}.`)).toBe(true);
+    expect(wholeWord(forbidden[3] as string).test(`${forbidden[3]}s`)).toBe(false);
   });
 
   it('finds none of the host vocabulary anywhere under src/', () => {
@@ -65,7 +68,7 @@ describe('the domain-agnostic rule', () => {
     expect(files.length).toBeGreaterThan(5);
     const findings = files.flatMap((path) => {
       const text = readFileSync(path, 'utf8');
-      return FORBIDDEN.filter((word) => wholeWord(word).test(text)).map(
+      return forbiddenWords().filter((word) => wholeWord(word).test(text)).map(
         (word) => `${relative(SRC, path)}: ${word}`,
       );
     });

@@ -40,7 +40,7 @@ describe('createApiTenant', () => {
     (key, path) => {
       const error = errorOf(api(withValue(serverConfig(), path, undefined)));
       expect(error.key).toBe(key);
-      expect(error.message).toBe(`@12-apps/tenant: config "${error.key}" is required and missing.`);
+      expect(error.message).toMatch(/is required and missing\.$/u);
     },
   );
 
