@@ -49,10 +49,15 @@ function dayOf(iso: string, locale: string, timeZone: string): string {
 
 type Words = { title: string; body: string };
 
-function noticeWordsOf<S extends string, Tx>(
-  tenant: LifecycleTenant<S, Tx>,
-  config: TenantLifecycleConfig<S, Tx>,
-): TenantLifecycle<S>['noticeWords'] {
+/**
+ * The lifecycle's notice words alone, for a host whose notification
+ * registry renders them apart from the lifecycle wiring (no hooks needed):
+ * the tenant's copy packs plus the lifecycle's copy extension.
+ */
+export function createNoticeWords(
+  tenant: Pick<LifecycleTenant<string, unknown>, 'config' | 'copyFor'>,
+  config: Pick<TenantLifecycleConfig, 'copy'>,
+): TenantLifecycle['noticeWords'] {
   const { notifications } = tenant.config.ids;
   const { locales, defaultLocale } = tenant.config.copy;
   type Writer = (copy: TenantCopyPack, name: string, day: string, payload: TenantNoticePayload, tag: string) => Words;
@@ -106,6 +111,6 @@ export function createTenantLifecycle<S extends string, Tx>(
     },
     blockers: (tenantId, now = new Date()) => context.blockersOf(tenantId, now),
     sweep: (now) => sweepTenants(context, now),
-    noticeWords: noticeWordsOf(tenant, config),
+    noticeWords: createNoticeWords(tenant, config),
   };
 }

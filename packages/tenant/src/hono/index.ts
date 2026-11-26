@@ -17,7 +17,19 @@ export function mountTenant<A extends Pick<Hono, 'on'>>(app: A, tenant: Pick<Api
   return app;
 }
 
-type Middleware = Parameters<Pick<Hono, 'use'>['use']>[1];
+/**
+ * A gate middleware, typed structurally (the request it reads and the `next`
+ * it calls), so it fits any Hono version the host resolves the optional peer to.
+ */
+export type TenantGateMiddleware = (
+  context: { req: { raw: Request } },
+  next: () => Promise<void>,
+) => Promise<Response | undefined>;
+
+/** The one member of a Hono app the gate mount calls. */
+export interface TenantGateApp {
+  use(path: string, handler: TenantGateMiddleware): unknown;
+}
 
 /** A refusal as the response every gate renders: `{ error, code, details: {} }` with its status. */
 function refused(refusal: GateRefusal): Response {
@@ -25,7 +37,7 @@ function refused(refusal: GateRefusal): Response {
 }
 
 /** The admin gate as a middleware: mount it on `<admin.prefix>/*`. */
-export function tenantAdminGate(gates: Pick<TenantGates, 'adminRefusal'>): Middleware {
+export function tenantAdminGate(gates: Pick<TenantGates, 'adminRefusal'>): TenantGateMiddleware {
   return async (context, next) => {
     const refusal = await gates.adminRefusal(context.req.raw);
     if (refusal !== null) return refused(refusal);
@@ -35,7 +47,7 @@ export function tenantAdminGate(gates: Pick<TenantGates, 'adminRefusal'>): Middl
 }
 
 /** The public gate as a middleware: mount it on each `<public.prefix>/<family>/*`. */
-export function tenantPublicGate(gates: Pick<TenantGates, 'publicRefusal'>): Middleware {
+export function tenantPublicGate(gates: Pick<TenantGates, 'publicRefusal'>): TenantGateMiddleware {
   return async (context, next) => {
     const refusal = await gates.publicRefusal(context.req.raw);
     if (refusal !== null) return refused(refusal);
@@ -45,7 +57,7 @@ export function tenantPublicGate(gates: Pick<TenantGates, 'publicRefusal'>): Mid
 }
 
 /** Mount both gates: `<admin.prefix>/*`, then `<public.prefix>/<family>/*` for each family. Returns `app`. */
-export function mountTenantGates<A extends Pick<Hono, 'use'>>(
+export function mountTenantGates<A extends TenantGateApp>(
   app: A,
   gates: Pick<TenantGates, 'adminRefusal' | 'publicRefusal' | 'config'>,
 ): A {

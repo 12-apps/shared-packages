@@ -319,7 +319,11 @@ const tenant = createApiTenant({
   `mountTenantGates(app, gates)` from `@12-apps/tenant/hono`. `lookup` is your
   kept slug lookup (the status rides it: an open tenant pays nothing more); a
   family's `fixedWords` are never looked up; `slugAfter` names words after
-  which the next segment is the slug.
+  which the next segment is the slug. The middlewares are typed structurally
+  (`TenantGateMiddleware`), so they fit whatever Hono version you resolve.
+- **Notice words without the hooks**: `createNoticeWords(tenant, { copy })`
+  answers `noticeWords` alone, for a notification registry that renders the
+  lifecycle's notices apart from the module that wires its hooks.
 
 #### Moving an older closing table (expand and contract)
 

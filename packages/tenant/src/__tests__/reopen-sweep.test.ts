@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { purgeAtFor, reminderDue, sameTenantName } from '../index';
-import { TenantLifecycleRefusal } from '../server';
+import { TenantLifecycleRefusal, createApiTenant, createNoticeWords } from '../server';
+import { serverConfig } from './fixtures';
 import { DAY_MS, lifecycleHost, request } from './lifecycle-fixtures';
 
 /** Reopening, the sweep, and the pure readings they rest on. */
@@ -148,6 +149,24 @@ describe('the sweep', () => {
       body: 'en-GB: noticeWeekBody(Clínica Norte, 26/12/2026).',
     });
     expect(() => lifecycle.noticeWords('clinic.export_ready', payload, { locale: null, timeZone: 'UTC' })).toThrow(RangeError);
+  });
+});
+
+describe('createNoticeWords', () => {
+  it('words the notices from the packs alone, with no lifecycle hooks', () => {
+    const words = createNoticeWords(createApiTenant(serverConfig()), {
+      copy: {
+        locales: {
+          'en-GB': { noticePlatformScheduledTitle: (name) => `t:${name}`, noticePlatformScheduledBody: (n, d, r) => `b:${n}:${d}:${r}` },
+        },
+      },
+    });
+    const payload = { tenantId: 't-1', name: 'North', slug: 'north', purgeAt: PURGE.toISOString(), by: 'platform' as const, reason: 'Audit' };
+    expect(words('clinic.closing_scheduled', payload, { locale: 'en-GB', timeZone: 'UTC' })).toEqual({
+      title: 't:North',
+      body: 'b:North:26/12/2026:Audit',
+    });
+    expect(words('clinic.reopened', payload, { locale: null, timeZone: 'UTC' }).title).toBe('en-GB: noticeReopenedTitle(North).');
   });
 });
 
