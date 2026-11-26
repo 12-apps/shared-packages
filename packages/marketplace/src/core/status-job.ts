@@ -28,7 +28,7 @@ import type { MarketplaceDeliveredBy } from "./types";
  */
 
 /** What the job reads of the acceptance row. */
-export interface StatusJobRow {
+interface StatusJobRow {
   orderId: string;
   provider: string;
   status: string;
@@ -37,12 +37,12 @@ export interface StatusJobRow {
 }
 
 /** What one run did, in the outbound job's own shape. */
-export type StatusJobOutcome =
+type StatusJobOutcome =
   | { kind: "skipped"; reason: string }
   | { kind: "done"; action: "status" }
   | { kind: "failed"; action: "status"; reason: string };
 
-export interface StatusJobDeps {
+interface StatusJobDeps {
   attempt: { attempt: number; maxAttempts: number };
   ref: OutboundOrderRef;
   retryError: (message: string) => Error;
