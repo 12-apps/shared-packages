@@ -15,10 +15,39 @@
 import type { TenantCoreConfig } from '../config';
 import { createReadings, frozenCopy, type DeepReadonly, type TenantReadings } from '../core';
 import type { TenantPort, TenantRecord, TenantTreePort } from '../port';
+import { createTenantSlugs, type KeptMemory, type TenantSlugPort, type TenantSlugRecord, type TenantSlugs } from '../slugs';
 import { createTenantTree, type TenantTree } from '../tree';
-import { validateCoreConfig, validatePort, validateTreePort } from '../validate';
+import { validateCoreConfig, validatePort, validateSlugs, validateTreePort } from '../validate';
 
 export { TenantConfigError } from '../validate';
+export {
+  EVERY_SCOPE,
+  TENANT_SLUG_PORT_METHODS,
+  createKeptMemory,
+  createKeptSlugs,
+  createSlugResolver,
+  createTenantSlugs,
+  type KeptMemory,
+  type KeptMemoryErrorEvent,
+  type KeptMemoryOptions,
+  type KeptReadOptions,
+  type KeptSlugs,
+  type TenantChangeHandlers,
+  type TenantChangeListener,
+  type TenantSlugLookup,
+  type TenantSlugParent,
+  type TenantSlugPort,
+  type TenantSlugRecord,
+  type TenantSlugResolver,
+  type TenantSlugs,
+} from '../slugs';
+
+/** Slug resolution's config: the host's slug port and its kept memory. */
+export interface TenantSlugsConfig<R extends TenantSlugRecord = TenantSlugRecord> {
+  port: TenantSlugPort<R>;
+  /** One memory per channel per process (`createKeptMemory`). */
+  memory: KeptMemory;
+}
 
 /** A framework-neutral route: the Hono adapter mounts each one as given. */
 export interface TenantRoute {
@@ -29,8 +58,9 @@ export interface TenantRoute {
 }
 
 /**
- * Everything `createApiTenant` needs. Nothing is optional but the tenant tree,
- * an opt-in feature: give `tree` and every one of its members is required.
+ * Everything `createApiTenant` needs. Nothing is optional but the tenant tree and
+ * slug resolution, opt-in features: give `tree` or `slugs` and every one of
+ * its members is required.
  */
 export interface TenantServerConfig<S extends string = string, Tx = unknown>
   extends TenantCoreConfig<S> {
@@ -41,6 +71,11 @@ export interface TenantServerConfig<S extends string = string, Tx = unknown>
    * host has no tree and `tenant.tree` is absent.
    */
   tree?: TenantTreePort<Tx>;
+  /**
+   * Slug resolution (kept slugs, the resolution cache). Left out, the host
+   * resolves slugs itself and `tenant.slugs` is absent.
+   */
+  slugs?: TenantSlugsConfig;
 }
 
 export interface ApiTenant<S extends string = string, Tx = unknown> extends TenantReadings<S> {
@@ -50,6 +85,8 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   port: TenantPort<S, Tx>;
   /** The tenant tree, read and moved through `config.tree`; absent when none was given. */
   tree?: TenantTree<Tx>;
+  /** Slug resolution through `config.slugs`; absent when none was given. */
+  slugs?: TenantSlugs;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
   /** The tenant, read through the port, on `tx` when given. */
@@ -70,6 +107,8 @@ export function createApiTenant<S extends string, Tx = unknown>(
   validatePort((config as { port?: unknown }).port);
   const treePort = (config as { tree?: unknown }).tree;
   if (treePort !== undefined) validateTreePort(treePort);
+  const slugs = (config as { slugs?: unknown }).slugs;
+  if (slugs !== undefined) validateSlugs(slugs);
   const data = frozenCopy({ statuses: config.statuses, ids: config.ids, copy: config.copy });
   const known = new Set<string>(data.statuses.all);
   const { port } = config;
@@ -78,6 +117,7 @@ export function createApiTenant<S extends string, Tx = unknown>(
     config: data,
     port,
     ...(config.tree === undefined ? {} : { tree: createTenantTree(config.tree) }),
+    ...(config.slugs === undefined ? {} : { slugs: createTenantSlugs(config.slugs) }),
     routes: Object.freeze([]),
     byId: (id, tx) => port.byId(id, tx),
     setStatusIf: (id, from, to, tx) => {

@@ -41,5 +41,27 @@ export {
   type TenantTreeErrorCode,
   type TenantTreePort,
 } from './tree';
-export { TenantConfigError, validateCoreConfig, validatePort, validateTreePort } from './validate';
+export {
+  EVERY_SCOPE,
+  TENANT_SLUG_PORT_METHODS,
+  createKeptMemory,
+  createKeptSlugs,
+  createSlugResolver,
+  createTenantSlugs,
+  validateKeptMemoryOptions,
+  type KeptMemory,
+  type KeptMemoryErrorEvent,
+  type KeptMemoryOptions,
+  type KeptReadOptions,
+  type KeptSlugs,
+  type TenantChangeHandlers,
+  type TenantChangeListener,
+  type TenantSlugLookup,
+  type TenantSlugParent,
+  type TenantSlugPort,
+  type TenantSlugRecord,
+  type TenantSlugResolver,
+  type TenantSlugs,
+} from './slugs';
+export { TenantConfigError, validateCoreConfig, validatePort, validateSlugs, validateTreePort } from './validate';
 export type { DeepReadonly, TenantReadings, TenantRefusalKind } from './core';

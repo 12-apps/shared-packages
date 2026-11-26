@@ -110,7 +110,7 @@ const port: TenantPort<Status, Tx> = {
 - **`byId` reads on `tx` when one is given**, so a refusal inside the
   transaction sees the status the transaction sees.
 - **`bySlug` resolves the tenant's current slug only.** A former slug you keep
-  for redirects is not answered here.
+  is not answered here: kept slugs go through the slug port (below).
 
 ### The tenant tree (opt-in)
 
@@ -178,6 +178,70 @@ Keep it distinguishable from a grant on the parent tenant itself: a scope that
 names "the tenants below X" must never be the same string as X's own. And
 wherever you gather the holders of grants by scope, gather the WHOLE chain
 above a tenant, not only its parent.
+
+### Slug resolution (opt-in)
+
+A tenant keeps every slug it ever held, so an old link still names it, and a
+lookup is answered from process memory once resolved, until the database says
+the tenant changed. **Optional**, like the tree: a host that passes no `slugs`
+boots unchanged and gets no `tenant.slugs`. Nothing is added to the tenant
+port. The package owns no slug table and no trigger.
+
+```ts
+import { createKeptMemory, createApiTenant } from '@12-apps/tenant/server';
+
+// ONE memory per channel per process, made at module load.
+const memory = createKeptMemory({
+  channel: 'tenant_slug_changed',          // the channel your triggers NOTIFY on
+  listen: (channel, handlers) => …,        // your LISTEN; resolves once connected
+  onError: ({ phase, channel, error }) => …, // log it in your words: 'start' | 'dropped'
+  backstopMs: 10 * 60 * 1000,              // trust a kept value this long with no notification
+  retryMs: 30 * 1000,                      // pause before retrying a listener that failed to start
+  maxScopes: 5_000,                        // addresses kept, oldest dropped first
+  maxSlots: 256,                           // slots per address (slug resolution uses one)
+  database: () => …,                       // optional: the database the listener hears
+});
+const slugs: TenantSlugPort<YourRecord> = {
+  current: (slug, parent) => …,  // ONE read: the tenant whose current slug is `slug`
+  former: (slug, parent) => …,   // ONE read: the tenant that held `slug` before, with its CURRENT slug
+};
+const tenant = createApiTenant({ ...config, port, slugs: { port: slugs, memory } });
+await tenant.slugs?.resolve('north-wing');                         // a root
+await tenant.slugs?.resolve('radiology', { parentPath: '/t1/' });  // a unit under t1
+```
+
+Every number is required (`TenantConfigError`, key `memory.<key>`); the port's
+two members and the memory are checked at startup (`slugs.port.current`,
+`slugs.port.former`, `slugs.memory.read`). A host that is not on
+`createApiTenant` yet uses the same pieces standalone: `createSlugResolver(port)`
+(the two reads), `createKeptSlugs(memory)` (the keeping) and
+`createTenantSlugs({ port, memory })` (both).
+
+- **The statement budget.** A kept address costs no statement; a miss on a
+  current slug costs one (`current`); a former or unknown slug costs two
+  (`current`, then `former`). An unknown slug is never kept, so a stream of
+  made-up slugs cannot grow the memory.
+- **Keys.** A root lookup keys on the slug alone, as every address did before
+  the tree. A unit's slug is unique within its parent: the lookup names the
+  parent's path, the port receives `{ id, path }` of the parent, and the key is
+  the path plus the slug. A bad path throws `TenantTreeError`; a slug holding
+  `/` is loaded every time and never kept.
+- **Your triggers.** On every write that changes what a lookup answers (the
+  slug, and every column your record carries), and on every write to your
+  former-slug table, `pg_notify(<channel>, '*')` AFTER the write commits. Every
+  process drops every kept address: these writes are rare. A payload naming
+  one address drops only that one (the root's slug, or the unit's path plus
+  slug).
+- **Before any lookup under a parent**, the triggers must also fire on a change
+  of the tenant's parent or path: a moved unit answers at its new parent only.
+- **The memory's rules.** Nothing is kept while the listener is down (a
+  disconnect and a reconnect each drop everything, since a notification sent
+  meanwhile is lost); a load a notification overtakes is not kept; one load
+  answers a burst of the same lookup; a read through a transaction (`via`)
+  never starts the `LISTEN`, which on a single connection would wait for it.
+  Make the database client before the first lookup when `listen` depends on it.
+- **One memory per channel per process**, shared by everything that reads
+  under that channel. Two memories on one channel each open a listener.
 
 ### The schema and the migration
 

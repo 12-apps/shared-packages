@@ -33,8 +33,8 @@ in later releases on top of the same config. How to adopt it: [ADOPTING.md](./AD
 
 | Import | What | Needs |
 |---|---|---|
-| `@12-apps/tenant` | config types, `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`) | nothing |
-| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given) | nothing |
+| `@12-apps/tenant` | config types, `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`), slug resolution (`createKeptMemory`, `createSlugResolver`, `createKeptSlugs`, `createTenantSlugs`, `TenantSlugPort`) | nothing |
+| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given, `tenant.slugs` when `slugs` is), and the slug resolution exports | nothing |
 | `@12-apps/tenant/hono` | `mountTenant(app, tenant)` | `hono` |
 | `@12-apps/tenant/react` | `createWebTenant` | nothing yet |
 | `@12-apps/tenant/manifest` | the wiring manifest (`db`) | `@12-apps/wiring` (types) |
@@ -54,8 +54,8 @@ in later releases on top of the same config. How to adopt it: [ADOPTING.md](./AD
   `TenantConfigError` naming the key, at startup.
 - **The tenant row stays the host's.** The package never maps it; its own tables
   are keyed by an opaque `tenant_id` with no foreign key. `bySlug` resolves the
-  tenant's CURRENT slug only; former slugs a host keeps are the address
-  behaviour's, through a port of its own.
+  tenant's CURRENT slug only; former (kept) slugs go through the slug port,
+  `TenantSlugPort`, which the host implements over its own tables.
 
 ## Tables
 
