@@ -22,6 +22,11 @@ import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
 import { createMemoryDb } from "./memory-db";
 
+/* eslint-disable test-flakiness/no-database-operations --
+   The seed helpers below write rows into the harness's OWN in-memory fake
+   (`createMemoryDb`), built per `createHarness` call: they are how a case puts
+   the engine in a state, not a database a case shares. */
+
 /**
  * A mounted engine over recording ports. Nothing reaches a network: `http` is
  * a scripted fake that records every request, and a test that expects no call
