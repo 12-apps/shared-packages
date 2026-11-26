@@ -88,20 +88,19 @@ describe('hold: a refused capture kept for its sale context', () => {
   });
 
   it('two contexts racing for one capture: the hold is in the write predicate, the loser decides again and is refused', async () => {
-    let racer: (() => Promise<void>) | null = null;
+    // One race, landed between the move's read and its write: the other context holds it first.
+    const races: (() => Promise<void>)[] = [];
     const w = world({
       wrap: (store): TerminalCaptureStore => ({
         ...store,
         async writeIfUnchanged(seen, patch) {
-          const race = racer;
-          racer = null;
-          if (race) await race();
+          await races.shift()?.();
           return store.writeIfUnchanged(seen, patch);
         },
       }),
     });
     await taken(w);
-    racer = async () => void (await w.captures.store.writeIfUnchanged({ ...versionFor(w), holdKey: null }, { holdKey: OTHER_CONTEXT }));
+    races.push(async () => void (await w.captures.store.writeIfUnchanged({ ...versionFor(w), holdKey: null }, { holdKey: OTHER_CONTEXT })));
 
     expect((await refusal(w.ledger.hold(key(), MESA))).code).toBe('BOUND_ELSEWHERE');
     expect(w.row('TC-0001').holdKey).toBe(OTHER_CONTEXT);

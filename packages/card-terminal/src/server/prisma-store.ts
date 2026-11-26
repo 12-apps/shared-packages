@@ -143,6 +143,20 @@ async function flagStaleUnbound(prisma: PrismaTerminalCaptureClient, now: Date, 
 
 type ClientSource = PrismaTerminalCaptureClient | (() => PrismaTerminalCaptureClient | Promise<PrismaTerminalCaptureClient>);
 
+/** A move's predicate: the row as it was read, the hold only when the move names it. */
+function versionWhere(seen: CaptureVersion): CaptureUpdateWhere {
+  const { id, state, orderId, refundFlaggedAt, refundClearedAt, awaitingReport, holdKey } = seen;
+  return {
+    id,
+    state,
+    orderId,
+    refundFlaggedAt,
+    refundClearedAt,
+    ...(awaitingReport ? AWAITING_REPORT : {}),
+    ...(holdKey === undefined ? {} : { holdKey }),
+  };
+}
+
 /** The held captures of one sale context: UNBOUND, flag not live, oldest first. */
 async function findHeld(prisma: PrismaTerminalCaptureClient, clientId: string, holdKey: string): Promise<TerminalCaptureRecord[]> {
   const rows = await prisma.terminalCapture.findMany({
@@ -185,19 +199,7 @@ export function createPrismaTerminalCaptureStore(source: ClientSource, options: 
       return rows.map(toRecord);
     },
     async writeIfUnchanged(seen, patch) {
-      const { id, state, orderId, refundFlaggedAt, refundClearedAt, awaitingReport, holdKey } = seen;
-      const written = await (await client()).terminalCapture.updateMany({
-        where: {
-          id,
-          state,
-          orderId,
-          refundFlaggedAt,
-          refundClearedAt,
-          ...(awaitingReport ? AWAITING_REPORT : {}),
-          ...(holdKey === undefined ? {} : { holdKey }),
-        },
-        data: patch,
-      });
+      const written = await (await client()).terminalCapture.updateMany({ where: versionWhere(seen), data: patch });
       return written.count === 1;
     },
     async flagIfNotLive(clientId, transactionCode, flag, unboundOnly) {

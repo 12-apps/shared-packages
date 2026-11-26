@@ -71,6 +71,7 @@ export {
   type TerminalCaptureLedger,
   type TerminalCaptureLedgerConfig,
 } from './ledger';
+export { type TerminalCaptureHolds } from './holds';
 export {
   createTerminalLegs,
   wireOf,

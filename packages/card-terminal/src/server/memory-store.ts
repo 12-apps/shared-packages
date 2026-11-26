@@ -49,6 +49,13 @@ function answer(row: Row): TerminalCaptureRecord {
 
 const sameTime = (a: Date | null, b: Date | null): boolean => (a === null || b === null ? a === b : a.getTime() === b.getTime());
 
+/** The optional parts of a predicate: the hold when it is named, the legacy report when it is awaited. */
+function optionalPartsMatch(row: Row, seen: CaptureVersion): boolean {
+  if (seen.holdKey !== undefined && (row.holdKey ?? null) !== seen.holdKey) return false;
+  if (!seen.awaitingReport) return true;
+  return row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null;
+}
+
 function matches(row: Row, seen: CaptureVersion): boolean {
   return (
     row.id === seen.id &&
@@ -56,9 +63,7 @@ function matches(row: Row, seen: CaptureVersion): boolean {
     row.orderId === seen.orderId &&
     sameTime(row.refundFlaggedAt, seen.refundFlaggedAt) &&
     sameTime(row.refundClearedAt, seen.refundClearedAt) &&
-    (seen.holdKey === undefined || (row.holdKey ?? null) === seen.holdKey) &&
-    (!seen.awaitingReport ||
-      (row.source === 'JOURNAL' && row.transactionId === null && row.authorizationCode === null && row.terminalSerial === null))
+    optionalPartsMatch(row, seen)
   );
 }
 
