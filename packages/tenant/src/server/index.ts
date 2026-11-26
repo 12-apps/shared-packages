@@ -14,6 +14,7 @@
 import type { TenantCoreConfig } from '../config';
 import { createReadings, type TenantReadings } from '../core';
 import type { TenantPort } from '../port';
+import { createTenantTree, type TenantTree } from '../tree';
 import { validateCoreConfig, validatePort } from '../validate';
 
 export { TenantConfigError } from '../validate';
@@ -38,6 +39,8 @@ export interface ApiTenant<S extends string = string, Tx = unknown> extends Tena
   config: Readonly<TenantServerConfig<S, Tx>>;
   /** The host's tenant port, as given. */
   port: TenantPort<S, Tx>;
+  /** The tenant tree, read and moved through the port's tree methods. */
+  tree: TenantTree;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
 }
@@ -52,6 +55,7 @@ export function createApiTenant<S extends string, Tx = unknown>(
     ...createReadings(frozen),
     config: frozen,
     port: frozen.port,
+    tree: createTenantTree(frozen.port),
     routes: Object.freeze([]),
   };
 }

@@ -11,7 +11,11 @@ This first release ships the **contract** every later behaviour extends:
   copy packs per locale;
 - the **tenant port** the package reaches the host's tenant row through:
   `bySlug`, `byId`, `setStatusIf(id, from, to)`, `clearProfile(tx, id)`,
-  `timeZone(id)`;
+  `timeZone(id)`, and the tree's `treeNode`, `treeAncestors`, `treeDescendants`,
+  `moveSubtree`;
+- the **tenant tree**: a tenant under a parent, any depth, on a materialized
+  path the package computes and validates; `parentOf`, `rootOf`, `ancestorsOf`,
+  `descendantsOf` (one port call each) and a subtree `move` that refuses a cycle;
 - `createApiTenant` and `createWebTenant`, which validate all of it at startup;
 - the package's own tables, `tenant_closings` and `tenant_data_exports`, as a
   Prisma partial with its own migration.
@@ -23,8 +27,8 @@ in later releases on top of the same config. How to adopt it: [ADOPTING.md](./AD
 
 | Import | What | Needs |
 |---|---|---|
-| `@12-apps/tenant` | config types, `TenantPort`, `TenantConfigError`, the validators | nothing |
-| `@12-apps/tenant/server` | `createApiTenant` | nothing |
+| `@12-apps/tenant` | config types, `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`) | nothing |
+| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree`) | nothing |
 | `@12-apps/tenant/hono` | `mountTenant(app, tenant)` | `hono` |
 | `@12-apps/tenant/react` | `createWebTenant` | nothing yet |
 | `@12-apps/tenant/manifest` | the wiring manifest (`db`) | `@12-apps/wiring` (types) |

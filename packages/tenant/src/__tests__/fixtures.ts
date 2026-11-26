@@ -64,6 +64,10 @@ export function fakePort(): TenantPort<ClinicStatus, { label: string }> {
     setStatusIf: async () => false,
     clearProfile: async () => undefined,
     timeZone: async () => 'Europe/London',
+    treeNode: async () => null,
+    treeAncestors: async () => [],
+    treeDescendants: async () => [],
+    moveSubtree: async () => 0,
   };
 }
 

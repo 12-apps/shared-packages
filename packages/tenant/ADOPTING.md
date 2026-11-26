@@ -73,12 +73,52 @@ const port: TenantPort<Status, Tx> = {
   setStatusIf: (id, from, to) => …,  // compare-and-set: true only when the row moved
   clearProfile: (tx, id) => …,       // erase the row's profile inside the purge's transaction
   timeZone: (id) => …,               // IANA zone
+  treeNode: (id) => …,               // { id, parentId, path } | null — one read
+  treeAncestors: (id) => …,          // the node and every node above it — one read
+  treeDescendants: (id) => …,        // the node and every node below it — one read
+  moveSubtree: (move) => …,          // apply a planned move — one statement, rows written
 };
 ```
 
 `setStatusIf` must be a real compare-and-set (`UPDATE … WHERE id = $1 AND status
 = $2`, answering whether a row changed): the lifecycle relies on it to make each
 step happen once.
+
+### The tenant tree
+
+A tenant may sit under another (ownership only, any depth: a company above its
+units, a unit above its venues). Store three columns on your tenant row: the
+parent's id (NULL for a standalone tenant), the **materialized path** and,
+if you want one, your own unit code. The package computes and validates every
+path; you store it and apply what it plans.
+
+- **The path** is `/<root id>/…/<own id>/`; a standalone tenant's is
+  `/<own id>/`, so backfilling an existing table makes every row a root.
+  Ids must not contain `/`.
+- **`treeAncestors(id)`**: ONE read of the rows whose ids are the segments of
+  the tenant's own path (a primary-key read; nothing recurses).
+- **`treeDescendants(id)`**: ONE read of the rows whose path starts with the
+  tenant's own, served by an index on the path. With a byte-ordered collation
+  (Postgres `COLLATE "C"`) the prefix is exactly the range
+  `path >= p AND path < p-minus-its-last-"/" || '0'`.
+- **`moveSubtree(move)`**: ONE statement that replaces the prefix
+  `move.fromPath` with `move.toPath` on every row under it and re-points the row
+  `move.id` at `move.parentId`, applied ONLY while that row's path is still
+  `fromPath` and the parent's is still `parentPath` (lock the parent row in the
+  same statement). Answer the rows written; 0 tells the package the tree moved
+  under its plan, and it refuses the move by name.
+- **Hold the row to its path** in the database too: a path that names the row
+  once and last, and is `/<own id>/` exactly when there is no parent, so no
+  writer can store a cycle.
+
+`tenant.tree` (`createApiTenant`) answers `parentOf`, `rootOf`, `ancestorsOf`,
+`descendantsOf` (one port call each, at any depth) and `move(id, parentId)`,
+which refuses a cycle (`TenantTreeError`, code `cycle`) before anything is
+written.
+
+A grant across a tree is your authorization's business, not the package's.
+Keep it distinguishable from a grant on the parent tenant itself: a scope
+that names "the tenants below X" must never be the same string as X's own.
 
 ### The schema and the migration
 
