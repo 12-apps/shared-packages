@@ -1,3 +1,5 @@
+import { OPEN_DELIVERY_MERCHANT_REASON_CODES } from "../open-delivery/reasons";
+
 /**
  * The words the 99Food adapter needs from its host, and nothing else.
  *
@@ -6,25 +8,8 @@
  * `./en-US`); a host passes one by hand, or its own.
  */
 
-/**
- * The cancellation codes a merchant may send, verbatim from Open Delivery
- * v1.7.1 (`RequestCancelled.code`). Pinned by the spec, not estimated. The two
- * codes only the marketplace sends (`CONSUMER_CANCELLATION_REQUESTED`,
- * `OTHER_CANCELLATION_REASON`) are not a store's to choose and are left out.
- */
-export const NINETY_NINE_FOOD_REASON_CODES = [
-  "SYSTEMIC_ISSUES",
-  "DUPLICATE_APPLICATION",
-  "UNAVAILABLE_ITEM",
-  "RESTAURANT_WITHOUT_DELIVERY_PERSON",
-  "OUTDATED_MENU",
-  "ORDER_OUTSIDE_THE_DELIVERY_AREA",
-  "BLOCKED_CUSTOMER",
-  "OUTSIDE_DELIVERY_HOURS",
-  "INTERNAL_DIFFICULTIES_OF_THE_RESTAURANT",
-  "RISK_AREA",
-  "DELIVERY_PROBLEM",
-] as const;
+/** The cancellation codes a merchant may send: Open Delivery v1.7.1's (`../open-delivery/reasons.ts`). */
+export const NINETY_NINE_FOOD_REASON_CODES = OPEN_DELIVERY_MERCHANT_REASON_CODES;
 
 export type NinetyNineFoodReasonCode = (typeof NINETY_NINE_FOOD_REASON_CODES)[number];
 

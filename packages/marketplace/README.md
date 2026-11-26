@@ -3,7 +3,7 @@
 One integration engine for every marketplace a store sells through. Each
 marketplace is an **adapter** on that engine, shipped inside this package at
 its own subpath (`@12-apps/marketplace/ifood`, `@12-apps/marketplace/99food`,
-`@12-apps/marketplace/rappi`).
+`@12-apps/marketplace/keeta`, `@12-apps/marketplace/rappi`).
 
 ```ts
 import { createMarketplaceEngine } from "@12-apps/marketplace";
@@ -59,6 +59,8 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | `@12-apps/marketplace/ifood/pt-BR`, `/en-US` | the iFood adapter's copy packs (reason labels, "no street number") |
 | `@12-apps/marketplace/99food` | `createNinetyNineFoodAdapter({ copy, apiBaseUrl, portalUrl })`, provider `NINETY_NINE_FOOD`, on Open Delivery |
 | `@12-apps/marketplace/99food/pt-BR`, `/en-US` | the 99Food adapter's copy packs |
+| `@12-apps/marketplace/keeta` | `createKeetaAdapter({ copy, apiBaseUrl?, portalUrl?, pauseByStoreSwitch? })`, provider `KEETA`, on Open Delivery; `createKeetaAuthorization()` for the self-serve merchant authorization |
+| `@12-apps/marketplace/keeta/pt-BR`, `/en-US` | the Keeta adapter's copy packs |
 | `@12-apps/marketplace/rappi` | `createRappiAdapter({ copy, apiBaseUrl, tokenUrl, portalUrl, amountUnit })`, provider `RAPPI` |
 | `@12-apps/marketplace/rappi/pt-BR`, `/en-US` | the Rappi adapter's copy packs |
 | `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS` (six: a read and a bulk write per entity), `MARKETPLACE_PERMISSIONS`, the strict Zod inputs |
@@ -136,6 +138,17 @@ there, chosen in the adapter's code and marked so beside it.
 | `X-App-MerchantId` on the notification (the operation lists no header) | ESTIMATED |
 | A product in the document is PUBLISHED once 99Food took the notification, not once it read the menu | choice |
 
+**Keeta — pull, Open Delivery v1.5.0 + Keeta's changes** (`src/keeta/merchant.ts`)
+
+| fact | status |
+|---|---|
+| `POST /v1/merchantUpdate/{merchantId}` (the SOFTWARE's merchant id in the path): an empty body makes Keeta call the host's `GET /v1/merchant` and reload everything; 204 | CONFIRMED — [merchantUpdate](https://api-docs.mykeeta.com/apis/opendelivery/merchantendpoints/merchantupdate) |
+| `entityType` + `updatedObjects` applies only `ITEM_OFFER` / `OPTION` **status** as sent (since v1.0.8); `MENU`, `CATEGORY`, `ITEM`… still reload the whole menu: a product's name, photo and price reach Keeta only through the document, so the adapter is pull, not push | CONFIRMED — same; [general-info](https://api-docs.mykeeta.com/apis/opendelivery/general-info) ("only full-menu update") |
+| The document's `items[].unit` must be `UN`, every item needs a status and a delivery price, `itemOffers[].price.originalValue` is required, `currency`, `lastUpdate` and `TTL` are ignored; `basicInfo.contactEmails` and `contactPhones.commercialNumber` are required (the host's part) | CONFIRMED — [getMerchant](https://api-docs.mykeeta.com/apis/opendelivery/merchantendpoints/getmerchant) |
+| The document's URL is per merchant, registered at onboarding (`getMerchantURL.baseURL`, optional `apiKey`) | CONFIRMED — [putMerchantOnboarding](https://api-docs.mykeeta.com/apis/opendelivery/merchantendpoints/putmerchantonboarding) |
+| An update with no body and no `Content-Type` is read as the documented "empty body" | ESTIMATED |
+| `POST /v1/merchant/image/upload` (an image URL for the menu) | not used: the document carries the host's own `imageUrl` |
+
 **Rappi — not supported** (no `catalogue` on the adapter)
 
 | fact | status |
@@ -200,7 +213,7 @@ reader that day, so what they would settle is ESTIMATED below (the push's
 | An item `type` other than `DEFAULT` (a pizza, a combo) is read as a plain item with `ITEM_TYPE_UNSUPPORTED` | choice |
 | The read covers the merchant-level categories (the DEFAULT, delivery, context); other catalogs and `contextModifiers` prices are not read | ESTIMATED |
 
-99Food and Rappi state no `catalogueReader`: `engine.readCatalogue` answers
+99Food, Keeta and Rappi state no `catalogueReader`: `engine.readCatalogue` answers
 `UNSUPPORTED` for them.
 
 ## iFood is unverified
@@ -218,7 +231,9 @@ iFood: the HTTP client is the host's port.
 99Food completed Open Delivery (Abrasel) adherence, so its adapter speaks
 [Open Delivery v1.7.1](https://abrasel-nacional.github.io/opendelivery/openapi.yaml)
 and is registered as `NINETY_NINE_FOOD`. Its webhook is the engine's one
-route, `POST /webhooks/marketplace/:tenantSlug/NINETY_NINE_FOOD`.
+route, `POST /webhooks/marketplace/:tenantSlug/NINETY_NINE_FOOD`. The standard's
+readers and calls live in `src/open-delivery/`, shared with Keeta; what is
+99Food's (its dialect, copy and ESTIMATED choices) is in `src/99food/`.
 
 ```ts
 import { createNinetyNineFoodAdapter } from "@12-apps/marketplace/99food";
@@ -258,6 +273,83 @@ end to end: event, fetch, ingest, aceite, confirm, cancel, the answer.
 - with no `externalCode`, a line keys on the item id, which may be per order (then each such order adds an unmapped SKU row);
 - that 99Food sends every event by webhook (Open Delivery also allows
   polling, which this adapter does not do).
+
+## Keeta, on Open Delivery
+
+Keeta's API is [Open Delivery v1.5.0 with Keeta's own changes](https://api-docs.mykeeta.com/apis/opendelivery/general-info)
+("the definitions of this document prevail"; `openapi.json` and its
+changelog to v1.0.9, read 2026-11-26). The adapter is built on the same Open
+Delivery module as 99Food's (`src/open-delivery/`: the readers, the token
+grant, the order calls, the menu document, `merchantUpdate`), and is
+registered as `KEETA`. Its webhook is the engine's one route, `POST
+/webhooks/marketplace/:tenantSlug/KEETA`, registered per store as
+`ordersWebhookURL` at onboarding.
+
+```ts
+import { createKeetaAdapter, createKeetaAuthorization } from "@12-apps/marketplace/keeta";
+import { KEETA_ADAPTER_COPY_PT_BR } from "@12-apps/marketplace/keeta/pt-BR";
+
+createKeetaAdapter({ copy: KEETA_ADAPTER_COPY_PT_BR }); // apiBaseUrl and portalUrl default to Keeta's documented ones
+const authorization = createKeetaAuthorization();       // the self-serve merchant authorization calls
+```
+
+What differs from 99Food's v1.7.1, and where the adapter handles it:
+
+| Keeta | 99Food (v1.7.1) | in |
+|---|---|---|
+| **Every request** (the token grant included) carries `X-App-Signature`: Base64 HMAC-SHA256, keyed by the client secret, of the URL without its query + `&k=v` per query parameter sorted by key + `&` + the body, the body compact RFC 8785 JSON (an empty body or `{}` is left out with its `&`) | no request signature | `src/keeta/signature.ts`, `src/keeta/outbound.ts` |
+| The webhook's `X-App-Signature` is Base64 HMAC-SHA256 of the body | lowercase hex | `src/keeta/signature.ts` |
+| Token: JSON `{ client_id, client_secret, grant_type: "app_level_token" }` (v1.0.9; `client_credentials` stays accepted for certified integrations); ONE token per application, for every store that authorized it | form-encoded `client_credentials` | `src/keeta/outbound.ts` |
+| Merchant authorization the software can automate: `GET /oauth/authorization/url`, the redirect's `authId`, `GET /oauth/authorized/{authId}/merchantInfo`, `PUT /v1/merchantOnboarding?merchantId=`, and the authorization webhook (`opType` 1 added, 2 revoked) | none | `src/keeta/authorization.ts` |
+| `merchantUpdate/{merchantId}`: the path names the merchant | `merchantUpdate`, merchant in a header | `src/keeta/merchant.ts` |
+| Menu: full reload only (`ITEM_OFFER` / `OPTION` status excepted) | full reload | `src/keeta/merchant.ts` |
+| Personal data encrypted (`ENC_…`: the phone, the address's district, number, complement, formatted address); `POST /v1/batchDecrypt` (≤ 50 a call) only for the merchant's own delivery | plain | `src/keeta/normalize.ts` |
+| No `CANCELLATION_REQUEST_DENIED`: a request Keeta does not grant is silent, so it ends TIMEOUT at the answer window | the denial event | the adapter's `cancellationAnswerWindowMs` |
+| `outOfStockItems` carries the PDV codes (`externalCode`, Keeta's example `"PDV-1002"`): sent with an item-unavailable reason when the store named the SKUs | item uuids: not sent | `openDeliveryRequestCancellation`'s option |
+| No take-out (`PICKED_UP` "is not sent"), so no `pickedUp`; `delivered` only for the merchant's bag | `pickedUp` for a take-out | `openDeliveryStatus`'s option |
+| One public base URL (`https://open.mykeeta.com/api/open/opendelivery`) and Merchant Portal (`https://merchant.mykeeta.com/`) | given at onboarding: required config | defaults, overridable |
+
+| part | from Keeta's documentation |
+|---|---|
+| Merchant id | A connection's `externalMerchantId` for Keeta is the SOFTWARE's merchant id: the `merchantId` the onboarding binds to `keetaMerchantId`, echoed as `X-App-MerchantId` and `Order.merchant.id`, and the `{merchantId}` of `merchantUpdate`. Keeta's own store id (`keetaMerchantId`, `authorizedShops[].id`) is the onboarding's. "Without onboarding there are no order events"; onboarding the same id again replaces the mapping. |
+| Events | `CREATED` → fetch; `CANCELLED` (its `metadata` a JSON string with `reason`, `code`) → cancelled; `DISPATCHED`, `CONCLUDED` → lifecycle; the rest (`CONFIRMED`, `READY_FOR_PICKUP`, `PICKUP_ONGOING`, `RIDER_ARRIVED_AT_STORE`, `ORDER_COLLECTED`, `DELIVERED`, `CANCELLATION_REQUESTED`, the refund events, `RECOMMENDED_PREPARATION_START`) recorded and IGNORED. Keeta retries an unanswered webhook 3 times (1, 2 and 3 minutes later). |
+| Confirm | `POST /v1/orders/{id}/confirm` `{ createdAt, orderExternalCode, preparationTime? }`; 202, then `CONFIRMED`; 422 "invalid or repeated state". Keeta cancels an order not accepted within 5 minutes and may close the store for it: a connection's acknowledgement window should be at most 300 s. |
+| Cancel | `POST /v1/orders/{id}/requestCancellation` `{ reason, code, mode, outOfStockItems? }` with Keeta's eleven v1.0.7+ codes (the standard's); 202 "received for analysis", then `CANCELLED` or nothing. |
+| Order | The standard's `Order`; `total.orderAmount` = items + fees − discounts is the total, no commission (`commissionCents` null). An encrypted value Keeta would not reveal (its own fleet, a refused or failed decrypt) is dropped, never shown: the number reads the copy's missing-number text, the phone is null. A failed decrypt never keeps the order out of the queue. |
+
+The fixtures are Keeta's own examples (`src/keeta/__tests__/fixtures.ts`: the
+Brazilian order of `orderDetails`' appendix, `newEvent`, `merchantInfo`, the
+authorization webhook, the signature-string examples).
+`src/keeta/__tests__/engine.test.ts` drives the engine through the adapter end
+to end; `src/keeta/__tests__/keeta.test.ts` pins every request's shape and
+signature.
+
+**ESTIMATED, to be checked in Keeta's SIT:**
+
+- the SANDBOX base URL: Keeta documents one host, and a test application (its
+  own client id and secret, its test stores) is what makes a session a test
+  one, so both environments default to it;
+- query values are signed DECODED (only the authorization calls send one, and
+  only `redirectUri` changes under encoding);
+- the webhook signature covers the raw body as received; the authorization
+  webhook uses the same Base64 HMAC (its schema says only "SHA256 hash of the
+  body"); the answer it wants is `{ code: 0, message: "success" }`
+  (`KEETA_AUTHORIZATION_WEBHOOK_ANSWER`: "JSON with `code` and `message`");
+- the cancellation answer window, 5 minutes (Keeta names none, and sends no
+  denial);
+- `outOfStockItems` reads PDV codes (the example's), not Keeta's item ids;
+- `OrderConfirmed.createdAt` is sent as the moment of the confirmation (as
+  for 99Food; Keeta's example shows a minute after the order);
+- a `batchDecrypt` entry with no `errorCode` is a success; decrypt runs only
+  when `delivery.deliveredBy` is `MERCHANT`;
+- an empty-body `merchantUpdate` is sent with no `Content-Type`;
+- that Keeta sends every event by webhook: polling (`GET /v1/events:polling`,
+  2 a minute, with acknowledgement) is not done by this adapter, though Keeta
+  recommends it as a fallback.
+
+Out of scope: refunds (`USER_REFUND_REQUEST`, `acceptRefund`, `rejectRefund`),
+tracking (`POST /v1/orders/{id}/tracking`), the image upload, and serving
+`GET /v1/merchant` and the authorization webhook, which are host routes.
 
 ## Rappi, from its public developer portal
 
@@ -397,11 +489,11 @@ then it claims the row (STORE, SENDING, unique per (order, step)) and calls
 FAILED. A SENDING row left by a dead job is re-queued by the outbound sweep
 after 10 minutes and failed after 24 hours.
 
-| step | iFood (ESTIMATED) | 99Food (Open Delivery v1.7.1) | Rappi |
-|---|---|---|---|
-| READY | `POST /orders/{id}/readyToPickup`, not for a merchant bag | `POST /v1/orders/{id}/readyForPickup` | `POST /orders/{id}/ready-for-pickup` (ESTIMATED verb; MANUAL-notification stores only) |
-| DISPATCHED | `POST /orders/{id}/dispatch`, merchant bag only | `POST /v1/orders/{id}/dispatch`, merchant bag only | none |
-| HANDED_OVER | none | merchant bag `delivered`, take-out `pickedUp`, fleet none | none |
+| step | iFood (ESTIMATED) | 99Food (Open Delivery v1.7.1) | Keeta | Rappi |
+|---|---|---|---|---|
+| READY | `POST /orders/{id}/readyToPickup`, not for a merchant bag | `POST /v1/orders/{id}/readyForPickup` | `POST /v1/orders/{id}/readyForPickup` | `POST /orders/{id}/ready-for-pickup` (ESTIMATED verb; MANUAL-notification stores only) |
+| DISPATCHED | `POST /orders/{id}/dispatch`, merchant bag only | `POST /v1/orders/{id}/dispatch`, merchant bag only | `POST /v1/orders/{id}/dispatch`, merchant bag only | none |
+| HANDED_OVER | none | merchant bag `delivered`, take-out `pickedUp`, fleet none | merchant bag `delivered`; no take-out (`PICKED_UP` is never sent), fleet none | none |
 
 Sources: Open Delivery `openapi.yaml` (read 2026-11-25), Rappi's portal
 "Managing User Orders" (read 2026-11-25); iFood's developer portal answered 403,
@@ -458,6 +550,8 @@ marketplace's sandbox.
 | 99Food | `merchantStatus` has no end ("you don't know when the service will be re-established"): a switch | CONFIRMED for the standard | same |
 | 99Food | The path is `/v1/merchantUpdate` (the spec files the webhook under the key `/v1/menuUpdated`, while its description and route table say `POST /v1/merchantUpdate`) | ESTIMATED | same |
 | 99Food | 99Food implements `merchantUpdate`, and the token names the merchant (the body names none) | ESTIMATED | none public for 99Food |
+| Keeta | `POST /v1/merchantUpdate/{merchantId}` with only `merchantStatus` (`AVAILABLE`/`UNAVAILABLE`) opens or closes the store "without reloading the menu"; 204, 400, 401, 503; `merchantStatus` beside `entityType` makes Keeta ignore the rest | CONFIRMED | [merchantUpdate](https://api-docs.mykeeta.com/apis/opendelivery/merchantendpoints/merchantupdate) |
+| Keeta | No end, no id: a switch, offered only with `pauseByStoreSwitch: true`; the store's open state also depends on its hours and items | CONFIRMED | same |
 | 99Food | The marketplace PULLING the status (`GET /v1/merchant/{id}/status`, host: the software) | Not used: the engine pushes, and serving the status is a host route this package does not ship | same spec |
 
 ### Failure codes

@@ -1,6 +1,7 @@
-import { answered, outboundResultOf, type AdapterCallContext, type OutboundResult } from "../core/adapter";
+import type { AdapterCallContext, OutboundResult } from "../core/adapter";
 import type { MarketplaceAvailability } from "../core/pause-port";
-import { baseOf, bearer, tokenKey, type NinetyNineFoodApiBaseUrls } from "./outbound";
+import { openDeliveryMerchantUpdate, openDeliverySwitchAvailability } from "../open-delivery/merchant";
+import { ninetyNineFoodDialect, type NinetyNineFoodApiBaseUrls } from "./outbound";
 
 /**
  * 99Food's half of the store pause (FUT-4851), on Open Delivery v1.7.1: the
@@ -28,29 +29,13 @@ export function openDeliverySetMerchantStatus(
   bases: NinetyNineFoodApiBaseUrls,
   status: "AVAILABLE" | "UNAVAILABLE",
 ): Promise<OutboundResult> {
-  return answered(async () => {
-    const auth = await bearer(ctx, bases);
-    if (!("token" in auth)) return auth;
-    const response = await ctx.http({
-      method: "POST",
-      url: `${baseOf(ctx, bases)}/v1/merchantUpdate`,
-      headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ merchantStatus: status }),
-    });
-    if (response.status !== 401) return outboundResultOf(response);
-    ctx.tokens.delete(tokenKey(ctx));
-    return { kind: "retry", reason: "99Food refused the token" };
+  return openDeliveryMerchantUpdate(ctx, ninetyNineFoodDialect(bases), {
+    path: "/v1/merchantUpdate",
+    body: { merchantStatus: status },
   });
 }
 
 /** 99Food's availability capability: Open Delivery's merchant status, a switch. */
 export function openDeliveryAvailability(bases: NinetyNineFoodApiBaseUrls): MarketplaceAvailability {
-  return {
-    kind: "switch",
-    pause: async (ctx, request) => {
-      const result = await openDeliverySetMerchantStatus(ctx, bases, "UNAVAILABLE");
-      return result.kind === "accepted" ? { kind: "paused", externalId: null, until: request.until } : result;
-    },
-    resume: (ctx) => openDeliverySetMerchantStatus(ctx, bases, "AVAILABLE"),
-  };
+  return openDeliverySwitchAvailability((ctx, _merchantId, status) => openDeliverySetMerchantStatus(ctx, bases, status));
 }
