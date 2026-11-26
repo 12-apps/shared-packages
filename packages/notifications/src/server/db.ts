@@ -27,7 +27,9 @@ import type { ChannelConsentDelegate, SendCounterDelegate } from './consent-db';
 // ---------------------------------------------------------------------------
 
 export interface NotificationCreateData {
-  userId: string;
+  /** `null` only for a GUEST row, which carries {@link NotificationCreateData.recipientPhone} instead. */
+  userId: string | null;
+  recipientPhone?: string | null;
   clientId: string | null;
   side: string | null;
   type: string;

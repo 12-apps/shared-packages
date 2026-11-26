@@ -399,6 +399,24 @@ sweep — endpoints and screens included.
       resolver that throws, or a counter statement that fails, drops the paid
       channels of that emit; the inbox row and the free channels are still
       written. A seam without `notificationSendCounter` is reported at mount.
+    - **A GUEST — a phone with no account — is told with `api.notifyGuest({
+      type, recipient: { phone, clientId, locale? }, payload })`.** Your call is
+      the consent decision (the person asked, in person, to be told on this
+      phone about this one thing), so what a guest may get is narrower than an
+      account: only the paid phone channels the TYPE declares in `channels`
+      (required; a type that declares none is refused), none in
+      `requireConsent` (a guest cannot confirm), the store's `channelPolicy`,
+      never past a STOP the number gave (any account's, or the guest's own:
+      an inbound opt-out or a provider refusal of the number records a guest
+      row by number), and within `caps` — the day counted on
+      `guest:<E.164>`, the store's month as usual. Preferences and
+      `emitChannelFilter` are not consulted (a guest has none, and your hook
+      reads an account). The row has no `userId` and the number in
+      `recipientPhone`: it is in nobody's inbox, `onCommitted` is not told, and
+      a transport sees `recipient.guest === true` with `userId: ''`. It needs
+      `consent` configured, and rejects otherwise. Schema: migration
+      `20261126160000_guest_phone_recipient` (expand-only) makes both
+      `user_id` columns nullable; a NULL passes your `user_id → users` FK.
     - **Two more routes** (`/phone-confirmation/resend`, `/phone-confirmation/code`)
       are mounted when `consent` is configured; they are cookie-authenticated
       writes like the rest (rule 13).

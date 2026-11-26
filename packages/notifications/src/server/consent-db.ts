@@ -22,7 +22,8 @@ export type ChannelConsentMethod = 'REPLY' | 'CODE' | 'GRANDFATHERED';
  */
 export interface ChannelConsentRow {
   id: string;
-  userId: string;
+  /** The account, or `null` on a GUEST row: a number with no account that said stop. */
+  userId: string | null;
   channel: string;
   /** E.164. Consent belongs to this NUMBER on this channel. */
   destination: string;
@@ -54,7 +55,7 @@ export interface ChannelConsentRow {
  */
 export interface ChannelConsentWhere {
   id?: string | { in: string[] };
-  userId?: string;
+  userId?: string | null;
   channel?: string | { in: string[] };
   destination?: string;
   status?: ChannelConsentStatus | { in: ChannelConsentStatus[] };
@@ -67,11 +68,14 @@ export interface ChannelConsentWhere {
 }
 
 export interface ChannelConsentCreateData {
-  userId: string;
+  userId: string | null;
   channel: string;
   destination: string;
   status: ChannelConsentStatus;
   method: ChannelConsentMethod;
+  /** Set only on a guest's STOP row, which is created opted out. */
+  optedOutAt?: Date;
+  consentExternalId?: string | null;
 }
 
 export interface ChannelConsentUpdateData {

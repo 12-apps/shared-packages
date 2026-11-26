@@ -71,7 +71,8 @@ export interface DeliveryReceiptInput {
 export interface AppliedDeliveryReceipt {
   deliveryId: string;
   notificationId: string;
-  userId: string;
+  /** The account, or `null` for a GUEST send (`notifyGuest`). */
+  userId: string | null;
   channel: PaidChannel;
   status: 'DELIVERED' | 'UNDELIVERED';
   at: Date;
@@ -106,7 +107,8 @@ async function afterApplied(
   const notification = await client.notification.findUnique({ where: { id: row.notificationId } });
   if (!notification) return;
   const permanent = status === 'UNDELIVERED' && input.permanent === true;
-  if (permanent) await dropGrandfathered(client, notification.userId, input.channel);
+  // A guest has nothing grandfathered: a bad number simply stays DEAD.
+  if (permanent && notification.userId !== null) await dropGrandfathered(client, notification.userId, input.channel);
   try {
     deps.onDeliveryReceipt?.({
       deliveryId: row.id,

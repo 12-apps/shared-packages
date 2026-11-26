@@ -32,6 +32,8 @@ export {
   type NotificationGenerator,
   type NotificationLogger,
   type NotificationRecipient,
+  type NotificationGuestRecipient,
+  type NotificationGuestEvent,
   type NotificationTaxonomy,
   type NotificationTransport,
   type TransportRecipient,

@@ -33,7 +33,10 @@ export interface ListNotificationsResult {
 /** A stored notification row, as the db seam hands it back. */
 export interface NotificationRow {
   id: string;
-  userId: string;
+  /** The account, or `null` on a GUEST row (`notifyGuest`), which is in nobody's inbox. */
+  userId: string | null;
+  /** A guest row's phone (E.164); absent or `null` on every account row. */
+  recipientPhone?: string | null;
   clientId: string | null;
   /** The side this row is for (`customer`, `staff` — host vocabulary); `null` = unclassified. */
   side: string | null;
