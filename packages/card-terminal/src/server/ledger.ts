@@ -1,10 +1,5 @@
-import {
-  MOVE_ATTEMPTS,
-  REFUSALS,
-  bindDecision,
-  markDecision,
-  versionOf,
-} from './decisions';
+import { MOVE_ATTEMPTS, REFUSALS, bindDecision, markDecision, releaseHold, versionOf } from './decisions';
+import { captureHolds, type TerminalCaptureHolds } from './holds';
 import {
   CaptureError,
   UNBOUND_ONLY_REASONS,
@@ -92,7 +87,7 @@ export interface DeviceCaptureAnswer {
   refundFlagged: boolean;
 }
 
-export interface TerminalCaptureLedger<TTx = unknown> {
+export interface TerminalCaptureLedger<TTx = unknown> extends TerminalCaptureHolds<TTx> {
   readonly maxAmountCents: number;
   readonly unboundRefundAfterMs: number;
   /**
@@ -129,9 +124,10 @@ export interface TerminalCaptureLedger<TTx = unknown> {
    * it. A replay naming the same sale is a no-op, and so is one that finds the
    * capture already BOUND to it. Another sale is `BOUND_ELSEWHERE`; a capture
    * flagged for any refund but the timeout's is `FLAGGED`, as `bind` would
-   * answer it.
+   * answer it. A capture held for a sale context other than `holdKey` (or for
+   * any, when it is absent) is `BOUND_ELSEWHERE`.
    */
-  markSaleCreated(tx: TTx, key: CaptureKey, orderId: string): Promise<TerminalCaptureRecord>;
+  markSaleCreated(tx: TTx, key: CaptureKey, orderId: string, holdKey?: string): Promise<TerminalCaptureRecord>;
   /**
    * -> BOUND: the captures become legs of the sale's payment row, in the
    * transaction that claims that row. A capture UNBOUND or ORDER_CREATED for
@@ -261,7 +257,13 @@ async function record<TTx>(
   return { capture: row, created: inserted };
 }
 
-async function markSaleCreated<TTx>(engine: Engine<TTx>, tx: TTx, key: CaptureKey, orderId: string): Promise<TerminalCaptureRecord> {
+async function markSaleCreated<TTx>(
+  engine: Engine<TTx>,
+  tx: TTx,
+  key: CaptureKey,
+  orderId: string,
+  holdKey?: string,
+): Promise<TerminalCaptureRecord> {
   const { clientId, transactionCode } = key;
   if (!(await engine.sales.saleBelongs(tx, clientId, orderId))) {
     throw new CaptureError('SALE_MISMATCH', transactionCode, REFUSALS.SALE_MISMATCH);
@@ -269,10 +271,10 @@ async function markSaleCreated<TTx>(engine: Engine<TTx>, tx: TTx, key: CaptureKe
   const store = engine.storeFor(tx);
   for (let attempt = 0; attempt < MOVE_ATTEMPTS; attempt += 1) {
     const current = await readOrRefuse(store, clientId, transactionCode);
-    const decision = markDecision(current, orderId);
+    const decision = markDecision(current, orderId, holdKey);
     if (decision === 'replay') return current;
     if (decision !== 'mark') throw new CaptureError(decision, transactionCode, REFUSALS[decision]);
-    const after = await landOn(store, current, { state: 'ORDER_CREATED', orderId });
+    const after = await landOn(store, current, { state: 'ORDER_CREATED', orderId, ...releaseHold(current) });
     if (after) return after;
   }
   throw new CaptureError('CONTENDED', transactionCode, REFUSALS.CONTENDED);
@@ -298,6 +300,7 @@ async function bindOne(store: TerminalCaptureStore, clientId: string, code: stri
       orderId: target.orderId,
       paymentId: target.paymentId,
       ...(decision.clearFlag ? { refundClearedAt: now } : {}),
+      ...releaseHold(current),
     });
     if (after) return { record: after, moved: true };
     // Changed since the read (a racing bind, a flag): read and decide again.
@@ -377,7 +380,8 @@ export function createTerminalCaptureLedger<TTx = unknown>(config: TerminalCaptu
       if (deviceIds.length === 0) return [];
       return storeFor(tx).findUnclaimed(clientId, [...new Set(deviceIds)]);
     },
-    markSaleCreated: (tx, key, orderId) => markSaleCreated(engine, tx, key, orderId),
+    ...captureHolds(storeFor),
+    markSaleCreated: (tx, key, orderId, holdKey) => markSaleCreated(engine, tx, key, orderId, holdKey),
     bind: async (tx, clientId, codes, target, now = clock()) => (await bind(engine, tx, clientId, codes, target, now)).bound,
     bindReporting: (tx, clientId, codes, target, now = clock()) => bind(engine, tx, clientId, codes, target, now),
     flag: (key, reason, now = clock(), tx) => flag(engine, key, reason, now, tx),

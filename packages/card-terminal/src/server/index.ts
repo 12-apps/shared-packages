@@ -71,6 +71,7 @@ export {
   type TerminalCaptureLedger,
   type TerminalCaptureLedgerConfig,
 } from './ledger';
+export { type TerminalCaptureHolds } from './holds';
 export {
   createTerminalLegs,
   wireOf,
@@ -90,11 +91,14 @@ export {
   type SaleCapture,
 } from './binder';
 export {
+  CAPTURE_HOLD_SELECT,
   CAPTURE_SELECT,
   createPrismaTerminalCaptureStore,
   prismaTerminalCaptureStoreFor,
   type CaptureRow,
+  type CaptureSelect,
   type PrismaTerminalCaptureClient,
+  type PrismaTerminalCaptureStoreOptions,
   type TerminalCaptureDelegate,
 } from './prisma-store';
 export { createMemoryTerminalCaptureStore, type MemoryTerminalCaptures } from './memory-store';
@@ -145,6 +149,13 @@ export {
   type ExcessSale,
   type ExcessSettled,
 } from './capture-excess';
+export {
+  CAPTURE_REFUSAL_REASONS,
+  decideCaptureRefusal,
+  type CaptureRefusalDecision,
+  type CaptureRefusalInput,
+  type CaptureRefusalReason,
+} from './capture-refusal';
 export {
   createTypedCaptureClaims,
   heldAnswer,

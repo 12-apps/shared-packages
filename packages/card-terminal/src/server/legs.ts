@@ -1,4 +1,4 @@
-import { owedBackForGood } from './decisions';
+import { heldElsewhere, owedBackForGood } from './decisions';
 import {
   CaptureError,
   clampToNow,
@@ -67,17 +67,19 @@ export interface TerminalLegs<TTx = unknown> {
    * The request's codes as the tenant holds them, read before anything is
    * written: refused when one conflicts, is flagged, names another tenant's
    * terminal, or when they name more than one sale; otherwise the sale they
-   * name (`null`: none, a new sale).
+   * name (`null`: none, a new sale). A capture held for a sale context other
+   * than `holdKey` (or for any, when it is absent) is `BOUND_ELSEWHERE`.
    */
-  held(clientId: string, captures: readonly StationCaptureWire[]): Promise<HeldCaptures>;
+  held(clientId: string, captures: readonly StationCaptureWire[], holdKey?: string): Promise<HeldCaptures>;
   /** Every one of the request's codes is BOUND to `orderId`: the request already settled it. */
   allBoundTo(held: Extract<HeldCaptures, { ok: true }>, captures: readonly StationCaptureWire[], orderId: string): boolean;
   /**
    * A settle of an existing sale: refused when a code names another sale;
    * `ALL_BOUND` when every one is already BOUND to this sale; otherwise
-   * `PROCEED`. No read at all for a sale with no terminal leg.
+   * `PROCEED`. No read at all for a sale with no terminal leg. `holdKey`: the
+   * sale context this sale settles, as {@link held}.
    */
-  heldForSale(clientId: string, orderId: string, captures: readonly StationCaptureWire[]): Promise<HeldForSale>;
+  heldForSale(clientId: string, orderId: string, captures: readonly StationCaptureWire[], holdKey?: string): Promise<HeldForSale>;
   /**
    * Record the request's captures before the sale is written, so the tenant
    * can reconcile — and the sweep flag — a capture whose sale is then
@@ -88,15 +90,18 @@ export interface TerminalLegs<TTx = unknown> {
    * UNBOUND -> ORDER_CREATED for each capture, in the sale's create
    * transaction: written and marked together, or neither. A capture another
    * sale took meanwhile throws its {@link CaptureError}, which rolls the
-   * create back.
+   * create back. `holdKey`: the sale context this sale settles; a capture
+   * held for another (or for any, when absent) throws `BOUND_ELSEWHERE`.
    */
-  markCreatedIn(tx: TTx, clientId: string, captures: readonly StationCaptureWire[], orderId: string): Promise<void>;
+  markCreatedIn(tx: TTx, clientId: string, captures: readonly StationCaptureWire[], orderId: string, holdKey?: string): Promise<void>;
   /**
    * The settle's hook: record each capture again (a no-op once recorded) and
    * bind them all to the payment row. `undefined` for a sale with none, so
-   * every other settle is the settle it always was.
+   * every other settle is the settle it always was. `holdKey`: the sale
+   * context this sale settles; its held captures are bound and let go, one
+   * held for another context (or for any, when absent) throws `BOUND_ELSEWHERE`.
    */
-  bindingFor(clientId: string, orderId: string, captures: readonly StationCaptureWire[]): CaptureBinding<TTx> | undefined;
+  bindingFor(clientId: string, orderId: string, captures: readonly StationCaptureWire[], holdKey?: string): CaptureBinding<TTx> | undefined;
   /**
    * After a claim this request LOST: whether every one of its codes is now
    * BOUND to `orderId` — a concurrent twin settled it with these very
@@ -116,9 +121,20 @@ export interface TerminalLegs<TTx = unknown> {
    * back, as the wire a terminal leg sends, oldest first: money a counter
    * already received and may still use for a sale ("received, no sale"), so a
    * buyer is never charged again after a reload. Unused, they keep the sweep's
-   * window. One read; none for no terminal.
+   * window. A capture held for a sale context is left out: it is that
+   * context's money (`heldFor`). One read; none for no terminal.
    */
   unclaimed(clientId: string, deviceIds: readonly string[]): Promise<StationCaptureWire[]>;
+  /**
+   * The captures held for a sale context (`ledger.hold`, after a settle refused
+   * them because the bill grew), as the wire a terminal leg resends, oldest
+   * first: ANY terminal settling that context — not only the one that took
+   * them — is offered them as money already received, and
+   * charges only the rest. A flagged capture is never offered. The settle that
+   * binds them lets go of the hold. One read. Throws when the ledger's store
+   * keeps no holds (`ledger.holdsReady`).
+   */
+  heldFor(clientId: string, holdKey: string): Promise<StationCaptureWire[]>;
   /** A move the record refused mid-request, as its code. */
   refusalCodeOf(error: CaptureError): CaptureNotBoundReason;
 }
@@ -131,11 +147,13 @@ export interface TerminalLegsConfig<TTx = unknown> {
 }
 
 /** Why a held capture cannot pay this request — or `null` when it can. */
-function heldRefusal(record: TerminalCaptureRecord, sent: StationCaptureWire | undefined): CaptureNotBoundReason | null {
+function heldRefusal(record: TerminalCaptureRecord, sent: StationCaptureWire | undefined, holdKey?: string): CaptureNotBoundReason | null {
   if (sent === undefined) return null;
   if (record.amountCents !== sent.amountCents || record.kind !== sent.kind) return 'CONFLICT';
   // Two terminals cannot have taken one capture: when both sides name one, they are the same.
   if (record.deviceId !== null && sent.deviceId != null && record.deviceId !== sent.deviceId) return 'CONFLICT';
+  // Money held for another sale context is that context's.
+  if (heldElsewhere(record, holdKey)) return 'BOUND_ELSEWHERE';
   return owedBackForGood(record) ? 'FLAGGED' : null;
 }
 
@@ -189,12 +207,17 @@ async function devicesAreTheTenants<TTx>(
   return directory.devicesBelong(clientId, ids);
 }
 
-async function held<TTx>(config: TerminalLegsConfig<TTx>, clientId: string, captures: readonly StationCaptureWire[]): Promise<HeldCaptures> {
+async function held<TTx>(
+  config: TerminalLegsConfig<TTx>,
+  clientId: string,
+  captures: readonly StationCaptureWire[],
+  holdKey?: string,
+): Promise<HeldCaptures> {
   if (!(await devicesAreTheTenants(config.directory, clientId, captures))) return { ok: false, code: 'DEVICE_UNKNOWN' };
   const records = await config.ledger.findByCodes(clientId, codesOf(captures));
   const sent = new Map(captures.map((capture) => [capture.transactionCode, capture]));
   for (const record of records) {
-    const refusal = heldRefusal(record, sent.get(record.transactionCode));
+    const refusal = heldRefusal(record, sent.get(record.transactionCode), holdKey);
     if (refusal !== null) return { ok: false, code: refusal };
   }
   const orders = new Set(records.flatMap((record) => (record.orderId === null ? [] : [record.orderId])));
@@ -220,9 +243,10 @@ async function heldForSale<TTx>(
   clientId: string,
   orderId: string,
   captures: readonly StationCaptureWire[],
+  holdKey?: string,
 ): Promise<HeldForSale> {
   if (captures.length === 0) return { kind: 'PROCEED' };
-  const found = await held(config, clientId, captures);
+  const found = await held(config, clientId, captures, holdKey);
   if (!found.ok) return { kind: 'REFUSED', code: found.code };
   if (found.orderId === null) return { kind: 'PROCEED' };
   if (found.orderId !== orderId) return { kind: 'REFUSED', code: 'BOUND_ELSEWHERE' };
@@ -234,9 +258,9 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
 
   return {
     capturesOf: (tenders) => tenders.flatMap((leg) => (leg.capture === undefined ? [] : [leg.capture])),
-    held: (clientId, captures) => held(config, clientId, captures),
+    held: (clientId, captures, holdKey) => held(config, clientId, captures, holdKey),
     allBoundTo,
-    heldForSale: (clientId, orderId, captures) => heldForSale(config, clientId, orderId, captures),
+    heldForSale: (clientId, orderId, captures, holdKey) => heldForSale(config, clientId, orderId, captures, holdKey),
     async recordStation(clientId, captures, tx) {
       try {
         await recordAll(config, clientId, captures, tx);
@@ -246,16 +270,16 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
         return notBoundReasonOf(error);
       }
     },
-    async markCreatedIn(tx, clientId, captures, orderId) {
-      for (const capture of captures) await ledger.markSaleCreated(tx, { clientId, transactionCode: capture.transactionCode }, orderId);
+    async markCreatedIn(tx, clientId, captures, orderId, holdKey) {
+      for (const capture of captures) await ledger.markSaleCreated(tx, { clientId, transactionCode: capture.transactionCode }, orderId, holdKey);
     },
-    bindingFor(clientId, orderId, captures) {
+    bindingFor(clientId, orderId, captures, holdKey) {
       if (captures.length === 0) return undefined;
       const codes = codesOf(captures);
       return {
         bind: async (tx, paymentId) => {
           await recordAll(config, clientId, captures, tx);
-          await ledger.bind(tx, clientId, codes, { orderId, paymentId });
+          await ledger.bind(tx, clientId, codes, { orderId, paymentId, ...(holdKey === undefined ? {} : { holdKey }) });
         },
       };
     },
@@ -273,6 +297,7 @@ export function createTerminalLegs<TTx = unknown>(config: TerminalLegsConfig<TTx
       return byOrder;
     },
     unclaimed: async (clientId, deviceIds) => (await ledger.findUnclaimed(clientId, deviceIds)).map(wireOf),
+    heldFor: async (clientId, holdKey) => (await ledger.findHeld(clientId, holdKey)).map(wireOf),
     refusalCodeOf: notBoundReasonOf,
   };
 }

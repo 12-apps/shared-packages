@@ -16,6 +16,11 @@ import type { CapturePatch, CaptureVersion, NewTerminalCapture, StaleHeldCursor,
  * `(client_id, transaction_code)`, with partial indexes on the UNBOUND and the
  * ORDER_CREATED rows by `captured_at` for the sweep, and a `created_at` the
  * database writes; the column names are the ones below.
+ *
+ * Holds (`hold`, `findHeld`) are opt-in: `{ holds: true }` says the host's
+ * table maps a nullable `hold_key` column (`holdKey` on the model), and only
+ * then does the store select it, write it and answer `findHeld`. Without it
+ * the store never names the column, so a table migrated before it still works.
  */
 
 export const CAPTURE_SELECT = {
@@ -42,6 +47,17 @@ export const CAPTURE_SELECT = {
   refundClearedAt: true,
 } as const;
 
+/** {@link CAPTURE_SELECT} with the hold, for a table that maps `hold_key` (`{ holds: true }`). */
+export const CAPTURE_HOLD_SELECT = { ...CAPTURE_SELECT, holdKey: true } as const;
+
+/** What the store selects: the hold only when the table maps it. */
+export type CaptureSelect = typeof CAPTURE_SELECT | typeof CAPTURE_HOLD_SELECT;
+
+export interface PrismaTerminalCaptureStoreOptions {
+  /** The table maps a nullable `hold_key` column (`holdKey`): the store keeps holds. Default: false. */
+  holds?: boolean;
+}
+
 /** The row as Prisma returns it under {@link CAPTURE_SELECT}: the sets are TEXT columns held by CHECKs. */
 export interface CaptureRow extends Omit<TerminalCaptureRecord, 'kind' | 'state' | 'source'> {
   kind: string;
@@ -60,7 +76,8 @@ const NOT_OWED_BACK = [...NOT_LIVE, { refundReason: 'UNBOUND_TIMEOUT' }] as cons
 type CaptureFindManyWhere =
   | { clientId: string; transactionCode: { in: string[] } }
   | { clientId: string; orderId: { in: string[] }; state: 'ORDER_CREATED' }
-  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; OR: typeof NOT_OWED_BACK }
+  | { clientId: string; deviceId: { in: string[] }; state: 'UNBOUND'; holdKey?: null; OR: typeof NOT_OWED_BACK }
+  | { clientId: string; holdKey: string; state: 'UNBOUND'; OR: typeof NOT_LIVE }
   | {
       state: 'ORDER_CREATED';
       capturedAt: { lte: Date };
@@ -80,13 +97,13 @@ export interface TerminalCaptureDelegate {
   createMany(args: { data: NewTerminalCapture[]; skipDuplicates: true }): PromiseLike<{ count: number }>;
   findUnique(args: {
     where: { clientId_transactionCode: { clientId: string; transactionCode: string } };
-    select: typeof CAPTURE_SELECT;
+    select: CaptureSelect;
   }): PromiseLike<CaptureRow | null>;
   findMany(args: {
     where: CaptureFindManyWhere;
     orderBy?: { capturedAt: 'asc' } | readonly [{ capturedAt: 'asc' }, { id: 'asc' }];
     take?: number;
-    select: typeof CAPTURE_SELECT;
+    select: CaptureSelect;
   }): PromiseLike<CaptureRow[]>;
   updateMany(args: { where: CaptureUpdateWhere; data: CapturePatch }): PromiseLike<{ count: number }>;
 }
@@ -126,18 +143,49 @@ async function flagStaleUnbound(prisma: PrismaTerminalCaptureClient, now: Date, 
 
 type ClientSource = PrismaTerminalCaptureClient | (() => PrismaTerminalCaptureClient | Promise<PrismaTerminalCaptureClient>);
 
-/** The store over one client. A function is resolved on every call, for a host whose client is built lazily. */
-export function createPrismaTerminalCaptureStore(source: ClientSource): TerminalCaptureStore {
+/** A move's predicate: the row as it was read, the hold only when the move names it. */
+function versionWhere(seen: CaptureVersion): CaptureUpdateWhere {
+  const { id, state, orderId, refundFlaggedAt, refundClearedAt, awaitingReport, holdKey } = seen;
+  return {
+    id,
+    state,
+    orderId,
+    refundFlaggedAt,
+    refundClearedAt,
+    ...(awaitingReport ? AWAITING_REPORT : {}),
+    ...(holdKey === undefined ? {} : { holdKey }),
+  };
+}
+
+/** The held captures of one sale context: UNBOUND, flag not live, oldest first. */
+async function findHeld(prisma: PrismaTerminalCaptureClient, clientId: string, holdKey: string): Promise<TerminalCaptureRecord[]> {
+  const rows = await prisma.terminalCapture.findMany({
+    where: { clientId, holdKey, state: 'UNBOUND', OR: NOT_LIVE },
+    orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
+    select: CAPTURE_HOLD_SELECT,
+  });
+  return rows.map(toRecord);
+}
+
+/**
+ * The store over one client. A function is resolved on every call, for a host
+ * whose client is built lazily. `{ holds: true }` when the table maps
+ * `hold_key` ({@link PrismaTerminalCaptureStoreOptions}).
+ */
+export function createPrismaTerminalCaptureStore(source: ClientSource, options: PrismaTerminalCaptureStoreOptions = {}): TerminalCaptureStore {
   const client = async (): Promise<PrismaTerminalCaptureClient> => (typeof source === 'function' ? source() : source);
+  const select: CaptureSelect = options.holds ? CAPTURE_HOLD_SELECT : CAPTURE_SELECT;
   const find = async (clientId: string, transactionCode: string): Promise<TerminalCaptureRecord | null> => {
     const row = await (await client()).terminalCapture.findUnique({
       where: { clientId_transactionCode: { clientId, transactionCode } },
-      select: CAPTURE_SELECT,
+      select,
     });
     return row ? toRecord(row) : null;
   };
+  const holds = options.holds ? { findHeld: async (clientId: string, holdKey: string) => findHeld(await client(), clientId, holdKey) } : {};
 
   return {
+    ...holds,
     async insertIfAbsent(row) {
       const inserted = await (await client()).terminalCapture.createMany({ data: [row], skipDuplicates: true });
       return inserted.count === 1;
@@ -146,16 +194,12 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
     async findMany(clientId, transactionCodes) {
       const rows = await (await client()).terminalCapture.findMany({
         where: { clientId, transactionCode: { in: [...transactionCodes] } },
-        select: CAPTURE_SELECT,
+        select,
       });
       return rows.map(toRecord);
     },
     async writeIfUnchanged(seen, patch) {
-      const { id, state, orderId, refundFlaggedAt, refundClearedAt, awaitingReport } = seen;
-      const written = await (await client()).terminalCapture.updateMany({
-        where: { id, state, orderId, refundFlaggedAt, refundClearedAt, ...(awaitingReport ? AWAITING_REPORT : {}) },
-        data: patch,
-      });
+      const written = await (await client()).terminalCapture.updateMany({ where: versionWhere(seen), data: patch });
       return written.count === 1;
     },
     async flagIfNotLive(clientId, transactionCode, flag, unboundOnly) {
@@ -180,15 +224,16 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
         where: { state: 'ORDER_CREATED', capturedAt: { lte: cutoff }, createdAt: { lte: cutoff }, AND: [{ OR: NOT_LIVE }, ...past] },
         orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
         take: limit,
-        select: CAPTURE_SELECT,
+        select,
       });
       return rows.map(toRecord);
     },
     async findUnclaimed(clientId, deviceIds) {
       const rows = await (await client()).terminalCapture.findMany({
-        where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', OR: NOT_OWED_BACK },
+        // A held capture is its sale context's money, never "received, no sale" on its terminal.
+        where: { clientId, deviceId: { in: [...deviceIds] }, state: 'UNBOUND', ...(options.holds ? { holdKey: null } : {}), OR: NOT_OWED_BACK },
         orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
-        select: CAPTURE_SELECT,
+        select,
       });
       return rows.map(toRecord);
     },
@@ -196,7 +241,7 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
       const rows = await (await client()).terminalCapture.findMany({
         where: { clientId, orderId: { in: [...orderIds] }, state: 'ORDER_CREATED' },
         orderBy: { capturedAt: 'asc' },
-        select: CAPTURE_SELECT,
+        select,
       });
       return rows.map(toRecord);
     },
@@ -207,7 +252,10 @@ export function createPrismaTerminalCaptureStore(source: ClientSource): Terminal
  * The {@link TerminalCaptureStoreFor} a ledger takes: the store on the host's
  * transaction client when one is passed, on `root` otherwise.
  */
-export function prismaTerminalCaptureStoreFor<TTx extends PrismaTerminalCaptureClient>(root: ClientSource): TerminalCaptureStoreFor<TTx> {
-  const rootStore = createPrismaTerminalCaptureStore(root);
-  return (tx) => (tx ? createPrismaTerminalCaptureStore(tx) : rootStore);
+export function prismaTerminalCaptureStoreFor<TTx extends PrismaTerminalCaptureClient>(
+  root: ClientSource,
+  options: PrismaTerminalCaptureStoreOptions = {},
+): TerminalCaptureStoreFor<TTx> {
+  const rootStore = createPrismaTerminalCaptureStore(root, options);
+  return (tx) => (tx ? createPrismaTerminalCaptureStore(tx, options) : rootStore);
 }
