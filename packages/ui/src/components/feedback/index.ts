@@ -1,5 +1,6 @@
 export * from './ConfirmAction';
 export * from './Dialog';
+export * from './InlineConfirm';
 export * from './Modal';
 export * from './NotificationStatusNotice';
 export * from './SequenceResolver';

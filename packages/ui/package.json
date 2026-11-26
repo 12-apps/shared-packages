@@ -336,6 +336,10 @@
       "types": "./dist/types/components/feedback/Dialog/index.d.ts",
       "default": "./dist/feedback/Dialog.js"
     },
+    "./feedback/InlineConfirm": {
+      "types": "./dist/types/components/feedback/InlineConfirm/index.d.ts",
+      "default": "./dist/feedback/InlineConfirm.js"
+    },
     "./feedback/Modal": {
       "types": "./dist/types/components/feedback/Modal/index.d.ts",
       "default": "./dist/feedback/Modal.js"

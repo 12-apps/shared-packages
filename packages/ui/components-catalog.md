@@ -308,6 +308,13 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/ConfirmAction`
 **Docs**: `src/components/feedback/ConfirmAction/ConfirmAction.md`
 
+### InlineConfirm
+**Purpose**: The confirmation of an irreversible act drawn IN PLACE, inside the list row it acts on — `ConfirmAction`'s contract without the popup
+**Use Cases**: Removing a row from a list the reader must keep in view while deciding (a queue, a set of rows), where a dialog would cover it
+**Features**: The act as a question, what happens, what cannot be undone set apart, the verb as the one red button and a cancel; nothing runs until the verb, one write per confirmation, a failure kept open with its sentence, focus on the cancel when it opens and handed back on cancel, Escape backs out; the verb leads at the start edge and, narrow, whole buttons stack with the verb on top (cancel first in the tab order); renders in the tree, never a portal; every word is the host's
+**Location**: `src/components/feedback/InlineConfirm`
+**Docs**: `src/components/feedback/InlineConfirm/InlineConfirm.md`
+
 ### Dialog
 **Purpose**: Display modal dialogs
 **Use Cases**: Confirmations, forms, detailed information, alerts
