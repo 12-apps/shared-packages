@@ -20,6 +20,8 @@ import { API_BASE, ENCRYPTED, KEETA_DECRYPTED, KEETA_MERCHANT_ID, KEETA_ORDER_ID
 
 const P = KEETA_PROVIDER;
 const ATTEMPT = { attempt: 1, maxAttempts: 3 };
+/** The sandbox URL of the example order's resource. */
+const orderUrl = (action: string): string => `${API_BASE.SANDBOX}/v1/orders/${KEETA_ORDER_ID}/${action}`;
 const TOKEN = { status: 200, body: JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 7200 }) };
 
 /** Keeta's API as its documentation describes it. */
@@ -38,7 +40,7 @@ function keeta(options: { deliveredBy?: string; decrypt?: (request: MarketplaceH
 }
 
 function harness(http: ReturnType<typeof scriptedHttp> = keeta()) {
-  const h = createHarness({
+  const mounted = createHarness({
     http,
     dedupeQueue: true,
     cancellationHooks: true,
@@ -47,7 +49,7 @@ function harness(http: ReturnType<typeof scriptedHttp> = keeta()) {
       createKeetaAdapter({ copy: KEETA_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE }),
     ],
   });
-  return { h, http };
+  return { h: mounted, http };
 }
 
 async function deliver(subject: Harness, payload: unknown) {
@@ -144,7 +146,7 @@ describe("the engine through the Keeta adapter, end to end", () => {
     expect(JSON.stringify(h.created[0]?.order)).not.toContain(ENCRYPTED.phone);
   });
 
-  it("the aceite sends the signed confirm; a refusal the cancellation request; CANCELLED confirms it", async () => {
+  it("the aceite sends the signed confirm", async () => {
     const { h, http } = harness();
     await connect(h);
     const orderId = await arrive(h);
@@ -155,12 +157,18 @@ describe("the engine through the Keeta adapter, end to end", () => {
       action: "confirm",
     });
     const confirm = http.requests.at(-1);
-    expect(confirm?.url).toBe(`${API_BASE.SANDBOX}/v1/orders/${KEETA_ORDER_ID}/confirm`);
+    expect(confirm?.url).toBe(orderUrl("confirm"));
     expect(confirm?.headers["X-App-Signature"]).toEqual(expect.any(String));
+  });
+
+  it("a refusal sends the cancellation request; Keeta's CANCELLED confirms it", async () => {
+    const { h, http } = harness();
+    await connect(h);
+    const orderId = await arrive(h);
 
     await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "UNAVAILABLE_ITEM" });
     await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
-    expect(http.requests.at(-1)?.url).toBe(`${API_BASE.SANDBOX}/v1/orders/${KEETA_ORDER_ID}/requestCancellation`);
+    expect(http.requests.at(-1)?.url).toBe(orderUrl("requestCancellation"));
     expect(h.acceptance(orderId)?.cancellationStatus).toBe("REQUESTED");
 
     expect(await deliver(h, keetaEvent("CANCELLATION_REQUESTED"))).toMatchObject({ kind: "ignored" });

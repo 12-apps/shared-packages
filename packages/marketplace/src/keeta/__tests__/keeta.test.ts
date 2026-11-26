@@ -36,25 +36,25 @@ import {
 
 const SECRET = "app-secret";
 const TOKEN = { status: 200, body: JSON.stringify({ access_token: "tok", token_type: "bearer", expires_in: 7200 }) };
-const NOW = new Date("2026-11-26T12:00:00Z");
+const NOW_ISO = "2026-11-26T12:00:00.000Z";
 
 function context(answer: (request: MarketplaceHttpRequest) => MarketplaceHttpResponse = () => ({ status: 204, body: "" })) {
-  const requests: MarketplaceHttpRequest[] = [];
+  const sent: MarketplaceHttpRequest[] = [];
   const ctx: CatalogueCallContext = {
     http: (request) => {
-      requests.push(request);
+      sent.push(request);
       return Promise.resolve(request.url.endsWith("/oauth/token") ? TOKEN : answer(request));
     },
     credentials: { clientId: "app-id", clientSecret: SECRET, webhookSecret: SECRET },
     environment: "SANDBOX",
     tokens: new Map(),
-    now: NOW,
+    now: new Date(NOW_ISO),
     externalMerchantId: KEETA_MERCHANT_ID,
     loadImage: () => Promise.resolve(null),
     category: () => Promise.resolve({ id: "unused" }),
     forgetCategory: () => Promise.resolve(),
   };
-  return { ctx, requests };
+  return { ctx, requests: sent };
 }
 
 /** The signature Keeta's reference implementation computes, recomputed from the request as sent. */
@@ -67,7 +67,7 @@ function expectSigned(request: MarketplaceHttpRequest | undefined): void {
 const adapter = (extra: Partial<Parameters<typeof createKeetaAdapter>[0]> = {}) =>
   createKeetaAdapter({ copy: KEETA_ADAPTER_COPY_EN_US, apiBaseUrl: API_BASE, ...extra });
 
-const order = { externalOrderId: KEETA_ORDER_ID, externalDisplayId: "4821", hostOrderCode: "host-1", placedAt: NOW };
+const order = { externalOrderId: KEETA_ORDER_ID, externalDisplayId: "4821", hostOrderCode: "host-1", placedAt: new Date(NOW_ISO) };
 
 describe("the request signature (Base64 HMAC-SHA256 of URL + sorted query + RFC 8785 body)", () => {
   it("builds exactly the strings of Keeta's own examples", () => {
@@ -115,7 +115,9 @@ describe("the token (POST /oauth/token, JSON app_level_token, signed)", () => {
     expect(requests[0]?.body).toBe('{"client_id":"app-id","client_secret":"app-secret","grant_type":"app_level_token"}');
     for (const request of requests) expectSigned(request);
     expect(requests[1]?.headers.Authorization).toBe("Bearer tok");
-    expect(requests[1]?.body).toBe(`{"createdAt":"${NOW.toISOString()}","orderExternalCode":"host-1","preparationTime":20}`);
+    // Canonical: the keys in sorted order.
+    expect(Object.keys(JSON.parse(requests[1]?.body ?? "{}"))).toEqual(["createdAt", "orderExternalCode", "preparationTime"]);
+    expect(JSON.parse(requests[1]?.body ?? "{}")).toEqual({ createdAt: NOW_ISO, orderExternalCode: "host-1", preparationTime: 20 });
   });
 
   it("a refused grant is our credentials (own); a 401 on a call forgets the token and retries", async () => {
@@ -238,29 +240,34 @@ describe("the menu and the pause (POST /v1/merchantUpdate/{merchantId})", () => 
 });
 
 describe("the self-serve merchant authorization", () => {
-  const authorization = createKeetaAuthorization({ apiBaseUrl: API_BASE });
+  const authorization = () => createKeetaAuthorization({ apiBaseUrl: API_BASE });
+  const back = "https://host.example.test/keeta/back";
+  const sandbox = (path: string): string => `${API_BASE.SANDBOX}${path}`;
 
   it("asks for the authorization URL with no token, signed with its sorted query", async () => {
     const url = "https://merchant.mykeeta.com/m/web/openapi/authorize?locale=pt&region=BR&appId=1#/app-activation";
     const { ctx, requests } = context(() => ({ status: 200, body: JSON.stringify({ merchantAuthorizationUrl: url }) }));
 
-    expect(await authorization.authorizationUrl(ctx, { redirectUri: "https://host.example.test/keeta/back" })).toEqual({ kind: "ok", value: url });
+    expect(await authorization().authorizationUrl(ctx, { redirectUri: back })).toEqual({ kind: "ok", value: url });
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.url).toBe(
-      `${API_BASE.SANDBOX}/oauth/authorization/url?clientId=app-id&redirectUri=${encodeURIComponent("https://host.example.test/keeta/back")}`,
-    );
+    const sentUrl = new URL(requests[0]?.url ?? "");
+    expect(`${sentUrl.origin}${sentUrl.pathname}`).toBe(sandbox("/oauth/authorization/url"));
+    expect(Object.fromEntries(sentUrl.searchParams)).toEqual({ clientId: "app-id", redirectUri: back });
     expect(requests[0]?.headers.Authorization).toBeUndefined();
-    expect(keetaSignatureString(requests[0]!.url, undefined)).toBe(
-      `${API_BASE.SANDBOX}/oauth/authorization/url&clientId=app-id&redirectUri=https://host.example.test/keeta/back`,
-    );
+    // Signed with the query sorted and DECODED.
+    expect(keetaSignatureString(requests[0]!.url, undefined).split("&")).toEqual([
+      sandbox("/oauth/authorization/url"),
+      "clientId=app-id",
+      `redirectUri=${back}`,
+    ]);
     expectSigned(requests[0]);
   });
 
   it("lists the stores of an authorization, Keeta's integer ids as text", async () => {
     const { ctx, requests } = context(() => ({ status: 200, body: JSON.stringify(KEETA_MERCHANT_INFO) }));
-    const result = await authorization.authorizedShops(ctx, { authId: "41008" });
+    const result = await authorization().authorizedShops(ctx, { authId: "41008" });
 
-    expect(requests.at(-1)?.url).toBe(`${API_BASE.SANDBOX}/oauth/authorized/41008/merchantInfo?pageNum=1&pageSize=100`);
+    expect(requests.at(-1)?.url).toBe(sandbox("/oauth/authorized/41008/merchantInfo?pageNum=1&pageSize=100"));
     expect(result).toEqual({
       kind: "ok",
       value: {
@@ -283,7 +290,7 @@ describe("the self-serve merchant authorization", () => {
 
   it("onboards a store: the software's id in the query, Keeta's in the body, the two URLs", async () => {
     const { ctx, requests } = context(() => ({ status: 201, body: "{}" }));
-    const result = await authorization.onboard(ctx, {
+    const result = await authorization().onboard(ctx, {
       merchantId: KEETA_MERCHANT_ID,
       keetaMerchantId: 159416882,
       merchantDocument: { url: "https://host.example.test/keeta/LOJA-SP-001/merchant", apiKey: "store-key" },
@@ -317,9 +324,9 @@ describe("the self-serve merchant authorization", () => {
 
   it("a 503 is a retry, an answer of another shape a refusal", async () => {
     const busy = context(() => ({ status: 503, body: "busy" }));
-    expect(await authorization.authorizationUrl(busy.ctx, {})).toMatchObject({ kind: "retry" });
+    expect(await authorization().authorizationUrl(busy.ctx, {})).toMatchObject({ kind: "retry" });
     const odd = context(() => ({ status: 200, body: JSON.stringify({ merchantAuthorizationUrl: "http://plain.test" }) }));
-    expect(await authorization.authorizationUrl(odd.ctx, {})).toMatchObject({ kind: "refused" });
+    expect(await authorization().authorizationUrl(odd.ctx, {})).toMatchObject({ kind: "refused" });
   });
 });
 

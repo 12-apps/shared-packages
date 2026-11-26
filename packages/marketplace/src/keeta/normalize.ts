@@ -122,11 +122,10 @@ export async function revealKeetaOrder(
   if (ciphers.length === 0) return order;
   const plain = new Map<string, string>();
   if (pick(order, "delivery", "deliveredBy") === "MERCHANT") {
-    for (let start = 0; start < ciphers.length; start += DECRYPT_BATCH) {
-      for (const [cipher, text] of await decrypt(ctx, dialect, ciphers.slice(start, start + DECRYPT_BATCH))) {
-        plain.set(cipher, text);
-      }
-    }
+    const batches: string[][] = [];
+    for (let start = 0; start < ciphers.length; start += DECRYPT_BATCH) batches.push(ciphers.slice(start, start + DECRYPT_BATCH));
+    const answers = await Promise.all(batches.map((batch) => decrypt(ctx, dialect, batch)));
+    for (const [cipher, text] of answers.flat()) plain.set(cipher, text);
   }
   return replaced(order, plain);
 }

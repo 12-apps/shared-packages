@@ -55,7 +55,7 @@ export function keetaCatalogue(dialect: OpenDeliveryDialect): PullCatalogue {
 }
 
 /** Open or close the store on Keeta. */
-export function keetaSetMerchantStatus(
+function keetaSetMerchantStatus(
   ctx: AdapterCallContext,
   dialect: OpenDeliveryDialect,
   merchantId: string,

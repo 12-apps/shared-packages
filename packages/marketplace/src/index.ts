@@ -13,7 +13,8 @@
  * acceptance clock and its sweep, the SKU map, the integration settings and
  * the outbound engine, and knows no marketplace by name. Each marketplace is
  * an adapter at its own subpath (`@12-apps/marketplace/ifood`,
- * `@12-apps/marketplace/99food`, `@12-apps/marketplace/rappi`), registered at
+ * `@12-apps/marketplace/99food`, `@12-apps/marketplace/keeta`,
+ * `@12-apps/marketplace/rappi`), registered at
  * mount. The wiring manifests are at `./manifest` and `./manifest/server`.
  *
  * Everything the engine needs from its host is a required port with no

@@ -20,7 +20,7 @@ export const OPEN_DELIVERY_MERCHANT_REASON_CODES = [
   "DELIVERY_PROBLEM",
 ] as const;
 
-export type OpenDeliveryMerchantReasonCode = (typeof OPEN_DELIVERY_MERCHANT_REASON_CODES)[number];
+type OpenDeliveryMerchantReasonCode = (typeof OPEN_DELIVERY_MERCHANT_REASON_CODES)[number];
 
 /** The one reason that means "an item is unavailable". */
 export const OPEN_DELIVERY_ITEM_UNAVAILABLE: OpenDeliveryMerchantReasonCode = "UNAVAILABLE_ITEM";

@@ -55,14 +55,14 @@ const DEFAULT_TOKEN_SECONDS = 3600;
 export type OpenDeliveryStop = Exclude<OutboundResult, { kind: "accepted" }>;
 
 /** The base URL with its trailing slashes cut, by a loop: a `/\/+$/` regex backtracks polynomially on many slashes. */
-export function baseOf(ctx: AdapterCallContext, bases: OpenDeliveryApiBaseUrls): string {
+function baseOf(ctx: AdapterCallContext, bases: OpenDeliveryApiBaseUrls): string {
   const base = bases[ctx.environment];
   let end = base.length;
   while (end > 0 && base.charCodeAt(end - 1) === 47) end -= 1;
   return base.slice(0, end);
 }
 
-export const tokenKey = (ctx: AdapterCallContext, dialect: OpenDeliveryDialect): string =>
+const tokenKey = (ctx: AdapterCallContext, dialect: OpenDeliveryDialect): string =>
   `${dialect.provider}:${ctx.environment}:${ctx.credentials.clientId}`;
 
 /** The standard's `TokenResponse` (`access_token`, `token_type`, `expires_in`), read defensively. */
@@ -92,7 +92,7 @@ function signed(
  * A bearer token from the per-process cache, or a fresh grant at `POST
  * /oauth/token`. Keyed by provider, environment and client id; memory only.
  */
-export async function bearer(
+async function bearer(
   ctx: AdapterCallContext,
   dialect: OpenDeliveryDialect,
 ): Promise<{ token: string } | OpenDeliveryStop> {
@@ -121,7 +121,7 @@ export async function bearer(
 }
 
 /** One call, as an Open Delivery adapter states it. */
-export interface OpenDeliveryCall {
+interface OpenDeliveryCall {
   method: MarketplaceHttpRequest["method"];
   /** From the base: `/v1/orders/…`. Path segments are the caller's to encode. */
   path: string;
@@ -136,9 +136,29 @@ export interface OpenDeliveryCall {
 }
 
 /** The URL a call goes to: base, path, and the query string when there is one. */
-export function urlOf(ctx: AdapterCallContext, dialect: OpenDeliveryDialect, call: OpenDeliveryCall): string {
+function urlOf(ctx: AdapterCallContext, dialect: OpenDeliveryDialect, call: OpenDeliveryCall): string {
   const query = call.query && Object.keys(call.query).length > 0 ? `?${new URLSearchParams(call.query).toString()}` : "";
   return `${baseOf(ctx, dialect.bases)}${call.path}${query}`;
+}
+
+/** The request a call makes, before its signature. */
+function requestOf(
+  ctx: AdapterCallContext,
+  dialect: OpenDeliveryDialect,
+  call: OpenDeliveryCall,
+  token: string | null,
+): MarketplaceHttpRequest {
+  const body = call.body === undefined ? undefined : dialect.serialize(call.body);
+  return {
+    method: call.method,
+    url: urlOf(ctx, dialect, call),
+    headers: {
+      ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...call.headers,
+    },
+    ...(body === undefined ? {} : { body }),
+  };
 }
 
 /**
@@ -154,19 +174,7 @@ export async function openDeliveryCall(
   const authenticated = call.authenticated ?? true;
   const auth = authenticated ? await bearer(ctx, dialect) : null;
   if (auth && !("token" in auth)) return auth;
-  const body = call.body === undefined ? undefined : dialect.serialize(call.body);
-  const response = await ctx.http(
-    signed(ctx, dialect, {
-      method: call.method,
-      url: urlOf(ctx, dialect, call),
-      headers: {
-        ...(auth ? { Authorization: `Bearer ${auth.token}` } : {}),
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...call.headers,
-      },
-      ...(body === undefined ? {} : { body }),
-    }),
-  );
+  const response = await ctx.http(signed(ctx, dialect, requestOf(ctx, dialect, call, auth?.token ?? null)));
   if (!authenticated || response.status !== 401) return response;
   ctx.tokens.delete(tokenKey(ctx, dialect));
   return { kind: "retry", reason: `${dialect.name} refused the token` };

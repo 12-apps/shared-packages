@@ -81,7 +81,7 @@ export function openDeliveryMenuDocument(input: {
 }
 
 /** One `merchantUpdate` call, where and with what the marketplace takes it. */
-export interface OpenDeliveryMerchantUpdate {
+interface OpenDeliveryMerchantUpdate {
   /** From the base: `/v1/merchantUpdate`, or a marketplace's own (Keeta's names the merchant). */
   path: string;
   /** Absent: the empty body that means "pull the whole merchant again". */

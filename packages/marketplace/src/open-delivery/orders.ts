@@ -56,7 +56,7 @@ async function fetched(call: () => Promise<FetchOrderResult>): Promise<FetchOrde
 }
 
 /** How a fetched `Order` becomes the engine's order. */
-export interface OpenDeliveryFetchOptions {
+interface OpenDeliveryFetchOptions {
   normalize(order: unknown): NormalizedMarketplaceOrder | null;
   /**
    * OPTIONAL. What the adapter does to the parsed `Order` before it is
@@ -130,7 +130,7 @@ export function openDeliveryConfirm(
 const MAX_OUT_OF_STOCK_ITEMS = 100;
 
 /** How a marketplace reads `RequestCancelled.outOfStockItems`. */
-export interface OpenDeliveryCancellationOptions {
+interface OpenDeliveryCancellationOptions {
   /**
    * The offending SKUs (`externalCode`) are sent as `outOfStockItems` with an
    * item-unavailable reason. False where the marketplace wants its own item
@@ -182,7 +182,7 @@ export function openDeliveryRequestCancellation(
 type StatusPath = (facts: StatusFacts) => { action: string; body?: unknown } | null;
 
 /** The status calls a marketplace serves. */
-export interface OpenDeliveryStatusOptions {
+interface OpenDeliveryStatusOptions {
   /** A take-out's HANDED_OVER is `POST /v1/orders/{id}/pickedUp`. False where the marketplace has no take-out. */
   takeoutPickedUp: boolean;
 }
