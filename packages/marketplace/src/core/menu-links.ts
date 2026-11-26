@@ -14,6 +14,13 @@ import type { MarketplaceProvider } from "./types";
  * The package never dereferences `menuItemId`. It asks the host whether the id
  * is theirs (`order.catalogHas`, in `./bulk.ts`) and stores it; what the id
  * MEANS is the host's.
+ *
+ * A link may narrow the mapping to ONE variation of that id (`variationId`,
+ * FUT-4927): a marketplace SKU usually names one flavour or size, and the
+ * host's order line is then the item plus that variation. `variationId` null
+ * is the item alone, exactly as before it existed; it is never set without
+ * `menuItemId`, and the host answers whether it belongs to the item
+ * (`order.catalogHasVariation`).
  */
 
 /** A link as every read surface sees it. */
@@ -24,7 +31,15 @@ export interface MarketplaceMenuLinkView {
   externalName: string;
   /** The host catalog id, or null while the SKU is unmapped. */
   menuItemId: string | null;
+  /** The variation of `menuItemId` the SKU names, or null for the item alone. */
+  variationId: string | null;
   lastSeenAt: Date;
+}
+
+/** What one SKU resolves to on the ingest path; both null while it is unmapped. */
+interface ResolvedSku {
+  menuItemId: string | null;
+  variationId: string | null;
 }
 
 const LINK_SELECT = {
@@ -33,6 +48,7 @@ const LINK_SELECT = {
   externalSku: true,
   externalName: true,
   menuItemId: true,
+  variationId: true,
   lastSeenAt: true,
 } as const;
 
@@ -42,6 +58,7 @@ interface LinkRow {
   externalSku: string;
   externalName: string | null;
   menuItemId: string | null;
+  variationId?: string | null;
   lastSeenAt: Date;
 }
 
@@ -52,6 +69,8 @@ function toView(row: LinkRow): MarketplaceMenuLinkView {
     externalSku: row.externalSku,
     externalName: row.externalName ?? row.externalSku,
     menuItemId: row.menuItemId,
+    // A row of a host whose client predates the column reads as the item alone.
+    variationId: row.menuItemId === null ? null : (row.variationId ?? null),
     lastSeenAt: row.lastSeenAt,
   };
 }
@@ -86,6 +105,10 @@ export async function listMarketplaceMenuLinks(
  * transaction. The caller has already checked the id is this tenant's
  * (`order.catalogHas`). Creates the link if the SKU has never been seen: an
  * operator mapping ahead of the first order is doing the right thing.
+ *
+ * Every write sets BOTH halves: a mapping to the item alone (`variationId`
+ * absent or null) clears a variation an earlier mapping named, and an unmap
+ * clears both.
  */
 export async function upsertLink(
   db: MarketplaceDb,
@@ -95,8 +118,10 @@ export async function upsertLink(
     externalSku: string;
     externalName?: string;
     menuItemId: string | null;
+    variationId?: string | null;
   },
 ): Promise<MarketplaceMenuLinkView> {
+  const variationId = input.menuItemId === null ? null : (input.variationId ?? null);
   const row = (await db.marketplaceMenuLink.upsert({
     where: {
       clientId_provider_externalSku: {
@@ -111,11 +136,12 @@ export async function upsertLink(
       externalSku: input.externalSku,
       externalName: input.externalName ?? input.externalSku,
       menuItemId: input.menuItemId,
+      variationId,
     },
     // `externalName` is NOT rewritten here. It is the marketplace's snapshot of
     // what it called the item, and an operator's typing is not a better record
     // of that than the marketplace's own text.
-    update: { menuItemId: input.menuItemId },
+    update: { menuItemId: input.menuItemId, variationId },
     select: LINK_SELECT,
   })) as LinkRow;
   return toView(row);
@@ -139,8 +165,8 @@ export async function resolveSkus(
     skus: { externalSku: string; name: string }[];
     seenAt: Date;
   },
-): Promise<Map<string, string | null>> {
-  const resolved = new Map<string, string | null>();
+): Promise<Map<string, ResolvedSku>> {
+  const resolved = new Map<string, ResolvedSku>();
   for (const sku of input.skus) {
     const row = (await db.marketplaceMenuLink.upsert({
       where: {
@@ -158,9 +184,12 @@ export async function resolveSkus(
         lastSeenAt: input.seenAt,
       },
       update: { lastSeenAt: input.seenAt },
-      select: { menuItemId: true },
-    })) as { menuItemId: string | null };
-    resolved.set(sku.externalSku, row.menuItemId);
+      select: { menuItemId: true, variationId: true },
+    })) as { menuItemId: string | null; variationId?: string | null };
+    resolved.set(sku.externalSku, {
+      menuItemId: row.menuItemId,
+      variationId: row.menuItemId === null ? null : (row.variationId ?? null),
+    });
   }
   return resolved;
 }

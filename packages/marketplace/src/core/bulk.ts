@@ -40,12 +40,17 @@ export type IntegrationRowInput =
   | ({ operation?: "upsert" } & Omit<SaveMarketplaceIntegrationInput, "clientId">)
   | { operation: "archive" | "unarchive"; provider: string; reason?: string | null };
 
-/** One SKU link: map it to a catalog id, or unmap it with `menuItemId: null`. */
+/**
+ * One SKU link: map it to a catalog id, or unmap it with `menuItemId: null`.
+ * `variationId` narrows the mapping to one variation of that id (FUT-4927);
+ * absent or null maps the item alone, and it may not be set on an unmap.
+ */
 export interface MenuLinkRowInput {
   provider: string;
   externalSku: string;
   externalName?: string;
   menuItemId: string | null;
+  variationId?: string | null;
 }
 
 /** The key of each row seen twice, as problems. */
@@ -177,7 +182,33 @@ async function auditArchives(
   }
 }
 
-/** Map or unmap many SKUs at once; every catalog id must be the store's. */
+/**
+ * The catalog half of one link row: the item must be the store's, and a named
+ * variation must be one of that item's, as the host answers. A variation on an
+ * unmap, or with a host that cannot answer for variations, is refused at the
+ * variation, and the item is not asked about it.
+ */
+async function linkRowProblems(
+  ctx: EngineContext,
+  clientId: string,
+  row: MenuLinkRowInput,
+  index: number,
+): Promise<BulkProblem[]> {
+  const variationPath = ["links", index, "variationId"];
+  const variationId = row.variationId ?? null;
+  if (row.menuItemId === null) {
+    return variationId === null ? [] : [{ path: variationPath, code: "CATALOG_ITEM_NOT_FOUND" }];
+  }
+  if (!(await ctx.ports.order.catalogHas(clientId, row.menuItemId))) {
+    return [{ path: ["links", index, "menuItemId"], code: "CATALOG_ITEM_NOT_FOUND" }];
+  }
+  if (variationId === null) return [];
+  const order = ctx.ports.order;
+  const belongs = order.catalogHasVariation ? await order.catalogHasVariation(clientId, row.menuItemId, variationId) : false;
+  return belongs ? [] : [{ path: variationPath, code: "CATALOG_ITEM_NOT_FOUND" }];
+}
+
+/** Map or unmap many SKUs at once; every catalog id (and variation) must be the store's. */
 export async function upsertMenuLinks(
   ctx: EngineContext,
   input: { clientId: string; rows: readonly MenuLinkRowInput[]; validateOnly?: boolean },
@@ -186,11 +217,7 @@ export async function upsertMenuLinks(
     ...duplicates(input.rows, (row) => `${row.provider}\u0000${row.externalSku}`, "links", "externalSku"),
     ...unknownProviders(ctx, input.rows, "links"),
   ];
-  for (const [index, row] of input.rows.entries()) {
-    if (row.menuItemId !== null && !(await ctx.ports.order.catalogHas(input.clientId, row.menuItemId))) {
-      problems.push({ path: ["links", index, "menuItemId"], code: "CATALOG_ITEM_NOT_FOUND" });
-    }
-  }
+  for (const [index, row] of input.rows.entries()) problems.push(...(await linkRowProblems(ctx, input.clientId, row, index)));
   if (problems.length > 0) return { kind: "refused", problems };
 
   const validateOnly = input.validateOnly === true;
