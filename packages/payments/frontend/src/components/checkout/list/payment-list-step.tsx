@@ -191,19 +191,28 @@ function PreloadTop({ state, cap, config, taxIdOnFile }: { state: ListState; cap
  * `credit.appliesAtDoor` (FUT-3582), a DOOR option too. Otherwise a door
  * option or no choice charges the cart's total, so "Total" stands alone.
  */
-function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null): { label: string; amountLabel: string; dueTitle: string; dueLabel: string } | undefined {
+function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null): CreditRows | undefined {
   if (!list.credit || !list.amountDueLabel || !list.copy.amountDue) return undefined;
-  const { label, amountLabel, appliesAtDoor } = list.credit;
-  if (choice?.kind === "door") {
-    if (!appliesAtDoor) return undefined;
-    // The host's own door remainder; door rows carry no method price while credited.
-    const option = list.door?.find((door) => door.id === choice.id);
-    return { label, amountLabel, dueTitle: list.copy.amountDue, dueLabel: option?.totalLabel ?? list.amountDueLabel };
-  }
+  const { label, amountLabel } = list.credit;
+  const dueLabel = dueLabelFor(list, choice, list.amountDueLabel);
+  return dueLabel === undefined ? undefined : { label, amountLabel, dueTitle: list.copy.amountDue, dueLabel };
+}
+
+type CreditRows = { label: string; amountLabel: string; dueTitle: string; dueLabel: string };
+
+/** The host's own door remainder, when it opted in; door rows carry no method price while credited. */
+function doorDueLabel(list: CheckoutPaymentList, id: string, hostDue: string): string | undefined {
+  if (!list.credit?.appliesAtDoor) return undefined;
+  return list.door?.find((door) => door.id === id)?.totalLabel ?? hostDue;
+}
+
+/** The "A pagar" amount for the chosen option, or `undefined` when no credit rows are drawn for it. */
+function dueLabelFor(list: CheckoutPaymentList, choice: CheckoutListChoice | null, hostDue: string): string | undefined {
+  if (choice?.kind === "door") return doorDueLabel(list, choice.id, hostDue);
   if (choice?.kind !== "online") return undefined;
   // A priced row names its own amount due (FUT-4416); the host's otherwise.
   const price = chosenPrice(list, choice);
-  return { label, amountLabel, dueTitle: list.copy.amountDue, dueLabel: price ? priceText(list.copy, price) : list.amountDueLabel };
+  return price ? priceText(list.copy, price) : hostDue;
 }
 
 /** Which price a payment raised again after the cart moved is for (FUT-4416): Pix's, or the chosen row's. */

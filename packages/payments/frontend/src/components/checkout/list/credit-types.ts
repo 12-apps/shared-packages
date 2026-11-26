@@ -26,6 +26,11 @@ export interface PaymentListCredit {
      * Opt in to the credit rows under a DOOR option (cash, the courier's card
      * machine, the waiter), for a host whose balance pays part of a door order
      * too (FUT-3582). Default `false`: the rows are drawn for online only.
+     *
+     * With `true`, EVERY door option MUST carry `totalLabel`: the net door
+     * remainder, the figure its button names too. A door option's method
+     * `price` is ignored by the row, and `amountDueLabel` plus
+     * `copy.amountDue` are still required for the rows to draw.
      */
     appliesAtDoor?: boolean;
   };

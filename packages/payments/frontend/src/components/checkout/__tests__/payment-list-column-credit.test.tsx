@@ -82,7 +82,7 @@ describe("store credit in the column", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, door: [door()] } });
     const drawn = await column();
     await within(drawn).findByTestId("list-summary-credit-row");
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     await waitFor(() => expect(within(drawn).getByTestId("list-pay").textContent).toBe("Enviar pedidoR$ 27,00"));
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
     expect(within(drawn).getByTestId("pay-bar-total").textContent).toBe("R$ 27,00");
@@ -92,11 +92,11 @@ describe("store credit in the column", () => {
     const withTotal = { ...door(), totalLabel: "R$ 22,00" };
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, credit: { ...CREDIT, appliesAtDoor: true }, door: [withTotal, { ...door(), id: "card", label: "Maquininha" }] } });
     const drawn = await column();
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     expect((await within(drawn).findByTestId("list-summary-credit-row")).textContent).toBe("Crédito da loja− R$ 5,00");
     expect(within(drawn).getByTestId("list-summary-due-row").textContent).toBe("A pagarR$ 22,00");
     // A door option with no totalLabel of its own falls back to the host's amount due.
-    fireEvent.click(screen.getByTestId("list-door-card-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-card-radio"));
     await waitFor(() => expect(within(drawn).getByTestId("list-summary-due-row").textContent).toBe("A pagarR$ 22,00"));
   });
 
@@ -117,7 +117,7 @@ describe("store credit in the column", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...WITH_CREDIT, credit: { ...CREDIT, appliesAtDoor: false }, door: [door()] } });
     const drawn = await column();
     await within(drawn).findByTestId("list-summary-credit-row");
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
   });
 
@@ -125,7 +125,7 @@ describe("store credit in the column", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { ...COVERED, door: [door()] } });
     const drawn = await column();
     expect((await within(drawn).findByTestId("list-summary-due-row")).textContent).toBe("A pagarR$ 0,00");
-    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    fireEvent.click(await screen.findByTestId("list-door-cash-radio"));
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
     expect(within(drawn).getByTestId("list-pay").textContent).toBe("Enviar pedidoR$ 27,00");
   });
