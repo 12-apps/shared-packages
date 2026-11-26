@@ -312,7 +312,7 @@ mapping to the item works as it did.
 null. Write it on the order line with `subjectRef`; a host that ignores it
 keeps selling the item alone.
 
-**The database.** Migration `20261126180000_marketplace_menu_link_variation`
+**The database.** Migration `20261126230000_marketplace_menu_link_variation`
 adds the nullable `marketplace_menu_links.variation_id`: additive, no foreign
 key, every existing link stays the item alone. A client generated before the
 migration reads every link as the item alone.
