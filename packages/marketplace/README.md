@@ -255,8 +255,9 @@ engine supplies each one:
   token is stored back. A refused refresh marks the connection `FAILED`: the
   store links again.
 - **The app's credentials** are the host's, through the optional
-  `appCredentials(provider, environment)` port (client id, secret, and the key
-  the app's deliveries are signed with). Unbound, or null for a marketplace:
+  `appCredentials(provider, environment)` port (client id, secret, and
+  optionally a separate key the app's deliveries are signed with; absent or
+  empty, the client secret, which is what iFood signs with). Unbound, or null for a marketplace:
   `available: false`, and a store's own credentials keep working exactly as
   before. Typing credentials into a linked connection makes it `CREDENTIALS`
   again.
@@ -264,7 +265,13 @@ engine supplies each one:
   /webhooks/marketplace/:provider`. The store is found by the merchant the
   delivery names, and the delivery must carry a valid signature by the app's
   key (unsigned is refused here, whatever the store's own setting). The
-  per-store address keeps working.
+  per-store address keeps working, and a linked store's never accepts an
+  unsigned delivery either. A merchant is held by one live connection of a
+  marketplace at a time: every write refuses `MERCHANT_TAKEN` at
+  `externalMerchantId`, and a partial unique index backs it. A linked
+  connection with no merchant chosen yet (the list failed, or the grant covers
+  several) has every delivery to this address refused, and iFood redelivers,
+  until the store chooses one.
 
 What iFood's pages settle, read 2026-11-26 as Markdown
 (`developer.ifood.com.br/pt-BR/docs/guides/modules/authentication/distributed.md`,
@@ -280,7 +287,7 @@ What iFood's pages settle, read 2026-11-26 as Markdown
 | The refresh token's lifetime | ESTIMATED: unstated; a refused refresh marks the connection FAILED |
 | `GET /merchant/v1.0/merchants?page=&size=` (size 100) → `[{ id, name, corporateName }]` | CONFIRMED |
 | The status of a wrong or used authorization code | ESTIMATED: any final 4xx is `CODE_REFUSED` |
-| The key iFood signs an app's webhook deliveries with | ESTIMATED: the host passes it as the app's `webhookSecret` |
+| The key iFood signs an app's webhook deliveries with | CONFIRMED (`webhook-signature.md`): the app's `client_secret`, the default when `webhookSecret` is absent |
 
 ## 99Food, on Open Delivery
 

@@ -291,7 +291,10 @@ async function webhookSecretOf(
   }
   const app = await appCredentialsOf(ctx, provider, environmentOf(row.environment));
   if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
-  return app.webhookSecret;
+  // The marketplace signs with the app's client secret unless the host names another key.
+  const secret = app.webhookSecret || app.clientSecret;
+  if (!secret) throw new Error(`No webhook key is configured for ${provider}.`);
+  return secret;
 }
 
 const environmentOf = (value: string | undefined): "SANDBOX" | "PRODUCTION" =>

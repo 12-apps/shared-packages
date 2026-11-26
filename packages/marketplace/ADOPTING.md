@@ -341,7 +341,8 @@ software's own app"). What the host binds and decides:
   shows the per-store form, as before.
 - **The app's webhook**: register `…/webhooks/marketplace/IFOOD` (under the
   host's mount) as the app's one webhook address on iFood's developer portal,
-  and pass the key iFood signs it with as `webhookSecret`.
+  iFood signs it with the app's client secret, so `webhookSecret` may be left
+  null; pass it only to verify with another key.
 - **The screen** is the host's: `GET …/link` says whether to offer it and
   restores a code in progress after a reload; `start`, `finish` and, when the
   grant covers several iFood stores, `merchants` and `merchant`. Each refusal

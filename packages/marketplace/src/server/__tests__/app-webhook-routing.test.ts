@@ -111,3 +111,22 @@ describe("the app's address routes a delivery to exactly one store", () => {
     expect(h.created).toEqual([]);
   });
 });
+
+describe("a linked store's per-store address", () => {
+  const perStore = (h: Harness, payload: unknown, key: string | null) =>
+    post(h, "/webhooks/marketplace/:tenantSlug/:provider", { tenantSlug: "loja", provider: "IFOOD" }, payload, key);
+
+  it("refuses an unsigned delivery when the app names no webhook key, and verifies with the client secret instead", async () => {
+    for (const webhookSecret of [null, ""]) {
+      const h = createHarness({ http: ifoodHttp(), appCredentials: () => ({ ...APP, webhookSecret }) });
+      expect(await link(h, TENANT)).toMatchObject({ kind: "linked" });
+
+      expect((await perStore(h, ifoodPlaced("forged-1"), null)).status).toBe(401);
+      expect(h.created).toEqual([]);
+
+      expect(await perStore(h, ifoodPlaced("ext-1"), APP.clientSecret)).toMatchObject({ status: 200, body: { outcome: "ingested" } });
+      expect((await appPost(h, ifoodPlaced("ext-2"), APP.clientSecret)).status).toBe(200);
+      expect(h.created.map((order) => order.clientId)).toEqual([TENANT, TENANT]);
+    }
+  });
+});
