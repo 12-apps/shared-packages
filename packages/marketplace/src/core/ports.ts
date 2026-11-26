@@ -146,11 +146,22 @@ export type MarketplaceAdmissionResult =
 export type MarketplaceRefusal = "REJECTED" | "EXPIRED" | "CANCELLED";
 
 /**
- * Why the store's own cancellation request FAILED: REFUSED (the marketplace
- * said no, or every attempt failed) or TIMEOUT (no answer inside the
- * marketplace's cancellation window). Vocabulary, not copy.
+ * Why the store's own cancellation request FAILED. Vocabulary, not copy.
+ *
+ * - `REFUSED`: the marketplace judged the request and denied it: its denial
+ *   event, an answer that is its business refusal, or an adapter that has no
+ *   cancellation API to call. An adapter that cannot tell a business 4xx from
+ *   a malformed request (iFood, Rappi) reports every final 4xx as REFUSED.
+ * - `UNREACHABLE`: our own request never got a judgement: no credentials or
+ *   ones that do not open, a token the marketplace did not grant, a request
+ *   the marketplace calls malformed (99Food's 400), or every attempt failed
+ *   on the network or a 5xx. Retrying, or fixing the connection, can help.
+ * - `TIMEOUT`: no answer inside the marketplace's cancellation window.
+ *
+ * A host written before `UNREACHABLE` existed treats an unknown value as it
+ * treats REFUSED: the order stays and a person finishes in the marketplace's app.
  */
-export type CancellationFailureReason = "REFUSED" | "TIMEOUT";
+export type CancellationFailureReason = "REFUSED" | "UNREACHABLE" | "TIMEOUT";
 
 /**
  * The host's domain, as five questions the engine asks and never answers.

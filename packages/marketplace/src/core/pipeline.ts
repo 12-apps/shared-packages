@@ -4,7 +4,7 @@ import { awaitOrderBody, merchantMismatch, requeueOwedFetch } from "./fetch-orde
 import { deferInboxEvent, recordInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { connectionMerchantId, resolveIngestionTarget } from "./integration";
-import { markCancelledBeforeIngest } from "./order-fetch-marks";
+import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest, markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
@@ -190,7 +190,19 @@ async function ingestCarried(
     ctx.ports.logger.error(`marketplace.ingest: inbox row ${inboxId} refused: ${mismatch}`);
     return { kind: "failed", reason: mismatch };
   }
+  // A CANCELLED that found nothing to cancel left its marker (an earlier
+  // NEW_ORDER FAILED, so no acceptance existed). The retry sweep re-runs that
+  // row: ingesting it now would send a cancelled order to the kitchen.
+  if (await cancelledBeforeIngest(ctx, { clientId, provider: order.provider, externalOrderId: order.externalOrderId })) {
+    await settleInboxEvent(ctx, inboxId, "IGNORED", CANCELLED_BEFORE_INGEST_REASON);
+    return { kind: "ignored", reason: CANCELLED_BEFORE_INGEST_REASON };
+  }
   const result = await ingestMarketplaceOrder(ctx, { clientId, order, settings, now });
+  // A CANCELLED that read the acceptances while this ingest's transaction was
+  // still open found none and left its marker: honour it now, through the
+  // ordinary cancel path (the order is cancelled; no confirm is owed).
+  const ref = { clientId, provider: order.provider, externalOrderId: order.externalOrderId };
+  if (await cancelledBeforeIngest(ctx, ref)) await cancelAcceptance(ctx, ref);
   await settleInboxEvent(ctx, inboxId, "PROCESSED");
   return { kind: "ingested", orderId: result.orderId, unmappedSkus: result.unmappedSkus };
 }

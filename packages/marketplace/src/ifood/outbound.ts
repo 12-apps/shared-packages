@@ -1,6 +1,7 @@
 import {
   answered,
   outboundResultOf,
+  tokenGrantResultOf,
   type AdapterCallContext,
   type CancellationRequestInput,
   type OutboundOrderRef,
@@ -70,7 +71,7 @@ export async function bearer(ctx: AdapterCallContext): Promise<{ token: string }
       clientSecret: ctx.credentials.clientSecret,
     }).toString(),
   });
-  if (response.status < 200 || response.status >= 300) return outboundResultOf(response);
+  if (response.status < 200 || response.status >= 300) return tokenGrantResultOf(response);
   const token = tokenOf(response.body);
   if (!token) return { kind: "retry", reason: "iFood answered the token grant without a token" };
   ctx.tokens.set(key, { token: token.token, expiresAt: ctx.now.getTime() + token.expiresInSeconds * 1000 });

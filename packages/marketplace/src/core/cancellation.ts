@@ -160,6 +160,7 @@ export function refusalData(plan: CancellationPlan, fromStatus: string, now: Dat
     cancellationReasonCode: plan.reason?.code ?? null,
     cancellationOffendingSkus: plan.skus.length > 0 ? plan.skus : null,
     cancellationRequestedAt: plan.status === "PENDING" ? now : null,
+    // FAILED here means the adapter has no cancellation API to call: the marketplace's own limit, REFUSED.
     cancellationFailureReason: plan.status === "FAILED" ? "REFUSED" : null,
   };
 }
@@ -177,12 +178,14 @@ export function requestData(plan: CancellationPlan, now: Date): Record<string, u
     cancellationReasonCode: plan.reason?.code ?? null,
     cancellationOffendingSkus: plan.skus.length > 0 ? plan.skus : null,
     cancellationRequestedAt: plan.status === "PENDING" ? now : null,
+    // FAILED here means the adapter has no cancellation API to call: the marketplace's own limit, REFUSED.
     cancellationFailureReason: plan.status === "FAILED" ? "REFUSED" : null,
   };
 }
 
 /**
- * The marketplace refused the store's cancellation request. FAILED (REFUSED),
+ * The marketplace refused the store's cancellation request: its denial event.
+ * FAILED (REFUSED),
  * from PENDING or REQUESTED only: CONFIRMED is terminal, so a refusal arriving
  * after the cancellation changes nothing. The host hears it once, from the
  * call that moved the row. Returns whether a row moved.

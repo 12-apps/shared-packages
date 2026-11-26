@@ -69,6 +69,18 @@ export type MarketplaceOrderType = "DELIVERY" | "TAKEOUT";
 /** WHO carries a delivery: the merchant's own courier, or the marketplace's fleet. */
 export type MarketplaceDeliveredBy = "MERCHANT" | "MARKETPLACE";
 
+/** WHO pays for a discount: the store, the marketplace's own campaign, or someone else (a card issuer, a voucher). */
+export type MarketplaceDiscountSponsor = "MERCHANT" | "MARKETPLACE" | "OTHER";
+
+/** One discount on an order, as the part one sponsor pays. */
+export interface NormalizedOrderDiscount {
+  /** The discount's value in the smallest currency unit. */
+  cents: number;
+  sponsor: MarketplaceDiscountSponsor;
+  /** What the marketplace called the campaign, when it says. */
+  name?: string;
+}
+
 /** An incoming marketplace order, normalized. */
 export interface NormalizedMarketplaceOrder {
   provider: MarketplaceProvider;
@@ -96,6 +108,19 @@ export interface NormalizedMarketplaceOrder {
   deliveredBy?: MarketplaceDeliveredBy | null;
   /** Null on a take-out and when unstated. */
   deliveryAddress?: NormalizedAddress | null;
+  /**
+   * OPTIONAL. The delivery fee the buyer was charged, in the smallest currency
+   * unit. 0 is a free delivery; null or absent is "did not say".
+   */
+  deliveryFeeCents?: number | null;
+  /** OPTIONAL. The items' sum as the marketplace states it, before fees and discounts. Null or absent is "did not say". */
+  subtotalCents?: number | null;
+  /**
+   * OPTIONAL. The discounts on the order, one entry per sponsor's share, so a
+   * host can tell what the store gave from what the marketplace paid for.
+   * Absent is "did not say"; an empty array is "no discount".
+   */
+  discounts?: NormalizedOrderDiscount[];
   /**
    * OPTIONAL. The merchant the order names, when its body says (Open
    * Delivery's `merchant.id`). A fetched order naming another merchant than

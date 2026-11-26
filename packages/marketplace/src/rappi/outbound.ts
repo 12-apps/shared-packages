@@ -1,6 +1,7 @@
 import {
   answered,
   outboundResultOf,
+  tokenGrantResultOf,
   type AdapterCallContext,
   type CancellationRequestInput,
   type MarketplaceHttpResponse,
@@ -96,7 +97,7 @@ export async function bearer(
     body: JSON.stringify({ client_id: ctx.credentials.clientId, client_secret: ctx.credentials.clientSecret }),
   });
   if (response.status < 200 || response.status >= 300) {
-    const result = outboundResultOf(response);
+    const result = tokenGrantResultOf(response);
     return result.kind === "accepted" ? { kind: "retry", reason: "unexpected token answer" } : result;
   }
   const token = tokenOf(response.body);

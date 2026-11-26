@@ -206,6 +206,49 @@ describe("the engine through the 99Food adapter, end to end", () => {
     expect(h.cancellationFailed).toEqual([{ orderId, reason: "REFUSED" }]);
   });
 
+  it("[FUT-4917] a 400 on the request is our malformed request: UNREACHABLE; a 422 is 99Food's business answer: REFUSED", async () => {
+    for (const [status, expected] of [
+      [400, "UNREACHABLE"],
+      [422, "REFUSED"],
+    ] as const) {
+      const http = scriptedHttp((request) => {
+        if (request.url.endsWith("/oauth/token")) return TOKEN;
+        if (request.method === "GET") return { status: 200, body: JSON.stringify(specOrder(decodeURIComponent(request.url.split("/").pop() ?? ""))) };
+        return { status, body: JSON.stringify({ message: "no" }) };
+      });
+      const { h } = harness({ http });
+      await connect(h);
+      const orderId = await arrive(h, SECOND_ORDER_ID);
+      await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "OUTSIDE_DELIVERY_HOURS" });
+
+      await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
+
+      expect(h.acceptance(orderId)).toMatchObject({ cancellationStatus: "FAILED", cancellationFailureReason: expected });
+      expect(h.cancellationFailed).toEqual([{ orderId, reason: expected }]);
+    }
+  });
+
+  it("[FUT-4917] a token grant 99Food refuses (401) is UNREACHABLE", async () => {
+    let granted = false;
+    const http = scriptedHttp((request) => {
+      // The first grant is short-lived, so it is not reused: the next call asks again and is refused.
+      if (request.url.endsWith("/oauth/token")) {
+        return granted ? { status: 401, body: "invalid_client" } : { status: 200, body: JSON.stringify({ access_token: "tok", expires_in: 1 }) };
+      }
+      if (request.method === "GET") return { status: 200, body: JSON.stringify(specOrder(decodeURIComponent(request.url.split("/").pop() ?? ""))) };
+      return { status: 202, body: "" };
+    });
+    const { h } = harness({ http });
+    await connect(h);
+    const orderId = await arrive(h, SECOND_ORDER_ID);
+    await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "OUTSIDE_DELIVERY_HOURS" });
+    granted = true;
+
+    await h.engine.runOutbound({ clientId: TENANT, orderId, action: "requestCancellation" }, ATTEMPT);
+
+    expect(h.cancellationFailed).toEqual([{ orderId, reason: "UNREACHABLE" }]);
+  });
+
   it("retries a fetch 99Food did not answer, fails it on the last attempt, and the reconciliation re-queues it", async () => {
     const http = openDelivery({ order: () => ({ status: 503, body: "busy" }) });
     const { h } = harness({ http });

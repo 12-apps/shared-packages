@@ -20,6 +20,7 @@ export {
   useWebDiscounts,
   DiscountsSurface,
   type DiscountsScreenProps,
+  type DiscountsScreenRequest,
   type DiscountsWebConfig,
   type WebDiscounts,
 } from "./create-web-discounts";

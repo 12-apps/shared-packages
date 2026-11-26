@@ -42,6 +42,7 @@ import {
 import { useBulkActions, type BulkActions } from "./use-bulk-actions";
 import { useBulkDelete } from "./use-bulk-delete";
 import { useDiscountsData } from "./use-discounts-data";
+import { useOpenOnCreateRequest } from "./use-open-on-create-request";
 import type { DiscountsBulkSlotProps } from "./use-discounts-bulk";
 
 /**
@@ -68,6 +69,16 @@ export interface DiscountsScreenProps {
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
   breadcrumb?: readonly { label: string; href?: string }[];
+  /**
+   * The host asks for the create dialog: its own "create" entry, elsewhere in
+   * its chrome, landing here. Once the list has loaded the dialog opens, the
+   * same one the header's button opens, and {@link onCreateRequestHandled}
+   * fires exactly once, so the host can drop whatever carried the request (a
+   * URL param). Re-renders while this stays true neither reopen the dialog
+   * nor call the handler again; a new request needs it to go false first.
+   */
+  createRequested?: boolean;
+  onCreateRequestHandled?: () => void;
   /**
    * The host's report for the bulk actions (FUT-4420). A COMPONENT, for the
    * reason `RolesScreen.bulkSlot` is one: it renders INSIDE this screen's
@@ -323,6 +334,8 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const [searchParams] = useSearchParams();
   const data = useDiscountsData(api, discountsSearch(searchParams), onError);
   const [createOpen, setCreateOpen] = useState(false);
+  const ready = !data.loading && data.error === null;
+  useOpenOnCreateRequest(props.createRequested === true, ready, () => setCreateOpen(true), props.onCreateRequestHandled);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
   const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot, timezone);

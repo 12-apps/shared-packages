@@ -124,8 +124,13 @@ export interface AdapterCallContext {
 export type OutboundResult =
   /** 2xx. For a marketplace whose outcome is asynchronous, "the request was taken". */
   | { kind: "accepted" }
-  /** A final 4xx (not 408/425/429): never retried. */
-  | { kind: "refused"; status: number; message: string }
+  /**
+   * A final 4xx (not 408/425/429): never retried. `own` marks a refusal that
+   * is not the marketplace's judgement of the order: our credentials were not
+   * accepted, or our request was malformed. A cancellation request that ends
+   * so fails as UNREACHABLE, not REFUSED.
+   */
+  | { kind: "refused"; status: number; message: string; own?: true }
   /** 408, 425, 429, 5xx, a timeout, a network error: retried until the last attempt. */
   | { kind: "retry"; reason: string };
 
@@ -220,6 +225,16 @@ export function outboundResultOf(response: MarketplaceHttpResponse): OutboundRes
   const refusal = response.status >= 400 && response.status < 500 && !TRANSIENT_CLIENT_STATUSES.has(response.status);
   if (refusal) return { kind: "refused", status: response.status, message };
   return { kind: "retry", reason: `status ${response.status}: ${message}` };
+}
+
+/**
+ * {@link outboundResultOf} for a token grant: a final 4xx there says our
+ * credentials were not accepted, never a judgement of any order, so it is an
+ * `own` refusal.
+ */
+export function tokenGrantResultOf(response: MarketplaceHttpResponse): OutboundResult {
+  const result = outboundResultOf(response);
+  return result.kind === "refused" ? { ...result, own: true } : result;
 }
 
 /** A call that never got an answer is a retry, with the reason a log can read. */

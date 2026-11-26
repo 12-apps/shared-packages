@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createIfoodAdapter } from "..";
 import { IFOOD_ADAPTER_COPY_PT_BR } from "../pt-BR";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../en-US";
+import { ifoodPlacedWithMoney } from "./fixtures";
 import { normalizeIfoodEvent as normalizeWith, verifyIfoodSignature } from "../normalize";
 
 /** The adapter's normalizer with the pt-BR pack's missing-number words. */
@@ -304,5 +305,42 @@ describe("the iFood adapter", () => {
     );
     expect(adapter.normalize({ code: "CAN", orderId: "o" })?.cancellationOutcome).toBe("CONFIRMED");
     expect(adapter.normalize({ code: "PLC", orderId: "o" })?.cancellationOutcome).toBeNull();
+  });
+});
+
+describe("the money of an order (FUT-5117, ESTIMATED field names)", () => {
+  it("reads the delivery fee, the subtotal and each sponsor's share of every discount", () => {
+    const event = normalizeIfoodEvent(ifoodPlacedWithMoney());
+
+    expect(event?.order).toMatchObject({
+      totalCents: 4850,
+      deliveryFeeCents: 650,
+      subtotalCents: 5000,
+      discounts: [
+        { cents: 300, sponsor: "MARKETPLACE", name: "Cupom de boas-vindas" },
+        { cents: 200, sponsor: "MERCHANT", name: "Cupom de boas-vindas" },
+        { cents: 300, sponsor: "OTHER" },
+        { cents: 150, sponsor: "OTHER" },
+      ],
+    });
+  });
+
+  it("states a free delivery as 0 and leaves an unstated fee, subtotal and discounts absent", () => {
+    const free = normalizeIfoodEvent({
+      id: "e1",
+      code: "PLC",
+      orderId: "o1",
+      order: { items: [{ externalCode: "S", name: "S", quantity: 1, unitPrice: 10 }], total: { orderAmount: 10, deliveryFee: 0 }, benefits: [] },
+    });
+    expect(free?.order).toMatchObject({ deliveryFeeCents: 0, subtotalCents: null, discounts: [] });
+
+    const bare = normalizeIfoodEvent({
+      id: "e2",
+      code: "PLC",
+      orderId: "o2",
+      order: { items: [{ externalCode: "S", name: "S", quantity: 1, unitPrice: 10 }], total: { orderAmount: 10 } },
+    });
+    expect(bare?.order).toMatchObject({ deliveryFeeCents: null, subtotalCents: null });
+    expect(bare?.order).not.toHaveProperty("discounts");
   });
 });
