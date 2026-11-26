@@ -344,6 +344,13 @@ a label broken inside one — and a stack has ONE order across the package
 
 `AlertDialog` (and so `ConfirmAction`) is the reference implementation.
 
+**One exception: `InlineConfirm`.** Its pair sits inside a list row, not in a
+dialog's footer, and there the VERB LEADS at the start edge with the cancel
+after it — a row is read from its start, and the owner's approved frames for
+the first host (FUT-5615, Mesas › Fila) draw it that way. Everything else here
+holds: the cancel stays first in the DOM and the tab order (`row-reverse`
+draws the order), whole buttons wrap, and stacked the verb is on top.
+
 ### Narrow layouts read the container
 
 A component that lays out differently when it is narrow answers to the space it

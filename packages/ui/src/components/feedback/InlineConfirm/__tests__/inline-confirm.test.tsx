@@ -4,7 +4,7 @@
  * confirmation, a failure kept open with its sentence, focus starting on the
  * safe button and handed back on cancel, and Escape backing out.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React, { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +43,35 @@ function Row({ onConfirm, onCancel = () => undefined }: { onConfirm: () => void 
         />
       </li>
     </ul>
+  );
+}
+
+/**
+ * The documented shape: the trigger is HIDDEN while the confirmation is open,
+ * so it is a new element when focus comes back, reached by `returnFocusTo`.
+ * `onClose` lets the host close it from outside (another write landed).
+ */
+function HidingRow({ onConfirm }: { onConfirm: () => void | Promise<unknown> }) {
+  const [open, setOpen] = useState(false);
+  const trigger = React.useRef<HTMLButtonElement | null>(null);
+  return (
+    <div data-testid="row">
+      {open ? null : (
+        <button ref={trigger} type="button" autoFocus onClick={() => setOpen(true)}>
+          Abrir
+        </button>
+      )}
+      <button type="button" onClick={() => setOpen(false)}>
+        Fechar por fora
+      </button>
+      <InlineConfirm
+        {...WORDS}
+        open={open}
+        onConfirm={onConfirm}
+        onCancel={() => setOpen(false)}
+        returnFocusTo={() => trigger.current}
+      />
+    </div>
   );
 }
 
@@ -119,10 +148,14 @@ describe('InlineConfirm', () => {
     render(<Row onConfirm={onConfirm} />);
     fireEvent.click(screen.getByRole('button', { name: 'Abrir' }));
 
-    fireEvent.click(confirmButton());
-    fireEvent.click(confirmButton());
+    // Both presses in ONE tick, before React re-renders the button disabled:
+    // only the in-flight guard can drop the second.
+    const verb = confirmButton();
+    act(() => {
+      verb.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      verb.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 
-    fireEvent.click(confirmButton());
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   });
 
@@ -157,5 +190,53 @@ describe('InlineConfirm', () => {
 
     expect(onCancel).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('inline-confirm')).toBeInTheDocument());
+  });
+
+  it.each([
+    ['the cancel', () => fireEvent.click(cancelButton())],
+    ['Escape', () => fireEvent.keyDown(cancelButton(), { key: 'Escape' })],
+  ])('hands focus to the trigger the host renders again after %s', async (_label, backOut) => {
+    render(<HidingRow onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir' }));
+    await waitFor(() => expect(cancelButton()).toHaveFocus());
+
+    backOut();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Abrir' })).toHaveFocus());
+  });
+
+  it('puts focus on the verb after a failed write, so Enter tries again', async () => {
+    render(<Row onConfirm={() => Promise.reject(new Error('Esse cliente já saiu da fila.'))} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir' }));
+
+    fireEvent.click(confirmButton());
+
+    await screen.findByTestId('inline-confirm-error');
+    await waitFor(() => expect(confirmButton()).toHaveFocus());
+  });
+
+  it('forgets a failure when the host closes it, so reopening shows no stale error', async () => {
+    render(<HidingRow onConfirm={() => Promise.reject(new Error('Esse cliente já saiu da fila.'))} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir' }));
+    fireEvent.click(confirmButton());
+    await screen.findByTestId('inline-confirm-error');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar por fora' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir' }));
+
+    expect(screen.getByTestId('inline-confirm')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('inline-confirm-error')).toBeNull());
+  });
+
+  it('keeps focus on the verb while the write is out', async () => {
+    render(<Row onConfirm={() => new Promise<void>(() => undefined)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir' }));
+    await waitFor(() => expect(cancelButton()).toHaveFocus());
+
+    fireEvent.click(confirmButton());
+
+    expect(confirmButton()).not.toHaveAttribute('disabled');
+    expect(cancelButton()).not.toHaveAttribute('disabled');
+    expect(cancelButton()).toHaveAttribute('aria-disabled', 'true');
   });
 });

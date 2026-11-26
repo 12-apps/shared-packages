@@ -25,11 +25,24 @@ export interface InlineConfirmProps {
   /**
    * The act. A returned promise holds the confirmation pending (both buttons
    * inert, Escape ignored) and a second confirm in that window is dropped. A
-   * rejection keeps it open with the rejection's message, else `errorText`.
+   * rejection keeps it open with the rejection's message, else `errorText`,
+   * announced, with focus on the verb so Enter tries again.
    */
   onConfirm: () => void | Promise<unknown>;
-  /** The reader backed out — the cancel button or Escape. Focus goes back to where it was before opening. */
+  /**
+   * The reader backed out — the cancel button or Escape. The host closes the
+   * confirmation (`open={false}`); on that commit focus goes back to
+   * `returnFocusTo()`, else to the element that had it when the confirmation
+   * opened, if it is still in the page.
+   */
   onCancel: () => void;
+  /**
+   * Where focus goes back after a cancel, read on the commit that closes the
+   * confirmation. REQUIRED in practice when the host hides its trigger while
+   * the confirmation is open: the trigger is unmounted then, and only this can
+   * reach the one rendered again.
+   */
+  returnFocusTo?: () => HTMLElement | null;
   /** Said when `onConfirm` rejects with no message of its own. */
   errorText?: string;
   /** Root test id; the buttons take `-confirm`, `-cancel`, the failure `-error`. */

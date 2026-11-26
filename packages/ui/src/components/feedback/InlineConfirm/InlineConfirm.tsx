@@ -36,16 +36,24 @@ const Actions = styled('div')(({ theme }) => ({
   justifyContent: 'flex-end',
   columnGap: theme.spacing(1),
   rowGap: theme.spacing(1),
-  // A narrow row (a phone's card) stacks each button across the line.
-  [`@container ${INLINE_CONFIRM_CONTAINER} (width < ${rem(theme, INLINE_CONFIRM_NARROW_BELOW)})`]: { '& > *': { flexGrow: 1 } },
+  // A narrow row (a phone's card): each button takes a whole line of its own.
+  [`@container ${INLINE_CONFIRM_CONTAINER} (width < ${rem(theme, INLINE_CONFIRM_NARROW_BELOW)})`]: {
+    '& > *': { flexGrow: 1, flexBasis: '100%' },
+  },
 }));
 
 const Root = styled('div')(({ theme }) => ({
+  // A flex item in a host's row would otherwise collapse to nothing.
+  width: '100%',
   containerType: 'inline-size',
   containerName: INLINE_CONFIRM_CONTAINER,
   display: 'flex',
   flexDirection: 'column',
-  gap: theme.spacing(1),
+  // The prototype's rhythm on the theme's stops: ~13px from the hairline to the
+  // question, ~4px from the question to its body, 8px before the buttons.
+  '& > .inline-confirm-title': { marginTop: theme.spacing(1.5) },
+  '& > .inline-confirm-text': { marginTop: theme.spacing(0.5) },
+  '& > .inline-confirm-actions': { marginTop: theme.spacing(1) },
 }));
 
 /** The rejection's own sentence when it has one; the host's fallback otherwise. */
@@ -54,8 +62,13 @@ function failureText(error: unknown, fallback?: string): string {
   return fallback ?? '';
 }
 
-/** Run the act once: pending while its promise is out, the failure kept. */
-function useConfirmRun(onConfirm: InlineConfirmProps['onConfirm'], errorText?: string) {
+/**
+ * Run the act once: pending while its promise is out, the failure kept and
+ * announced (`role="alert"`), with focus on the verb, so a keyboard reader
+ * retries with Enter instead of tabbing back in. A confirmation the host closed forgets its failure, so reopening it
+ * never shows a stale one.
+ */
+function useConfirmRun(open: boolean, onConfirm: InlineConfirmProps['onConfirm'], errorText?: string) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -73,26 +86,56 @@ function useConfirmRun(onConfirm: InlineConfirmProps['onConfirm'], errorText?: s
       });
   }, [errorText, onConfirm]);
   const reset = useCallback(() => setError(null), []);
-  return { pending, error, run, reset };
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (error !== null) confirmRef.current?.focus();
+  }, [error]);
+  useEffect(() => {
+    if (!open) setError(null);
+  }, [open]);
+  return { pending, error, confirmRef, run, reset };
 }
 
 /**
  * Focus moves to the cancel when the confirmation opens — the safe tap, so a
- * stray Enter cannot complete the act — and the element that had it before is
- * remembered, to be handed back on cancel.
+ * stray Enter cannot complete the act. Backing out hands focus back AFTER the
+ * host has re-rendered — on the commit that closes the confirmation (or
+ * unmounts it), never inside the click — to `returnFocusTo()` when given, else
+ * to the element that held focus when it opened, if that is still in the page.
+ * A trigger the host hides while the confirmation is open is unmounted by
+ * then, so such a host passes `returnFocusTo`.
  */
-function useOpenFocus(open: boolean, cancelRef: React.RefObject<HTMLButtonElement | null>) {
+function useReturnFocus(
+  open: boolean,
+  cancelRef: React.RefObject<HTMLButtonElement | null>,
+  returnFocusTo: InlineConfirmProps['returnFocusTo'],
+): () => void {
   const before = useRef<HTMLElement | null>(null);
+  const wanted = useRef(false);
+  const target = useRef(returnFocusTo);
   useEffect(() => {
-    if (!open) return;
-    const active = typeof document === 'undefined' ? null : document.activeElement;
-    before.current = active instanceof HTMLElement ? active : null;
-    cancelRef.current?.focus();
-  }, [cancelRef, open]);
-  return useCallback(() => {
-    const target = before.current;
+    target.current = returnFocusTo;
+  });
+  const giveBack = useCallback(() => {
+    if (!wanted.current) return;
+    wanted.current = false;
+    const element = target.current?.() ?? before.current;
     before.current = null;
-    if (target && target.isConnected) target.focus();
+    if (element && element.isConnected) element.focus();
+  }, []);
+  useEffect(() => {
+    if (!open) {
+      giveBack();
+      return;
+    }
+    const active = typeof document === 'undefined' ? null : document.activeElement;
+    before.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    cancelRef.current?.focus();
+  }, [cancelRef, giveBack, open]);
+  // A host that unmounts the confirmation instead of closing it.
+  useEffect(() => giveBack, [giveBack]);
+  return useCallback(() => {
+    wanted.current = true;
   }, []);
 }
 
@@ -106,19 +149,20 @@ export function InlineConfirm({
   onConfirm,
   onCancel,
   errorText,
+  returnFocusTo,
   dataTestId = 'inline-confirm',
 }: InlineConfirmProps): React.JSX.Element | null {
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-  const { pending, error, run, reset } = useConfirmRun(onConfirm, errorText);
-  const restoreFocus = useOpenFocus(open, cancelRef);
+  const { pending, error, confirmRef, run, reset } = useConfirmRun(open, onConfirm, errorText);
+  const askForFocusBack = useReturnFocus(open, cancelRef, returnFocusTo);
 
   const cancel = useCallback(() => {
     if (pending) return;
     reset();
+    askForFocusBack();
     onCancel();
-    restoreFocus();
-  }, [onCancel, pending, reset, restoreFocus]);
+  }, [askForFocusBack, onCancel, pending, reset]);
 
   if (!open) return null;
   return (
@@ -133,29 +177,33 @@ export function InlineConfirm({
       }}
     >
       <Divider />
-      <Typography id={titleId} variant="body1" component="p" sx={{ fontWeight: 600 }}>
+      <Typography id={titleId} className="inline-confirm-title" variant="body1" component="p" sx={{ fontWeight: 600 }}>
         {title}
       </Typography>
       {description ? (
-        <Typography variant="body2" component="p" color="text.secondary">
+        <Typography className="inline-confirm-text" variant="body2" component="p" color="text.secondary">
           {description}
         </Typography>
       ) : null}
       {irreversibleNote ? (
-        <Typography variant="body2" component="p" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-irreversible`}>
+        <Typography className="inline-confirm-text" variant="body2" component="p" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-irreversible`}>
           {irreversibleNote}
         </Typography>
       ) : null}
       {error ? (
-        <Typography variant="body2" component="p" color="error" role="alert" data-testid={`${dataTestId}-error`}>
+        <Typography className="inline-confirm-text" variant="body2" component="p" color="error" role="alert" data-testid={`${dataTestId}-error`}>
           {error}
         </Typography>
       ) : null}
-      <Actions>
-        <Button ref={cancelRef} variant="outline" color="primary" disabled={pending} onClick={cancel} dataTestId={`${dataTestId}-cancel`}>
+      {/* Neither button is natively disabled while the write is out — the
+          pressed one would drop focus to the page: the verb is `loading`
+          (aria-disabled, press ignored) and the cancel is aria-disabled, its
+          press ignored by `cancel`. */}
+      <Actions className="inline-confirm-actions">
+        <Button ref={cancelRef} variant="outline" color="primary" aria-disabled={pending || undefined} onClick={cancel} dataTestId={`${dataTestId}-cancel`}>
           {cancelText}
         </Button>
-        <Button variant="solid" color="danger" loading={pending} disabled={pending} onClick={run} dataTestId={`${dataTestId}-confirm`}>
+        <Button ref={confirmRef} variant="solid" color="danger" loading={pending} onClick={run} dataTestId={`${dataTestId}-confirm`}>
           {confirmText}
         </Button>
       </Actions>

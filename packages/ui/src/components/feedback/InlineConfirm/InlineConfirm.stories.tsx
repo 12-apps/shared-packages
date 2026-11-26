@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import Paper from '@mui/material/Paper/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import { Button } from '../../form/Button';
 
@@ -22,6 +22,8 @@ const WORDS = {
 /** A list row with its trigger, the place the confirmation opens. */
 function Row(props: Partial<InlineConfirmProps> & { width?: number }): React.JSX.Element {
   const [open, setOpen] = useState(props.open ?? false);
+  // The trigger hides while asking, so focus comes back through returnFocusTo.
+  const trigger = useRef<HTMLButtonElement | null>(null);
   return (
     <Paper variant="outlined" sx={{ p: 2, width: props.width ?? 520 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -29,7 +31,7 @@ function Row(props: Partial<InlineConfirmProps> & { width?: number }): React.JSX
           2. Joaquim Prado
         </Typography>
         {open ? null : (
-          <Button variant="text" color="neutral" size="sm" onClick={() => setOpen(true)}>
+          <Button ref={trigger} variant="text" color="neutral" size="sm" onClick={() => setOpen(true)}>
             Remover da fila
           </Button>
         )}
@@ -40,6 +42,7 @@ function Row(props: Partial<InlineConfirmProps> & { width?: number }): React.JSX
         open={open}
         onConfirm={props.onConfirm ?? (() => setOpen(false))}
         onCancel={() => setOpen(false)}
+        returnFocusTo={() => trigger.current}
       />
     </Paper>
   );
@@ -67,7 +70,7 @@ export const Default: Story = { args: {} };
 
 export const Open: Story = { args: { open: true } };
 
-export const OnAPhone: Story = { args: { open: true, width: 300 } };
+export const OnAPhone: Story = { args: { open: true, width: 260 } };
 
 export const Failed: Story = {
   args: { open: true, onConfirm: () => Promise.reject(new Error('Esse cliente já saiu da fila.')) },

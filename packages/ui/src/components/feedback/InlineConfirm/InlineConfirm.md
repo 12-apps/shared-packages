@@ -17,11 +17,21 @@ The same contract as `ConfirmAction`, without the dialog:
 - **One write per confirmation.** A returned promise holds it pending — both
   buttons inert, Escape ignored — and a second press in that window is dropped.
 - **A failure stays visible.** A rejection keeps it open with the rejection's
-  message (throw the server's sentence), else `errorText`, and the reader can
-  press the verb again.
+  message (throw the server's sentence), else `errorText`, announced as an
+  alert, and focus moves to the verb so the reader retries with Enter. A
+  confirmation the host closes forgets its failure: reopened, it starts clean.
 - **The keyboard is safe.** Focus moves to the CANCEL when it opens, so a stray
-  Enter cannot complete the act. Escape backs out like the cancel, and both
-  hand focus back to the element that had it before opening (the row's trigger).
+  Enter cannot complete the act. Escape backs out like the cancel. While the
+  write is out neither button is natively disabled — the pressed one keeps
+  focus — the verb shows its spinner and both ignore presses (`aria-disabled`).
+- **Focus comes back after the host re-renders.** On a cancel or Escape the
+  host closes the confirmation (`open={false}`); on THAT commit — never inside
+  the click — focus goes to `returnFocusTo()` when given, else to the element
+  that held focus when the confirmation opened, if it is still in the page.
+  **A host that hides its trigger while the confirmation is open must pass
+  `returnFocusTo`**: the trigger it rendered before is gone by then, and only
+  the callback can reach the one rendered again. Keep `InlineConfirm` mounted
+  and toggle `open`; unmounting it on cancel still hands focus back.
 - **In the tree, never a portal.** It renders where it is placed, so it scrolls
   with its row and nothing covers the list.
 
@@ -47,17 +57,35 @@ Every word is the host's; the component writes none.
   with the **verb on top** and the cancel at the bottom
   (`components-guidelines.md`, "Stacked buttons"); in a narrow row (a container
   under 288px, written through the theme and read by a container query, never a
-  media query) each spans the line.
-- Red appears only on the verb's button.
+  media query) each button takes a whole line of its own.
+- Spacing follows the first host's approved frames on the theme's stops: about
+  12px from the hairline to the question, 4px from the question to its body and
+  the note, 8px before the buttons.
+- **The buttons keep the library's size** (40px tall, 16px label), not the
+  frames' hand-drawn 36px: the 40px tap target is a repository rule and the
+  library's scale is the design system (decided in the review of #1132).
+- **Reading order differs from visual order, on purpose.** The verb is drawn
+  first, but the cancel ("Manter") comes first in the DOM, so a screen reader
+  and the Tab key reach it first: the safe answer is the first one met.
+- Red marks the verb's button and a failure, nothing else.
+- The verb LEADS, unlike `AlertDialog`'s pair where the primary sits on the
+  right: in a row the eye reads from the start edge, and the owner's approved
+  frames (FUT-5615) draw it so. The cancel is still first in the tab order.
 
 ## Usage
 
 ```tsx
 import { InlineConfirm } from '@12-apps/ui/feedback/InlineConfirm';
 
+const trigger = useRef<HTMLButtonElement | null>(null);
+
 <li>
   <span>{guest.name}</span>
-  {asking ? null : <Button variant="text" onClick={() => setAsking(true)}>{copy.remove}</Button>}
+  {asking ? null : (
+    <Button ref={trigger} variant="text" onClick={() => setAsking(true)}>
+      {copy.remove}
+    </Button>
+  )}
   <InlineConfirm
     open={asking}
     title={copy.removeAsk(firstName)}
@@ -72,6 +100,8 @@ import { InlineConfirm } from '@12-apps/ui/feedback/InlineConfirm';
       setAsking(false);
     }}
     onCancel={() => setAsking(false)}
+    // The trigger is hidden while asking: hand focus to the one rendered again.
+    returnFocusTo={() => trigger.current}
     dataTestId={`remove-ask-${guest.id}`}
   />
 </li>;
@@ -90,6 +120,7 @@ import { InlineConfirm } from '@12-apps/ui/feedback/InlineConfirm';
 | `onConfirm` | `() => void \| Promise<unknown>` | — |
 | `onCancel` | `() => void` | — |
 | `errorText` | `string` | none |
+| `returnFocusTo` | `() => HTMLElement \| null` | the element focused when it opened |
 | `dataTestId` | `string` | `inline-confirm` (buttons `-confirm`, `-cancel`; the note `-irreversible`; the failure `-error`) |
 
 ## Accessibility
@@ -97,7 +128,9 @@ import { InlineConfirm } from '@12-apps/ui/feedback/InlineConfirm';
 - `role="group"` named by the title, so a screen reader announces the question
   when focus lands on the cancel.
 - The failure is `role="alert"`.
-- Focus: the cancel on open; back to the trigger on cancel or Escape.
+- Focus: the cancel on open; the verb after a failed write; back to
+  `returnFocusTo()` (or the element focused before opening) on the commit
+  that closes it after a cancel or Escape.
 
 ## When not to use it
 
