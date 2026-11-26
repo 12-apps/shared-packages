@@ -105,15 +105,23 @@ const ID_GROUPS = {
   permissions: ['close'],
 } as const satisfies { [G in keyof TenantIds]: readonly (keyof TenantIds[G])[] };
 
+function validateIdGroup(value: unknown, group: string, names: readonly string[]): void {
+  const bag = requireBag(value, `ids.${group}`);
+  const values = Object.fromEntries(
+    names.map((name) => [name, requireString(bag[name], `ids.${group}.${name}`)]),
+  );
+  // Two acts sharing one id would be indistinguishable to whoever reads it.
+  requireDistinct(values, `ids.${group}`);
+}
+
 function validateIds(value: unknown): void {
   const ids = requireBag(value, 'ids');
-  for (const [group, names] of Object.entries(ID_GROUPS)) {
-    const bag = requireBag(ids[group], `ids.${group}`);
-    const values: Record<string, string> = {};
-    for (const name of names) values[name] = requireString(bag[name], `ids.${group}.${name}`);
-    // Two acts sharing one id would be indistinguishable to whoever reads it.
-    requireDistinct(values, `ids.${group}`);
-  }
+  for (const [group, names] of Object.entries(ID_GROUPS)) validateIdGroup(ids[group], group, names);
+}
+
+function validatePack(value: unknown, tag: string): void {
+  const pack = requireBag(value, `copy.locales.${tag}`);
+  TENANT_COPY_KEYS.forEach((copyKey) => requireString(pack[copyKey], `copy.locales.${tag}.${copyKey}`));
 }
 
 function validateCopy(value: unknown): void {
@@ -123,10 +131,7 @@ function validateCopy(value: unknown): void {
   if (tags.length === 0) {
     throw new TenantConfigError('copy.locales', 'must hold at least one locale pack');
   }
-  for (const tag of tags) {
-    const pack = requireBag(locales[tag], `copy.locales.${tag}`);
-    for (const copyKey of TENANT_COPY_KEYS) requireString(pack[copyKey], `copy.locales.${tag}.${copyKey}`);
-  }
+  for (const tag of tags) validatePack(locales[tag], tag);
   const fallback = requireString(copy.defaultLocale, 'copy.defaultLocale');
   if (!tags.includes(fallback)) {
     throw new TenantConfigError('copy.defaultLocale', `names "${fallback}", which copy.locales does not hold`);
