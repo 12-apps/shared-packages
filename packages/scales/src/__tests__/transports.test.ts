@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createAndroidSerialTransport } from "../android";
 import { createNodeSerialTransport } from "../node";
 import { createWebSerialTransport } from "../web";
-import { createUranoParser, uranoPopLight } from "../urano";
+import { createUranoParser, createUranoPopLight } from "../urano";
 import { captures, frame } from "./urano-captures";
+
+const uranoPopLight = createUranoPopLight("Urano US 31/2 POP Light");
 
 const reading = () => expect.objectContaining({ netGrams: 428, tareGrams: 286 });
 

@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScale } from "../reader";
 import { createScaleRegistry } from "../registry";
 import type { ByteTransport, ScaleEvent, SerialConfig } from "../types";
-import { uranoPopLight } from "../urano";
+import { createUranoPopLight } from "../urano";
 import { captures, frame } from "./urano-captures";
+
+const uranoPopLight = createUranoPopLight("Urano US 31/2 POP Light");
 
 function fakeTransport({ respondOnOpen = false }: { respondOnOpen?: boolean } = {}) {
   const data = new Set<(bytes: Uint8Array) => void>();

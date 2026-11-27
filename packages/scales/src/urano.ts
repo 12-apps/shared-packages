@@ -53,12 +53,14 @@ export function createUranoParser(): ScaleParser {
   };
 }
 
-export const uranoPopLight: ScaleProfile = {
-  id: "urano-pop-light",
-  label: "Urano US 31/2 POP Light",
-  serial: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none", dtr: true, rts: true },
-  request: { kind: "poll", bytes: Uint8Array.of(5), intervalMs: 500 },
-  silence: "moving-or-invalid",
-  usbHints: [{ vendorId: 0x1a86, productId: 0x7523 }],
-  createParser: createUranoParser,
-};
+export function createUranoPopLight(label: string): ScaleProfile {
+  return {
+    id: "urano-pop-light",
+    label,
+    serial: { baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none", dtr: true, rts: true },
+    request: { kind: "poll", bytes: Uint8Array.of(5), intervalMs: 500 },
+    silence: "moving-or-invalid",
+    usbHints: [{ vendorId: 0x1a86, productId: 0x7523 }],
+    createParser: createUranoParser,
+  };
+}

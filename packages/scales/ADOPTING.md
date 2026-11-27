@@ -2,7 +2,7 @@
 
 The package reports what the instrument measured. The host owns physical access, device selection, pricing, plate policy, and what to do with a settled reading.
 
-- Create a registry with `createScaleRegistry([uranoPopLight])`.
+- Create a registry with `createScaleRegistry([createUranoPopLight(copy.uranoModelName)])`. The host supplies the profile’s display label in its copy pack.
 - For Electron or Node, use `createNodeSerialTransport` from `@12-apps/scales/node`. The host supplies a `serialport` handle with `autoOpen: false`. Rediscover the port path in `createPort` to tolerate a changed path after a reconnect.
 - For Web Serial, give `createWebSerialTransport` from `@12-apps/scales/web` a port granted by the browser. The host is responsible for requesting permission with a user gesture.
 - For React Native Android, bind an Android USB serial module to `AndroidSerialBridge` and give it to `createAndroidSerialTransport` from `@12-apps/scales/android`. Open, write, close, and data and disconnect events belong to that module. The reader and parser stay in TypeScript.
