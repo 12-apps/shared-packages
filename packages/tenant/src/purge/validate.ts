@@ -47,7 +47,7 @@ interface Scope {
 }
 
 /** The model's mapped name, or the error naming it. */
-export function resolvedAt(scope: Pick<Scope, 'resolve'>, value: unknown, key: string): string {
+function resolvedAt(scope: Pick<Scope, 'resolve'>, value: unknown, key: string): string {
   const model = textAt(value, key);
   const table = scope.resolve(model);
   if (typeof table !== 'string' || table === '') {
