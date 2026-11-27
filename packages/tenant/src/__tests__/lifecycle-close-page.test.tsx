@@ -126,8 +126,9 @@ describe('the close dialog (K-D)', () => {
     expect(wordsNotFromPack(dialog.textContent ?? '', [NAME])).toBe('');
   });
 
-  it('lights the confirm only with a reason, the name as the server compares it and the PIN (K-D5, K-D7)', async () => {
-    const off = () => confirmButton().hasAttribute('disabled') || confirmButton().getAttribute('aria-disabled') === 'true';
+  const off = () => confirmButton().hasAttribute('disabled') || confirmButton().getAttribute('aria-disabled') === 'true';
+
+  it('lights the confirm only with a reason and the name as the server compares it (K-D5, K-D7)', async () => {
     await openDialog(hostState());
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'ab' } });
@@ -138,7 +139,9 @@ describe('the close dialog (K-D)', () => {
     fireEvent.change(field('close-ward-name'), { target: { value: 'Other' } });
     expect(off()).toBe(true);
     expect(screen.getByText(`«h.nameMismatch» «h.nameHint(${NAME})»`)).toBeTruthy();
-    cleanup();
+  });
+
+  it('keeps the confirm off until the PIN is ready (K-D7)', async () => {
     await openDialog(hostState({ pin: pin({ ready: false }) }));
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'moving' } });
