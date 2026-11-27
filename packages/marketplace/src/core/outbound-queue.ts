@@ -34,7 +34,11 @@ export interface OutboundJobPayload {
    * belongs to: the owner of its SENDING claim. Absent on every other action.
    */
   claimKey?: string;
-  /** OPTIONAL. The pickup code a `validatePickupCode` call sends; absent on every other action. */
+  /**
+   * OPTIONAL. The pickup code a `validatePickupCode` call sends; absent on every
+   * other action. The one non-identifier in the payload: a short-lived code the
+   * job needs to send, which no log line prints.
+   */
   code?: string;
 }
 
@@ -55,8 +59,6 @@ function ableTo(adapter: MarketplaceAdapter, payload: OutboundJobPayload): boole
       return Boolean(payload.step && adapter.capabilities.statusSteps?.includes(payload.step));
     case "confirm":
       return adapter.capabilities.apiConfirm;
-    case "validatePickupCode":
-      return adapter.courier !== undefined;
     default:
       return adapter.capabilities.apiCancel;
   }

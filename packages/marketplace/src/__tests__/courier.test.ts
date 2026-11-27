@@ -151,6 +151,17 @@ describe("COLLECTED joins DISPATCHED in the lifecycle rule (FUT-4653)", () => {
     expect(inboxRow(h, "evt-ext-1-CLT")).toMatchObject({ status: "PROCESSED" });
   });
 
+  it("a CLT of a bag the store carries moves nothing, is never noted, and the host is not asked", async () => {
+    const h = createHarness({ lifecycle: ["moved"] });
+    await acceptedOrder(h, "MERCHANT");
+
+    const outcome = await deliverIfood(h, ifoodEvent("ext-1", "CLT"));
+
+    expect(outcome).toEqual({ kind: "ignored", reason: "COLLECTED of a bag the marketplace does not carry" });
+    expect(h.lifecycleCalls).toHaveLength(0);
+    expect(h.memory.tables.marketplaceStatusUpdate.rows).toHaveLength(0);
+  });
+
   it("with no courier hook the CLT still moves the bag, as a DSP does", async () => {
     const h = createHarness({ lifecycle: ["moved"] });
     const orderId = await acceptedOrder(h);
@@ -246,6 +257,21 @@ describe("the validatePickupCode job", () => {
     expect(await h.engine.runOutbound(job(orderId, "0000"), FIRST)).toEqual({ kind: "done", action: "validatePickupCode" });
     expect(h.pickupCodeVerdicts).toEqual([{ orderId, validation: "INVALID" }]);
     expect(h.acceptance(orderId)).toEqual(before);
+  });
+
+  it("the code never reaches the logger, whatever the verdict", async () => {
+    const answers = ['{"valid":true}', '{"valid":false}', "nope"];
+    for (const [index, body] of answers.entries()) {
+      const code = `98${index}7`;
+      const h = createHarness({ http: answering(body, index === 2 ? 400 : 200), pickupCodeHook: true });
+      const orderId = await acceptedOrder(h);
+      await h.engine.validatePickupCode({ clientId: TENANT, orderId, code, at: new Date(1) });
+
+      await h.engine.runOutbound(job(orderId, code), LAST);
+
+      expect(h.pickupCodeVerdicts).toHaveLength(1);
+      expect(h.logged.filter((line) => line.message.includes(code))).toEqual([]);
+    }
   });
 
   it("a 4xx is final: UNVERIFIED, logged at error, never retried", async () => {

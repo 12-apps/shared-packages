@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createIfoodAdapter } from "..";
 import type { AdapterCallContext, MarketplaceHttpRequest, MarketplaceHttpResponse } from "../../core/adapter";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../en-US";
-import { IFOOD_COURIER } from "../courier";
+import { IFOOD_COURIER, IFOOD_COURIER_NAME_MAX } from "../courier";
 import { ifoodPlacedWithMoney } from "./fixtures";
 
 /**
@@ -57,6 +57,13 @@ describe("the courier events", () => {
     );
 
     expect(event?.courier?.courier).toEqual({ name: "Ana", photoUrl: null, vehicle: "OTHER" });
+  });
+
+  it("bounds what it keeps: a long name is truncated, a long photo URL dropped, nothing throws", () => {
+    const longUrl = `https://static.ifood.com.br/${"a".repeat(2100)}.jpg`;
+    const event = normalize(courierEvent("ADR", { workerName: "N".repeat(500), workerPhotoUrl: longUrl }));
+
+    expect(event?.courier?.courier).toEqual({ name: "N".repeat(IFOOD_COURIER_NAME_MAX), photoUrl: null, vehicle: null });
   });
 
   it("an ASSIGN_DRIVER with no metadata names nobody", () => {

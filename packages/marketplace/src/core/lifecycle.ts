@@ -76,6 +76,15 @@ function refusal(held: HeldAcceptance): string | null {
   return null;
 }
 
+/**
+ * A COLLECTED is the marketplace's courier taking the bag (FUT-5665): for a
+ * bag the store carries it moves nothing and is never noted, so it cannot
+ * stand in for the store's own HANDED_OVER (a merchant bag's "delivered").
+ */
+function notTheFleets(lifecycle: MarketplaceLifecycle, held: HeldAcceptance): string | null {
+  return lifecycle === "COLLECTED" && held.deliveredBy !== "MARKETPLACE" ? "COLLECTED of a bag the marketplace does not carry" : null;
+}
+
 function deliveredByOf(held: HeldAcceptance): MarketplaceDeliveredBy | null {
   return held.deliveredBy === "MERCHANT" || held.deliveredBy === "MARKETPLACE" ? held.deliveredBy : null;
 }
@@ -122,7 +131,7 @@ export async function followLifecycle(
     await deferInboxEvent(ctx, inboxId, reason);
     return { kind: "ignored", reason };
   }
-  const stopped = refusal(held);
+  const stopped = refusal(held) ?? notTheFleets(lifecycle, held);
   if (stopped) return ignored(ctx, inboxId, stopped);
 
   const echo = ECHO_OF[lifecycle];

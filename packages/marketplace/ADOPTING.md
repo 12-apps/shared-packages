@@ -28,7 +28,7 @@ error at mount, never a default that quietly adopts another host's policy.
 | `secrets` | `{ seal(plaintext): string; open(sealed): string }` | Seal and open the credential blob with the host's key. `open` THROWS on a blob that will not open. |
 | `http` | `(req: MarketplaceHttpRequest) => Promise<MarketplaceHttpResponse>` | The only way the engine reaches a marketplace. Answer any status; throw only when no answer arrived (timeout, network). The host owns the timeout, proxy and CA. `method` is `GET`, `POST`, `PUT` or, since the catalogue (1.2), `PATCH`. |
 | `audit` | `{ record(entry: { clientId; actorId: string \| null; action: "marketplace.integration.archive" \| "marketplace.integration.unarchive"; provider; reason: string \| null; at: Date }, db: MarketplaceDb): Promise<void> }` | Every archive and unarchive of a connection, INSIDE the same transaction: write the line through `db`, so an archive never lands without its line and a failing audit rolls the archive back. `actorId` is `MarketplaceActor.userId`. |
-| `enqueue` | `{ enqueue(name, payload, { dedupeKey? }) => Promise<{ enqueued: boolean; reason?: string }> }` | The wiring `JobsEnqueuePort`. Never throws. The engine queues only its own three on-demand jobs: `marketplace.outbound` (`{ clientId, orderId, action }`, dedupe key `marketplace.outbound:<action>:<orderId>`; `validatePickupCode` adds `code` and keys on the hand-over's instant), `marketplace.fetch-order` (`{ clientId, inboxId }`, dedupe key `marketplace.fetch-order:<inboxId>`) and `marketplace.catalogue` (`{ clientId, publicationId, action }`, dedupe key `marketplace.catalogue:<action>:<publicationId>:<asked at, ms>`); the sweeps re-queue each under a key of their own. |
+| `enqueue` | `{ enqueue(name, payload, { dedupeKey? }) => Promise<{ enqueued: boolean; reason?: string }> }` | The wiring `JobsEnqueuePort`. Never throws. The engine queues only its own three on-demand jobs: `marketplace.outbound` (`{ clientId, orderId, action }`, dedupe key `marketplace.outbound:<action>:<orderId>`; `validatePickupCode` adds `code`, the one non-identifier a payload carries, a short-lived code no log line prints, and keys on the hand-over's instant), `marketplace.fetch-order` (`{ clientId, inboxId }`, dedupe key `marketplace.fetch-order:<inboxId>`) and `marketplace.catalogue` (`{ clientId, publicationId, action }`, dedupe key `marketplace.catalogue:<action>:<publicationId>:<asked at, ms>`); the sweeps re-queue each under a key of their own. |
 | `clock` | `{ now(): Date }` | What time it is. |
 | `logger` | `{ info, warn, error }` | The wiring `LoggerPort`; bind `assembled.loggers["@12-apps/marketplace"]`. |
 | `publishChanged` | `(clientId) => void` | Tell the staff surfaces something moved. Fire-and-forget. |
@@ -366,7 +366,12 @@ iFood's `delivery.deliveredBy = IFOOD`), the engine reports where its courier
 is, carries the code the courier states at the counter, checks that code with
 the marketplace after the hand-over, and reads the courier's tracking. All of
 it is additive: every new port and field is optional, nothing below needs an
-engine migration, and an unbound host behaves byte for byte as on 1.x.
+engine migration, and a host that binds none of the new hooks keeps its 1.x
+behaviour, with one exception: a host that binds `onLifecycle` now receives
+`lifecycle: "COLLECTED"` (iFood `CLT`, Keeta `ORDER_COLLECTED`, for a bag the
+marketplace carries; before, IGNORED as `no order body`). A switch with a
+default answers `unchanged`; an exhaustive switch must add the case, as for
+`status` in FUT-4653.
 
 **What the host binds.**
 
@@ -388,8 +393,9 @@ engine migration, and an unbound host behaves byte for byte as on 1.x.
 - `order.onLifecycle` now also gets `lifecycle: "COLLECTED"` (iFood `CLT`,
   Keeta `ORDER_COLLECTED`). For a fleet bag treat it as `DISPATCHED`: the
   courier has the bag, so move it to handed over, forward only, with no code
-  asked. The engine notes it as the marketplace's HANDED_OVER, and treats a
-  `COLLECTED` after your own informed HANDED_OVER as an echo. The courier's
+  asked. A `COLLECTED` of a bag the marketplace does not carry is IGNORED by
+  the engine, never noted and never sent to the host. The engine notes it as
+  the marketplace's HANDED_OVER, and treats a `COLLECTED` after your own informed HANDED_OVER as an echo. The courier's
   facts reach `onCourier` first; when the lifecycle moves nothing the row is
   settled by the courier's answer.
 - `order.onPickupCodeValidated(clientId, orderId, validation)`: `VALID`,

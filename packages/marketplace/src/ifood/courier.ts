@@ -53,9 +53,14 @@ const VEHICLE_OF: Readonly<Record<string, MarketplaceCourierVehicle>> = {
   CARRO: "CAR",
 };
 
-/** An https URL, or null: a photo the host renders is never another scheme. */
+/** The longest courier name kept: a longer one is truncated, never refused. */
+export const IFOOD_COURIER_NAME_MAX = 120;
+/** The longest photo URL kept: a longer one is dropped (a truncated URL is a broken one). */
+export const IFOOD_COURIER_PHOTO_URL_MAX = 2048;
+
+/** An https URL of bounded length, or null: a photo the host renders is never another scheme. */
 function httpsUrl(value: string | null): string | null {
-  if (!value) return null;
+  if (!value || value.length > IFOOD_COURIER_PHOTO_URL_MAX) return null;
   try {
     return new URL(value).protocol === "https:" ? value : null;
   } catch {
@@ -77,7 +82,7 @@ function metadataOf(payload: unknown): unknown {
 /** The courier an ADR names: `workerName`, `workerPhotoUrl`, `workerVehicleType`. Null when it names nothing. */
 function readCourier(payload: unknown): MarketplaceCourier | null {
   const metadata = metadataOf(payload);
-  const name = firstString(metadata, [["workerName"]]);
+  const name = firstString(metadata, [["workerName"]])?.slice(0, IFOOD_COURIER_NAME_MAX) ?? null;
   const photoUrl = httpsUrl(firstString(metadata, [["workerPhotoUrl"]]));
   const stated = firstString(metadata, [["workerVehicleType"]])?.toUpperCase() ?? null;
   const vehicle = stated === null ? null : (VEHICLE_OF[stated] ?? "OTHER");

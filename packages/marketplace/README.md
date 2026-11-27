@@ -578,7 +578,9 @@ for the host (ADOPTING.md section 10):
   unsupported.
 - **COLLECTED is a lifecycle step.** `CLT` / `ORDER_COLLECTED` also names
   `lifecycle: "COLLECTED"`, which follows the FUT-4653 rules like a
-  `DISPATCHED` and is noted as the marketplace's `HANDED_OVER`.
+  `DISPATCHED` and is noted as the marketplace's `HANDED_OVER`, for a bag the
+  marketplace carries only (a store-carried bag's COLLECTED is IGNORED, never
+  noted, so the store's own "delivered" is still sent).
 - **The pickup code.** `NormalizedMarketplaceOrder.pickupCode` (iFood
   `delivery.pickupCode`). After its local check and hand-over, the host calls
   `engine.validatePickupCode`, and the `marketplace.outbound` job (action
