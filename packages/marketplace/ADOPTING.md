@@ -443,3 +443,47 @@ ETA are the host's own columns.
 
 **Copy.** The engine adds no copy key; every sentence ("Código não confere",
 "Voltando para a loja") is the host's.
+
+## 11. iFood: the order fetched after PLACED (FUT-5800)
+
+iFood's events name an order without carrying it: a PLACED is
+`{ id, code: "PLC", fullCode: "PLACED", orderId, merchantId, createdAt }`, and
+the order itself is `GET /order/v1.0/orders/{orderId}`. The iFood adapter now
+marks a PLACED that carries no items `orderToFetch` and implements
+`fetchOrder`, so a PLACED by id goes through the engine's existing order-fetch
+path, the one 99Food and Keeta already use. A PLACED that does carry the order
+(a replay, an older payload) is ingested from its body as before.
+
+**The path is the webhook only.** The software connects to iFood as one
+centralized app that iFood calls back (owner, FUT-5798: "no 30-second
+polling"), so the engine has no events poller, calls neither
+`events:polling` nor `events/acknowledgment`, and asks the host to schedule
+nothing new.
+
+**The contract.**
+
+| | |
+|---|---|
+| **What the host binds** | Nothing new. The `marketplace.fetch-order` job already arrives with `MARKETPLACE_JOBS` (bind `{ engine }`); the `enqueue` port carries it and the `http` port makes its `GET`. A host that holds the job (its `enqueue` answers "not enqueued") holds every iFood order: each waits PENDING and the reconciliation sweep re-queues it. |
+| **Delivery** | At least once. iFood redelivers a webhook it got no 2xx for; a second copy of an event is expected, never an error. |
+| **Recorded before answered** | The webhook answers 2xx only after the delivery's inbox row is written (PENDING, "order details to fetch"). That 2xx is the acknowledgement: a delivery whose row could not be written answers no 2xx (the write's throw reaches the host's error handler), and iFood delivers it again. |
+| **Dedupe** | By event id, at the inbox's unique `(provider, eventId)`: a redelivered PLACED is `duplicate`, queues nothing and calls nobody. By order id, at ingest's `(provider, externalOrderId)`: a second PLACED for the same order under another event id, or the same order also delivered with its body, fetches at most again and still lands ONE order. |
+| **When iFood is called** | Never in the webhook request. The request queues `marketplace.fetch-order` (`{ clientId, inboxId }`, dedupe key `marketplace.fetch-order:<inboxId>`) after the row is written; the job reads the row, calls `GET /order/v1.0/orders/{id}` with the connection's bearer token (the adapter's token cache, the linked grant for a linked store) and ingests the answer through the one ingest path. The acceptance window counts from when the event arrived, not from when the fetch returned. |
+| **Retry and backoff** | 3 attempts, exponential from 5 s. Retried: 404 (an order iFood has not replicated yet, ESTIMATED), 408, 425, 429, 5xx, a timeout or a network error, and a 2xx whose body is not JSON. Refused at once (row FAILED, no retry): a 2xx naming another order or carrying no items, and any other final 4xx. The last attempt settles the row FAILED (`order fetch failed: …`). The `marketplace.reconcile-inbox` sweep (every 5 min) re-queues a FAILED or still-PENDING row older than 2 minutes, until the row has been tried `maxInboxAttempts` times. |
+| **Terminal state** | The inbox row: PROCESSED (ingested), IGNORED (cancelled before its body arrived), or FAILED with its reason once its attempts are spent. A FAILED row is never re-run past `maxInboxAttempts`; it stays as the evidence. |
+| **401: credentials refused** | A 401 on the order read forgets the cached token and asks for a new one, once, inside the same attempt. A second 401, a 403 (the merchant has not authorized the app), or a token grant iFood refuses with a final 4xx, is our credentials refused, not the order's fault: the job does not retry it, settles the row FAILED (`order fetch failed: refused 401: …`), stamps the connection `status: "FAILED"` (what the connections screen shows) and calls `publishChanged`. The stamp is the engine's, for every adapter whose `fetchOrder` answers an `own` 4xx refusal (99Food and Keeta on a refused token grant too). No tight loop: the next try is the sweep's, at its 5-minute cadence and within the row's attempt bound. Only the credentials the call was made with are judged: a store that entered new ones meanwhile is not stamped. Re-entering the credentials resets the status to UNVERIFIED, and the next fetch that succeeds on credentials stamped FAILED sets them VERIFIED again (`lastVerifiedAt` too); the sweep then ingests what is still within its bound. |
+
+**What the host does on the bump.** Nothing to code: confirm the
+`marketplace.fetch-order` job runs on the worker (it was registered with the
+other jobs since 1.x), and that the iFood webhook is registered. An iFood
+order then reaches `order.create` as it did with a body. The outcome the
+webhook answers for a PLACED by id is `{ received: true, outcome: "awaitingOrder" }`.
+
+**What the fetched order carries.** The same `NormalizedMarketplaceOrder` a
+PLACED with its body produces (lines with their SKU, name, quantity, unit price
+and note; the buyer; the total, delivery fee, subtotal and discounts; the
+order type, who delivers, the address and the pickup code), plus
+`externalMerchantId` from the order's `merchant.id`: an order naming another
+merchant than the connection's is refused FAILED, as for 99Food. The canonical
+shape has no field for an item's options or for the payment methods; the raw
+order is not stored by the engine.

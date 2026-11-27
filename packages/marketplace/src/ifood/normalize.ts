@@ -202,8 +202,12 @@ function optional<K extends string, V>(key: K, value: V | undefined): { [P in K]
   return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
 }
 
-/** The order body of a placed-order event, or null when it carries none. */
-function readOrder(
+/**
+ * The order body of a placed-order event, or null when it carries none. Also
+ * reads the order iFood serves at `GET /order/v1.0/orders/{id}` (`./fetch-order.ts`),
+ * whose fields are the same ones the event's `order` would carry.
+ */
+export function readIfoodOrder(
   payload: unknown,
   externalOrderId: string,
   missingStreetNumber: string,
@@ -247,6 +251,22 @@ function readOrder(
 }
 
 /**
+ * The order a PLACED carries, or, when it carries none, the mark that has it
+ * fetched: iFood's events carry only the order id (sandbox, 2026-11-27), so the
+ * `marketplace.fetch-order` job reads it (FUT-5800). Any other event: no order.
+ */
+function placedOrder(
+  payload: unknown,
+  placed: boolean,
+  externalOrderId: string,
+  missingStreetNumber: string,
+): Pick<NormalizedEvent, "order" | "orderToFetch"> {
+  if (!placed) return { order: null };
+  const order = readIfoodOrder(payload, externalOrderId, missingStreetNumber);
+  return order ? { order } : { order: null, orderToFetch: true };
+}
+
+/**
  * Normalize one iFood delivery.
  *
  * Returns null only when the payload carries no order id at all — the one thing
@@ -276,7 +296,7 @@ export function normalizeIfoodEvent(
     eventType,
     externalMerchantId: firstString(payload, [["merchantId"], ["merchant", "id"]]),
     externalOrderId,
-    order: placed ? readOrder(payload, externalOrderId, options.missingStreetNumber) : null,
+    ...placedOrder(payload, placed, externalOrderId, options.missingStreetNumber),
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : refusedRequest ? "FAILED" : null,
     ...(LIFECYCLE_OF[eventType.toUpperCase()] ? { lifecycle: LIFECYCLE_OF[eventType.toUpperCase()] } : {}),

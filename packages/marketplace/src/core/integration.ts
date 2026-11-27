@@ -357,18 +357,33 @@ export async function readOutboundConnection(
   clientId: string,
   provider: MarketplaceProvider,
 ): Promise<OutboundConnection | null> {
+  return (await readSealedOutboundConnection(ctx, clientId, provider))?.connection ?? null;
+}
+
+/**
+ * {@link readOutboundConnection}, with the sealed blob it was opened from: a
+ * caller that stamps the connection afterwards (`./fetch-order.ts`) guards
+ * the stamp on it, so a call made with credentials since replaced never
+ * judges the new ones. The blob never reaches an adapter.
+ */
+export async function readSealedOutboundConnection(
+  ctx: EngineContext,
+  clientId: string,
+  provider: MarketplaceProvider,
+): Promise<{ connection: OutboundConnection; sealed: string } | null> {
   const db = await ctx.ports.db();
   const row = (await db.marketplaceIntegration.findUnique({
     where: { clientId_provider: { clientId, provider } },
     select: { environment: true, credentials: true, authMode: true },
   })) as { environment: string; credentials: string; authMode?: string } | null;
   if (!row || row.credentials === "") return null;
+  const sealed = row.credentials;
   const environment = environmentOf(row.environment);
-  if (row.authMode !== "LINKED") return { environment, credentials: openCredentials(ctx, row.credentials) };
+  if (row.authMode !== "LINKED") return { connection: { environment, credentials: openCredentials(ctx, sealed) }, sealed };
   // Linked: the software's app speaks for the store, with the store's refresh token.
   const app = await appCredentialsOf(ctx, provider, environment);
   if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
-  const refreshToken = openLinkRefreshToken(ctx, row.credentials);
-  const link = { clientId, provider, environment, refreshToken, app, sealed: row.credentials };
-  return { environment, credentials: app, grant: linkGrant(ctx, link) };
+  const refreshToken = openLinkRefreshToken(ctx, sealed);
+  const link = { clientId, provider, environment, refreshToken, app, sealed };
+  return { connection: { environment, credentials: app, grant: linkGrant(ctx, link) }, sealed };
 }

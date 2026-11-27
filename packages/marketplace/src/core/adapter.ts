@@ -237,7 +237,8 @@ export interface MarketplaceAdapter {
    * OPTIONAL. Fetch the order an event announced with `orderToFetch` (a
    * marketplace whose events carry no order body). Called only from the
    * `marketplace.fetch-order` job. An adapter whose events always carry the
-   * order (iFood) leaves it out.
+   * order leaves it out. A final `refused` marked `own` with a 4xx status is
+   * our credentials refused: the engine stamps the connection FAILED.
    */
   fetchOrder?(ctx: AdapterCallContext, order: { externalOrderId: string }): Promise<FetchOrderResult>;
   /**

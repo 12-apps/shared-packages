@@ -1,6 +1,7 @@
 import { deferInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder } from "./ingest";
-import { readOutboundConnection, resolveIngestionTarget } from "./integration";
+import { markCredentialsAccepted, markCredentialsRefused } from "./connection-stamp";
+import { readSealedOutboundConnection, resolveIngestionTarget } from "./integration";
 import type { FetchOrderResult } from "./adapter";
 import { cancelAcceptance } from "./acceptance";
 import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest } from "./order-fetch-marks";
@@ -131,30 +132,37 @@ async function owedFetch(
   return { row, event };
 }
 
+/** What one call to the adapter answered, and the sealed credentials it was made with (null: no call). */
+interface AdapterFetch {
+  result: FetchOrderResult;
+  sealed: string | null;
+}
+
 /** One call to the adapter, or the refusal that stands in for it. */
 async function fetchThroughAdapter(
   ctx: EngineContext,
   clientId: string,
   provider: MarketplaceProvider,
   externalOrderId: string,
-): Promise<FetchOrderResult> {
+): Promise<AdapterFetch> {
   const adapter = ctx.registry.get(provider);
-  if (!adapter?.fetchOrder) return { kind: "refused", status: 0, message: `${provider} cannot fetch an order` };
-  let connection;
+  if (!adapter?.fetchOrder) return { result: { kind: "refused", status: 0, message: `${provider} cannot fetch an order` }, sealed: null };
+  let opened;
   try {
-    connection = await readOutboundConnection(ctx, clientId, provider);
+    opened = await readSealedOutboundConnection(ctx, clientId, provider);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return { kind: "refused", status: 0, message: `credentials do not open: ${reason}` };
+    return { result: { kind: "refused", status: 0, message: `credentials do not open: ${reason}` }, sealed: null };
   }
-  if (!connection) return { kind: "refused", status: 0, message: "no credentials on file" };
+  if (!opened) return { result: { kind: "refused", status: 0, message: "no credentials on file" }, sealed: null };
   try {
-    return await adapter.fetchOrder(
-      { http: ctx.ports.http, tokens: ctx.tokens, now: ctx.ports.clock.now(), ...connection },
+    const result = await adapter.fetchOrder(
+      { http: ctx.ports.http, tokens: ctx.tokens, now: ctx.ports.clock.now(), ...opened.connection },
       { externalOrderId },
     );
+    return { result, sealed: opened.sealed };
   } catch (error) {
-    return { kind: "retry", reason: error instanceof Error ? error.message : String(error) };
+    return { result: { kind: "retry", reason: error instanceof Error ? error.message : String(error) }, sealed: opened.sealed };
   }
 }
 
@@ -222,6 +230,11 @@ async function ingestFetched(
   return { kind: "ingested", orderId: ingested.orderId, unmappedSkus: ingested.unmappedSkus };
 }
 
+/** A final refusal of our own credentials by the marketplace (a 4xx, not a local "no credentials"). */
+function credentialsRefused(result: FetchOrderResult): boolean {
+  return result.kind === "refused" && result.own === true && result.status >= 400 && result.status < 500;
+}
+
 /**
  * Run one queued fetch. Returns what it did; throws {@link FetchOrderRetryError}
  * for an answer worth retrying before the last attempt. A refusal, or the last
@@ -241,12 +254,41 @@ export async function runFetchOrder(
     await deferInboxEvent(ctx, row.id, "integration is not enabled");
     return { kind: "skipped", reason: "integration is not enabled" };
   }
-  const result = await fetchThroughAdapter(ctx, payload.clientId, event.provider, event.externalOrderId ?? "");
-  if (result.kind === "order") return ingestFetched(ctx, row, payload.clientId, result.order, target);
+  const { result, sealed } = await fetchThroughAdapter(ctx, payload.clientId, event.provider, event.externalOrderId ?? "");
+  const stamp = sealed === null ? null : { clientId: payload.clientId, provider: event.provider, sealed };
+  if (result.kind === "order") {
+    // The credentials worked: a FAILED stamp left by an earlier refusal of these same ones is lifted.
+    if (stamp) await markCredentialsAccepted(ctx, stamp);
+    return ingestFetched(ctx, row, payload.clientId, result.order, target);
+  }
+  return endUnfetched(ctx, { row, event, result, attempt, stamp });
+}
+
+/**
+ * A fetch that brought no order: rethrown for the queue while a retry is worth
+ * it, else the row settles FAILED. Our credentials refused (a 401 that a fresh
+ * token did not cure, a refused token grant) are never retried by the queue:
+ * the connection reads FAILED, and the reconciliation sweep's next pass,
+ * minutes away and within the row's attempt bound, is the only re-try, so a
+ * revoked app never loops.
+ */
+async function endUnfetched(
+  ctx: EngineContext,
+  input: {
+    row: InboxRow;
+    event: NormalizedEvent;
+    result: Exclude<FetchOrderResult, { kind: "order" }>;
+    attempt: { attempt: number; maxAttempts: number };
+    /** The connection and the sealed credentials the call was made with; null when no call was made. */
+    stamp: { clientId: string; provider: MarketplaceProvider; sealed: string } | null;
+  },
+): Promise<FetchOrderOutcome> {
+  const { row, event, result, attempt } = input;
   const reason = result.kind === "refused" ? `refused ${result.status}: ${result.message}` : result.reason;
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
     throw new FetchOrderRetryError(`fetch of ${event.externalOrderId ?? "?"} (inbox ${row.id}): ${reason}`);
   }
+  if (input.stamp && credentialsRefused(result)) await markCredentialsRefused(ctx, input.stamp);
   await settleInboxEvent(ctx, row.id, "FAILED", `order fetch failed: ${reason}`);
   ctx.ports.logger.error(`${MARKETPLACE_FETCH_ORDER_JOB}: inbox row ${row.id} failed: ${reason}`);
   return { kind: "failed", reason };

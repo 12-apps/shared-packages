@@ -3,6 +3,7 @@ import { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from 
 import { IFOOD_CATALOGUE } from "./catalogue";
 import { IFOOD_CATALOGUE_READER } from "./catalogue-read";
 import { IFOOD_COURIER } from "./courier";
+import { ifoodFetchOrder } from "./fetch-order";
 import { IFOOD_LINKING } from "./linking";
 import { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
 import { IFOOD_PORTAL_URL, ifoodConfirm, ifoodInformStatus, ifoodRequestCancellation, ifoodStatusSupported } from "./outbound";
@@ -77,6 +78,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
     catalogueReader: IFOOD_CATALOGUE_READER,
     confirm: (ctx, order) => ifoodConfirm(ctx, order),
     requestCancellation: ifoodRequestCancellation,
+    // iFood's events carry only the order id: a PLACED with no items is fetched (FUT-5800).
+    fetchOrder: (ctx, order) => ifoodFetchOrder(ctx, order, normalizeOptions),
     statusSupported: ifoodStatusSupported,
     informStatus: ifoodInformStatus,
     // The Merchant API's interruptions: an id and an end per closure (FUT-4851).
@@ -92,7 +95,8 @@ export function createIfoodAdapter(config: IfoodAdapterConfig): MarketplaceAdapt
 }
 
 export { IFOOD_REASON_CODES, type IfoodAdapterCopy, type IfoodReasonCode } from "./copy";
-export { normalizeIfoodEvent, verifyIfoodSignature } from "./normalize";
+export { normalizeIfoodEvent, readIfoodOrder, verifyIfoodSignature } from "./normalize";
+export { ifoodFetchOrder } from "./fetch-order";
 export { IFOOD_CATALOGUE, ifoodItemBody, ifoodItemId, ifoodProductId } from "./catalogue";
 export { IFOOD_CATALOGUE_READER } from "./catalogue-read";
 export { IFOOD_LINKING } from "./linking";
