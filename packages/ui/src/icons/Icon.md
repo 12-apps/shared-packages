@@ -30,3 +30,8 @@ twin can draw the same one.
 The shared glyph catalog includes `VolumeUp` and `VolumeOff` for sound controls,
 using the same generated Material paths on web and native. Name the enclosing
 control with its action; leave the icon decorative when that control owns the label.
+
+The terminal tile glyphs (`Pause`, `PlayArrow`, `Print`, `QrCode`, `Group`, `Cake`,
+`SwapHoriz`, `Link`, `MergeType`, `CallSplit`, `ListAlt`, `EditNote`, `LockOpen`,
+`Receipt`) let a native screen draw the same tile icons as a web admin, from the
+same generated paths.
