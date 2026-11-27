@@ -2230,6 +2230,9 @@ importers:
       '@12-apps/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@12-apps/notifications':
+        specifier: workspace:*
+        version: link:../notifications
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
@@ -2248,6 +2251,9 @@ importers:
       '@mui/material':
         specifier: ^6.5.0
         version: 6.5.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react@19.2.0))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@tanstack/react-query':
+        specifier: ^5.62.0
+        version: 5.101.4(react@19.2.0)
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)

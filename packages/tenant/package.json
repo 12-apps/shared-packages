@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "description": "Domain-agnostic tenant behaviours: the lifecycle of a tenant (closing, reopening, the purge and the data export), configured by each host with its own status set, ids, copy packs and a required tenant port. The tenant row stays the host's: the package reads and writes it only through the port, and owns two tables of its own (tenant_closings, tenant_data_exports) keyed by an opaque tenant id with no foreign key. Custom domains as an opt-in port (the engine in . and ./server, the pure half in ./domains, the screen in ./domains/react). Backend factory (./server), Hono mount (./hono), frontend factory (./react) and the package-owned Prisma partial + migrations. Adoption contract in ADOPTING.md.",
+  "description": "Domain-agnostic tenant behaviours: the lifecycle of a tenant (closing, reopening, the purge and the data export), configured by each host with its own status set, ids, copy packs and a required tenant port. The tenant row stays the host's: the package reads and writes it only through the port, and owns two tables of its own (tenant_closings, tenant_data_exports) keyed by an opaque tenant id with no foreign key. Custom domains as an opt-in port (the engine in . and ./server, the pure half in ./domains, the screen in ./domains/react). The closing screens (the owner's close page, its dialog, the banner and the refusal screen) and the platform's archive panel and card in ./lifecycle/react. Backend factory (./server), Hono mount (./hono), frontend factory (./react) and the package-owned Prisma partial + migrations. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -12,6 +12,7 @@
     "./react": "./src/react/index.ts",
     "./domains": "./src/domains/index.ts",
     "./domains/react": "./src/domains/react/index.ts",
+    "./lifecycle/react": "./src/lifecycle/react/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./package.json": "./package.json"
   },
@@ -51,12 +52,14 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/notifications": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/ui": "workspace:*",
     "@12-apps/wiring": "workspace:*",
     "@electric-sql/pglite": "^0.2.17",
     "@mui/icons-material": "^6.5.0",
     "@mui/material": "^6.5.0",
+    "@tanstack/react-query": "^5.62.0",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
