@@ -28,8 +28,8 @@ This first release ships the **contract** every later behaviour extends:
 
 The closing lifecycle (close and reopen as a dangerous act, the blockers, the
 sweep that reminds and purges, and the admin and public gates) is opt-in:
-`createApiTenant({ lifecycle })` and `createTenantGates`. The purge and the
-data export arrive in later releases on top of the same config. How to adopt it: [ADOPTING.md](./ADOPTING.md).
+`createApiTenant({ lifecycle })` and `createTenantGates`. The purge (`createTenantPurge`) and the data export
+(`createTenantExport`, `@12-apps/tenant/export`) build on the same config. How to adopt it: [ADOPTING.md](./ADOPTING.md).
 
 ## Entry points
 
@@ -40,6 +40,7 @@ data export arrive in later releases on top of the same config. How to adopt it:
 | `@12-apps/tenant/domains` | custom domains' pure half, browser-safe: `hostnameOrNull`, `createDomainDns` (the records under your TXT prefix), the zone helpers, `domainsOf` and the record types, `canonicalHostOf`, `pairRedirectOf`, the planner | nothing |
 | `@12-apps/tenant/domains/react` | `createDomainsScreen` (the domains card, every word your pack, your confirm button and segmented control injected), the records parts | `react`, `@12-apps/ui`, `@mui/icons-material` |
 | `@12-apps/tenant/lifecycle/react` | `createClosingScreens` (the owner's close page with its dialog, the closing banner, the gone screen, the refusal readers) and `createPlatformArchive` (the platform's archive panel and card): every word your pack, every code, path, widget and data hook yours | `react`, `@12-apps/ui`, `@mui/icons-material` |
+| `@12-apps/tenant/export` | `createTenantExport` (the data export: request, download, the build and sweep handlers, the purge's `beforeErase`), `TenantExportRefusal`, the ZIP64 writer and CSV helpers; server-only (`node:zlib`, a temp file) | nothing |
 | `@12-apps/tenant/hono` | `mountTenant(app, tenant)`, `mountTenantGates(app, gates)`, `tenantAdminGate`, `tenantPublicGate` | `hono` |
 | `@12-apps/tenant/react` | `createWebTenant` | nothing yet |
 | `@12-apps/tenant/manifest` | the wiring manifest (`db`) | `@12-apps/wiring` (types) |
