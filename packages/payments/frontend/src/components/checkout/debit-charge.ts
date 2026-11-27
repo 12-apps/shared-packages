@@ -35,7 +35,7 @@ function failureWords(copy: PaymentListDebitCopy, failure: ThreeDSFailure): stri
 }
 
 /** Hand the host its report; a throwing host callback never costs the buyer the error copy. */
-export function reportFailure(
+function reportFailure(
   report: ((failure: ThreeDSFailureReport) => void) | undefined,
   failure: ThreeDSFailureReport,
 ): void {
