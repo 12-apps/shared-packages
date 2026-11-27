@@ -8,7 +8,7 @@ import type {
 import { taxIdCharacters, taxIdKind } from '../../card/tax-id';
 import { authenticatePagBankDebit } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
-import { THREEDS_FAILURES } from './HomologacaoEvidenceCard';
+import { THREEDS_FAILURES, threeDSReasonOf } from './HomologacaoEvidenceCard';
 
 /**
  * The data half of the PRODUCTION evidence card (FUT-4198): the cardholder
@@ -174,7 +174,7 @@ export async function authenticateRealDebit(
   });
   return outcome.ok
     ? { ...encrypted, authenticationId: outcome.authenticationId, authenticated: outcome.authenticated }
-    : { ...encrypted, failure: THREEDS_FAILURES[outcome.failure] };
+    : { ...encrypted, failure: THREEDS_FAILURES[outcome.failure], ...threeDSReasonOf(outcome.detail) };
 }
 
 const STORAGE_KEY = 'payments.homologacao.production.buyer';

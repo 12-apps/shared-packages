@@ -16,7 +16,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import { maskTestCard, PAGBANK_3DS_TEST_CARD, PAGBANK_TEST_CARDS } from '../../card/pagbank-test-cards';
-import { authenticatePagBankDebit, type ThreeDSFailure } from '../../card/three-ds';
+import { authenticatePagBankDebit, threeDSFailureSummary, type ThreeDSFailure, type ThreeDSFailureDetail } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
 import type { GooglePayApi } from '../checkout/google-pay-button';
 import type { ApplePaySdkLoader } from '../checkout/apple-pay-sdk';
@@ -161,7 +161,13 @@ async function authenticateDebitTestCard(
   });
   return outcome.ok
     ? { ...encrypted, authenticationId: outcome.authenticationId, authenticated: outcome.authenticated }
-    : { ...encrypted, failure: THREEDS_FAILURES[outcome.failure] };
+    : { ...encrypted, failure: THREEDS_FAILURES[outcome.failure], ...threeDSReasonOf(outcome.detail) };
+}
+
+/** PagBank's answer to a failed debit 3DS, for the evidence (FUT-5806); nothing when it said nothing. */
+export function threeDSReasonOf(detail: ThreeDSFailureDetail | undefined): { threeDSReason?: string } {
+  const said = threeDSFailureSummary(detail);
+  return said ? { threeDSReason: said } : {};
 }
 
 /** Each official test card, encrypted, then the debit one authenticated (FUT-3755). */

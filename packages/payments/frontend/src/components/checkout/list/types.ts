@@ -26,6 +26,7 @@ import type { PixFaceCopy } from "./pix-face-copy";
 import type { PaymentListAmountsCopy, PaymentListPricing } from "./price-types";
 
 export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
+export type { ThreeDSFailureReport } from "./debit-copy";
 export type { CheckoutDoorOption, CheckoutDoorRowControls };
 export type { CheckoutChoicePrice, CheckoutListNudge, CheckoutListNudgeAction, CheckoutListPrices, CheckoutOnlineRowId, CheckoutPricedAs, CheckoutWalletPrice } from "./price-types";
 

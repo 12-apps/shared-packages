@@ -49,7 +49,9 @@ function blockedBecause(deps: EvidenceRunDeps, card: BrowserCardResult | undefin
   if (!card) return deps.copy.debitNotReported;
   if (!card.encrypted) return encryptFailure(deps, card);
   if (card.authenticationId) return null;
-  return deps.copy.threeDSFailed(deps.copy.browserFailures[card.failure ?? 'THREEDS_FAILED']);
+  const why = deps.copy.browserFailures[card.failure ?? 'THREEDS_FAILED'];
+  const said = card.threeDSReason?.trim();
+  return deps.copy.threeDSFailed(said ? `${why} — PagBank: ${said}` : why);
 }
 
 /** The browser's 3DS answer, as evidence: a note, since no call of ours made it. */

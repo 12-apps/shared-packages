@@ -24,7 +24,21 @@ describe("authenticatePagBankDebit with a timeout", () => {
     vi.useFakeTimers();
     const pending = authenticatePagBankDebit({ ...INPUT, timeoutMs: 1_000 });
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(await pending).toEqual({ ok: false, failure: "ERROR" });
+    expect(await pending).toEqual({
+      ok: false,
+      failure: "ERROR",
+      detail: { message: "3-D Secure timed out", timedOut: true },
+    });
+  });
+
+  it("answers the SDK's rejection detail, not just ERROR", async () => {
+    const rejection = { detail: { httpStatus: 400, traceId: "trace-9", errorMessages: [{ code: "40002", description: "invalid card" }] } };
+    vi.stubGlobal("PagSeguro", { encryptCard: vi.fn(), setUp: vi.fn(), authenticate3DS: () => Promise.reject(rejection) });
+    expect(await authenticatePagBankDebit({ ...INPUT, timeoutMs: 1_000 })).toEqual({
+      ok: false,
+      failure: "ERROR",
+      detail: { httpStatus: 400, traceId: "trace-9", errorMessages: [{ code: "40002", description: "invalid card" }] },
+    });
   });
 
   it("still answers the SDK's outcome when it arrives in time", async () => {

@@ -1,3 +1,4 @@
+import type { ThreeDSFailure, ThreeDSFailureDetail } from "../../../card/three-ds";
 /**
  * The debit card row's host inputs (FUT-3754) — their own module for the size
  * gate on `types.ts`, which re-exports them.
@@ -44,6 +45,14 @@ export type CheckoutBillingLookup = (
   postalCode: string,
 ) => Promise<{ street?: string | null; city: string; regionCode: string } | null>;
 
+/** One failed debit 3-D Secure, as the host reports it (FUT-5806). */
+export interface ThreeDSFailureReport {
+  /** Where it ran: a buyer's checkout, or the platform's production evidence. */
+  surface: "checkout" | "evidence";
+  failure: ThreeDSFailure;
+  detail?: ThreeDSFailureDetail;
+}
+
 /**
  * Where the buyer's card bill goes, as a debit's 3-D Secure needs it
  * (FUT-3754). The host's delivery address is the one it has; Brazil only.
@@ -60,6 +69,13 @@ export interface CheckoutBillingAddress {
 
 /** The debit row's host inputs on `CheckoutPaymentList`. */
 export interface PaymentListDebitInputs {
+  /**
+   * Called on every failed 3-D Secure of a debit card (FUT-5806) with what
+   * PagBank answered — never card data. The buyer still reads the row's copy;
+   * this is so the HOST can report it (its error tracker), because a handled
+   * failure reaches no uncaught-error funnel and was otherwise recorded nowhere.
+   */
+  onThreeDSFailure?: (failure: ThreeDSFailureReport) => void;
   /** The billing address a DEBIT card's 3-D Secure needs (FUT-3754); none ⇒ the row asks it via `billingLookup`. */
   billingAddress?: CheckoutBillingAddress | null;
   /** Looks a CEP up, so the debit row can ask the address in any store type (FUT-4109). */
