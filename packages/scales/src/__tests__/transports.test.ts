@@ -1,0 +1,96 @@
+import { EventEmitter } from "node:events";
+import { describe, expect, it, vi } from "vitest";
+import { createAndroidSerialTransport } from "../android";
+import { createNodeSerialTransport } from "../node";
+import { createWebSerialTransport } from "../web";
+import { createUranoParser, uranoPopLight } from "../urano";
+import { captures, frame } from "./urano-captures";
+
+const reading = () => expect.objectContaining({ netGrams: 428, tareGrams: 286 });
+
+describe("scale byte transports", () => {
+  it("sets the Node line signals and forwards bytes over serialport", async () => {
+    const port = Object.assign(new EventEmitter(), {
+      isOpen: false,
+      open: vi.fn((done: () => void) => { port.isOpen = true; done(); }),
+      set: vi.fn((_value: unknown, done: () => void) => done()),
+      write: vi.fn((_value: unknown, done: () => void) => done()),
+      close: vi.fn((done: () => void) => { port.isOpen = false; done(); }),
+    });
+    const signal = vi.fn();
+    const parse = vi.fn(createUranoParser().push);
+    const transport = createNodeSerialTransport({ createPort: () => port });
+    transport.onData(parse);
+    transport.onClose(signal);
+    await transport.open(uranoPopLight.serial);
+    await transport.write(Uint8Array.of(5));
+    port.emit("data", frame(captures.second));
+    port.emit("close");
+    await transport.close();
+    expect(port.set).toHaveBeenCalledWith({ dtr: true, rts: true }, expect.any(Function));
+    expect(port.write).toHaveBeenCalledWith(Uint8Array.of(5), expect.any(Function));
+    expect(parse).toHaveReturnedWith([reading()]);
+    expect(signal).toHaveBeenCalledOnce();
+    expect(port.listenerCount("data")).toBe(0);
+  });
+
+  it("preserves unsigned bytes over the Android bridge", async () => {
+    const open = vi.fn(async () => {});
+    const write = vi.fn(async () => {});
+    const close = vi.fn(async () => {});
+    const parse = vi.fn(createUranoParser().push);
+    const stop = vi.fn();
+    const transport = createAndroidSerialTransport({
+      open, write, close,
+      subscribeData(listener) {
+        listener(Array.from(frame(captures.second)));
+        return stop;
+      },
+      subscribeDisconnect: () => stop,
+    });
+    const off = transport.onData(parse);
+    await transport.open(uranoPopLight.serial);
+    await transport.write(Uint8Array.of(5));
+    await transport.close();
+    off();
+    expect(open).toHaveBeenCalledWith(uranoPopLight.serial);
+    expect(write).toHaveBeenCalledWith([5]);
+    expect(parse).toHaveReturnedWith([reading()]);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("reads and releases the Web Serial streams without reporting a manual close", async () => {
+    const open = vi.fn(async () => {});
+    const close = vi.fn(async () => {});
+    const setSignals = vi.fn(async () => {});
+    const write = vi.fn();
+    const signal = vi.fn();
+    let parsed: ReturnType<ReturnType<typeof createUranoParser>["push"]> | undefined;
+    const parser = createUranoParser();
+    const port = {
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      readable: new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(frame(captures.second)); },
+      }),
+      writable: new WritableStream<Uint8Array>({ write }),
+      open, close, setSignals,
+    };
+    const transport = createWebSerialTransport(port);
+    const read = new Promise<void>((resolve) => {
+      transport.onData((bytes) => { parsed = parser.push(bytes); resolve(); });
+    });
+    transport.onClose(signal);
+    await transport.open(uranoPopLight.serial);
+    await read;
+    await transport.write(Uint8Array.of(5));
+    await transport.close();
+    expect(transport.usb).toEqual({ vendorId: 0x1a86, productId: 0x7523 });
+    expect(parsed).toEqual([reading()]);
+    expect(setSignals).toHaveBeenCalledWith({ dataTerminalReady: true, requestToSend: true });
+    expect(write).toHaveBeenCalledWith(Uint8Array.of(5), expect.anything());
+    expect(signal).not.toHaveBeenCalled();
+    expect(port.readable.locked).toBe(false);
+    expect(port.writable.locked).toBe(false);
+  });
+});
