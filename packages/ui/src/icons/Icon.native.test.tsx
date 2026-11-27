@@ -31,7 +31,7 @@ describe('Icon (native)', () => {
     'NotificationsActive',
     'RoomService',
     'ReceiptLong',
-    'Restaurant',
+    'LocalDining',
     'DeliveryDining',
   ] as const)('renders the terminal tile glyph %s', (name) => {
     render(<Icon name={name} label={name} />);
