@@ -80,7 +80,7 @@ export const WAIT: TerminalWaitCopy = {
   cashSub: 'Moved to cash',
   waitingLink: 'Waiting for the terminal',
   waitingLinkSub: 'Or record it',
-  doneLine: (label) => `${label} done`,
+  doneLine: (label, nsu) => (nsu === undefined ? `${label} done` : `${label} done, NSU ${nsu}`),
   resend: 'Send again',
   other: 'Another tender',
   otherLabel: 'Tenders',

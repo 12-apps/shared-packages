@@ -60,8 +60,12 @@ export interface TerminalWaitCopy {
   /** Waiting for the station's first answer about its terminal. */
   readonly waitingLink: string;
   readonly waitingLinkSub: string;
-  /** A done leg in the list beside the current one. */
-  readonly doneLine: (label: string) => string;
+  /**
+   * A done leg in the list beside the current one. `nsu` is the acquirer's host
+   * NSU when the terminal reported it, and absent for a terminal of an earlier
+   * release: the host words the line with it, or as before without it.
+   */
+  readonly doneLine: (label: string, nsu?: string) => string;
   readonly resend: string;
   readonly other: string;
   readonly otherLabel: string;

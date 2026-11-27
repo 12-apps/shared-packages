@@ -44,6 +44,11 @@ export interface CaptureTrace {
   readonly transactionCode: string;
   readonly transactionId: string | null;
   readonly authorizationCode: string | null;
+  /**
+   * The acquirer's host NSU, when the terminal reports it. Optional on the wire:
+   * a terminal of an earlier release never sends it, and a station reads its absence as "none".
+   */
+  readonly hostNsu?: string | null;
   readonly brand: string | null;
   readonly installments: number;
   readonly serial: string;
@@ -221,6 +226,7 @@ const CAPTURE_SHAPE: Shape = {
     kind: oneOf(CHARGE_METHODS),
     capturedAt: isoDate,
   },
+  optional: { hostNsu: nullable(text(64)) },
 };
 
 type Problem = { refusal: LinkRefusal; detail: string };

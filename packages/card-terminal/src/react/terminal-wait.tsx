@@ -135,7 +135,7 @@ function LegExits(props: TerminalWaitProps & { leg: FlowLeg; onManual: (via: Els
 /** A listed leg's words: a terminal leg done, a manual leg marked as manual, or its name. */
 function lineOf(leg: FlowLeg, copy: TerminalWaitCopy, name: string): string {
   if (leg.status === 'manual') return copy.manualLine(name);
-  return leg.status === 'approved' ? copy.doneLine(name) : name;
+  return leg.status === 'approved' ? copy.doneLine(name, leg.capture?.hostNsu ?? undefined) : name;
 }
 
 /** The split's other legs, one line each. */

@@ -73,6 +73,11 @@ describe("the LAN capture book", () => {
     });
   });
 
+  it("carries the terminal's host NSU onto the leg's wire, and none as null", () => {
+    expect(captureWireOf("device-1", { ...TRACE, hostNsu: "004512" }).hostNsu).toBe("004512");
+    expect(captureWireOf("device-1", { ...TRACE, hostNsu: null }).hostNsu).toBeNull();
+  });
+
   it("hears what the terminal wiring broadcasts, and still sends it on", async () => {
     const book = bookOn(memoryFiles());
     const sent: unknown[] = [];

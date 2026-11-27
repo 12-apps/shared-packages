@@ -43,6 +43,23 @@ const CAPTURE: CaptureTrace = {
   capturedAt: "2026-11-03T15:00:00.000Z",
 };
 
+describe("the capture's host NSU", () => {
+  const envelope = { v: 1, n: 1, at: NOW, sid: "a".repeat(32), mac: "0".repeat(64) };
+  const approved = (capture: Record<string, unknown>) => ({ ...envelope, type: "status", chargeId: "c-1", state: "approved", capture });
+
+  it.each([["a text", "004512"], ["null", null]])("is read when the terminal sends %s", (_name, hostNsu) => {
+    expect(readMessage(JSON.stringify(approved({ ...CAPTURE, hostNsu })), "terminal")).toMatchObject({ ok: true, message: { capture: { hostNsu } } });
+  });
+
+  it("is optional: a terminal of an earlier release sends none and is read as before", () => {
+    expect(readMessage(JSON.stringify(approved({ ...CAPTURE })), "terminal")).toMatchObject({ ok: true });
+  });
+
+  it.each([["a number", 4512], ["too long", "9".repeat(65)]])("refuses %s", (_name, hostNsu) => {
+    expect(readMessage(JSON.stringify(approved({ ...CAPTURE, hostNsu })), "terminal")).toMatchObject({ ok: false, refusal: "bad-field", detail: "capture" });
+  });
+});
+
 describe("the handshake", () => {
   it("opens one session both sides agree on, and carries a charge and its approval", () => {
     const { station, terminal } = pair();
