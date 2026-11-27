@@ -321,23 +321,50 @@ describe('the archive card', () => {
       await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-archived')));
     });
 
-    it('archived → archive, even when a closing overlay drops focus after the re-read', async () => {
-      const { rerender } = render(
-        <>
-          {cardAt('WINDING_DOWN')}
-          <input data-testid="overlay-field" />
-        </>,
-      );
-      act(() => screen.getByTestId('overlay-field').focus());
-      rerender(
-        <>
-          {cardAt('OPEN')}
-          <input data-testid="overlay-field" />
-        </>,
-      );
-      // The overlay still holds focus at the re-read; then it closes and drops it.
-      rerender(cardAt('OPEN'));
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-open')));
+    it('archived → archive: an overlay still open keeps focus, and when it closes after the change focus comes here', () => {
+      vi.useFakeTimers();
+      try {
+        const withOverlay = (status: string) => (
+          <>
+            {cardAt(status)}
+            <input data-testid="overlay-field" />
+          </>
+        );
+        const { rerender } = render(withOverlay('WINDING_DOWN'));
+        act(() => screen.getByTestId('overlay-field').focus());
+        rerender(withOverlay('OPEN'));
+        act(() => vi.advanceTimersByTime(100));
+        // The overlay is still open: its field keeps focus.
+        expect(document.activeElement).toBe(screen.getByTestId('overlay-field'));
+        // Then it closes and drops focus to <body>; the watch sends it to the new entry.
+        rerender(cardAt('OPEN'));
+        expect(document.activeElement).toBe(document.body);
+        act(() => vi.advanceTimersByTime(50));
+        expect(document.activeElement).toBe(screen.getByTestId('archive-open'));
+        // The focused button's ripple settles on its own timers.
+        act(() => vi.runOnlyPendingTimers());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a re-read the person did not cause never takes focus from the field they are typing in', () => {
+      vi.useFakeTimers();
+      try {
+        const withField = (status: string) => (
+          <>
+            {cardAt(status)}
+            <input data-testid="typing" />
+          </>
+        );
+        const { rerender } = render(withField('OPEN'));
+        act(() => screen.getByTestId('typing').focus());
+        rerender(withField('WINDING_DOWN'));
+        act(() => vi.advanceTimersByTime(1_200));
+        expect(document.activeElement).toBe(screen.getByTestId('typing'));
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('restored → open without the archive permission: focus goes to the card itself', async () => {
@@ -347,22 +374,23 @@ describe('the archive card', () => {
       await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-card')));
     });
 
-    it('never takes a focus the person moved elsewhere', async () => {
-      const { rerender } = render(
-        <>
-          {cardAt('OPEN')}
-          <button type="button" data-testid="elsewhere" />
-        </>,
-      );
-      rerender(
-        <>
-          {cardAt('WINDING_DOWN')}
-          <button type="button" data-testid="elsewhere" />
-        </>,
-      );
-      act(() => screen.getByTestId('elsewhere').focus());
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(document.activeElement).toBe(screen.getByTestId('elsewhere'));
+    it('never takes a focus the person moved elsewhere after the change', () => {
+      vi.useFakeTimers();
+      try {
+        const withButton = (status: string) => (
+          <>
+            {cardAt(status)}
+            <button type="button" data-testid="elsewhere" />
+          </>
+        );
+        const { rerender } = render(withButton('OPEN'));
+        rerender(withButton('WINDING_DOWN'));
+        act(() => screen.getByTestId('elsewhere').focus());
+        act(() => vi.advanceTimersByTime(1_200));
+        expect(document.activeElement).toBe(screen.getByTestId('elsewhere'));
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

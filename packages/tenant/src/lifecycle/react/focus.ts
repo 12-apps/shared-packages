@@ -18,11 +18,12 @@ function focusIsLost(): boolean {
 
 /**
  * When `state` changes under a mounted component (never on its first render,
- * nor from `''`, a state not known yet),
- * focus what `target()` answers. A dialog may still hold focus at that moment
- * and drop it to `<body>` when it closes, so for a moment after the change a
- * lost focus is sent to the target again. A focus the person moved somewhere
- * else is never taken.
+ * nor from `''`, a state not known yet), and focus is lost, focus what
+ * `target()` answers. A focus that is still somewhere (a field the person is
+ * typing in during a re-read they did not cause, an overlay still open) is
+ * never taken. An overlay that closes just after the change drops focus to
+ * `<body>`, so for a moment after the change a lost focus is sent to the
+ * target.
  */
 export function useFocusOnChange(state: string, target: () => HTMLElement | null): void {
   const seen = useRef<string | null>(null);
@@ -32,7 +33,7 @@ export function useFocusOnChange(state: string, target: () => HTMLElement | null
     const before = seen.current;
     seen.current = state;
     if (before === null || before === '' || before === state) return undefined;
-    find.current()?.focus();
+    if (focusIsLost()) find.current()?.focus();
     let waited = 0;
     const timer = window.setInterval(() => {
       waited += STEP_MS;
