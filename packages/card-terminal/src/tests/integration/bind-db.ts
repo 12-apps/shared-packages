@@ -38,6 +38,8 @@ export interface BindDb {
   claim(code: string, orderId: string, paymentId: string, options?: ClaimOptions): Promise<string[]>;
   read(code: string): Promise<TerminalCaptureRecord>;
   clearPayments(): Promise<void>;
+  /** Empties both tables: the state a freshly opened engine starts from, at a fraction of a boot's cost. */
+  reset(): Promise<void>;
   /** Runs a statement written with `?` placeholders, numbered left to right as a positional driver binds them. */
   runPositional(text: string, values: readonly unknown[]): Promise<Record<string, unknown>[]>;
   close(): Promise<void>;
@@ -161,6 +163,9 @@ export async function openBindDb(): Promise<BindDb> {
     read,
     clearPayments: async () => {
       await db.query(`TRUNCATE payments`);
+    },
+    reset: async () => {
+      await db.query(`TRUNCATE terminal_captures, payments`);
     },
     runPositional: async (statement, values) => {
       const numbered = statement.split('?').reduce((out, part, index) => (index === 0 ? part : `${out}$${index}${part}`), '');
