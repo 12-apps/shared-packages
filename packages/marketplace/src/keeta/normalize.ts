@@ -1,6 +1,6 @@
 import { outboundResultOf, type AdapterCallContext } from "../core/adapter";
-import { pick } from "../core/payload-read";
-import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
+import { firstDate, pick } from "../core/payload-read";
+import type { MarketplaceCourierStep, NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { isStop, openDeliveryCall, type OpenDeliveryDialect } from "../open-delivery/client";
 import { normalizeOpenDeliveryEventAs, normalizeOpenDeliveryOrderAs } from "../open-delivery/normalize";
 
@@ -12,14 +12,25 @@ import { normalizeOpenDeliveryEventAs, normalizeOpenDeliveryOrderAs } from "../o
  *
  * Events (Keeta's order guide, read 2026-11-26): `CREATED` → fetch;
  * `CANCELLED` (with a JSON-string `metadata` carrying `reason` and `code`) →
- * cancelled; `DISPATCHED`, `CONCLUDED` → lifecycle. Keeta has NO
+ * cancelled; `DISPATCHED`, `CONCLUDED` → lifecycle; `RIDER_ARRIVED_AT_STORE`,
+ * `ORDER_COLLECTED` → courier steps (the second a lifecycle too). Keeta has NO
  * `CANCELLATION_REQUEST_DENIED`: a store's request that Keeta does not grant
  * produces no event, so it ends TIMEOUT at the adapter's answer window. The
- * rest (`CONFIRMED`, `READY_FOR_PICKUP`, `PICKUP_ONGOING`,
- * `RIDER_ARRIVED_AT_STORE`, `ORDER_COLLECTED`, `DELIVERED`,
+ * rest (`CONFIRMED`, `READY_FOR_PICKUP`, `PICKUP_ONGOING`, `DELIVERED`,
  * `CANCELLATION_REQUESTED`, `USER_REFUND_REQUEST`, `REFUNDED`,
  * `REFUND_FAILED`, `RECOMMENDED_PREPARATION_START`) are recorded and IGNORED.
  */
+
+/**
+ * Keeta's rider events as courier steps (FUT-5665). ESTIMATED: the event names
+ * are Keeta's order guide's (read 2026-11-26), their meaning is read off the
+ * names; they carry no rider's name, photo or vehicle. `PICKUP_ONGOING` is left
+ * IGNORED: whether it means "on the way" or "at the counter" is not stated.
+ */
+const KEETA_COURIER_STEP_OF: Readonly<Record<string, MarketplaceCourierStep>> = {
+  RIDER_ARRIVED_AT_STORE: "ARRIVED_AT_ORIGIN",
+  ORDER_COLLECTED: "COLLECTED",
+};
 
 /** The provider id Keeta is registered under. Uppercase: the column's CHECK holds that shape. */
 export const KEETA_PROVIDER = "KEETA";
@@ -31,7 +42,11 @@ const DECRYPT_BATCH = 50;
 
 /** Normalize one webhook `Event`. Null only when it names no order. */
 export function normalizeKeetaEvent(payload: unknown): NormalizedEvent | null {
-  return normalizeOpenDeliveryEventAs(KEETA_PROVIDER, payload);
+  const event = normalizeOpenDeliveryEventAs(KEETA_PROVIDER, payload);
+  const step = event ? KEETA_COURIER_STEP_OF[event.eventType] : undefined;
+  if (!event || !step) return event;
+  const courier = { step, at: firstDate(payload, [["createdAt"]]), courier: null, returning: null };
+  return { ...event, courier, ...(step === "COLLECTED" ? { lifecycle: "COLLECTED" as const } : {}) };
 }
 
 /** Normalize one `Order`, after {@link revealKeetaOrder}. Null when it carries no id or no line. */

@@ -1,6 +1,7 @@
 import type { AdapterRegistry } from "./registry";
 import type { AdapterTokenCache, MarketplaceAdapter, MarketplaceHttp, StatusStep } from "./adapter";
 import type { CatalogueImage, CatalogueItem } from "./catalogue-port";
+import type { MarketplaceCourierAnswer, MarketplaceCourierFacts, PickupCodeValidation } from "./courier-port";
 import type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
 import type { MarketplaceAppCredentialsPort, MarketplaceLinkAttemptDelegate } from "./linking-port";
 import type {
@@ -11,7 +12,7 @@ import type {
   MarketplaceRefusal,
   ResolvedOrderLine,
 } from "./order-types";
-import type { NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
+import type { NormalizedCourierEvent, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 export type { MarketplaceLifecycleAnswer, MarketplaceLifecycleFacts } from "./lifecycle-port";
 export type {
@@ -222,6 +223,27 @@ export interface MarketplaceOrderPort {
    * Absent: the engine cannot tell, and sends nothing.
    */
   statusHolds?(clientId: string, orderId: string, step: StatusStep): Promise<boolean>;
+  /**
+   * OPTIONAL (FUT-5665). The marketplace's courier moved: named, on the way,
+   * at the counter, holding the bag, or bringing it back. Store the facts on
+   * the order; never move it (a `COLLECTED` moves through `onLifecycle`).
+   * Idempotent: a redelivery is deduped, but the reconcile pass re-runs a
+   * FAILED row. Asked for an ACCEPTED order only, whatever the connection's
+   * `followStatus`. Absent: courier events are understood and ignored.
+   */
+  onCourier?(
+    clientId: string,
+    orderId: string,
+    event: NormalizedCourierEvent,
+    facts: MarketplaceCourierFacts,
+  ): Promise<MarketplaceCourierAnswer>;
+  /**
+   * OPTIONAL (FUT-5665). The marketplace's verdict on the pickup code the host
+   * sent with `engine.validatePickupCode`. Called once per job, after the
+   * hand-over has committed: `INVALID` warns, it moves nothing. A throw is
+   * logged. Absent: the verdict is only logged.
+   */
+  onPickupCodeValidated?(clientId: string, orderId: string, validation: PickupCodeValidation): Promise<void>;
   /** Queue facts for a batch of orders, keyed by id. Missing ids are dropped. */
   summarize(
     clientId: string,

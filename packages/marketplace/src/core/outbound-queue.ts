@@ -1,4 +1,4 @@
-import type { StatusStep } from "./adapter";
+import type { MarketplaceAdapter, StatusStep } from "./adapter";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -16,10 +16,11 @@ import type { MarketplaceProvider } from "./types";
 export const MARKETPLACE_OUTBOUND_JOB = "marketplace.outbound";
 
 /**
- * What goes out: the store's aceite, the store's cancellation request, or a
- * step of the order the store reached (`status`, FUT-4653).
+ * What goes out: the store's aceite, the store's cancellation request, a
+ * step of the order the store reached (`status`, FUT-4653), or the pickup code
+ * the store checked at the hand-over (`validatePickupCode`, FUT-5665).
  */
-export type OutboundAction = "confirm" | "requestCancellation" | "status";
+export type OutboundAction = "confirm" | "requestCancellation" | "status" | "validatePickupCode";
 
 /** The outbound job's payload. Identifiers only. */
 export interface OutboundJobPayload {
@@ -33,6 +34,8 @@ export interface OutboundJobPayload {
    * belongs to: the owner of its SENDING claim. Absent on every other action.
    */
   claimKey?: string;
+  /** OPTIONAL. The pickup code a `validatePickupCode` call sends; absent on every other action. */
+  code?: string;
 }
 
 /** The dedupe key: at most one queued call per (order, action). */
@@ -43,6 +46,20 @@ export function outboundDedupeKey(payload: OutboundJobPayload): string {
 /** The dedupe key of one status move: a re-dispatch after an undo is another instant, so another key. */
 export function statusDedupeKey(step: StatusStep, orderId: string, at: Date): string {
   return `${MARKETPLACE_OUTBOUND_JOB}:status:${step}:${orderId}:${at.getTime()}`;
+}
+
+/** Whether the adapter's marketplace can take this call at all. */
+function ableTo(adapter: MarketplaceAdapter, payload: OutboundJobPayload): boolean {
+  switch (payload.action) {
+    case "status":
+      return Boolean(payload.step && adapter.capabilities.statusSteps?.includes(payload.step));
+    case "confirm":
+      return adapter.capabilities.apiConfirm;
+    case "validatePickupCode":
+      return adapter.courier !== undefined;
+    default:
+      return adapter.capabilities.apiCancel;
+  }
 }
 
 /**
@@ -65,13 +82,7 @@ export async function enqueueOutbound(
 ): Promise<boolean> {
   const adapter = ctx.registry.get(provider);
   if (!adapter) return false;
-  const able =
-    payload.action === "status"
-      ? Boolean(payload.step && adapter.capabilities.statusSteps?.includes(payload.step))
-      : payload.action === "confirm"
-        ? adapter.capabilities.apiConfirm
-        : adapter.capabilities.apiCancel;
-  if (!able) return false;
+  if (!ableTo(adapter, payload)) return false;
   const outcome = await ctx.ports.enqueue.enqueue(MARKETPLACE_OUTBOUND_JOB, payload, { dedupeKey });
   if (!outcome.enqueued) {
     ctx.ports.logger.warn(

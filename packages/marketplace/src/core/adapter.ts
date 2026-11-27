@@ -1,4 +1,5 @@
 import type { MarketplaceCatalogue } from "./catalogue-port";
+import type { MarketplaceCourierApi } from "./courier-port";
 import type { CatalogueReader } from "./catalogue-read-port";
 import type { MarketplaceLinking } from "./linking-port";
 import type { MarketplaceAvailability } from "./pause-port";
@@ -263,6 +264,11 @@ export interface MarketplaceAdapter {
    * marketplace (FUT-5613). Absent: a store connects with its own credentials only.
    */
   readonly linking?: MarketplaceLinking;
+  /**
+   * OPTIONAL. The marketplace's own courier (FUT-5665): the pickup-code check
+   * and the tracking read. Absent: neither is offered, and the host says so.
+   */
+  readonly courier?: MarketplaceCourierApi;
   /** Where "open it on the marketplace" goes: the order when `perOrderAppLink`, else the portal. Always https. */
   appLink(order: Pick<OutboundOrderRef, "externalOrderId" | "externalDisplayId">): string;
 }
