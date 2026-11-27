@@ -35,6 +35,8 @@ import type { CatalogueMenuOptions } from "./catalogue-port";
 import { readMarketplaceCatalogue } from "./catalogue-read";
 import type { CatalogueReadResult } from "./catalogue-read-port";
 import type { CataloguePublicationView } from "./catalogue-store";
+import { courierEngine } from "./courier";
+import type { MarketplaceCourierEngine } from "./courier-port";
 import {
   runFetchOrder,
   type FetchOrderJobPayload,
@@ -97,7 +99,7 @@ import { readOrderStates, type MarketplaceOrderState } from "./state";
 import type { MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
 
 /** Everything the mounted engine can do, with the ports and adapters bound in. */
-export interface MarketplaceEngine {
+export interface MarketplaceEngine extends MarketplaceCourierEngine {
   /** Every registered marketplace, in registration order. */
   providers(): readonly MarketplaceProvider[];
   /** Whether a provider id (a URL segment, a body field) names a registered adapter. */
@@ -375,6 +377,7 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
     runFetchOrder: (payload, attempt) => runFetchOrder(ctx, payload, attempt),
     informStatus: (input) => informStatus(ctx, input),
+    ...courierEngine(ctx),
 
     // Null too when the host bound no catalogue port: nothing could be published.
     catalogueMode: (provider) => (ports.catalogue ? (registry.get(provider)?.catalogue?.mode ?? null) : null),

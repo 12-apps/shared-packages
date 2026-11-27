@@ -14,7 +14,8 @@ import type {
   ResolvedOrderLine,
 } from "../core/ports";
 import type { MarketplaceAppCredentialsPort } from "../core/linking-port";
-import type { NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
+import type { MarketplaceCourierAnswer, MarketplaceCourierFacts, PickupCodeValidation } from "../core/courier-port";
+import type { NormalizedCourierEvent, NormalizedEvent, NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
 import { createMemoryDb } from "./memory-db";
@@ -78,6 +79,10 @@ interface HarnessOptions {
   /** Whether the host says an order still holds a step; absent, `statusHolds` is not bound. */
   statusHolds?: (step: StatusStep) => boolean | Promise<boolean>;
   appCredentials?: MarketplaceAppCredentialsPort; // The software's own app (FUT-5613); absent, no linking.
+  /** The host's answers to courier events (FUT-5665), one per call (the last repeats); absent, `onCourier` is not bound. */
+  courier?: readonly (MarketplaceCourierAnswer | Error)[];
+  /** Bind `onPickupCodeValidated` (FUT-5665); `"throw"` makes it throw. */
+  pickupCodeHook?: true | "throw";
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -104,6 +109,28 @@ export function createHarness(options: HarnessOptions = {}) {
   const cancellationFailed: { orderId: string; reason: CancellationFailureReason }[] = [];
   const lifecycleCalls: { orderId: string; event: NormalizedEvent; facts: MarketplaceLifecycleFacts }[] = [];
   const holdsAsked: { orderId: string; step: StatusStep }[] = [];
+  const courierCalls: { orderId: string; event: NormalizedCourierEvent; facts: MarketplaceCourierFacts }[] = [];
+  const pickupCodeVerdicts: { orderId: string; validation: PickupCodeValidation }[] = [];
+  const courierHooks = {
+    ...(options.courier
+      ? {
+          onCourier: async (_c: string, orderId: string, event: NormalizedCourierEvent, facts: MarketplaceCourierFacts) => {
+            courierCalls.push({ orderId, event, facts });
+            const answer = options.courier![Math.min(courierCalls.length - 1, options.courier!.length - 1)]!;
+            if (answer instanceof Error) throw answer;
+            return answer;
+          },
+        }
+      : {}),
+    ...(options.pickupCodeHook
+      ? {
+          onPickupCodeValidated: async (_c: string, orderId: string, validation: PickupCodeValidation) => {
+            pickupCodeVerdicts.push({ orderId, validation });
+            if (options.pickupCodeHook === "throw") throw new Error("host verdict half failed");
+          },
+        }
+      : {}),
+  };
   const cancellationHooks = options.cancellationHooks
     ? {
         onCancellationConfirmed: async (_clientId: string, orderId: string) => {
@@ -144,6 +171,7 @@ export function createHarness(options: HarnessOptions = {}) {
       summarize: async (_clientId, ids) =>
         new Map(ids.map((id) => [id, { buyerName: "Buyer", totalCents: 1000, unmappedLines: 0, createdAt: null }])),
       ...cancellationHooks,
+      ...courierHooks,
       ...(options.lifecycle
         ? {
             onLifecycle: async (_clientId: string, orderId: string, event: NormalizedEvent, facts: MarketplaceLifecycleFacts) => {
@@ -344,6 +372,8 @@ export function createHarness(options: HarnessOptions = {}) {
     cancellationFailed,
     lifecycleCalls,
     holdsAsked,
+    courierCalls,
+    pickupCodeVerdicts,
     connect,
     acceptance,
   };

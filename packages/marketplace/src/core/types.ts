@@ -127,6 +127,14 @@ export interface NormalizedMarketplaceOrder {
    * the connection's is refused.
    */
   externalMerchantId?: string | null;
+  /**
+   * OPTIONAL (FUT-5665). The code the marketplace's courier states at the
+   * counter to collect the bag (iFood's `delivery.pickupCode`), for the host
+   * to check locally at the hand-over. Null or absent: the marketplace asks
+   * none for this order (the check is off for the store, or the store carries
+   * the bag itself).
+   */
+  pickupCode?: string | null;
 }
 
 /**
@@ -138,11 +146,49 @@ export type CancellationOutcome = "CONFIRMED" | "FAILED";
 
 /**
  * A step of the order's life a marketplace announces about an order it
- * already has (FUT-4653): the courier left (`DISPATCHED`) or the order is
- * finished (`CONCLUDED`). An event that names one moves nothing by itself; the
- * engine asks the host to move the order forward (`onLifecycle`).
+ * already has (FUT-4653): the courier left (`DISPATCHED`), the marketplace's
+ * courier has the bag (`COLLECTED`, FUT-5665: for a fleet bag it is the same
+ * hand-over as `DISPATCHED`) or the order is finished (`CONCLUDED`). An event
+ * that names one moves nothing by itself; the engine asks the host to move the
+ * order forward (`onLifecycle`).
  */
-export type MarketplaceLifecycle = "DISPATCHED" | "CONCLUDED";
+export type MarketplaceLifecycle = "DISPATCHED" | "COLLECTED" | "CONCLUDED";
+
+/**
+ * Where the marketplace's own courier is with a bag (FUT-5665), provider-
+ * neutral: named (`ASSIGNED`), on the way to the store (`GOING_TO_ORIGIN`),
+ * at the counter (`ARRIVED_AT_ORIGIN`), holding the bag (`COLLECTED`), or
+ * bringing it back (`RETURNING_TO_ORIGIN`, then `RETURNED_TO_ORIGIN`).
+ */
+export type MarketplaceCourierStep =
+  | "ASSIGNED"
+  | "GOING_TO_ORIGIN"
+  | "ARRIVED_AT_ORIGIN"
+  | "COLLECTED"
+  | "RETURNING_TO_ORIGIN"
+  | "RETURNED_TO_ORIGIN";
+
+/** What the courier rides, as a closed set the host has words for. `OTHER`: stated, and none of these. */
+export type MarketplaceCourierVehicle = "MOTORCYCLE" | "BICYCLE" | "CAR" | "OTHER";
+
+/** Who the marketplace sent, as much as it says. */
+export interface MarketplaceCourier {
+  name: string | null;
+  /** An https URL of the courier's photo, or null (any other scheme is dropped). */
+  photoUrl: string | null;
+  vehicle: MarketplaceCourierVehicle | null;
+}
+
+/** One courier event, normalized (FUT-5665). */
+export interface NormalizedCourierEvent {
+  step: MarketplaceCourierStep;
+  /** When the marketplace says it happened; null when it does not (the engine then hands the host its clock). */
+  at: Date | null;
+  /** Who is coming: on `ASSIGNED`, when the marketplace names them; null otherwise. */
+  courier: MarketplaceCourier | null;
+  /** The bag is coming back (`RETURNING`) or is back (`RETURNED`); null on every other step. */
+  returning: "RETURNING" | "RETURNED" | null;
+}
 
 /** What an adapter makes of one inbound delivery. */
 export interface NormalizedEvent {
@@ -181,4 +227,10 @@ export interface NormalizedEvent {
    * names one carries no order body.
    */
   lifecycle?: MarketplaceLifecycle | null;
+  /**
+   * OPTIONAL (FUT-5665). Where the marketplace's courier is, when this event
+   * says. A `COLLECTED` names the lifecycle too. Absent or null: the event
+   * names no courier step.
+   */
+  courier?: NormalizedCourierEvent | null;
 }

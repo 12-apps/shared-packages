@@ -83,6 +83,10 @@ export {
   type NormalizedAddress,
   type NormalizedBuyer,
   type MarketplaceLifecycle,
+  type MarketplaceCourier,
+  type MarketplaceCourierStep,
+  type MarketplaceCourierVehicle,
+  type NormalizedCourierEvent,
   type NormalizedEvent,
   type NormalizedMarketplaceOrder,
   type NormalizedOrderDiscount,
@@ -136,6 +140,18 @@ export {
 } from "./core/outbound-queue";
 export type { DeliveryOutcome } from "./core/pipeline";
 export type { InformStatusInput } from "./core/status-inform";
+export type {
+  CourierTrackingCallResult,
+  CourierTrackingResult,
+  MarketplaceCourierAnswer,
+  MarketplaceCourierApi,
+  MarketplaceCourierEngine,
+  MarketplaceCourierFacts,
+  MarketplaceCourierTracking,
+  PickupCodeCallResult,
+  PickupCodeValidation,
+  ValidatePickupCodeInput,
+} from "./core/courier-port";
 export {
   FetchOrderRetryError,
   MARKETPLACE_FETCH_ORDER_JOB,

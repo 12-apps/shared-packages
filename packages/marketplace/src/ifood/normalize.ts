@@ -19,6 +19,7 @@ import {
   toCents,
   verifyHmacSha256Hex,
 } from "../core/payload-read";
+import { readIfoodCourierEvent } from "./courier";
 
 /**
  * The iFood adapter's INBOUND half: one delivery → a {@link NormalizedEvent}.
@@ -53,6 +54,9 @@ const LIFECYCLE_OF: Readonly<Record<string, MarketplaceLifecycle>> = {
   DISPATCHED: "DISPATCHED",
   CON: "CONCLUDED",
   CONCLUDED: "CONCLUDED",
+  // iFood's courier has the bag (FUT-5665): for a fleet bag, the same hand-over as DSP.
+  CLT: "COLLECTED",
+  COLLECTED: "COLLECTED",
 };
 
 /**
@@ -237,6 +241,8 @@ function readOrder(
     deliveryFeeCents: firstCents(order, [["total", "deliveryFee"]]),
     subtotalCents: firstCents(order, [["total", "subTotal"]]),
     ...optional("discounts", readDiscounts(order)),
+    // The code iFood's courier states at the counter (FUT-5665; confirmed field). Null when iFood asks none.
+    pickupCode: firstString(order, [["delivery", "pickupCode"]]),
   };
 }
 
@@ -274,5 +280,6 @@ export function normalizeIfoodEvent(
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : refusedRequest ? "FAILED" : null,
     ...(LIFECYCLE_OF[eventType.toUpperCase()] ? { lifecycle: LIFECYCLE_OF[eventType.toUpperCase()] } : {}),
+    ...optional("courier", readIfoodCourierEvent(payload, eventType) ?? undefined),
   };
 }

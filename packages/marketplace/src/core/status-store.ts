@@ -1,6 +1,5 @@
 import type { StatusStep } from "./adapter";
 import type { EngineContext, MarketplaceDb } from "./ports";
-import type { MarketplaceLifecycle } from "./types";
 
 /**
  * The engine's memory of what was said about an order's steps, in
@@ -11,7 +10,7 @@ import type { MarketplaceLifecycle } from "./types";
  */
 
 /** A step as the table holds it: the three the store informs, and the one only a marketplace announces. */
-export type StatusRowStep = StatusStep | MarketplaceLifecycle;
+export type StatusRowStep = StatusStep | "CONCLUDED";
 
 /** Where a row stands. */
 export type StatusRowState = "SENDING" | "SENT" | "FAILED" | "NOTED";
@@ -65,7 +64,7 @@ export async function insertStatusRow(
 /** Remember a step the marketplace announced, so our own job never informs it back. */
 export async function noteMarketplaceStep(
   ctx: EngineContext,
-  row: { clientId: string; orderId: string; provider: string; step: MarketplaceLifecycle },
+  row: { clientId: string; orderId: string; provider: string; step: StatusRowStep },
 ): Promise<void> {
   const table = statusTable(await ctx.ports.db());
   if (table) await insertStatusRow(table, { ...row, source: "MARKETPLACE", state: "NOTED", claimKey: "" });

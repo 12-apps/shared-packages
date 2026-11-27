@@ -6,8 +6,14 @@ import { ingestMarketplaceOrder, type IngestSettings } from "./ingest";
 import { connectionMerchantId, resolveIngestionTarget } from "./integration";
 import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest, markCancelledBeforeIngest } from "./order-fetch-marks";
 import type { EngineContext } from "./ports";
-import type { MarketplaceLifecycle, MarketplaceProvider, NormalizedEvent, NormalizedMarketplaceOrder } from "./types";
-import { followLifecycle } from "./lifecycle";
+import type {
+  MarketplaceCourierStep,
+  MarketplaceLifecycle,
+  MarketplaceProvider,
+  NormalizedEvent,
+  NormalizedMarketplaceOrder,
+} from "./types";
+import { followCourierAndLifecycle } from "./courier";
 
 /**
  * One delivery, start to finish: normalize → inbox → ingest.
@@ -37,6 +43,8 @@ export type DeliveryOutcome =
   | { kind: "ingested"; orderId: string; unmappedSkus: string[] }
   /** A lifecycle event moved the order forward, through the host's `onLifecycle` (FUT-4653). */
   | { kind: "moved"; orderId: string; lifecycle: MarketplaceLifecycle }
+  /** A courier event's facts were stored by the host's `onCourier` (FUT-5665). */
+  | { kind: "courier"; orderId: string; step: MarketplaceCourierStep }
   | { kind: "cancelled" }
   | { kind: "cancellationFailed" }
   /** Recorded; the order body is fetched by the `marketplace.fetch-order` job. */
@@ -163,10 +171,11 @@ async function applyEvent(
     return { kind: "awaitingOrder" };
   }
 
-  // A lifecycle event (dispatched, concluded) of an order we hold: with the
-  // connection's switch ON and a host that binds the hook, the order follows.
-  // Anything else falls through to "understood, nothing to do", as before.
-  const followed = await followLifecycle(ctx, inboxId, clientId, event, settings);
+  // A courier event (FUT-5665) reaches a host that binds `onCourier`; a
+  // lifecycle event (dispatched, collected, concluded) of an order we hold:
+  // with the connection's switch ON and a host that binds the hook, the order
+  // follows. Anything else falls through to "understood, nothing to do", as before.
+  const followed = await followCourierAndLifecycle(ctx, inboxId, clientId, event, settings);
   if (followed) return followed;
   return ingestOrIgnore(ctx, inboxId, clientId, event, settings, now);
 }

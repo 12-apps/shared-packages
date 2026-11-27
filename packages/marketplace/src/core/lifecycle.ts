@@ -2,7 +2,7 @@ import { deferInboxEvent, settleInboxEvent } from "./inbox";
 import type { IngestSettings } from "./ingest";
 import type { DeliveryOutcome } from "./pipeline";
 import type { EngineContext } from "./ports";
-import { readStatusRows, noteMarketplaceStep, statusTable } from "./status-store";
+import { readStatusRows, noteMarketplaceStep, statusTable, type StatusRowStep } from "./status-store";
 import type { MarketplaceDeliveredBy, MarketplaceLifecycle, NormalizedEvent } from "./types";
 
 /**
@@ -20,7 +20,7 @@ import type { MarketplaceDeliveredBy, MarketplaceLifecycle, NormalizedEvent } fr
  * 3. a cancellation request standing (PENDING or REQUESTED) is the store's
  *    last word and nothing here contradicts it;
  * 4. an event that answers a step WE informed (a STORE row for DISPATCHED, or
- *    for HANDED_OVER when the event is CONCLUDED) is an echo: the failure case
+ *    for HANDED_OVER when the event is COLLECTED or CONCLUDED) is an echo: the failure case
  *    of forward-only alone is the store's undo, where the echo would
  *    dispatch a card again with no courier.
  *
@@ -36,7 +36,21 @@ import type { MarketplaceDeliveredBy, MarketplaceLifecycle, NormalizedEvent } fr
 /** The step of the table an event's echo is looked for under. */
 const ECHO_OF: Record<MarketplaceLifecycle, "DISPATCHED" | "HANDED_OVER"> = {
   DISPATCHED: "DISPATCHED",
+  // The courier holding the bag answers the store's hand-over (FUT-5665).
+  COLLECTED: "HANDED_OVER",
   CONCLUDED: "HANDED_OVER",
+};
+
+/**
+ * The step the marketplace's word is NOTED under. `COLLECTED` is the
+ * hand-over seen from the marketplace's side, so it is noted as HANDED_OVER:
+ * the table's vocabulary (its CHECK) is unchanged, and our own job never
+ * informs a hand-over the marketplace already announced.
+ */
+const NOTED_AS: Record<MarketplaceLifecycle, StatusRowStep> = {
+  DISPATCHED: "DISPATCHED",
+  COLLECTED: "HANDED_OVER",
+  CONCLUDED: "CONCLUDED",
 };
 
 interface HeldAcceptance {
@@ -60,6 +74,15 @@ function refusal(held: HeldAcceptance): string | null {
     return `a cancellation request is ${held.cancellationStatus}`;
   }
   return null;
+}
+
+/**
+ * A COLLECTED is the marketplace's courier taking the bag (FUT-5665): for a
+ * bag the store carries it moves nothing and is never noted, so it cannot
+ * stand in for the store's own HANDED_OVER (a merchant bag's "delivered").
+ */
+function notTheFleets(lifecycle: MarketplaceLifecycle, held: HeldAcceptance): string | null {
+  return lifecycle === "COLLECTED" && held.deliveredBy !== "MARKETPLACE" ? "COLLECTED of a bag the marketplace does not carry" : null;
 }
 
 function deliveredByOf(held: HeldAcceptance): MarketplaceDeliveredBy | null {
@@ -108,7 +131,7 @@ export async function followLifecycle(
     await deferInboxEvent(ctx, inboxId, reason);
     return { kind: "ignored", reason };
   }
-  const stopped = refusal(held);
+  const stopped = refusal(held) ?? notTheFleets(lifecycle, held);
   if (stopped) return ignored(ctx, inboxId, stopped);
 
   const echo = ECHO_OF[lifecycle];
@@ -121,7 +144,7 @@ export async function followLifecycle(
   // FAILED and logged): the marketplace's state and ours already agree, and a stricter ordering
   // would put a write before the host's answer on every event.
   const answer = await hook.call(ctx.ports.order, clientId, held.orderId, event, { deliveredBy: deliveredByOf(held) });
-  await noteMarketplaceStep(ctx, { clientId, orderId: held.orderId, provider: event.provider, step: lifecycle });
+  await noteMarketplaceStep(ctx, { clientId, orderId: held.orderId, provider: event.provider, step: NOTED_AS[lifecycle] });
   if (answer === "moved") {
     await settleInboxEvent(ctx, inboxId, "PROCESSED");
     ctx.ports.publishChanged(clientId);
