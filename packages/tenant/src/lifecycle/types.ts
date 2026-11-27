@@ -44,6 +44,10 @@ export interface TenantClosingRow {
   purgedAt: Date | null;
   afterCloseDoneAt: Date | null;
   afterCloseFailedAt: Date | null;
+  /** The object keys the purge still owes storage (the purge engine reads it; a hand-built table may leave it out). */
+  imageKeysOwed?: string[];
+  /** The image pass that emptied `imageKeysOwed`. */
+  imagesErasedAt?: Date | null;
 }
 
 /** What a close writes into a fresh row. */
@@ -113,7 +117,9 @@ export interface TenantClosingMirror<Tx> {
 export type TenantAuditEvent =
   | { act: 'closeScheduled'; tenantId: string; by: TenantCloseEntry; reason: string; purgeAt: Date; priorStatus: string }
   | { act: 'closeReopened'; tenantId: string; by: TenantCloseEntry; purgeAt: Date | null; restored: string }
-  | { act: 'afterCloseFailed'; tenantId: string; error: string };
+  | { act: 'afterCloseFailed'; tenantId: string; error: string }
+  /** The purge engine erased the tenant: `erased` is every table it emptied, in order. */
+  | { act: 'closePurged'; tenantId: string; purgeAt: Date; erased: readonly string[] };
 
 /** What every notice the lifecycle raises carries. */
 export interface TenantNoticePayload {
@@ -196,8 +202,20 @@ export interface TenantLifecycleConfig<S extends string = string, Tx = unknown> 
   invalidate(tenantId: string): Promise<void>;
   /** Raise a notice; true when RECORDED (a reminder is stamped only then). */
   notify(typeId: string, payload: TenantNoticePayload): Promise<boolean>;
-  /** The purge is due: run the host's. `skipped` stamps nothing; `purged` and `already` stamp `purgedAt`. */
-  onPurgeDue(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'skipped'>;
+  /**
+   * The purge is due: run the host's. `skipped` stamps nothing; `purged` and
+   * `already` stamp `purgedAt`. Exactly one of `onPurgeDue` and `purge` is
+   * given: both, or neither, is refused at startup.
+   */
+  onPurgeDue?(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'skipped'>;
+  /**
+   * The package's purge engine (`createTenantPurge`), in place of
+   * `onPurgeDue`: the sweep runs `run` for each due tenant and stamps nothing
+   * itself (the engine stamps `purgedAt` in its own transaction), then the
+   * image pass (`sweepImages`). Referenced lazily, so the engine may be built
+   * after this config.
+   */
+  purge?: TenantLifecyclePurge;
   /** Write one audit line ON `tx`. `action` is `ids.audit[event.act]`. */
   audit(tx: Tx, action: string, event: TenantAuditEvent): Promise<void>;
   /** The current request's locale, for refusals (null: the default pack). */
@@ -206,6 +224,12 @@ export interface TenantLifecycleConfig<S extends string = string, Tx = unknown> 
   onError(error: unknown, at: { act: string; tenantId: string }): void;
   /** The expand-and-contract mirror, when the host is moving an older table. */
   mirror?: TenantClosingMirror<Tx>;
+}
+
+/** What the lifecycle's sweep calls on the purge engine (`TenantPurge` satisfies it). */
+export interface TenantLifecyclePurge {
+  run(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'notClosing' | 'notDue' | 'descendantsPending'>;
+  sweepImages(now: Date): Promise<{ emptied: number }>;
 }
 
 /** A tenant's closing state, as an API answers it. */
@@ -223,6 +247,8 @@ export interface TenantSweepResult {
   purged: number;
   /** After-close hooks retried and gone through on this pass. */
   afterCloseRetried: number;
+  /** With `lifecycle.purge`: purged tenants whose owed objects are all gone now. Absent otherwise. */
+  imagesErased?: number;
 }
 
 export interface TenantLifecycle<S extends string = string> {

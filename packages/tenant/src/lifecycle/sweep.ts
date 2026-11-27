@@ -10,6 +10,8 @@
  * - retries the after-close hook while it has not gone through;
  * - once due, runs the host's purge, and stamps `purgedAt` on `purged` and on
  *   `already` (which heals a crash between the host's purge and the stamp);
+ *   with the package's engine (`lifecycle.purge`) the engine stamps it
+ *   itself, and the pass ends with the engine's image pass;
  * - before that, while closing, sends the reminder due: re-read right before
  *   the send, stamped only once the notice was RECORDED, conditionally, so a
  *   failed send is retried and two passes cannot both send.
@@ -20,7 +22,7 @@ import type { TenantRecord } from '../port';
 import { runAfterClose, payloadOf } from './close';
 import type { LifecycleContext } from './context';
 import { reminderDue, type TenantReminder } from './pure';
-import type { TenantClosingRow, TenantSweepResult } from './types';
+import type { TenantClosingRow, TenantLifecyclePurge, TenantSweepResult } from './types';
 
 const sentOf = (row: TenantClosingRow) => ({ week: row.remindedWeekAt !== null, day: row.remindedDayAt !== null });
 
@@ -55,7 +57,14 @@ async function sweepOne<S extends string, Tx>(
 ): Promise<void> {
   if (row.afterCloseDoneAt === null && (await runAfterClose(context, tenant, now))) result.afterCloseRetried += 1;
   if (row.purgeAt.getTime() <= now.getTime()) {
-    const outcome = await context.config.onPurgeDue(row.tenantId, { now });
+    const { purge, onPurgeDue } = context.config;
+    if (purge !== undefined) {
+      // The engine stamped `purgedAt` itself, in the transaction that erased: nothing to stamp here.
+      if ((await purge.run(row.tenantId, { now })) === 'purged') result.purged += 1;
+      return;
+    }
+    // Validated: one of the two is given.
+    const outcome = await (onPurgeDue as NonNullable<typeof onPurgeDue>)(row.tenantId, { now });
     if (outcome === 'skipped') return;
     if (outcome === 'purged') result.purged += 1;
     await context.stamp(row.tenantId, 'purgedAt', now, { kind: 'purged', at: now });
@@ -111,6 +120,21 @@ async function sweepPage<S extends string, Tx>(
   return swept;
 }
 
+/** The engine's image pass: every purged tenant still owing objects. A failure goes to `onError`. */
+async function sweepOwedImages<S extends string, Tx>(
+  context: LifecycleContext<S, Tx>,
+  purge: TenantLifecyclePurge,
+  now: Date,
+  result: TenantSweepResult,
+): Promise<void> {
+  result.imagesErased = 0;
+  try {
+    result.imagesErased = (await purge.sweepImages(now)).emptied;
+  } catch (error) {
+    context.config.onError(error, { act: 'purgeImages', tenantId: '' });
+  }
+}
+
 /**
  * Pages of `sweepBatch` rows, oldest purge first, by keyset; at most
  * `sweepBatch` live tenants are swept per pass, and a stale row (dropped)
@@ -135,5 +159,6 @@ export async function sweepTenants<S extends string, Tx>(context: LifecycleConte
     if (page.length < config.sweepBatch) break;
     after = page[page.length - 1] ?? null;
   }
+  if (config.purge !== undefined) await sweepOwedImages(context, config.purge, now, result);
   return result;
 }
