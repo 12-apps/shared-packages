@@ -43,7 +43,7 @@ export function ClosingBannerScreen({ slug, copy }: ClosingBannerProps): JSX.Ele
         </Box>
         {reopen.isError ? (
           <Box role="alert" sx={{ mt: 1, typography: 'body2', color: 'error.dark' }} data-testid="closing-banner-error">
-            {reopen.error?.message ?? copy.actFailed}
+            {reopen.error?.message}
           </Box>
         ) : null}
         <Stack direction="row" sx={{ mt: 1 }}>

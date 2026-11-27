@@ -93,7 +93,7 @@ export function validateClosingScreens(config: unknown): void {
   const hooks = ['useClosingView', 'useClosingState', 'useRequestExport', 'useClose', 'useReopen', 'useHoldsClose', 'usePathname', 'usePin'];
   checkGroup(bag.hooks, `${root}.hooks`, hooks, requireFunction);
   checkGroup(bag.components, `${root}.components`, ['PinFields', 'UndoNote', 'Link', 'Frame'], requireComponent);
-  for (const name of ['errorAnswer', 'toast', 'shortDay']) requireFunction(bag[name], `${root}.${name}`);
+  for (const name of ['errorAnswer', 'toast', 'navigate', 'shortDay']) requireFunction(bag[name], `${root}.${name}`);
   requireText(bag.testIdWord, `${root}.testIdWord`);
   requireText(bag.nameLocale, `${root}.nameLocale`);
 }

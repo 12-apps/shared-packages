@@ -59,7 +59,7 @@ function BlockerRow({ blocker, slug, copy }: { blocker: TenantClosingBlocker; sl
 
 export function PendingCard({ view, slug, copy }: CardProps): JSX.Element {
   return (
-    <Card variant="outlined" data-testid="close-pending">
+    <Card variant="outlined" tabIndex={-1} sx={{ outline: 'none' }} data-testid="close-pending">
       <CardContent>
         <Heading level="h3" size="h6">{copy.pendingTitle}</Heading>
         {view.blockers.length === 0 ? (

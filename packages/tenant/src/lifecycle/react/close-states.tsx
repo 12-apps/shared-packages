@@ -31,16 +31,21 @@ export function useShortDay(): (iso: string | null) => string {
 export function useReopenWithToast(slug: string, copy: TenantLifecycleCopy) {
   const config = useClosingConfig();
   const reopen = config.hooks.useReopen(slug);
-  const run = () =>
-    reopen.mutate(undefined, {
-      onSuccess: (answer) => {
+  // On the write's own answer, not on this component's: the reopen takes the banner (or the card) away
+  // with it, and the toast must still say what happened.
+  const run = () => {
+    reopen.mutateAsync().then(
+      (answer) => {
         const live = answer.status === config.statuses.active;
         config.toast(live ? copy.reopened : copy.reopenedSuspended, {
           severity: 'success',
           testId: `${config.testIdWord}-reopened-toast`,
         });
       },
-    });
+      // The refusal is the mutation's own error state, shown where the button is.
+      () => undefined,
+    );
+  };
   return { isPending: reopen.isPending, isError: reopen.isError, error: reopen.error, run };
 }
 
@@ -92,7 +97,7 @@ export function ClosingCard({ view, slug, copy, focusOnMount }: ClosingCardProps
         <Box sx={{ mt: 1 }}><Text>{copy.closingBody(day(view.requestedAt), day(view.purgeAt))}</Text></Box>
         <Box sx={{ mt: 1 }}><Text color="secondary">{copy.reopenNote}</Text></Box>
         {reopen.isError ? (
-          <Alert variant="danger" description={reopen.error?.message ?? copy.actFailed} sx={{ mt: 1.5 }} dataTestId="close-reopen-error" />
+          <Alert variant="danger" description={reopen.error?.message ?? ''} sx={{ mt: 1.5 }} dataTestId="close-reopen-error" />
         ) : null}
         <Button sx={{ mt: 2, ...TOUCH }} loading={reopen.isPending} onClick={reopen.run} dataTestId="close-reopen">
           {copy.reopen}

@@ -13,7 +13,7 @@
  * The buttons only call the host: it opens the one confirmation (the same
  * component its menu opens) and its own restore confirmation.
  */
-import type { JSX } from 'react';
+import { useRef, type JSX } from 'react';
 
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import { Button } from '@12-apps/ui/form/Button';
@@ -25,6 +25,7 @@ import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import { usePlatformConfig } from './context';
+import { useFocusOnChange } from './focus';
 import type { TenantArchivedFacts, TenantLifecycleCopy } from './copy';
 import { Emphasis, Fact, PendingList, SectionTitle } from './platform-parts';
 import type { TenantClosingBlocker, TenantQuery } from './types';
@@ -92,12 +93,12 @@ function ArchivedBody({ copy, archived, purgeDay, canRestore, onRestore }: Archi
   return (
     <>
       {archived === null ? null : (
-        <Box sx={{ typography: 'body1' }} data-testid="archive-archived">
+        <Box tabIndex={-1} sx={{ typography: 'body1', outline: 'none' }} data-testid="archive-archived">
           <Emphasis value={copy.platformArchived(archived)} />
         </Box>
       )}
       <Box sx={{ mt: 0.75 }}>
-        <Fact icon={<CalendarTodayOutlinedIcon />} dataTestId="archive-purge">
+        <Fact icon={<CalendarTodayOutlinedIcon fontSize="small" />} dataTestId="archive-purge">
           <Emphasis value={copy.platformPurgeFact(purgeDay)} />
         </Fact>
       </Box>
@@ -110,13 +111,30 @@ function ArchivedBody({ copy, archived, purgeDay, canRestore, onRestore }: Archi
   );
 }
 
+/** Where focus goes when the card turns over under the person: the new state's own first line or action. */
+const FOCUS_TARGET = {
+  archived: ['archive-archived', 'archive-restore'],
+  open: ['archive-open'],
+} as const;
+
 export function ArchiveCardScreen(props: ArchiveCardProps): JSX.Element | null {
   const { statuses } = usePlatformConfig();
   const open = statuses.closableFrom.includes(props.status);
   const archived = props.status === statuses.closing;
-  if (!open && !archived) return null;
+  const card = useRef<HTMLDivElement | null>(null);
+  const shown = archived ? 'archived' : open ? 'open' : 'none';
+  // The archive's entry (or the restore) is gone with the body it sat in, and the overlay or dialog it
+  // opened cannot hand focus back to it: focus goes to what the card says now, never to <body>.
+  useFocusOnChange(shown, () => {
+    if (shown === 'none' || card.current === null) return null;
+    const found = FOCUS_TARGET[shown]
+      .map((id) => card.current?.querySelector<HTMLElement>(`[data-testid="${id}"]`) ?? null)
+      .find((node) => node !== null);
+    return found ?? card.current;
+  });
+  if (shown === 'none') return null;
   return (
-    <Card variant="outlined" data-testid="archive-card">
+    <Card ref={card} tabIndex={-1} variant="outlined" data-testid="archive-card" sx={{ outline: 'none' }}>
       <CardContent>
         <Box sx={{ mb: 1.5 }}>
           <Heading level="h3" size="h6">{props.copy.platformCardTitle}</Heading>

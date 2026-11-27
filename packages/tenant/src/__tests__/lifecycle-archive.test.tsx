@@ -5,7 +5,7 @@
  * here, named by its id. The words are a hospital host's pack: none is the
  * package's (the T lines are the host's copy).
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createPlatformArchive, type TenantClosingBlocker, type TenantQuery } from '../lifecycle/react';
@@ -286,6 +286,84 @@ describe('the archive card', () => {
     cleanup();
     card({ status: 'SHUT' });
     expect(screen.queryByTestId('archive-card')).toBeNull();
+  });
+
+  describe('B1: focus when the card turns over under the person', () => {
+    const ARCHIVED = { day: '26/11/2026', actor: 'Admin User', byPlatform: true, reason: 'asked by phone' };
+
+    function cardAt(status: string, extra: Record<string, unknown> = {}) {
+      return (
+        <archiveScreens.ArchiveCard
+          status={status}
+          copy={copy}
+          blockers={query<readonly TenantClosingBlocker[]>([])}
+          purgeDay={PURGE}
+          archived={status === 'WINDING_DOWN' ? ARCHIVED : null}
+          canArchive
+          canRestore
+          onArchive={vi.fn()}
+          onRestore={vi.fn()}
+          {...extra}
+        />
+      );
+    }
+    const archiveScreens = createPlatformArchive(platformConfig());
+
+    it('takes no focus on its first render', () => {
+      render(cardAt('OPEN'));
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('archive → archived: focus goes to who archived it, not to <body>', async () => {
+      const { rerender } = render(cardAt('OPEN'));
+      act(() => screen.getByTestId('archive-open').focus());
+      rerender(cardAt('WINDING_DOWN'));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-archived')));
+    });
+
+    it('archived → archive, even when a closing overlay drops focus after the re-read', async () => {
+      const { rerender } = render(
+        <>
+          {cardAt('WINDING_DOWN')}
+          <input data-testid="overlay-field" />
+        </>,
+      );
+      act(() => screen.getByTestId('overlay-field').focus());
+      rerender(
+        <>
+          {cardAt('OPEN')}
+          <input data-testid="overlay-field" />
+        </>,
+      );
+      // The overlay still holds focus at the re-read; then it closes and drops it.
+      rerender(cardAt('OPEN'));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-open')));
+    });
+
+    it('restored → open without the archive permission: focus goes to the card itself', async () => {
+      const { rerender } = render(cardAt('WINDING_DOWN'));
+      act(() => screen.getByTestId('archive-restore').focus());
+      rerender(cardAt('ON_HOLD', { canArchive: false }));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-card')));
+    });
+
+    it('never takes a focus the person moved elsewhere', async () => {
+      const { rerender } = render(
+        <>
+          {cardAt('OPEN')}
+          <button type="button" data-testid="elsewhere" />
+        </>,
+      );
+      rerender(
+        <>
+          {cardAt('WINDING_DOWN')}
+          <button type="button" data-testid="elsewhere" />
+        </>,
+      );
+      act(() => screen.getByTestId('elsewhere').focus());
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(document.activeElement).toBe(screen.getByTestId('elsewhere'));
+    });
   });
 
   it('E11: without the permissions, the facts stay and the buttons go', () => {

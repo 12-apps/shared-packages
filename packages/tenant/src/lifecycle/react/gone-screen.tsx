@@ -25,7 +25,7 @@ export interface TenantGoneScreenProps {
 }
 
 export function TenantGoneScreenBody({ refusal, otherSlugs, onSignOut, copy, switchTarget }: TenantGoneScreenProps): JSX.Element {
-  const { testIdWord } = useClosingConfig();
+  const { testIdWord, navigate } = useClosingConfig();
   const target = switchTarget(otherSlugs);
   const closed = refusal === 'closed';
   return (
@@ -36,7 +36,7 @@ export function TenantGoneScreenBody({ refusal, otherSlugs, onSignOut, copy, swi
         primaryAction={
           target === null
             ? { label: copy.signOut, onClick: onSignOut }
-            : { label: copy.switchTenant, onClick: () => window.location.assign(target) }
+            : { label: copy.switchTenant, onClick: () => navigate(target) }
         }
       />
     </Box>

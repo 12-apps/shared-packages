@@ -30,6 +30,8 @@ export interface TenantRefusalConfig {
   };
   errorAnswer: TenantErrorAnswer;
   toast: TenantToast;
+  /** Leave for a full path of the app (`(path) => window.location.assign(path)`): the toast's way out and the switch. */
+  navigate: (path: string) => void;
   /** The noun the host's test ids carry (`close-<word>-dialog`, `<word>-gone-screen`). */
   testIdWord: string;
 }
@@ -82,7 +84,7 @@ export function makeRefusalReaders(config: TenantRefusalConfig): RefusalReaders 
       dismissible: true,
       assertive: true,
       testId: `${config.testIdWord}-read-only-toast`,
-      actions: slug ? [{ label: words.seeClosing, onClick: () => window.location.assign(closePagePath(slug)) }] : undefined,
+      actions: slug ? [{ label: words.seeClosing, onClick: () => config.navigate(closePagePath(slug)) }] : undefined,
     });
   }
 

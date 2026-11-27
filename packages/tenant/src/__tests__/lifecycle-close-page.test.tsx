@@ -178,6 +178,41 @@ describe('the close dialog (K-D)', () => {
     expect(host.closeRun).not.toHaveBeenCalled();
   });
 
+  /** Fill the dialog so its confirm is lit. */
+  function fill(): void {
+    fireEvent.change(field('close-ward-reason'), { target: { value: 'moving' } });
+    fireEvent.change(field('close-ward-name'), { target: { value: NAME } });
+  }
+
+  /** Escape, the close button and the way back: each must leave the dialog up. */
+  function tryEveryWayOut(dialog: HTMLElement): void {
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    const closeButton = screen.queryByRole('button', { name: '«h.closeLabel»' });
+    if (closeButton !== null) fireEvent.click(closeButton);
+    fireEvent.click(screen.getByRole('button', { name: '«h.cancel»' }));
+  }
+
+  it('cannot be closed while the close is with the server (K-D7)', async () => {
+    const host = hostState({ closeRun: vi.fn(() => new Promise<unknown>(() => undefined)) });
+    openDialog(host);
+    const dialog = await screen.findByTestId('close-ward-dialog');
+    fill();
+    fireEvent.click(confirmButton());
+    await waitFor(() => expect(host.closeRun).toHaveBeenCalledTimes(1));
+    tryEveryWayOut(dialog);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTestId('close-ward-dialog')).toBeTruthy();
+  });
+
+  it('cannot be closed while the PIN is with the server (K-D7)', async () => {
+    openDialog(hostState({ pin: pin({ busy: true }) }));
+    const dialog = await screen.findByTestId('close-ward-dialog');
+    expect(screen.getByRole('button', { name: '«h.closeLabel»' })).toBeTruthy();
+    tryEveryWayOut(dialog);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTestId('close-ward-dialog')).toBeTruthy();
+  });
+
   it('closes on Escape and returns focus to its opener (K-D8)', async () => {
     const { opener } = openDialog();
     const dialog = await screen.findByTestId('close-ward-dialog');
@@ -216,6 +251,15 @@ describe('the close page, other states (K-P9…K-P12)', () => {
     await waitFor(() => expect(second.toast).toHaveBeenCalledWith('«h.reopenedSuspended»', expect.objectContaining({ severity: 'success' })));
   });
 
+  it('after a reopen to the open tenant, focus goes to the first card, never to <body>', async () => {
+    const host = hostState({ view: query(CLOSING) });
+    const opened = page(host);
+    act(() => screen.getByTestId('close-reopen').focus());
+    host.view = query(view());
+    opened.rerender(<opened.screens.ClosePage slug="north" copy={copy} />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('close-pending')));
+  });
+
   it('says a failed reopen in place', async () => {
     page(hostState({ view: query(CLOSING), reopenRun: vi.fn(async () => Promise.reject(new Error('nope'))) }));
     fireEvent.click(screen.getByTestId('close-reopen'));
@@ -248,9 +292,9 @@ describe('the close page, other states (K-P9…K-P12)', () => {
 describe('the closing banner (K-B)', () => {
   const closingState = query({ status: 'WINDING_DOWN', requestedAt: '2026-11-26T12:00:00Z', purgeAt: '2026-12-26T12:00:00Z' });
 
-  function banner(host: HostState) {
-    const screens = createClosingScreens(closingConfig(host));
-    return render(<screens.ClosingBanner slug="north" copy={copy} />);
+  function banner(host: HostState, toast = vi.fn()) {
+    const screens = createClosingScreens(closingConfig(host, toast));
+    return { ...render(<screens.ClosingBanner slug="north" copy={copy} />), toast };
   }
 
   it('shows amber, with the dates, the read-only line and the reopen, to a holder (K-B1, K-B3)', () => {
@@ -261,6 +305,32 @@ describe('the closing banner (K-B)', () => {
     expect(screen.getByTestId('closing-banner-read-only').textContent).toBe('«h.bannerReadOnly»');
     expect(screen.getByTestId('closing-banner-reopen').textContent).toBe('«h.reopen»');
     expectOnlyPackWords(['D[2026-11-26]', 'D[2026-12-26]']);
+  });
+
+  it('is the warning alert, never the error one (K-B3)', () => {
+    banner(hostState({ state: closingState }));
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toMatch(/Warning/u);
+    expect(alert.className).not.toMatch(/Error/u);
+  });
+
+  it('reopens from its button and says so (K-B3, K-P12)', async () => {
+    const host = hostState({ state: closingState, reopenRun: vi.fn(async () => ({ status: 'ON_HOLD' })) });
+    const { toast } = banner(host);
+    fireEvent.click(screen.getByTestId('closing-banner-reopen'));
+    await waitFor(() => expect(host.reopenRun).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith('«h.reopenedSuspended»', { severity: 'success', testId: 'ward-reopened-toast' }),
+    );
+  });
+
+  it("says a failed reopen in its own line, as an alert, with the error's own message (K-B3)", async () => {
+    const { toast } = banner(hostState({ state: closingState, reopenRun: vi.fn(async () => Promise.reject(new Error('reopen refused'))) }));
+    fireEvent.click(screen.getByTestId('closing-banner-reopen'));
+    const line = await screen.findByTestId('closing-banner-error');
+    expect(line.getAttribute('role')).toBe('alert');
+    expect(line.textContent).toBe('reopen refused');
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it('asks only for a holder, and draws nothing for an open tenant (K-B1)', () => {
@@ -289,15 +359,25 @@ describe('the refusals (K-R)', () => {
 
   it('raises one read-only toast with the way to the close page under the host paths (K-R2)', () => {
     const toast = vi.fn();
-    const screens = createClosingScreens(closingConfig(hostState(), toast));
+    const navigate = vi.fn();
+    const screens = createClosingScreens(closingConfig(hostState(), toast, navigate));
     window.history.pushState({}, '', '/console/north/wards');
     screens.interceptReadOnly(answered(403, 'read only now', { code: 'WARD_READ_ONLY' }), { seeClosing: '«h.seeClosing»' });
     screens.interceptReadOnly(answered(403, 'other', { code: 'WARD_SHUT' }), { seeClosing: '«h.seeClosing»' });
     expect(toast).toHaveBeenCalledTimes(1);
-    const [message, options] = toast.mock.calls[0] as [string, { id: string; testId: string; actions: { label: string }[] }];
+    const [message, options] = toast.mock.calls[0] as [string, { actions: { label: string; onClick: () => void }[] }];
     expect(message).toBe('read only now');
-    expect(options).toMatchObject({ id: 'ward-read-only', severity: 'warning', testId: 'ward-read-only-toast', duration: 8000 });
+    expect(options).toMatchObject({
+      id: 'ward-read-only',
+      severity: 'warning',
+      testId: 'ward-read-only-toast',
+      duration: 8000,
+      dismissible: true,
+      assertive: true,
+    });
     expect(options.actions[0]?.label).toBe('«h.seeClosing»');
+    options.actions[0]?.onClick();
+    expect(navigate).toHaveBeenCalledWith('/console/north/settings/wind-down');
     expect(screens.closePagePath('north')).toBe('/console/north/settings/wind-down');
   });
 
@@ -321,7 +401,8 @@ describe('the refusals (K-R)', () => {
   });
 
   it('sends a member to the one other tenant, the picker, or signs out (K-R3)', () => {
-    const screens = createClosingScreens(closingConfig(hostState()));
+    const navigate = vi.fn();
+    const screens = createClosingScreens(closingConfig(hostState(), vi.fn(), navigate));
     expect(screens.switchTarget(['south'])).toBe('/console/south');
     expect(screens.switchTarget(['south', 'east'])).toBe('/console/');
     expect(screens.switchTarget([])).toBeNull();
@@ -334,6 +415,8 @@ describe('the refusals (K-R)', () => {
     cleanup();
     render(<screens.TenantGoneScreen refusal="closing" otherSlugs={['south']} onSignOut={onSignOut} copy={copy} />);
     expect(screen.getByTestId('ward-gone-screen').textContent).toContain('«h.refusedClosingBody»');
-    expect(screen.getByRole('button', { name: '«h.switchTenant»' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '«h.switchTenant»' }));
+    expect(navigate).toHaveBeenCalledWith('/console/south');
+    expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 });

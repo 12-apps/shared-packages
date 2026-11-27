@@ -41,7 +41,7 @@ export function SectionTitle({ children, first = false, level = 'h3' }: { childr
 export function Fact({ icon, children, dataTestId }: { icon: ReactNode; children: ReactNode; dataTestId: string }): JSX.Element {
   return (
     <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ py: 0.75 }} data-testid={dataTestId}>
-      <Box sx={{ color: 'text.secondary', display: 'flex', flex: 'none', '& svg': { fontSize: sxRem(20) } }} aria-hidden>
+      <Box sx={{ color: 'text.secondary', display: 'flex', flex: 'none' }} aria-hidden>
         {icon}
       </Box>
       <Box sx={{ typography: 'body1' }}>{children}</Box>

@@ -64,13 +64,13 @@ interface ContentProps extends Omit<ArchivePanelProps<TenantLifecyclePin>, 'open
 function Facts({ copy, purgeDay, purgeShortDay }: Pick<ContentProps, 'copy' | 'purgeDay' | 'purgeShortDay'>): JSX.Element {
   return (
     <Box data-testid="archive-facts">
-      <Fact icon={<MailOutlineIcon />} dataTestId="archive-fact-email">
+      <Fact icon={<MailOutlineIcon fontSize="small" />} dataTestId="archive-fact-email">
         <Emphasis value={copy.platformFactEmail(purgeShortDay)} />
       </Fact>
-      <Fact icon={<CalendarTodayOutlinedIcon />} dataTestId="archive-fact-purge">
+      <Fact icon={<CalendarTodayOutlinedIcon fontSize="small" />} dataTestId="archive-fact-purge">
         <Emphasis value={copy.platformFactPurge(purgeDay)} />
       </Fact>
-      <Fact icon={<PersonOutlineIcon />} dataTestId="archive-fact-audit">
+      <Fact icon={<PersonOutlineIcon fontSize="small" />} dataTestId="archive-fact-audit">
         {copy.platformFactAudit}
       </Fact>
     </Box>

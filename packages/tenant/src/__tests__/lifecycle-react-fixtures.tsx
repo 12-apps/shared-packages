@@ -170,7 +170,7 @@ function Overlay({ open, onClose, label, dataTestId, children }: { open: boolean
 
 const STATUSES = { active: 'OPEN', closing: 'WINDING_DOWN', closed: 'SHUT' } as const;
 
-export function closingConfig(host: HostState, toast = vi.fn()): TenantClosingScreensConfig<PinState> {
+export function closingConfig(host: HostState, toast = vi.fn(), navigate = vi.fn()): TenantClosingScreensConfig<PinState> {
   return {
     statuses: STATUSES,
     copy: { locales: { 'x-hospital': HOSPITAL_PACK }, defaultLocale: 'x-hospital' },
@@ -181,6 +181,7 @@ export function closingConfig(host: HostState, toast = vi.fn()): TenantClosingSc
         ? { status: (error as Error & { status: number }).status, body: (error as Error & { body?: unknown }).body, message: error.message }
         : null,
     toast,
+    navigate,
     testIdWord: 'ward',
     hooks: {
       useClosingView: () => host.view,

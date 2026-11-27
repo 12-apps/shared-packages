@@ -41,6 +41,7 @@ describe('closing screens config', () => {
     ['components.UndoNote'],
     ['errorAnswer'],
     ['toast'],
+    ['navigate'],
     ['shortDay'],
     ['testIdWord'],
     ['nameLocale'],

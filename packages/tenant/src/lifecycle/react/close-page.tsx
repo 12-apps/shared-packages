@@ -24,6 +24,7 @@ import { rem } from '@12-apps/ui/tokens';
 import { CloseCard, DataCard, PendingCard, SPAN } from './close-cards';
 import { ClosingCard, NotClosableNotice } from './close-states';
 import { useClosingConfig } from './context';
+import { useFocusOnChange } from './focus';
 import type { TenantLifecycleCopy } from './copy';
 import type { TenantClosingView } from './types';
 
@@ -85,16 +86,31 @@ function PageBody({ data, slug, copy, sawOpen, sawClosing }: BodyProps): JSX.Ele
   );
 }
 
+/**
+ * What the page saw before, which says what just happened, and the focus a
+ * reopen to the open tenant needs.
+ */
+function useStatusMemory(status: string): { sawOpen: boolean; sawClosing: boolean } {
+  const { statuses } = useClosingConfig();
+  // Set once the page saw the tenant open: a later closing is the close this person just confirmed.
+  const sawOpen = useRef(false);
+  if (status === statuses.active) sawOpen.current = true;
+  // Set once the page saw it closing: a later live-but-not-open status is the reopen that restored a suspension.
+  const sawClosing = useRef(false);
+  if (status === statuses.closing) sawClosing.current = true;
+  // A reopen to the open tenant takes away the reopen button: focus goes to the first card, never to <body>.
+  // (Every other turn already places it: the closing heading, the not-closable notice.)
+  useFocusOnChange(status, () =>
+    status === statuses.active ? document.querySelector<HTMLElement>('[data-testid="close-pending"]') : null,
+  );
+  return { sawOpen: sawOpen.current, sawClosing: sawClosing.current };
+}
+
 export function ClosePageScreen({ slug, copy }: ClosePageProps): JSX.Element {
   const { hooks, statuses, components } = useClosingConfig();
   const { Frame } = components;
   const view = hooks.useClosingView(slug);
-  // Set once the page saw the tenant open: a later closing is the close this person just confirmed.
-  const sawOpen = useRef(false);
-  if (view.data?.status === statuses.active) sawOpen.current = true;
-  // Set once the page saw it closing: a later live-but-not-open status is the reopen that restored a suspension.
-  const sawClosing = useRef(false);
-  if (view.data?.status === statuses.closing) sawClosing.current = true;
+  const { sawOpen, sawClosing } = useStatusMemory(view.data?.status ?? '');
   if (view.isPending) return <LoadingState dataTestId="close-loading" />;
   const data = view.data;
   if (view.isError || data === undefined) {
@@ -106,7 +122,7 @@ export function ClosePageScreen({ slug, copy }: ClosePageProps): JSX.Element {
     <Frame eligible={data.status === statuses.active}>
       <Box sx={GRID} data-testid="config-close">
         <Box className="close-grid">
-          <PageBody data={data} slug={slug} copy={copy} sawOpen={sawOpen.current} sawClosing={sawClosing.current} />
+          <PageBody data={data} slug={slug} copy={copy} sawOpen={sawOpen} sawClosing={sawClosing} />
         </Box>
       </Box>
     </Frame>

@@ -601,6 +601,7 @@ const closing = createClosingScreens({
   components: { PinFields, UndoNote, Link, Frame },  // your PIN fields, undo note, router link, page frame
   errorAnswer: (error) => (error instanceof ApiError ? error : null), // { status, body, message } | null
   toast,                                              // a @12-apps/notifications toaster fits
+  navigate: (path) => window.location.assign(path),   // the read-only toast's way out, the gone screen's switch
   shortDay: (iso) => …,                               // the page's and banner's short day, in your zone
   testIdWord: 'shop',                                 // close-<word>-dialog, <word>-gone-screen, …
   nameLocale: 'pt-BR',                                // the typed name compared as your server compares it
@@ -663,6 +664,12 @@ const archive = createPlatformArchive({
   `closing` (archived: `archived` facts, the deletion day, `onRestore` for
   your own restore confirmation); any other status draws nothing. Its entry
   is never disabled: the panel says what is missing.
+- **Focus survives the turn-over.** When the card's status turns (archived
+  after your re-read, open again after a restore) the entry that was pressed
+  is gone, so the card sends focus to its new state's first line or action
+  (`archive-archived`, `archive-open`, else the card), also when your overlay
+  or restore dialog drops focus to `<body>` as it closes just after. The
+  close page does the same for a reopen to the open tenant (`close-pending`).
 - Test ids: `archive-panel`, `archive-panel-body`, `archive-close`,
   `archive-pending(-none|-hint|-loading)`, `archive-blocker-<kind>`,
   `archive-reason`, `archive-undo`, `archive-error`, `archive-confirm`,
