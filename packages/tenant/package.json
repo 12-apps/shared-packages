@@ -13,6 +13,7 @@
     "./domains": "./src/domains/index.ts",
     "./domains/react": "./src/domains/react/index.ts",
     "./lifecycle/react": "./src/lifecycle/react/index.ts",
+    "./export": "./src/export/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./package.json": "./package.json"
   },

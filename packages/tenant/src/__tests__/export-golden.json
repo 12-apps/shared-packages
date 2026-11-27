@@ -1,0 +1,185 @@
+{
+  "$comment": "Bytes written by the extracted host writer (zip.ts sha256 db200481…d82769, csvLine/csvHeader/defused of its sections.ts, origin host commit 95bdd84d) for these sections: the golden the engine must reproduce.",
+  "input": {
+    "catalog": {
+      "name": "catálogo.csv",
+      "data": "﻿ID,Nome,Preço\r\np1,Consulta,\"120,90\"\r\np2,=Exame,\"80,00\"\r\n"
+    },
+    "orders": {
+      "name": "atendimentos.csv",
+      "header": [
+        "Atendimento",
+        "Nº",
+        "Data",
+        "Paciente",
+        "Sala",
+        "Itens",
+        "Total",
+        "Método",
+        "Pagamento",
+        "Situação"
+      ],
+      "pages": [
+        [
+          [
+            {
+              "raw": "A1B2C3D4"
+            },
+            {
+              "raw": "42"
+            },
+            {
+              "raw": "20/11/2026, 12:30"
+            },
+            "Ana Souza",
+            "Sala 4",
+            "Consulta +1",
+            {
+              "raw": "R$ 74,50"
+            },
+            {
+              "raw": "PIX"
+            },
+            {
+              "raw": "Pago"
+            },
+            {
+              "raw": "Em atendimento"
+            }
+          ],
+          [
+            {
+              "raw": "B2C3D4E5"
+            },
+            {
+              "raw": "—"
+            },
+            {
+              "raw": "21/11/2026, 09:05"
+            },
+            "=cmd|' /C calc'!A0",
+            "Recepção",
+            "Raio-X \"tórax\"; laudo",
+            {
+              "raw": "-R$ 5,00"
+            },
+            {
+              "raw": "Crédito + Cartão"
+            },
+            {
+              "raw": "Estornado"
+            },
+            {
+              "raw": "Cancelado"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "raw": "C3D4E5F6"
+            },
+            {
+              "raw": "43"
+            },
+            {
+              "raw": "22/11/2026, 18:40"
+            },
+            "@SUM(A1)",
+            "",
+            "+1 Retorno",
+            {
+              "raw": "R$ 9,90"
+            },
+            {
+              "raw": "Convênio"
+            },
+            {
+              "raw": "Pendente"
+            },
+            {
+              "raw": "Aguardando"
+            }
+          ]
+        ],
+        []
+      ]
+    },
+    "customers": {
+      "name": "contatos.csv",
+      "header": [
+        "Contato",
+        "Email",
+        "Telefone",
+        "Visitas",
+        "Total",
+        "Média",
+        "Última visita",
+        "Autorizou em"
+      ],
+      "pages": [
+        [
+          [
+            "Bruno Lima",
+            "bruno@example.com",
+            "11987654321",
+            {
+              "raw": "5"
+            },
+            {
+              "raw": "R$ 250,00"
+            },
+            {
+              "raw": "R$ 62,50"
+            },
+            {
+              "raw": "01/11/2026"
+            },
+            {
+              "raw": "01/10/2026"
+            }
+          ],
+          [
+            "***.***.***-**",
+            "-x@example.com",
+            "\t—",
+            {
+              "raw": "1"
+            },
+            {
+              "raw": "R$ 0,00"
+            },
+            {
+              "raw": "R$ 0,00"
+            },
+            {
+              "raw": "—"
+            },
+            {
+              "raw": "02/10/2026"
+            }
+          ]
+        ]
+      ]
+    },
+    "files": [
+      {
+        "name": "documentos/LAUDO/35261100000000000000650010000000011000000010.xml",
+        "data": "<laudo versao=\"4.00\"><corpo/></laudo>"
+      },
+      {
+        "name": "documentos/LAUDO/35261100000000000000650010000000011000000010-evento.xml",
+        "data": "<evento/>"
+      },
+      {
+        "name": "documentos/RECEITA/k3.xml",
+        "data": "<receita/>"
+      }
+    ]
+  },
+  "expected": {
+    "size": 2017,
+    "sha256": "28f83d9a6bd8fd4115603c967b9980e74fbf567796ff1253d60ba116226e38ef",
+    "base64": "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"
+  }
+}

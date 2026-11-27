@@ -474,6 +474,101 @@ const purge = createTenantPurge(tenant, lifecycleConfig, purgeConfig);
 - **No migration**: the engine writes `purged_at`, `image_keys_owed` and
   `images_erased_at`, which 1.0's `tenant_closings` already has.
 
+### The data export (opt-in, `@12-apps/tenant/export`, on top of the lifecycle)
+
+Additive: a host that builds no export boots unchanged. The engine owns the
+mechanism; the host owns what goes in the archive and where it lives.
+
+| The engine | The host |
+|---|---|
+| the request (one PREPARING row per tenant and its audit line, in one transaction; a second press answers the running one) | the session check (`authorize`) and the route it mounts `request` / `download` on |
+| the build job's handler: claim, heartbeat, retry cap, READY with a link capped at the closing's purge date, FAILED and told | registering `build` and `sweep` on its job queue (`enqueueBuild` names the job and its dedupe key) |
+| the sweep's handler: requeue, fail, tell again, expire | the schedule and the lease around it |
+| the download: 404, 410, the audit line, a `302` to the presigned link or the file streamed, never cached | the archive port: its bucket, prefix, ACL and presign lifetime |
+| the streaming ZIP64 writer, CSV quoting, the BOM, formula neutralisation | the SECTIONS: every file of the archive, its columns, its masking (an identity number, say) |
+| the notice's payload and words (`noticeExport*` of the base pack) | `notify`: its registry, its link, its e-mail |
+| purge-safe deletion: rows first, then every archive under the prefix | adding `beforeErase` to the purge config's `beforeErase` list |
+
+```ts
+import { createTenantExport, type TenantExportConfig } from '@12-apps/tenant/export';
+
+const exportConfig: TenantExportConfig<Tx> = {
+  db: {
+    transaction: (run) => prisma.$transaction(run),
+    table: (tx) => (tx ?? prisma).tenantDataExport,               // the synced model's delegate, or an adapter
+    isUniqueViolation: (error) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002',
+  },
+  sections: [                                                       // archive order; fixed names may not repeat
+    { kind: 'file', name: 'catalogue.csv', data: ({ tenantId }) => catalogueCsv(tenantId) },   // bytes as given
+    { kind: 'rows', name: ({ locale }) => words(locale).visits,      // a CSV, streamed page by page
+      header: ({ locale }) => words(locale).visitHeaders,
+      pages: (at) => visitPages(at) },                               // yields pages of cells; call nothing else
+    { kind: 'files', files: (at) => documents(at) },                 // one file at a time; `at.beat()` between your pages
+  ],
+  archives: { key, putStream, presign, delete, deleteTenant },     // see below
+  limits: { linkDays: 7, maxAttempts: 3, staleAfterMs: 15 * 60_000, beatEveryMs: 30_000, sweepBatch: 20 },
+  copy: { locales: { 'pt-BR': { archiveFilename: (day) => `dados-${day}.zip` }, 'en-US': { … } } }, // every base tag
+  archiveLocale: (tenantId) => 'pt-BR',                             // the language the archive is written in
+  authorize: async (request, { slug, permission }) => ({ tenantId, actorUserId }), // throw your 401/403 to refuse
+  enqueueBuild: (exportId, why) => buildJob.enqueue({ exportId }, { dedupeKey: … }), // why: { source: 'request' } | { source: 'sweep', attempts }
+  notify: (typeId, payload) => …,                                   // true when RECORDED; only then is notified_at stamped
+  audit: (tx, action, event) => …,                                  // event: TenantExportAuditEvent, its own type
+  mirror: { created, updated, deleted },                            // optional: your older table, until the contract release
+};
+const exports = createTenantExport(tenant, lifecycleConfig, exportConfig);
+// jobs:   handle: ({ exportId }) => exports.build(exportId)   ·   sweep: () => exports.sweep(new Date())
+// routes: POST → jsonOk(await exports.request({ request, slug }), { status: 202 })
+//         GET  → exports.download({ request, slug, exportId })  (a Response)
+// purge:  purgeConfig.beforeErase = [exports.beforeErase, …]
+```
+
+- **Cells.** A plain string is a value a person may have typed: the engine
+  prefixes `'` to one that starts with `=`, `+`, `-`, `@`, a tab or a CR. A value
+  you computed (an amount, a date, an id) goes as `{ raw }` and is only quoted.
+  The default is the safe one: a cell you forget to mark is neutralised.
+- **The archive port.** `key(tenantId, exportId)` is your key grammar (keep it,
+  so rows copied from an older table still resolve); `putStream(key, body,
+  size)` streams the built temp file; `presign(key, filename)` answers
+  `{ kind: 'redirect', url }`, `{ kind: 'stream', body }` (local disk) or
+  `{ kind: 'missing' }`; `delete(key)`; `deleteTenant(tenantId)` deletes by
+  PREFIX (an archive a failed build stored and never recorded goes too) and
+  throws when storage refuses, which stops the purge before it erases anything.
+- **Reused from the tenant and the lifecycle.** The ids
+  (`ids.audit.exportRequested`, `exportDownloaded`,
+  `ids.notifications.exportReady`, `ids.permissions.close`,
+  `ids.refusals.exportNeedsPerson`, `exportNotFound`, `exportExpired`,
+  `closed`), the base copy's `noticeExport*` and `refusalExport*` sentences,
+  `port.timeZone` (the clock the sections are written on), the lifecycle's
+  closing table (the link's cap), `locale()` (the refusal's words) and
+  `onError` (acts `exportBuild`, `exportNotify`).
+- **Refusals** are `TenantExportRefusal { kind, code, status, message }`:
+  `exportNeedsPerson` 403, `exportNotFound` 404, `exportExpired` 410, `closed`
+  403. Map them onto your error envelope as you map `TenantLifecycleRefusal`.
+- **One node.** An export covers the tenant it is asked for; the engine never
+  reads the tree. A consolidated export across a network is not its job.
+- **Classify the table.** `tenant_data_exports` carries `tenant_id`: list it in
+  the purge config as `erase` (the `beforeErase` hook has already emptied it).
+- Every key is required and checked at boot (`TenantConfigError`, the key
+  named: `export.limits.linkDays`, `export.archives.presign`, …).
+
+#### The origin host's mapping
+
+| The origin host today | the export config |
+|---|---|
+| `store_data_exports` | `tenant_data_exports` (same columns, `client_id` → `tenant_id`); `mirror` dual-writes the old table until TP9 |
+| `archive-storage.ts` (`archiveKey`, `putArchiveFile`, `openArchive`, `deleteArchive`, `deleteStoreArchives`) | `archives.key`, `putStream`, `presign`, `delete`, `deleteTenant` (the S3 and local code, unchanged) |
+| `build.ts`: `cardapio.csv`, `pedidos.csv`, `clientes.csv`, `notas-fiscais/…` | four `sections`: a `file`, two `rows` (cells from `orderCells` / `customerCells`, `maskCpf` kept there, computed cells as `{ raw }`), a `files` |
+| `export-copy.*` `files.archive` | `copy.locales[tag].archiveFilename: (day) => \`dados-da-loja-${day}.zip\`` |
+| `storeCopy` (DEFAULT_LOCALE) | `archiveLocale: () => DEFAULT_LOCALE` |
+| `client.timezone` | the tenant port's `timeZone` |
+| `LINK_DAYS`, `MAX_ATTEMPTS`, `STALE_BUILD_MS`, `BEAT_MS`, `SWEEP_LIMIT` | `limits: { linkDays: 7, maxAttempts: 3, staleAfterMs: 900_000, beatEveryMs: 30_000, sweepBatch: 20 }` |
+| `store_closing.export_requested` / `_downloaded` | `ids.audit.exportRequested` / `exportDownloaded` (already in 1.0's config) |
+| `store.export_ready`, `notifyStoreExportReady` | `ids.notifications.exportReady`; `notify` keeps the generator and `storeExportLink` |
+| `requireTenantPermissionBySlug(slug, "config:close")`, `getActorUserId()` | `authorize` |
+| `storeExportBuildJob.enqueue`, `store-export:${id}` / `:${attempts}` | `enqueueBuild` with `why.source` |
+| `EXPORT_NEEDS_PERSON`, `EXPORT_NOT_FOUND`, `EXPORT_EXPIRED`, `STORE_CLOSED` | `ids.refusals.*` (already in 1.0's config) |
+| `purgeStoreExports` in the purge's hooks | `exports.beforeErase` in `beforeErase` |
+
 ### Custom domains (opt-in)
 
 A tenant claims a hostname, proves it owns the zone with a TXT record, points

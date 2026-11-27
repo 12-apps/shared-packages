@@ -66,6 +66,9 @@ describe('the domain-agnostic rule', () => {
   it('finds none of the host vocabulary anywhere under src/', () => {
     const files = sourceFiles(SRC).filter((path) => path !== SELF);
     expect(files.length).toBeGreaterThan(5);
+    // The data export engine and its tests are searched too.
+    expect(files.filter((path) => relative(SRC, path).startsWith(join('export', ''))).length).toBeGreaterThan(9);
+    expect(files.some((path) => relative(SRC, path).startsWith(join('__tests__', 'export-')))).toBe(true);
     const findings = files.flatMap((path) => {
       const text = readFileSync(path, 'utf8');
       return forbiddenWords().filter((word) => wholeWord(word).test(text)).map(
