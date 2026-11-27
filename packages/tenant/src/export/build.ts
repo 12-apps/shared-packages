@@ -104,7 +104,13 @@ async function buildAndStore<S extends string, Tx>(engine: ExportEngine<S, Tx>, 
         throw error;
       },
     );
-    await engine.config.archives.putStream(key, createReadStream(file), size);
+    const body = createReadStream(file);
+    try {
+      await engine.config.archives.putStream(key, body, size);
+    } finally {
+      // A put that rejects before (or while) reading never leaves the file descriptor open.
+      body.destroy();
+    }
     return size;
   } finally {
     await rm(directory, { recursive: true, force: true });

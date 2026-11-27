@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+
 import { describe, expect, it } from 'vitest';
 
 import type { TenantExportContext, TenantExportSection } from '../export';
@@ -179,6 +181,23 @@ describe('build', () => {
     await expect(env.build().build('e1', AT)).resolves.toBe('built');
     expect(env.rows.get('e1')?.notifiedAt).toBeNull();
     expect(env.host.errors).toEqual([expect.objectContaining({ act: 'exportNotify' })]);
+  });
+
+  it('destroys the archive file stream when the put rejects before reading it', async () => {
+    const env = exportHost();
+    env.rows.set('e1', exportRow());
+    const handed: Readable[] = [];
+    const archives = {
+      ...env.archives,
+      putStream: async (_key: string, body: Readable) => {
+        handed.push(body);
+        throw new Error('bucket refused');
+      },
+    };
+    await expect(env.build({ archives }).build('e1', AT)).resolves.toBe('failed');
+    expect(handed).toHaveLength(1);
+    expect(handed[0]?.destroyed).toBe(true);
+    expect(env.rows.get('e1')?.status).toBe('PREPARING');
   });
 
   it('writes a files section one file at a time, as given', async () => {

@@ -16,6 +16,7 @@
  * reads the tree, and a consolidated export over a network is not its job.
  */
 import type { TenantStatusSet } from '../config';
+import type { DeepReadonly } from '../core';
 import type { LifecycleTenant } from '../lifecycle/context';
 import type { TenantLifecycleConfig } from '../lifecycle/types';
 import type { TenantPort } from '../port';
@@ -70,7 +71,7 @@ export interface ExportEngine<S extends string, Tx> {
   tenant: ExportTenant<S, Tx>;
   lifecycle: TenantLifecycleConfig<S, Tx>;
   config: TenantExportConfig<Tx>;
-  statuses: TenantStatusSet<S>;
+  statuses: DeepReadonly<TenantStatusSet<S>>;
   /** The table on `tx`, or on the client. */
   table(tx?: Tx): Promise<TenantDataExportTable>;
   /** One conditional write, with the mirror, in one transaction. Answers the rows moved. */
@@ -103,7 +104,7 @@ export function createTenantExport<S extends string, Tx>(
     tenant,
     lifecycle,
     config,
-    statuses: tenant.config.statuses as unknown as TenantStatusSet<S>,
+    statuses: tenant.config.statuses,
     table,
     write: (id, where, data) =>
       config.db.transaction(async (tx) => {
