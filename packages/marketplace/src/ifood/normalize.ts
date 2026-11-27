@@ -202,8 +202,12 @@ function optional<K extends string, V>(key: K, value: V | undefined): { [P in K]
   return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
 }
 
-/** The order body of a placed-order event, or null when it carries none. */
-function readOrder(
+/**
+ * The order body of a placed-order event, or null when it carries none. Also
+ * reads the order iFood serves at `GET /order/v1.0/orders/{id}` (`./fetch-order.ts`),
+ * whose fields are the same ones the event's `order` would carry.
+ */
+export function readIfoodOrder(
   payload: unknown,
   externalOrderId: string,
   missingStreetNumber: string,
@@ -265,6 +269,7 @@ export function normalizeIfoodEvent(
   const cancelled = ORDER_CANCELLED.has(eventType.toUpperCase());
   const placed = ORDER_PLACED.has(eventType.toUpperCase());
   const refusedRequest = CANCELLATION_REQUEST_FAILED.has(eventType.toUpperCase());
+  const order = placed ? readIfoodOrder(payload, externalOrderId, options.missingStreetNumber) : null;
 
   return {
     provider: "IFOOD",
@@ -276,7 +281,10 @@ export function normalizeIfoodEvent(
     eventType,
     externalMerchantId: firstString(payload, [["merchantId"], ["merchant", "id"]]),
     externalOrderId,
-    order: placed ? readOrder(payload, externalOrderId, options.missingStreetNumber) : null,
+    order,
+    // iFood's events carry only the order id (sandbox, 2026-11-27): a PLACED
+    // with no items is fetched by the `marketplace.fetch-order` job (FUT-5800).
+    ...(placed && order === null ? { orderToFetch: true } : {}),
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : refusedRequest ? "FAILED" : null,
     ...(LIFECYCLE_OF[eventType.toUpperCase()] ? { lifecycle: LIFECYCLE_OF[eventType.toUpperCase()] } : {}),

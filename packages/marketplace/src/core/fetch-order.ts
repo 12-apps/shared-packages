@@ -1,6 +1,6 @@
 import { deferInboxEvent, settleInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder } from "./ingest";
-import { readOutboundConnection, resolveIngestionTarget } from "./integration";
+import { markCredentialsRefused, readOutboundConnection, resolveIngestionTarget } from "./integration";
 import type { FetchOrderResult } from "./adapter";
 import { cancelAcceptance } from "./acceptance";
 import { CANCELLED_BEFORE_INGEST_REASON, cancelledBeforeIngest } from "./order-fetch-marks";
@@ -222,6 +222,11 @@ async function ingestFetched(
   return { kind: "ingested", orderId: ingested.orderId, unmappedSkus: ingested.unmappedSkus };
 }
 
+/** A final refusal of our own credentials by the marketplace (a 4xx, not a local "no credentials"). */
+function credentialsRefused(result: FetchOrderResult): boolean {
+  return result.kind === "refused" && result.own === true && result.status >= 400 && result.status < 500;
+}
+
 /**
  * Run one queued fetch. Returns what it did; throws {@link FetchOrderRetryError}
  * for an answer worth retrying before the last attempt. A refusal, or the last
@@ -244,6 +249,11 @@ export async function runFetchOrder(
   const result = await fetchThroughAdapter(ctx, payload.clientId, event.provider, event.externalOrderId ?? "");
   if (result.kind === "order") return ingestFetched(ctx, row, payload.clientId, result.order, target);
   const reason = result.kind === "refused" ? `refused ${result.status}: ${result.message}` : result.reason;
+  // Our credentials refused (a 401 that a fresh token did not cure, a refused
+  // token grant): never retried by the queue. The connection reads FAILED; the
+  // reconciliation sweep's next pass, minutes away and within the row's
+  // attempt bound, is the only re-try, so a revoked app never loops.
+  if (credentialsRefused(result)) await markCredentialsRefused(ctx, payload.clientId, event.provider);
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
     throw new FetchOrderRetryError(`fetch of ${event.externalOrderId ?? "?"} (inbox ${row.id}): ${reason}`);
   }

@@ -372,3 +372,29 @@ export async function readOutboundConnection(
   const link = { clientId, provider, environment, refreshToken, app, sealed: row.credentials };
   return { environment, credentials: app, grant: linkGrant(ctx, link) };
 }
+
+/**
+ * The marketplace refused this connection's credentials on a call no person
+ * made (the order fetch, FUT-5800): the connection reads FAILED, which is what
+ * the connections screen shows, and the staff surfaces are told. Re-entering
+ * the credentials resets it to UNVERIFIED. Best-effort: never throws.
+ */
+export async function markCredentialsRefused(
+  ctx: EngineContext,
+  clientId: string,
+  provider: MarketplaceProvider,
+): Promise<void> {
+  try {
+    const db = await ctx.ports.db();
+    const { count } = await db.marketplaceIntegration.updateMany({
+      where: { clientId, provider, archivedAt: null },
+      data: { status: "FAILED" },
+    });
+    if (count > 0) ctx.ports.publishChanged(clientId);
+  } catch (error) {
+    ctx.ports.logger.error(
+      `marketplace: ${provider} connection of ${clientId} not marked FAILED: ` +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+}
