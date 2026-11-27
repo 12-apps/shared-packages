@@ -22,11 +22,13 @@ error at mount, never a default that quietly adopts another host's policy.
 | `order.onRefused` | `(clientId, orderId, reason: "REJECTED" \| "EXPIRED" \| "CANCELLED") => Promise<void>` | Refuse/cancel the host order: the store refused on the clock, the clock lapsed, or the marketplace cancelled. After the commit and after the cancellation request is queued; a throw on a decision is logged. NOT called for `recordStoreCancellation`. A host that binds `onCancellationConfirmed` (request first) does not get `"REJECTED"` from `decide` either, nor `"CANCELLED"` for a cancellation the store asked for: `onCancellationConfirmed` replaces both. |
 | `order.onCancellationConfirmed` | OPTIONAL — binding it OPTS IN to request first. `(clientId, orderId) => Promise<void>` | The marketplace CONFIRMED the store's own cancellation request (its event, or the job's answer for a marketplace that answers in the response); the row is REJECTED/CONFIRMED by then. Run the host's cancel here. Bound: the store's refusals and cancels (`decide` REJECT, `recordStoreCancellation`) only REQUEST the cancellation and keep the order as it was until this is called, once (a redelivered confirmation calls nothing), INSTEAD of `onRefused`. Not bound (a 1.0.0 host): everything as 1.0.0 — REJECTED at request time, `onRefused(…, "REJECTED")` from `decide`, and `onRefused(…, "CANCELLED")` on the confirmation. A throw is logged. |
 | `order.onCancellationFailed` | OPTIONAL. `(clientId, orderId, reason: "REFUSED" \| "TIMEOUT") => Promise<void>` | The store's request FAILED: REFUSED (the marketplace's refusal event, the job's 4xx, its last attempt dying, or — request first — a marketplace whose API cannot take it, at once) or TIMEOUT (the outbound sweep, past the marketplace's answer window, or the 24-hour give-up). Called once, by the path that moved the row. Request first: the order stays as it was (AWAITING or ACCEPTED) and may be accepted again; show the adapter's app link and tell the person. A throw is logged. |
+| `order.onCourier` | OPTIONAL (FUT-5665). `(clientId, orderId, event: NormalizedCourierEvent, facts: { deliveredBy; at }) => Promise<"recorded" \| "unchanged" \| { kind: "unchanged"; reason }>` | The marketplace's courier moved (assigned, on the way, at the counter, collected, returning, returned): store the facts on the order, never move it. Asked for an ACCEPTED order only; idempotent (the reconcile pass may re-run a row). Section 10. |
+| `order.onPickupCodeValidated` | OPTIONAL (FUT-5665). `(clientId, orderId, validation: "VALID" \| "INVALID" \| "UNVERIFIED") => Promise<void>` | The marketplace's verdict on the code sent with `validatePickupCode`, after the hand-over committed. `INVALID` warns, moves nothing. A throw is logged. Section 10. |
 | `order.summarize` | `(clientId, orderIds: readonly string[]) => Promise<Map<string, MarketplaceOrderSummary>>` | The queue's host facts in one read: `{ buyerName, totalCents, unmappedLines, createdAt }`. |
 | `secrets` | `{ seal(plaintext): string; open(sealed): string }` | Seal and open the credential blob with the host's key. `open` THROWS on a blob that will not open. |
 | `http` | `(req: MarketplaceHttpRequest) => Promise<MarketplaceHttpResponse>` | The only way the engine reaches a marketplace. Answer any status; throw only when no answer arrived (timeout, network). The host owns the timeout, proxy and CA. `method` is `GET`, `POST`, `PUT` or, since the catalogue (1.2), `PATCH`. |
 | `audit` | `{ record(entry: { clientId; actorId: string \| null; action: "marketplace.integration.archive" \| "marketplace.integration.unarchive"; provider; reason: string \| null; at: Date }, db: MarketplaceDb): Promise<void> }` | Every archive and unarchive of a connection, INSIDE the same transaction: write the line through `db`, so an archive never lands without its line and a failing audit rolls the archive back. `actorId` is `MarketplaceActor.userId`. |
-| `enqueue` | `{ enqueue(name, payload, { dedupeKey? }) => Promise<{ enqueued: boolean; reason?: string }> }` | The wiring `JobsEnqueuePort`. Never throws. The engine queues only its own three on-demand jobs: `marketplace.outbound` (`{ clientId, orderId, action }`, dedupe key `marketplace.outbound:<action>:<orderId>`), `marketplace.fetch-order` (`{ clientId, inboxId }`, dedupe key `marketplace.fetch-order:<inboxId>`) and `marketplace.catalogue` (`{ clientId, publicationId, action }`, dedupe key `marketplace.catalogue:<action>:<publicationId>:<asked at, ms>`); the sweeps re-queue each under a key of their own. |
+| `enqueue` | `{ enqueue(name, payload, { dedupeKey? }) => Promise<{ enqueued: boolean; reason?: string }> }` | The wiring `JobsEnqueuePort`. Never throws. The engine queues only its own three on-demand jobs: `marketplace.outbound` (`{ clientId, orderId, action }`, dedupe key `marketplace.outbound:<action>:<orderId>`; `validatePickupCode` adds `code` and keys on the hand-over's instant), `marketplace.fetch-order` (`{ clientId, inboxId }`, dedupe key `marketplace.fetch-order:<inboxId>`) and `marketplace.catalogue` (`{ clientId, publicationId, action }`, dedupe key `marketplace.catalogue:<action>:<publicationId>:<asked at, ms>`); the sweeps re-queue each under a key of their own. |
 | `clock` | `{ now(): Date }` | What time it is. |
 | `logger` | `{ info, warn, error }` | The wiring `LoggerPort`; bind `assembled.loggers["@12-apps/marketplace"]`. |
 | `publishChanged` | `(clientId) => void` | Tell the staff surfaces something moved. Fire-and-forget. |
@@ -78,6 +80,8 @@ export const engine = createMarketplaceEngine({
 | `catalogueState({ clientId, productIds, providers? })` | The product page's read: one row per marketplace the product was ever switched on for, in one query. Draw PUBLISHED as "in the catalogue" (with your sentence for a `warningCode`, IMAGE_TOO_LARGE or IMAGE_REFUSED: it went out without its photo), PUBLISHING / WITHDRAWING as "sending…" (switch disabled), FAILED with your own sentence for its `failureCode` (REFUSED, UNAVAILABLE, TIMEOUT, NOT_CONNECTED, CREDENTIALS, PRODUCT_GONE, UNSUPPORTED, INTERNAL), the marketplace's own words from `failureReason` beside a REFUSED, and a retry (`publish` or `withdraw` again, per `failedAction`). The engine writes no sentence a person reads. No row is OFF. |
 | `catalogueDocument({ clientId, provider, options: { menuName, currency } })` | PULL marketplaces only (99Food): the menu part of the document the marketplace reads. Serve it from the route the marketplace pulls (Open Delivery's `GET /v1/merchant`), merged into the rest of that document, which is the host's (`id`, `status`, `lastUpdate`, `TTL`, `basicInfo`, `services`). The menu's name and the currency are the host's words. |
 | `informStatus({ clientId, orderId, step, at, delayMs? })` | An order reached `READY`, `DISPATCHED` or `HANDED_OVER` (FUT-4653). One enqueue, no statement, never throws: call it after the move's commit, from the one place every writer of that step passes, gated on the order being a marketplace's. `at` is the move's own timestamp (it makes the job's dedupe key, so a re-dispatch after an undo is a new job); `delayMs` is the board's undo window for a dispatch. Your `enqueue` port must pass `options.delayMs` on. The job decides everything else (see the README). |
+| `validatePickupCode({ clientId, orderId, code, at })` | After the host's own hand-over of a marketplace-courier bag committed, with the code the store checked locally (FUT-5665). One enqueue, never throws. Section 10. |
+| `courierTracking({ clientId, orderId })` | From a job, at most once per 30 s per order (iFood's rate): where the marketplace's courier is (`pickupEtaAt`, the "arrives at" time). Calls the marketplace at once; never on a tap or a screen load. Section 10. |
 | `ingest(...)`, `deliver(...)` | A producer that hands over an order directly; the webhook does `deliver` for you. |
 
 A host never writes `provider === "IFOOD"`. A capability is asked of
@@ -354,3 +358,82 @@ software's own app"). What the host binds and decides:
   `archive`): the row is kept; linking again unarchives it with its audit line.
 - **A view** gains `authMode`; a host that switches on it treats an absent
   value as `CREDENTIALS`.
+
+## 10. The marketplace's own courier and the pickup code (FUT-5665)
+
+When the marketplace's fleet carries a bag (`deliveredBy: "MARKETPLACE"`;
+iFood's `delivery.deliveredBy = IFOOD`), the engine reports where its courier
+is, carries the code the courier states at the counter, checks that code with
+the marketplace after the hand-over, and reads the courier's tracking. All of
+it is additive: every new port and field is optional, nothing below needs an
+engine migration, and an unbound host behaves byte for byte as on 1.x.
+
+**What the host binds.**
+
+- `order.onCourier(clientId, orderId, event, facts)`: a courier event of an
+  ACCEPTED order (an event before its order is deferred and re-run by the
+  reconcile pass; another status is IGNORED). `event` is
+  `NormalizedCourierEvent`: `step` (`ASSIGNED`, `GOING_TO_ORIGIN`,
+  `ARRIVED_AT_ORIGIN`, `COLLECTED`, `RETURNING_TO_ORIGIN`,
+  `RETURNED_TO_ORIGIN`), `at` (the event's instant or null), `courier` (on
+  `ASSIGNED`: `{ name, photoUrl, vehicle }`, the photo an https URL or null,
+  the vehicle `MOTORCYCLE` / `BICYCLE` / `CAR` / `OTHER` or null) and
+  `returning` (`RETURNING`, `RETURNED` or null). `facts` is
+  `{ deliveredBy, at }`, `at` falling back to the engine's clock. Store what
+  the card shows (name, photo, vehicle, arrived at, collected at, returning)
+  on your own order and answer `"recorded"`; the engine settles the inbox row
+  PROCESSED and calls `publishChanged`. It is NOT gated on `followStatus`: a
+  fact moves nothing. Unbound: courier events stay IGNORED (`no order body on
+  ADR`).
+- `order.onLifecycle` now also gets `lifecycle: "COLLECTED"` (iFood `CLT`,
+  Keeta `ORDER_COLLECTED`). For a fleet bag treat it as `DISPATCHED`: the
+  courier has the bag, so move it to handed over, forward only, with no code
+  asked. The engine notes it as the marketplace's HANDED_OVER, and treats a
+  `COLLECTED` after your own informed HANDED_OVER as an echo. The courier's
+  facts reach `onCourier` first; when the lifecycle moves nothing the row is
+  settled by the courier's answer.
+- `order.onPickupCodeValidated(clientId, orderId, validation)`: `VALID`,
+  `INVALID` (warn on the order; the hand-over stands) or `UNVERIFIED` (a final
+  4xx, retries that ran out, no connection: no verdict). Unbound: the verdict
+  is logged only.
+
+**What the host stores from the order.** `NormalizedMarketplaceOrder.pickupCode`
+(iFood `delivery.pickupCode`, null when the marketplace asks none) arrives in
+`order.create`. Keep it on your order; the hand-over compares the typed code
+with it LOCALLY, with no call to the marketplace. No code on the order: hand
+over as before.
+
+**What the host calls.**
+
+- `engine.validatePickupCode({ clientId, orderId, code, at })` AFTER the
+  hand-over's commit, with the code the store checked; `at` is the
+  hand-over's instant (the job's key). One enqueue of `marketplace.outbound`,
+  action `validatePickupCode`; never throws, false when the queue refused
+  (nothing re-queues it: the marketplace's check is its half, never a gate on
+  yours). The job skips, with no call, a marketplace with no `courier` API, an
+  order no longer ACCEPTED, a bag not carried by the marketplace's courier and
+  an empty code; a 5xx or timeout is retried (3 attempts from 30 s) and the
+  last answers `UNVERIFIED`.
+- `engine.courierTracking({ clientId, orderId })` from a job of yours while
+  the courier comes to the store, at most once per 30 s per order. Answers
+  `{ kind: "tracking", tracking: { pickupEtaAt, deliveryEtaAt, latitude,
+  longitude, trackedAt } }`, `{ kind: "notYet" }` (iFood's 404 before
+  `ASSIGN_DRIVER`), `{ kind: "unsupported", reason }` with no call (unknown
+  order, no `courier` API, a bag the store carries), or the `refused` /
+  `retry` shapes of an outbound call. Store `pickupEtaAt` as "chega em"; the
+  engine stores nothing.
+
+**What a marketplace offers.** `engine.adapter(provider).courier` is present
+when it has the two calls (iFood only). Courier events: iFood (all six;
+the two return events by long name only); Keeta `RIDER_ARRIVED_AT_STORE` and
+`ORDER_COLLECTED`, ESTIMATED, with no rider identity; 99Food and Rappi none
+(Open Delivery's standard events and Rappi's documented ones name no courier
+step).
+
+**Migration-free on the engine's side.** No engine table changes:
+`COLLECTED` is noted under the existing `HANDED_OVER` step of
+`marketplace_status_updates`. The courier facts, the pickup code and the last
+ETA are the host's own columns.
+
+**Copy.** The engine adds no copy key; every sentence ("Código não confere",
+"Voltando para a loja") is the host's.

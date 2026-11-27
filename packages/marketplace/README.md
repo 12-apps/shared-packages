@@ -375,7 +375,7 @@ What differs from 99Food's v1.7.1, and where the adapter handles it:
 | part | from Keeta's documentation |
 |---|---|
 | Merchant id | A connection's `externalMerchantId` for Keeta is the SOFTWARE's merchant id: the `merchantId` the onboarding binds to `keetaMerchantId`, echoed as `X-App-MerchantId` and `Order.merchant.id`, and the `{merchantId}` of `merchantUpdate`. Keeta's own store id (`keetaMerchantId`, `authorizedShops[].id`) is the onboarding's. "Without onboarding there are no order events"; onboarding the same id again replaces the mapping. |
-| Events | `CREATED` → fetch; `CANCELLED` (its `metadata` a JSON string with `reason`, `code`) → cancelled; `DISPATCHED`, `CONCLUDED` → lifecycle; the rest (`CONFIRMED`, `READY_FOR_PICKUP`, `PICKUP_ONGOING`, `RIDER_ARRIVED_AT_STORE`, `ORDER_COLLECTED`, `DELIVERED`, `CANCELLATION_REQUESTED`, the refund events, `RECOMMENDED_PREPARATION_START`) recorded and IGNORED. Keeta retries an unanswered webhook 3 times (1, 2 and 3 minutes later). |
+| Events | `CREATED` → fetch; `CANCELLED` (its `metadata` a JSON string with `reason`, `code`) → cancelled; `DISPATCHED`, `CONCLUDED` → lifecycle; `RIDER_ARRIVED_AT_STORE`, `ORDER_COLLECTED` → courier steps, the second a `COLLECTED` lifecycle too (FUT-5665, ESTIMATED); the rest (`CONFIRMED`, `READY_FOR_PICKUP`, `PICKUP_ONGOING`, `DELIVERED`, `CANCELLATION_REQUESTED`, the refund events, `RECOMMENDED_PREPARATION_START`) recorded and IGNORED. Keeta retries an unanswered webhook 3 times (1, 2 and 3 minutes later). |
 | Confirm | `POST /v1/orders/{id}/confirm` `{ createdAt, orderExternalCode, preparationTime? }`; 202, then `CONFIRMED`; 422 "invalid or repeated state". Keeta cancels an order not accepted within 5 minutes and may close the store for it: a connection's acknowledgement window should be at most 300 s. |
 | Cancel | `POST /v1/orders/{id}/requestCancellation` `{ reason, code, mode, outOfStockItems? }` with Keeta's eleven v1.0.7+ codes (the standard's); 202 "received for analysis", then `CANCELLED` or nothing. |
 | Order | The standard's `Order`; `total.orderAmount` = items + fees − discounts is the total, no commission (`commissionCents` null). An encrypted value Keeta would not reveal (its own fleet, a refused or failed decrypt) is dropped, never shown: the number reads the copy's missing-number text, the phone is null. A failed decrypt never keeps the order out of the queue. |
@@ -562,6 +562,40 @@ Sources: Open Delivery `openapi.yaml` (read 2026-11-25), Rappi's portal
 "Managing User Orders" (read 2026-11-25); iFood's developer portal answered 403,
 so every iFood row but confirm and requestCancellation is ESTIMATED, in
 `src/ifood/outbound.ts` and `src/ifood/normalize.ts` only.
+
+## The marketplace's own courier and the pickup code (FUT-5665)
+
+For a bag the marketplace's fleet carries, four additive pieces, each optional
+for the host (ADOPTING.md section 10):
+
+- **Courier events.** `NormalizedEvent.courier` (`NormalizedCourierEvent`:
+  `step`, `at`, `courier { name, photoUrl, vehicle }` on `ASSIGNED`,
+  `returning`) reaches `order.onCourier` for an ACCEPTED order; it moves
+  nothing. iFood: `ADR`/`ASSIGN_DRIVER` (metadata `workerName`,
+  `workerPhotoUrl`, `workerVehicleType`), `GTO`, `AAO`, `CLT`,
+  `DELIVERY_RETURNING_TO_ORIGIN`, `DELIVERY_RETURNED_TO_ORIGIN`. Keeta:
+  `RIDER_ARRIVED_AT_STORE`, `ORDER_COLLECTED` (ESTIMATED). 99Food, Rappi:
+  unsupported.
+- **COLLECTED is a lifecycle step.** `CLT` / `ORDER_COLLECTED` also names
+  `lifecycle: "COLLECTED"`, which follows the FUT-4653 rules like a
+  `DISPATCHED` and is noted as the marketplace's `HANDED_OVER`.
+- **The pickup code.** `NormalizedMarketplaceOrder.pickupCode` (iFood
+  `delivery.pickupCode`). After its local check and hand-over, the host calls
+  `engine.validatePickupCode`, and the `marketplace.outbound` job (action
+  `validatePickupCode`) posts `POST /order/v1.0/orders/{id}/validatePickupCode
+  {"code"}` and hands `{"valid"}` to `order.onPickupCodeValidated` as `VALID`,
+  `INVALID` or `UNVERIFIED`.
+- **Tracking.** `engine.courierTracking` reads `GET
+  /order/v1.0/orders/{id}/tracking` at once (404 is `notYet`); the host runs
+  it from a job, at most once per 30 s.
+
+Source: the iFood research of 2026-11-26 (Order module, marked confirmed
+there). ESTIMATED, in `src/ifood/courier.ts` only: the values of
+`workerVehicleType`, the names of the tracking body's second counts
+(`pickupEtaStart` / `deliveryEtaEnd`, else `pickupEta` / `deliveryEta`), the
+absence of short codes for the two return events, and whether a wrong code
+answers `{"valid": false}` rather than a 4xx (a 4xx is `UNVERIFIED`, never
+`INVALID`).
 
 ## Pausing a store (FUT-4851)
 
