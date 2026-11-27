@@ -13,6 +13,33 @@ describe('Icon (native)', () => {
     expect(Array.from(paths, (element) => element.getAttribute('d'))).toEqual(ICON_PATHS[name]);
   });
 
+  it.each([
+    'Pause',
+    'PlayArrow',
+    'Print',
+    'QrCode',
+    'Group',
+    'Cake',
+    'SwapHoriz',
+    'Link',
+    'MergeType',
+    'CallSplit',
+    'ListAlt',
+    'EditNote',
+    'LockOpen',
+    'Receipt',
+    'NotificationsActive',
+    'RoomService',
+    'ReceiptLong',
+    'LocalDining',
+    'DeliveryDining',
+  ] as const)('renders the terminal tile glyph %s', (name) => {
+    render(<Icon name={name} label={name} />);
+    const paths = screen.getByTestId(`icon-${name}`).querySelectorAll('path');
+    expect(paths.length).toBeGreaterThan(0);
+    expect(Array.from(paths, (element) => element.getAttribute('d'))).toEqual(ICON_PATHS[name]);
+  });
+
   it('draws the generated path for the glyph, at the md size', () => {
     render(<Icon name="Close" />);
     const svg = screen.getByTestId('icon-Close');
