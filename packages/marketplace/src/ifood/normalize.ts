@@ -251,6 +251,22 @@ export function readIfoodOrder(
 }
 
 /**
+ * The order a PLACED carries, or, when it carries none, the mark that has it
+ * fetched: iFood's events carry only the order id (sandbox, 2026-11-27), so the
+ * `marketplace.fetch-order` job reads it (FUT-5800). Any other event: no order.
+ */
+function placedOrder(
+  payload: unknown,
+  placed: boolean,
+  externalOrderId: string,
+  missingStreetNumber: string,
+): Pick<NormalizedEvent, "order" | "orderToFetch"> {
+  if (!placed) return { order: null };
+  const order = readIfoodOrder(payload, externalOrderId, missingStreetNumber);
+  return order ? { order } : { order: null, orderToFetch: true };
+}
+
+/**
  * Normalize one iFood delivery.
  *
  * Returns null only when the payload carries no order id at all — the one thing
@@ -269,7 +285,6 @@ export function normalizeIfoodEvent(
   const cancelled = ORDER_CANCELLED.has(eventType.toUpperCase());
   const placed = ORDER_PLACED.has(eventType.toUpperCase());
   const refusedRequest = CANCELLATION_REQUEST_FAILED.has(eventType.toUpperCase());
-  const order = placed ? readIfoodOrder(payload, externalOrderId, options.missingStreetNumber) : null;
 
   return {
     provider: "IFOOD",
@@ -281,10 +296,7 @@ export function normalizeIfoodEvent(
     eventType,
     externalMerchantId: firstString(payload, [["merchantId"], ["merchant", "id"]]),
     externalOrderId,
-    order,
-    // iFood's events carry only the order id (sandbox, 2026-11-27): a PLACED
-    // with no items is fetched by the `marketplace.fetch-order` job (FUT-5800).
-    ...(placed && order === null ? { orderToFetch: true } : {}),
+    ...placedOrder(payload, placed, externalOrderId, options.missingStreetNumber),
     cancelled,
     cancellationOutcome: cancelled ? "CONFIRMED" : refusedRequest ? "FAILED" : null,
     ...(LIFECYCLE_OF[eventType.toUpperCase()] ? { lifecycle: LIFECYCLE_OF[eventType.toUpperCase()] } : {}),

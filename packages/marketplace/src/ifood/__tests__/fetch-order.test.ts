@@ -27,16 +27,17 @@ type Answer = (request: MarketplaceHttpRequest, call: number) => MarketplaceHttp
 
 /** iFood's API: the token grant, and the order read answered by `order` (the documented order by default). */
 function ifoodApi(options: { order?: Answer; token?: Answer } = {}) {
-  let reads = 0;
-  let grants = 0;
-  return scriptedHttp((request) => {
+  const requests: MarketplaceHttpRequest[] = [];
+  const count = (grant: boolean) => requests.filter((r) => r.url.endsWith("/oauth/token") === grant).length;
+  const scripted = scriptedHttp((request) => {
+    requests.push(request);
     if (request.url.endsWith("/oauth/token")) {
-      grants += 1;
-      return options.token ? options.token(request, grants) : { status: 200, body: JSON.stringify({ accessToken: `tok-${grants}`, expiresIn: 3600 }) };
+      const grant = count(true);
+      return options.token ? options.token(request, grant) : { status: 200, body: JSON.stringify({ accessToken: `tok-${grant}`, expiresIn: 3600 }) };
     }
-    reads += 1;
-    return options.order ? options.order(request, reads) : { status: 200, body: JSON.stringify(ifoodDocumentedOrder()) };
+    return options.order ? options.order(request, count(false)) : { status: 200, body: JSON.stringify(ifoodDocumentedOrder()) };
   });
+  return scripted;
 }
 
 /** A harness connected to iFood under the fixtures' merchant. */
@@ -57,6 +58,15 @@ function inboxRow(h: Harness, eventId: string): Record<string, unknown> | undefi
 
 function integrationStatus(h: Harness): unknown {
   return h.memory.tables.marketplaceIntegration.rows[0]?.status;
+}
+
+/** One reconciliation pass at `at`, and the last attempt of every fetch it re-queued. */
+async function sweepPass(subject: Harness, at: Date): Promise<void> {
+  subject.setNow(at);
+  for (const row of await subject.engine.retryable()) {
+    expect(await subject.engine.reprocess(row)).toEqual({ kind: "awaitingOrder" });
+    await subject.engine.runFetchOrder(fetchJobs(subject).at(-1)!, LAST);
+  }
 }
 
 const gets = (http: ReturnType<typeof scriptedHttp>) => http.requests.filter((r) => r.method === "GET");
@@ -122,8 +132,8 @@ describe("iFood PLACED by id → fetched → ingested (FUT-5800)", () => {
     const carried = { ...ifoodPlacedById(), id: "evt-plc-carried", order: ifoodDocumentedOrder() };
     expect(await deliverIfood(carriedHarness, carried)).toMatchObject({ kind: "ingested" });
 
-    const { externalMerchantId: _merchant, ...fetched } = fetchedHarness.created[0]!.order;
-    expect(fetched).toEqual(carriedHarness.created[0]!.order);
+    // The fetched order also names its merchant (`merchant.id`); everything else is the same.
+    expect(fetchedHarness.created[0]!.order).toEqual({ ...carriedHarness.created[0]!.order, externalMerchantId: IFOOD_MERCHANT });
     expect(fetchedHarness.created[0]!.lines).toEqual(carriedHarness.created[0]!.lines);
   });
 
@@ -199,15 +209,8 @@ describe("iFood PLACED by id → fetched → ingested (FUT-5800)", () => {
     await deliverIfood(h, ifoodPlacedById());
     await h.engine.runFetchOrder(fetchJobs(h)[0]!, LAST);
 
-    let at = h.clock.at.getTime();
-    for (let pass = 0; pass < 10; pass += 1) {
-      at += FETCH_REQUEUE_AGE_MS + 1;
-      h.setNow(new Date(at));
-      for (const row of await h.engine.retryable()) {
-        expect(await h.engine.reprocess(row)).toEqual({ kind: "awaitingOrder" });
-        await h.engine.runFetchOrder(fetchJobs(h).at(-1)!, LAST);
-      }
-    }
+    const start = h.clock.at.getTime();
+    for (let pass = 1; pass <= 10; pass += 1) await sweepPass(h, new Date(start + pass * (FETCH_REQUEUE_AGE_MS + 1)));
 
     expect(await h.engine.retryable()).toEqual([]);
     expect(inboxRow(h, "evt-plc-1")).toMatchObject({ status: "FAILED" });

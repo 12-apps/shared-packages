@@ -248,15 +248,33 @@ export async function runFetchOrder(
   }
   const result = await fetchThroughAdapter(ctx, payload.clientId, event.provider, event.externalOrderId ?? "");
   if (result.kind === "order") return ingestFetched(ctx, row, payload.clientId, result.order, target);
+  return endUnfetched(ctx, { row, clientId: payload.clientId, event, result, attempt });
+}
+
+/**
+ * A fetch that brought no order: rethrown for the queue while a retry is worth
+ * it, else the row settles FAILED. Our credentials refused (a 401 that a fresh
+ * token did not cure, a refused token grant) are never retried by the queue:
+ * the connection reads FAILED, and the reconciliation sweep's next pass,
+ * minutes away and within the row's attempt bound, is the only re-try, so a
+ * revoked app never loops.
+ */
+async function endUnfetched(
+  ctx: EngineContext,
+  input: {
+    row: InboxRow;
+    clientId: string;
+    event: NormalizedEvent;
+    result: Exclude<FetchOrderResult, { kind: "order" }>;
+    attempt: { attempt: number; maxAttempts: number };
+  },
+): Promise<FetchOrderOutcome> {
+  const { row, event, result, attempt } = input;
   const reason = result.kind === "refused" ? `refused ${result.status}: ${result.message}` : result.reason;
-  // Our credentials refused (a 401 that a fresh token did not cure, a refused
-  // token grant): never retried by the queue. The connection reads FAILED; the
-  // reconciliation sweep's next pass, minutes away and within the row's
-  // attempt bound, is the only re-try, so a revoked app never loops.
-  if (credentialsRefused(result)) await markCredentialsRefused(ctx, payload.clientId, event.provider);
   if (result.kind === "retry" && attempt.attempt < attempt.maxAttempts) {
     throw new FetchOrderRetryError(`fetch of ${event.externalOrderId ?? "?"} (inbox ${row.id}): ${reason}`);
   }
+  if (credentialsRefused(result)) await markCredentialsRefused(ctx, input.clientId, event.provider);
   await settleInboxEvent(ctx, row.id, "FAILED", `order fetch failed: ${reason}`);
   ctx.ports.logger.error(`${MARKETPLACE_FETCH_ORDER_JOB}: inbox row ${row.id} failed: ${reason}`);
   return { kind: "failed", reason };
