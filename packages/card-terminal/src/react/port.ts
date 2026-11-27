@@ -98,6 +98,7 @@ export function captureWireOf(trace: TerminalCaptureTrace, deviceId: string | nu
     amountCents: trace.amountCents,
     capturedAt: trace.capturedAt,
     transactionId: trace.transactionId,
+    hostNsu: trace.hostNsu ?? null,
     authorizationCode: trace.authorizationCode,
     cardBrand: trace.brand,
     installments: trace.installments,
