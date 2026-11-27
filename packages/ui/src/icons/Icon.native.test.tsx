@@ -28,6 +28,11 @@ describe('Icon (native)', () => {
     'EditNote',
     'LockOpen',
     'Receipt',
+    'NotificationsActive',
+    'RoomService',
+    'ReceiptLong',
+    'Restaurant',
+    'DeliveryDining',
   ] as const)('renders the terminal tile glyph %s', (name) => {
     render(<Icon name={name} label={name} />);
     const paths = screen.getByTestId(`icon-${name}`).querySelectorAll('path');

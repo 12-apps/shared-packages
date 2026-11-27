@@ -33,5 +33,6 @@ control with its action; leave the icon decorative when that control owns the la
 
 The terminal tile glyphs (`Pause`, `PlayArrow`, `Print`, `QrCode`, `Group`, `Cake`,
 `SwapHoriz`, `Link`, `MergeType`, `CallSplit`, `ListAlt`, `EditNote`, `LockOpen`,
-`Receipt`) let a native screen draw the same tile icons as a web admin, from the
+`Receipt`, `NotificationsActive`, `RoomService`, `ReceiptLong`, `Restaurant`,
+`DeliveryDining`) let a native screen draw the same tile icons as a web admin, from the
 same generated paths.
