@@ -70,11 +70,11 @@ function OpenBody(props: ArchiveCardProps): JSX.Element {
       <Box sx={COLUMNS}>
         <Box className="archive-columns">
           <Box>
-            <SectionTitle first>{copy.platformPendingTitle}</SectionTitle>
+            <SectionTitle first level="h4">{copy.platformPendingTitle}</SectionTitle>
             <PendingList blockers={blockers} copy={copy} />
           </Box>
           <Box>
-            <SectionTitle first>{copy.platformCardWhat}</SectionTitle>
+            <SectionTitle first level="h4">{copy.platformCardWhat}</SectionTitle>
             <Text>{copy.platformArchiveLead(purgeDay)}</Text>
           </Box>
         </Box>

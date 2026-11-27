@@ -54,7 +54,7 @@ export function wordsNotFromPack(text: string, values: readonly string[]): strin
 }
 
 export const NAME = 'Hospital Santa Clara';
-export const DAY = (iso: string) => `D[${iso.slice(0, 10)}]`;
+const DAY = (iso: string) => `D[${iso.slice(0, 10)}]`;
 
 interface PinState extends TenantLifecyclePin {
   /** The host's own field (proves the wider pin type fits). */
@@ -134,7 +134,7 @@ export function hostState(overrides: Partial<HostState> = {}): HostState {
   };
 }
 
-export const HostLink = forwardRef<HTMLAnchorElement, { to: string; children?: ReactNode }>(function HostLink({ to, children, ...rest }, ref) {
+const HostLink = forwardRef<HTMLAnchorElement, { to: string; children?: ReactNode }>(function HostLink({ to, children, ...rest }, ref) {
   return (
     <a ref={ref} href={to} {...rest}>
       {children}
@@ -168,7 +168,7 @@ function Overlay({ open, onClose, label, dataTestId, children }: { open: boolean
   );
 }
 
-export const STATUSES = { active: 'OPEN', closing: 'WINDING_DOWN', closed: 'SHUT' } as const;
+const STATUSES = { active: 'OPEN', closing: 'WINDING_DOWN', closed: 'SHUT' } as const;
 
 export function closingConfig(host: HostState, toast = vi.fn()): TenantClosingScreensConfig<PinState> {
   return {

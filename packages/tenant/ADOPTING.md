@@ -568,6 +568,107 @@ pieces standalone, each checking its own: `createDnsChecks(dns)`,
   own empty state (keep its `domains-empty` test id) in place of the
   package's, for tooling that reads your JSX, such as a search index.
 
+### The closing screens (opt-in, `@12-apps/tenant/lifecycle/react`)
+
+The screens a person sees around the lifecycle. They ship the structure and
+the behaviour; the words, codes, paths, widgets and data are yours, every one
+required (`TenantConfigError`, key `closingScreens.<piece>` or
+`platformArchive.<piece>`). No copy ships with the package.
+
+**The pack.** One `TenantLifecycleCopy` per locale: your lifecycle pack
+(`TENANT_COPY_SHAPE`) plus the screens' own keys,
+`TENANT_LIFECYCLE_SCREENS_COPY_SHAPE`: `reopenedSuspended`,
+`notClosableTitle`, `notClosableBody`, `closeLabel` (a dialog's or panel's
+close button) and the platform's `platform*` keys. They are a separate shape
+on purpose: the backend never reads them, so `createApiTenant` keeps accepting
+the pack it accepted before. Four platform sentences answer a
+`TenantEmphasis` (`{ before, bold, after }`): `platformFactEmail`,
+`platformFactPurge`, `platformArchived(facts)` (`facts.byPlatform` false and
+`actor` null when the owner archived it) and `platformPurgeFact`.
+
+**The owner's half.**
+
+```ts
+const closing = createClosingScreens({
+  statuses: { active, closing, closed },
+  copy: { locales, defaultLocale },
+  refusals: { closing, closed, readOnly },            // your 403 body codes
+  paths: { app: '/app/', api: '/api/app/', closePage: 'settings/close' },
+  hooks: {
+    useClosingView, useClosingState, useRequestExport, useClose, useReopen, // react-query results fit
+    useHoldsClose, usePathname, usePin,
+  },
+  components: { PinFields, UndoNote, Link, Frame },  // your PIN fields, undo note, router link, page frame
+  errorAnswer: (error) => (error instanceof ApiError ? error : null), // { status, body, message } | null
+  toast,                                              // a @12-apps/notifications toaster fits
+  shortDay: (iso) => …,                               // the page's and banner's short day, in your zone
+  testIdWord: 'shop',                                 // close-<word>-dialog, <word>-gone-screen, …
+  nameLocale: 'pt-BR',                                // the typed name compared as your server compares it
+});
+// closing.ClosePage({ slug, copy }), closing.ClosingBanner({ slug, copy }),
+// closing.TenantGoneScreen({ refusal, otherSlugs, onSignOut, copy }),
+// closing.closingRefusalOf, interceptReadOnly, watchReadOnlyWrites, switchTarget, closePagePath
+```
+
+- **The writes are yours, and so is the re-read.** `useClose` and `useReopen`
+  invalidate what your app shows on success; `useReopen` answers the status it
+  restored, and the toast says `reopened` only when it is `active`, else
+  `reopenedSuspended`.
+- **The close page** is open → pending / data / close; neither open nor gone →
+  one notice (its title `reopenedSuspended`, with focus, right after a reopen
+  that restored a suspension); closing → since / until, the reopen and the
+  unnumbered data card; closed → one notice. `Frame` wraps the loaded page
+  with `eligible` true only while open.
+- **The test ids** a journey reads keep their names: `close-pending`,
+  `close-blocker-<kind>(-go)`, `close-data(-export|-preparing|-failed)`,
+  `close-act`, `close-missing`, `close-<word>-open|dialog|reason|name|undo|error`,
+  `close-closing(-heading)`, `close-reopen`, `close-not-closable`,
+  `close-closed`, `closing-banner(-read-only|-error|-reopen)`,
+  `<word>-gone-screen`, `<word>-read-only-toast`, `<word>-reopened-toast`.
+- **The readers.** `closingRefusalOf(error)` answers `'closing' | 'closed' |
+  'readOnly' | null` from a 403's body; pass `'closing' | 'closed'` to
+  `TenantGoneScreen`. Call `interceptReadOnly` from your query client's global
+  error hook and `watchReadOnlyWrites` once at boot: it watches non-GET
+  answers under `paths.api` and reads a clone.
+
+**The platform's half.**
+
+```ts
+const archive = createPlatformArchive({
+  statuses: { active, closing, closed, closableFrom },
+  copy: { locales, defaultLocale },
+  components: { PinFields, UndoNote, Overlay },
+  toast,
+});
+// archive.ArchivePanel({ open, name, purgeDay, purgeShortDay, blockers, pin, copy, onConfirm, onClose })
+// archive.ArchiveCard({ status, copy, blockers, purgeDay, archived, canArchive, canRestore, onArchive, onRestore })
+```
+
+- **`Overlay` is your shell**: a right side panel on a computer (your rule's
+  width; 400 px where ADR 0369 applies) and a bottom sheet on a phone. The
+  package fills it with the title row, a body that is the only scroller (the
+  PIN field is never cut by the actions) and the actions pinned to the bottom,
+  so the shell's content area must be a flex column of bounded height. Its veil
+  and Escape call `onClose`, which the panel ignores while the act is with the
+  server, and it returns focus to its opener.
+- **One component, two entries.** Your menu item and the card's
+  `onArchive` open the same `ArchivePanel`. `onConfirm(reason)` sends the
+  archive and re-reads; it rejects with the refusal, which the panel shows
+  inside itself. On success the panel raises `platformArchivedToast(name)`
+  and calls `onClose`.
+- **`blockers`** is a read (`{ data, isPending, isError, error, refetch }`),
+  shown read-only; any blocker holds the confirm with `missing(n)` beside it.
+  The PIN is the presser's, for this tenant: pass your hook's answer as `pin`.
+- **The card** shows while the status is in `closableFrom` (open) or is
+  `closing` (archived: `archived` facts, the deletion day, `onRestore` for
+  your own restore confirmation); any other status draws nothing. Its entry
+  is never disabled: the panel says what is missing.
+- Test ids: `archive-panel`, `archive-panel-body`, `archive-close`,
+  `archive-pending(-none|-hint|-loading)`, `archive-blocker-<kind>`,
+  `archive-reason`, `archive-undo`, `archive-error`, `archive-confirm`,
+  `archive-back`, `archive-missing`, `archive-card`, `archive-open`,
+  `archive-archived`, `archive-purge`, `archive-restore`.
+
 ### The schema and the migration
 
 - Copy the partial into your schema folder with

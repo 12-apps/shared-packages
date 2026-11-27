@@ -35,7 +35,7 @@ export function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export interface CloseDialogProps {
+interface CloseDialogProps {
   name: string;
   copy: TenantLifecycleCopy;
   /** Resolves when the close landed; throws the server's sentence when it did not. */

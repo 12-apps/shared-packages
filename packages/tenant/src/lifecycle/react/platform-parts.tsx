@@ -29,9 +29,9 @@ export function Emphasis({ value }: { value: TenantEmphasis }): JSX.Element {
 }
 
 /** A section's small heading inside the panel or the card. */
-export function SectionTitle({ children, first = false }: { children: string; first?: boolean }): JSX.Element {
+export function SectionTitle({ children, first = false, level = 'h3' }: { children: string; first?: boolean; level?: 'h3' | 'h4' }): JSX.Element {
   return (
-    <Box component="h3" sx={{ typography: 'subtitle2', color: 'text.secondary', m: 0, mt: first ? 0 : 2, mb: 1 }}>
+    <Box component={level} sx={{ typography: 'subtitle2', color: 'text.secondary', m: 0, mt: first ? 0 : 2, mb: 1 }}>
       {children}
     </Box>
   );
