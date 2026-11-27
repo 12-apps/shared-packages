@@ -38,10 +38,10 @@ describe("scale byte transports", () => {
 
 
   it("retires a late Node open without publishing into a newer connection", async () => {
-    let finishOpening: () => void = () => { throw new Error("Open did not start"); };
+    const openFirst = vi.fn<(done: () => void) => void>();
     const first = Object.assign(new EventEmitter(), {
       isOpen: false,
-      open(done: () => void) { finishOpening = () => { first.isOpen = true; done(); }; },
+      open: openFirst,
       set: vi.fn((_value: unknown, done: () => void) => done()),
       write: vi.fn((_value: unknown, done: () => void) => done()),
       close: vi.fn((done: () => void) => { first.isOpen = false; done(); }),
@@ -60,8 +60,11 @@ describe("scale byte transports", () => {
     const abandoned = transport.open(uranoPopLight.serial);
     const rejection = expect(abandoned).rejects.toThrow("stopped");
     await Promise.resolve();
+    const finishOpening = openFirst.mock.calls[0]?.[0];
+    if (!finishOpening) throw new Error("Open did not start");
     await transport.close();
     await transport.open(uranoPopLight.serial);
+    first.isOpen = true;
     finishOpening();
     first.emit("data", frame(captures.plate));
     await rejection;
@@ -103,7 +106,6 @@ describe("scale byte transports", () => {
     const setSignals = vi.fn(async () => {});
     const write = vi.fn();
     const signal = vi.fn();
-    let parsed: ReturnType<ReturnType<typeof createUranoParser>["push"]> | undefined;
     const parser = createUranoParser();
     const port = {
       getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
@@ -114,12 +116,12 @@ describe("scale byte transports", () => {
       open, close, setSignals,
     };
     const transport = createWebSerialTransport(port);
-    const read = new Promise<void>((resolve) => {
-      transport.onData((bytes) => { parsed = parser.push(bytes); resolve(); });
+    const read = new Promise<ReturnType<typeof parser.push>>((resolve) => {
+      transport.onData((bytes) => resolve(parser.push(bytes)));
     });
     transport.onClose(signal);
     await transport.open(uranoPopLight.serial);
-    await read;
+    const parsed = await read;
     await transport.write(Uint8Array.of(5));
     await transport.close();
     expect(transport.usb).toEqual({ vendorId: 0x1a86, productId: 0x7523 });
