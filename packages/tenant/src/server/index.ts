@@ -21,6 +21,12 @@ import { validateCoreConfig, validatePort, validateSlugs, validateTreePort } fro
 import { createTenantLifecycle, type TenantLifecycle, type TenantLifecycleConfig } from '../lifecycle';
 
 export * from '../lifecycle';
+import {
+  createApiTenantDomains,
+  validateDomains,
+  type ApiTenantDomains,
+  type TenantDomainsServerConfig,
+} from '../domains/server';
 
 export { TenantConfigError } from '../validate';
 export {
@@ -44,6 +50,32 @@ export {
   type TenantSlugResolver,
   type TenantSlugs,
 } from '../slugs';
+export {
+  TENANT_DOMAIN_PORT_METHODS,
+  TENANT_DOMAIN_QUOTA_METHODS,
+  TENANT_DOMAIN_RESOLVER_METHODS,
+  createApiTenantDomains,
+  createDnsChecks,
+  createTenantDomains,
+  createTlsAsk,
+  validateDomains,
+  type ApiTenantDomains,
+  type TenantDomainAnswer,
+  type TenantDomainContext,
+  type TenantDomainDnsChecks,
+  type TenantDomainDnsChecksConfig,
+  type TenantDomainOutcome,
+  type TenantDomainPort,
+  type TenantDomainQuota,
+  type TenantDomainResolver,
+  type TenantDomainResult,
+  type TenantDomains,
+  type TenantDomainsConfig,
+  type TenantDomainsServerConfig,
+  type TenantDomainTls,
+  type TenantDomainTlsAnswer,
+  type TenantDomainTlsConfig,
+} from '../domains/server';
 
 /** Slug resolution's config: the host's slug port and its kept memory. */
 export interface TenantSlugsConfig<R extends TenantSlugRecord = TenantSlugRecord> {
@@ -61,9 +93,9 @@ export interface TenantRoute {
 }
 
 /**
- * Everything `createApiTenant` needs. Nothing is optional but the tenant tree and
- * slug resolution, opt-in features: give `tree` or `slugs` and every one of
- * its members is required.
+ * Everything `createApiTenant` needs. Nothing is optional but the tenant tree,
+ * slug resolution, the lifecycle and custom domains, opt-in features: give
+ * `tree`, `slugs`, `lifecycle` or `domains` and every one of its members is required.
  */
 export interface TenantServerConfig<
   S extends string = string,
@@ -89,6 +121,11 @@ export interface TenantServerConfig<
    * `byId` MUST return each tenant's `name`.
    */
   lifecycle?: TenantLifecycleConfig<S, Tx>;
+  /**
+   * Custom domains (the host's domain port, its quota, the DNS checks' resolver,
+   * targets and TXT prefix, the TLS ask). Left out, `tenant.domains` is absent.
+   */
+  domains?: TenantDomainsServerConfig<Tx>;
 }
 
 export interface ApiTenant<S extends string = string, Tx = unknown, R extends TenantSlugRecord = TenantSlugRecord>
@@ -103,6 +140,8 @@ export interface ApiTenant<S extends string = string, Tx = unknown, R extends Te
   slugs?: TenantSlugs<R>;
   /** The closing lifecycle through `config.lifecycle`; absent when none was given. */
   lifecycle?: TenantLifecycle<S>;
+  /** Custom domains through `config.domains`; absent when none was given. */
+  domains?: ApiTenantDomains;
   /** The package's routes, in mount order. None yet: the lifecycle slice adds them. */
   routes: readonly TenantRoute[];
   /** The tenant, read through the port, on `tx` when given. */
@@ -125,6 +164,8 @@ export function createApiTenant<S extends string, Tx = unknown, R extends Tenant
   if (treePort !== undefined) validateTreePort(treePort);
   const slugs = (config as { slugs?: unknown }).slugs;
   if (slugs !== undefined) validateSlugs(slugs);
+  const domains = (config as { domains?: unknown }).domains;
+  if (domains !== undefined) validateDomains(domains);
   const data = frozenCopy({ statuses: config.statuses, ids: config.ids, copy: config.copy });
   const known = new Set<string>(data.statuses.all);
   const { port } = config;
@@ -134,6 +175,7 @@ export function createApiTenant<S extends string, Tx = unknown, R extends Tenant
     port,
     ...(config.tree === undefined ? {} : { tree: createTenantTree(config.tree) }),
     ...(config.slugs === undefined ? {} : { slugs: createTenantSlugs(config.slugs) }),
+    ...(config.domains === undefined ? {} : { domains: createApiTenantDomains(config.domains) }),
     routes: Object.freeze([]),
     byId: (id, tx) => port.byId(id, tx),
     setStatusIf: (id, from, to, tx) => {

@@ -8,7 +8,7 @@ export default defineConfig({
     poolOptions: { forks: { maxForks: 2, minForks: 1 } },
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

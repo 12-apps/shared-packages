@@ -35,8 +35,10 @@ data export arrive in later releases on top of the same config. How to adopt it:
 
 | Import | What | Needs |
 |---|---|---|
-| `@12-apps/tenant` | config types, the lifecycle's pure readings (`isTenantGone`, `sameTenantName`, `purgeAtFor`, `reminderDue`), `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`), slug resolution (`createKeptMemory`, `createSlugResolver`, `createKeptSlugs`, `createTenantSlugs`, `TenantSlugPort`) | nothing |
-| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given, `tenant.slugs` when `slugs` is, `tenant.lifecycle` when `lifecycle` is), `createTenantLifecycle`, `createTenantGates`, `TenantLifecycleRefusal`, and the slug resolution exports | nothing |
+| `@12-apps/tenant` | config types, the lifecycle's pure readings (`isTenantGone`, `sameTenantName`, `purgeAtFor`, `reminderDue`), `TenantPort`, `TenantConfigError`, the validators, the tree (`createTenantTree`, the path helpers, `TenantTreeError`), slug resolution (`createKeptMemory`, `createSlugResolver`, `createKeptSlugs`, `createTenantSlugs`, `TenantSlugPort`), custom domains' server half (`createTenantDomains`, `createDnsChecks`, `createTlsAsk`, `TenantDomainPort`, `TenantDomainQuota`) | nothing |
+| `@12-apps/tenant/server` | `createApiTenant` (with `tenant.tree` when a `tree` port is given, `tenant.slugs` when `slugs` is, `tenant.lifecycle` when `lifecycle` is, `tenant.domains` when `domains` is), `createTenantLifecycle`, `createTenantGates`, `TenantLifecycleRefusal`, and the slug resolution and custom domain exports | nothing |
+| `@12-apps/tenant/domains` | custom domains' pure half, browser-safe: `hostnameOrNull`, `createDomainDns` (the records under your TXT prefix), the zone helpers, `domainsOf` and the record types, `canonicalHostOf`, `pairRedirectOf`, the planner | nothing |
+| `@12-apps/tenant/domains/react` | `createDomainsScreen` (the domains card, every word your pack, your confirm button and segmented control injected), the records parts | `react`, `@12-apps/ui`, `@mui/icons-material` |
 | `@12-apps/tenant/hono` | `mountTenant(app, tenant)`, `mountTenantGates(app, gates)`, `tenantAdminGate`, `tenantPublicGate` | `hono` |
 | `@12-apps/tenant/react` | `createWebTenant` | nothing yet |
 | `@12-apps/tenant/manifest` | the wiring manifest (`db`) | `@12-apps/wiring` (types) |
