@@ -258,26 +258,48 @@ as the predicate of one Postgres `UPDATE … RETURNING`, to be used as a
 data-modifying CTE after the payment row in the same statement:
 
 ```ts
-const bind = captureBindSql(
-  { clientId, transactionCode, orderId, paymentIdSql: '(SELECT id FROM paid)', now, param },
-  { holds: true },
-);
-// WITH paid AS (INSERT INTO payments … RETURNING id), bound AS (${bind.text}) SELECT …
+// The caller's own insert and its sale guard; `param` numbers them in text order.
+const paid = `INSERT INTO payments (id, order_id) VALUES (${param(paymentId)}, ${param(orderId)}) ON CONFLICT DO NOTHING RETURNING id, order_id`;
+const bind = captureBindSql({
+  clientId,
+  transactionCode,
+  orderId,
+  paymentIdSql: '(SELECT id FROM paid)',
+  saleGuardSql: `EXISTS (SELECT 1 FROM paid WHERE paid.order_id = ${param(orderId)})`,
+  now,
+  param,
+});
+// WITH paid AS (${paid}), bound AS (${bind.text}) SELECT …
 ```
 
-`param` binds a value in the caller's statement and answers its placeholder.
+`{ holds: true }` (and a `holdKey`, the sale context the capture may be held
+for) only on a table that maps `hold_key`, as the Prisma store's does with
+`{ holds: true }`; the default names no hold column.
+
+`param` binds a value in the caller's statement and answers its placeholder;
+it is called once per use, in text order, so numbered (`$3`) and positional
+(`?`) placeholders both line up. `paymentIdSql` and `saleGuardSql` are spliced
+as written: never build them from input. `saleGuardSql` is required: true only
+when that payment row is this sale's at this tenant (the `SALE_MISMATCH` guard
+of `ledger.bind`). A NULL payment (an insert that returned nothing) binds
+nothing.
+
 The capture must already be recorded (`record` / `recordFromDevice`): a CTE
-does not see a sibling CTE's insert. No row returned means nothing was bound;
-`explainUnbound(current, target)` on the capture read afterwards answers
-`replay` (this sale's payment already holds it), `missing`, or the bind's
-refusal code.
+does not see a sibling CTE's insert. No row returned means nothing was bound,
+and the caller rolls its claim back; `explainUnbound(current, target)` on the
+capture read afterwards answers `replay` (this sale's payment already holds
+it: on a replay the target carries the ORIGINAL payment id, not a fresh one),
+`missing`, or the bind's refusal code.
 
 ### A door charge with no till (`planDoorSettlement`)
 
 One capture against what a sale owes, where no till can hand change back:
 `EXACT` settles the due; `SHORT` settles what was captured and names the
 shortfall for the caller to park; `EXCESS` settles the due and names the
-excess the caller records as owed back to the card. Pure; nothing is written.
+excess the caller records as owed back to the card. Every kind answers the
+same shape (`settleCents`, `shortCents`, `excessCents`, zero where it has
+none). A capture is at least one cent; a due may be zero (all excess). Pure;
+nothing is written.
 
 ### Upgrading to 1.2.0 (held captures)
 

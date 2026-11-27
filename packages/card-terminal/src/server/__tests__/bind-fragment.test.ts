@@ -24,7 +24,7 @@ beforeEach(async () => {
       amount_cents INT NOT NULL, state TEXT NOT NULL, order_id TEXT, payment_id TEXT, hold_key TEXT,
       refund_flagged_at TIMESTAMPTZ, refund_reason TEXT, refund_cleared_at TIMESTAMPTZ, updated_at TIMESTAMPTZ,
       UNIQUE (client_id, transaction_code));
-    CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL);
+    CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE);
   `);
 });
 
@@ -77,18 +77,38 @@ function params(): { param: SqlParam; values: unknown[] } {
   };
 }
 
+interface ClaimOptions {
+  /** The sale context the claim binds under (a held capture binds only to its own). */
+  holdKey?: string;
+  /** The payment row is inserted for this sale instead: the caller's sale guard must refuse it. */
+  paidForOrder?: string;
+  /** The insert lost its race (`ON CONFLICT DO NOTHING`) and returns no row. */
+  conflict?: boolean;
+  /** Replaces the sale guard (TRUE: prove a predicate holds on its own, not through the guard). */
+  saleGuardSql?: string;
+}
+
 /** The bind composed beside the payment insert, as a host's claim would: the codes it bound. */
-async function claim(code: string, orderId: string, paymentId: string): Promise<string[]> {
+async function claim(code: string, orderId: string, paymentId: string, options: ClaimOptions = {}): Promise<string[]> {
   const { param, values } = params();
   const paymentParam = param(paymentId);
-  const orderParam = param(orderId);
-  const bind = captureBindSql({ clientId: 't', transactionCode: code, orderId, paymentIdSql: '(SELECT id FROM paid)', now: NOW, param }, { holds: true });
-  const result = await db.query<{ transaction_code: string }>(
-    `WITH paid AS (INSERT INTO payments (id, order_id) VALUES (${paymentParam}, ${orderParam}) RETURNING id),
-          bound AS (${bind.text})
-     SELECT transaction_code FROM bound`,
-    values,
+  const paidOrderParam = param(options.paidForOrder ?? orderId);
+  const insert = `INSERT INTO payments (id, order_id) VALUES (${paymentParam}, ${paidOrderParam})${options.conflict ? ' ON CONFLICT (order_id) DO NOTHING' : ''} RETURNING id, order_id`;
+  // The guard's own placeholder is taken where it appears in the text: after the bind's.
+  const bind = captureBindSql(
+    {
+      clientId: 't',
+      transactionCode: code,
+      orderId,
+      paymentIdSql: '(SELECT id FROM paid)',
+      saleGuardSql: options.saleGuardSql ?? `EXISTS (SELECT 1 FROM paid WHERE paid.order_id = ${param(orderId)})`,
+      ...(options.holdKey === undefined ? {} : { holdKey: options.holdKey }),
+      now: NOW,
+      param,
+    },
+    { holds: true },
   );
+  const result = await db.query<{ transaction_code: string }>(`WITH paid AS (${insert}), bound AS (${bind.text}) SELECT transaction_code FROM bound`, values);
   return result.rows.map((row) => row.transaction_code);
 }
 
@@ -142,11 +162,13 @@ describe('captureBindSql', () => {
     for (const [index, row] of CASES.entries()) {
       const before = await read(row.code);
       const admits = typeof bindDecision(before, { orderId: 'o-1', paymentId: `p-${index}` }) === 'object';
+      // Each case is a sale of its own: one payment row per sale.
       const bound = await claim(row.code, 'o-1', `p-${index}`);
       expect({ code: row.code, bound: bound.length === 1 }).toEqual({ code: row.code, bound: admits });
       const after = await read(row.code);
       if (admits) expect(after).toMatchObject({ state: 'BOUND', orderId: 'o-1', paymentId: `p-${index}` });
       else expect(after).toEqual(before);
+      await db.query(`TRUNCATE payments`);
     }
   });
 
@@ -164,15 +186,68 @@ describe('captureBindSql', () => {
   it('binds once: a second claim binds nothing and is explained as a replay or a refusal', async () => {
     await seed([{ code: 'unbound' }]);
     expect(await claim('unbound', 'o-1', 'p-1')).toEqual(['unbound']);
-    expect(await claim('unbound', 'o-1', 'p-9')).toEqual([]);
+    expect(await claim('unbound', 'o-2', 'p-9')).toEqual([]);
     const current = await read('unbound');
     expect(explainUnbound(current, { orderId: 'o-1', paymentId: 'p-1' })).toBe('replay');
     expect(explainUnbound(current, { orderId: 'o-1', paymentId: 'p-9' })).toBe('BOUND_ELSEWHERE');
     expect(explainUnbound(null, { orderId: 'o-1', paymentId: 'p-1' })).toBe('missing');
   });
 
+  it('a payment insert that returned no row (a lost race) binds nothing and leaves the capture as it was', async () => {
+    await seed([{ code: 'first' }, { code: 'second' }]);
+    expect(await claim('first', 'o-1', 'p-1')).toEqual(['first']);
+    const before = await read('second');
+    // The guard is TRUE here, so it is the fragment's own NULL check that refuses.
+    expect(await claim('second', 'o-1', 'p-2', { conflict: true, saleGuardSql: 'TRUE' })).toEqual([]);
+    expect(await read('second')).toEqual(before);
+  });
+
+  it('a capture held for this sale context binds, one held for another never does, as bindDecision says', async () => {
+    const held: readonly Seed[] = [{ code: 'held-here', holdKey: 'h-1' }, { code: 'held-there', holdKey: 'h-2' }, { code: 'not-held' }];
+    await seed(held);
+    for (const [index, row] of held.entries()) {
+      const target = { orderId: `o-${index}`, paymentId: `p-${index}`, holdKey: 'h-1' };
+      const admits = typeof bindDecision(await read(row.code), target) === 'object';
+      const bound = await claim(row.code, target.orderId, target.paymentId, { holdKey: 'h-1' });
+      expect({ code: row.code, bound: bound.length === 1 }).toEqual({ code: row.code, bound: row.code !== 'held-there' });
+      expect({ code: row.code, bound: bound.length === 1 }).toEqual({ code: row.code, bound: admits });
+    }
+    expect((await read('held-here')).holdKey).toBeNull();
+    expect(explainUnbound(await read('held-there'), { orderId: 'o-1', paymentId: 'p-1', holdKey: 'h-1' })).toBe('BOUND_ELSEWHERE');
+  });
+
+  it('with no holdKey a held capture never binds, as bindDecision says', async () => {
+    await seed([{ code: 'held', holdKey: 'h-1' }]);
+    expect(typeof bindDecision(await read('held'), { orderId: 'o-1', paymentId: 'p-1' })).toBe('string');
+    expect(await claim('held', 'o-1', 'p-1')).toEqual([]);
+  });
+
+  it("refuses a payment row of another sale through the caller's sale guard", async () => {
+    await seed([{ code: 'unbound' }]);
+    expect(await claim('unbound', 'o-1', 'p-1', { paidForOrder: 'o-other' })).toEqual([]);
+    expect((await read('unbound')).state).toBe('UNBOUND');
+  });
+
+  it('lines up positional placeholders: every value is bound once per use, in text order', async () => {
+    await seed([{ code: 'unbound', flagged: 'UNBOUND_TIMEOUT' }]);
+    const values: unknown[] = [];
+    const positional: SqlParam = (value) => {
+      values.push(value);
+      return '?';
+    };
+    const input = { clientId: 't', transactionCode: 'unbound', orderId: 'o-1', paymentIdSql: `'p-1'`, saleGuardSql: 'TRUE', holdKey: 'h-1', now: NOW, param: positional };
+    const bind = captureBindSql(input, { holds: true });
+    expect(bind.text.split('?').length - 1).toBe(values.length);
+    // Number the `?` left to right, as a positional driver binds them, and run it on Postgres.
+    let n = 0;
+    const numbered = bind.text.replace(/\?/g, () => `$${(n += 1)}`);
+    const result = await db.query<Record<string, unknown>>(numbered, values);
+    expect(result.rows).toEqual([{ transaction_code: 'unbound', kind: 'CREDIT', amount_cents: 8990 }]);
+    expect(await read('unbound')).toMatchObject({ state: 'BOUND', orderId: 'o-1', paymentId: 'p-1', refundClearedAt: NOW });
+  });
+
   it('names no hold or stamp column when the table has none, and refuses a table name that is not an identifier', () => {
-    const input = { clientId: 't', transactionCode: 'x', orderId: 'o', paymentIdSql: '$9', now: NOW, param: () => '$1' };
+    const input = { clientId: 't', transactionCode: 'x', orderId: 'o', paymentIdSql: '$9', saleGuardSql: 'TRUE', now: NOW, param: () => '$1' };
     const sql = captureBindSql(input, { holds: false, updatedAt: false });
     expect(sql.text).not.toContain('hold_key');
     expect(sql.text).not.toContain('updated_at');

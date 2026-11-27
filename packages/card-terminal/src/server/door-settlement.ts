@@ -15,7 +15,8 @@
  *   the capture is the money truth.
  *
  * Nothing here writes. The bind is the ledger's (`bind`, or
- * `captureBindSql` inside the caller's claim).
+ * `captureBindSql` inside the caller's claim). A capture is at least one
+ * cent; a sale may owe nothing (all of the capture is then excess).
  */
 
 export interface DoorCapture {
@@ -23,13 +24,21 @@ export interface DoorCapture {
   amountCents: number;
 }
 
-export type DoorSettlement =
-  | { kind: 'EXACT'; settleCents: number }
-  | { kind: 'SHORT'; settleCents: number; shortCents: number }
-  | { kind: 'EXCESS'; settleCents: number; excess: { transactionCode: string; excessCents: number } };
+/**
+ * One shape for every kind: what the sale's payment row records, what is still
+ * owed (SHORT), and what is owed back on that capture (EXCESS) — zero where
+ * the kind has none.
+ */
+export interface DoorSettlement {
+  kind: 'EXACT' | 'SHORT' | 'EXCESS';
+  transactionCode: string;
+  settleCents: number;
+  shortCents: number;
+  excessCents: number;
+}
 
-function cents(name: string, value: number): number {
-  if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name} must be a non-negative integer of cents, got ${value}`);
+function cents(name: string, value: number, least: number): number {
+  if (!Number.isSafeInteger(value) || value < least) throw new RangeError(`${name} must be an integer of cents of at least ${least}, got ${value}`);
   return value;
 }
 
@@ -39,9 +48,11 @@ function cents(name: string, value: number): number {
  * otherwise.
  */
 export function planDoorSettlement(capture: DoorCapture, dueCents: number): DoorSettlement {
-  const captured = cents('amountCents', capture.amountCents);
-  const due = cents('dueCents', dueCents);
-  if (captured === due) return { kind: 'EXACT', settleCents: due };
-  if (captured < due) return { kind: 'SHORT', settleCents: captured, shortCents: due - captured };
-  return { kind: 'EXCESS', settleCents: due, excess: { transactionCode: capture.transactionCode, excessCents: captured - due } };
+  // A capture is money taken: at least one cent. A sale may owe nothing (an undone debt), then it is all excess.
+  const captured = cents('amountCents', capture.amountCents, 1);
+  const due = cents('dueCents', dueCents, 0);
+  const base = { transactionCode: capture.transactionCode, shortCents: 0, excessCents: 0 };
+  if (captured === due) return { ...base, kind: 'EXACT', settleCents: due };
+  if (captured < due) return { ...base, kind: 'SHORT', settleCents: captured, shortCents: due - captured };
+  return { ...base, kind: 'EXCESS', settleCents: due, excessCents: captured - due };
 }
