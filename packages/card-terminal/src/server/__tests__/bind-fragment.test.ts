@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { captureBindSql, explainUnbound } from '../bind-fragment';
 import { bindDecision } from '../decisions';
@@ -26,14 +26,34 @@ function cases(): readonly Seed[] {
   ];
 }
 
+/**
+ * Booting the engine (`new PGlite()`: WebAssembly instantiation plus an
+ * in-memory initdb) is the whole cost of this file, so it is paid ONCE per
+ * file and every test starts from emptied tables instead (FUT-5742). One boot
+ * per test cost 0.7 s each here and 3.5 to 7.8 s each on CI's Unit Tests job,
+ * where `turbo run test` runs the whole workspace at once: 45 to 74 s for the
+ * file, and a cold first boot over vitest's 10 s hook default (run
+ * 45986835474, both attempts). The reset is a TRUNCATE of both tables, ~2 ms.
+ *
+ * The one boot keeps a budget of its own, equal to the package's
+ * `testTimeout`: measured cold, it is 1.2 to 1.5 s on an idle machine and
+ * 10.9 s on a CPU shared nine ways (`taskset -c 0` beside eight busy
+ * loops), which reproduces CI's failure; 30 s leaves that a factor of 2.7.
+ */
+const BOOT_BUDGET_MS = 30_000;
+
 describe('captureBindSql', () => {
   let opened: BindDb | undefined;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     opened = await openBindDb();
+  }, BOOT_BUDGET_MS);
+
+  beforeEach(async () => {
+    await bound().reset();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await opened?.close();
     opened = undefined;
   });
