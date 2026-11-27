@@ -113,7 +113,11 @@ export function useDebitAddress(): DebitAddress | null {
 export function useDebitRun(choice: CheckoutListChoice | null, list: CheckoutPaymentList): DebitAuthentication | undefined {
   const billingAddress = useDebitAddress()?.address ?? list.billingAddress ?? null;
   if (choice?.kind !== "online" || choice.funding !== "DEBIT" || !billingAddress || !list.copy.debit) return undefined;
-  return { billingAddress, copy: list.copy.debit };
+  return {
+    billingAddress,
+    copy: list.copy.debit,
+    ...(list.onThreeDSFailure ? { onThreeDSFailure: list.onThreeDSFailure } : {}),
+  };
 }
 
 /** Why the debit row cannot pay yet, or `null` — the bar's reason under the button. */

@@ -60,6 +60,28 @@ async function runWithFailedDebit(w: ReturnType<typeof production>) {
   return prepared;
 }
 
+describe('homologação evidence: why the debit 3DS did not complete (FUT-5806)', () => {
+  it('given the browser reports PagBank\'s answer, then the debit steps quote it', async () => {
+    const w = production();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER));
+    const reason = 'HTTP 400 · 40002 invalid_parameter (paymentMethod.card) · trace t-1';
+    const withReason = cardsWithUnauthenticatedDebit().map((card) =>
+      card.scenario === 'debit' ? { ...card, threeDSReason: reason } : card,
+    );
+    await completeEvidenceRun(w.runDeps, prepared.runId, withReason, wallets());
+
+    expect(JSON.stringify(await latest(w))).toContain(`PagBank: ${reason}`);
+  });
+
+  it('given no reason from the browser, then the debit steps keep the plain wording', async () => {
+    const w = production();
+    await runWithFailedDebit(w);
+
+    expect(JSON.stringify(await latest(w))).not.toContain('PagBank:');
+  });
+});
+
 describe('homologação evidence: retry only what failed', () => {
   it('given a run whose debit failed, then only the debit is retryable', async () => {
     const w = production();

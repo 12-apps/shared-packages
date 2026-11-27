@@ -1,7 +1,7 @@
 import { authenticatePagBankDebit, type ThreeDSFailure } from "../../card/three-ds";
 import { err, ok, type Result } from "../../result";
 
-import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./list/types";
+import type { CheckoutBillingAddress, PaymentListDebitCopy, ThreeDSFailureReport } from "./list/types";
 import type { CheckoutClient } from "./transport";
 import type { BuyerInfo, CheckoutOrder } from "./types";
 
@@ -21,6 +21,8 @@ import type { BuyerInfo, CheckoutOrder } from "./types";
 export interface DebitAuthentication {
   billingAddress: CheckoutBillingAddress;
   copy: PaymentListDebitCopy;
+  /** The host's report of a failed authentication (FUT-5806); see `PaymentListDebitInputs`. */
+  onThreeDSFailure?: (failure: ThreeDSFailureReport) => void;
 }
 
 /** The session a stub connection answers — authenticating it needs no SDK and no bank. */
@@ -30,6 +32,18 @@ function failureWords(copy: PaymentListDebitCopy, failure: ThreeDSFailure): stri
   if (failure === "NOT_SUPPORTED") return copy.notSupported;
   if (failure === "REFUSED") return copy.refused;
   return copy.failed;
+}
+
+/** Hand the host its report; a throwing host callback never costs the buyer the error copy. */
+function reportFailure(
+  report: ((failure: ThreeDSFailureReport) => void) | undefined,
+  failure: ThreeDSFailureReport,
+): void {
+  try {
+    report?.(failure);
+  } catch {
+    // The report is the host's; the buyer's answer must not depend on it.
+  }
 }
 
 /** The authentication id to charge the debit card with, or the buyer's reason why not. */
@@ -56,5 +70,11 @@ export async function authenticateDebit(input: {
     },
     billingAddress: input.debit.billingAddress,
   });
-  return outcome.ok ? ok(outcome.authenticationId) : err(failureWords(copy, outcome.failure));
+  if (outcome.ok) return ok(outcome.authenticationId);
+  reportFailure(input.debit.onThreeDSFailure, {
+    surface: "checkout",
+    failure: outcome.failure,
+    ...(outcome.detail ? { detail: outcome.detail } : {}),
+  });
+  return err(failureWords(copy, outcome.failure));
 }
