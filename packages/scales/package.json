@@ -5,13 +5,26 @@
   "sideEffects": false,
   "description": "Model profiles and serial transports for scales with stable weight reporting.",
   "exports": {
-    ".": "./src/index.ts",
-    "./node": "./src/node.ts",
-    "./web": "./src/web.ts",
-    "./android": "./src/android.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "default": "./dist/web.js"
+    },
+    "./android": {
+      "types": "./dist/android.d.ts",
+      "default": "./dist/android.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "check-types": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
@@ -39,9 +52,7 @@
     "directory": "packages/scales"
   },
   "files": [
-    "src",
-    "!**/*.test.*",
-    "!**/__tests__/**",
+    "dist",
     "ADOPTING.md"
   ]
 }

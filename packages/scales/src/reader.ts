@@ -1,6 +1,6 @@
-import { delay } from "./timing";
-import type { ScaleRegistry } from "./registry";
-import type { ByteTransport, ScaleEvent, ScaleProfile, ScaleReading, Unsubscribe } from "./types";
+import { closeTransport, delay, runIo } from "./timing.js";
+import type { ScaleRegistry } from "./registry.js";
+import type { ByteTransport, ScaleEvent, ScaleProfile, ScaleReading, Unsubscribe } from "./types.js";
 
 export interface ScaleReader {
   start(): void;
@@ -43,7 +43,7 @@ export function createScale(options: ReaderOptions): ScaleReader {
   const silenceMs = options.silenceMs ?? 1500;
   const reconnectMs = options.reconnectMs ?? 1000;
   if (!Number.isInteger(settleSamples) || settleSamples < 1) throw new Error("Invalid scale settle sample count");
-  if (!(silenceMs > 0) || !(reconnectMs > 0)) throw new Error("Scale timings must be positive");
+  if (![silenceMs, reconnectMs].every((ms) => Number.isFinite(ms) && ms > 0)) throw new Error("Scale timings must be positive");
   let selected = profile === "auto" ? undefined : registry.get(profile);
   if (profile !== "auto" && !selected) throw new Error(`Unknown scale profile: ${profile}`);
 
@@ -73,7 +73,7 @@ export function createScale(options: ReaderOptions): ScaleReader {
     });
     const unsubscribeClose = transport.onClose(disconnect);
     try {
-      await transport.open(activeProfile.serial);
+      await runIo(() => transport.open(activeProfile.serial), controller.signal, 15_000);
       if (signal.aborted || controller.signal.aborted) return;
       onOpen();
       lastReadingAt = Date.now();
@@ -87,7 +87,7 @@ export function createScale(options: ReaderOptions): ScaleReader {
           samples.resetSamples();
           push({ kind: "silent", durationMs });
         }
-        if (request.kind === "poll") await transport.write(request.bytes);
+        if (request.kind === "poll") await runIo(() => transport.write(request.bytes), controller.signal, 1500);
         await delay(Math.max(0, interval - (Date.now() - startedAt)), controller.signal);
       }
     } finally {
@@ -95,7 +95,7 @@ export function createScale(options: ReaderOptions): ScaleReader {
       unsubscribeData();
       unsubscribeClose();
       signal.removeEventListener("abort", disconnect);
-      await transport.close().catch(() => undefined);
+      await closeTransport(transport);
     }
   }
 

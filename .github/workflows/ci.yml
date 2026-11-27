@@ -75,6 +75,7 @@ env:
     packages/messaging
     packages/card-terminal
     packages/tenant
+    packages/scales
 
 jobs:
   # ── Change detection ───────────────────────────────────────────────────────

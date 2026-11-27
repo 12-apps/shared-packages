@@ -1,5 +1,5 @@
-import { delay } from "./timing";
-import type { ByteTransport, ScaleProfile, UsbIds } from "./types";
+import { closeTransport, delay, runIo } from "./timing.js";
+import type { ByteTransport, ScaleProfile, UsbIds } from "./types.js";
 
 const PROBE_MS = 1500;
 
@@ -28,33 +28,31 @@ async function probe(transport: ByteTransport, profile: ScaleProfile, signal?: A
   });
   const unsubscribeClose = transport.onClose(abort);
   signal?.addEventListener("abort", abort, { once: true });
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timer = setTimeout(abort, PROBE_MS);
 
   try {
     if (signal?.aborted) return false;
-    await transport.open(profile.serial);
-    timer = setTimeout(abort, PROBE_MS);
+    await runIo(() => transport.open(profile.serial), stopped.signal);
     const { request } = profile;
     if (request.kind === "poll") {
       while (!stopped.signal.aborted) {
         const started = Date.now();
-        await transport.write(request.bytes);
+        await runIo(() => transport.write(request.bytes), stopped.signal);
         await delay(Math.max(0, request.intervalMs - (Date.now() - started)), stopped.signal);
       }
     } else {
       await delay(PROBE_MS, stopped.signal);
     }
-    return matched && !signal?.aborted;
   } catch {
-    // An unsupported line setting or failed write rules this profile out.
-    return false;
+    // A matching frame, stop, or I/O failure can interrupt the loop.
   } finally {
     clearTimeout(timer);
     unsubscribeData();
     unsubscribeClose();
     signal?.removeEventListener("abort", abort);
-    await transport.close().catch(() => undefined);
+    await closeTransport(transport);
   }
+  return matched && !signal?.aborted;
 }
 
 export function createScaleRegistry(profiles: readonly ScaleProfile[]): ScaleRegistry {

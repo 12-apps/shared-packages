@@ -18,6 +18,7 @@ export interface ByteTransport {
   readonly usb?: UsbIds;
   open(config: SerialConfig): Promise<void>;
   write(bytes: Uint8Array): Promise<void>;
+  /** Invalidate in-flight I/O. A late open must release its own handle before it can publish data. */
   close(): Promise<void>;
   onData(listener: (bytes: Uint8Array) => void): Unsubscribe;
   onClose(listener: () => void): Unsubscribe;

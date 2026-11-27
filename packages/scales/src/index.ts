@@ -1,4 +1,4 @@
-export * from "./types";
-export { createUranoParser, uranoPopLight } from "./urano";
-export { createScaleRegistry, type ScaleRegistry } from "./registry";
-export { createScale, type ScaleReader } from "./reader";
+export * from "./types.js";
+export { createUranoParser, uranoPopLight } from "./urano.js";
+export { createScaleRegistry, type ScaleRegistry } from "./registry.js";
+export { createScale, type ScaleReader } from "./reader.js";

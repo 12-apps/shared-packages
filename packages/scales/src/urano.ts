@@ -1,4 +1,4 @@
-import type { ScaleParser, ScaleProfile, ScaleReading } from "./types";
+import type { ScaleParser, ScaleProfile, ScaleReading } from "./types.js";
 
 const START = "\x08\x02\x03\x03\x02\x03\x01\x02\x00\x14";
 const END = "\x03\x09\x02\x01\x03";

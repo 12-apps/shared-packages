@@ -1,4 +1,4 @@
-import type { ByteTransport, SerialConfig, UsbIds } from "./types";
+import type { ByteTransport, SerialConfig, UsbIds } from "./types.js";
 
 export interface WebSerialPort {
   readonly readable: ReadableStream<Uint8Array> | null;
@@ -19,6 +19,9 @@ export function createWebSerialTransport(port: WebSerialPort): ByteTransport {
   const closed = new Set<() => void>();
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   let reading: Promise<void> | undefined;
+  let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
+  let opening = false;
+  let generation = 0;
   let opened = false;
   let closing = false;
   async function pump(active: ReadableStreamDefaultReader<Uint8Array>) {
@@ -39,27 +42,46 @@ export function createWebSerialTransport(port: WebSerialPort): ByteTransport {
   return {
     usb: usbIds(port),
     async open({ dtr, rts, ...settings }) {
-      if (opened) throw new Error("Web Serial port is already open");
-      await port.open(settings);
-      opened = true;
+      if (opened || opening || closing) throw new Error("Web Serial port is unavailable");
+      const session = ++generation;
+      opening = true;
+      try {
+        await port.open(settings);
+        if (session !== generation) {
+          await port.close();
+          throw new Error("Web Serial open was stopped");
+        }
+        opened = true;
+      } finally {
+        opening = false;
+      }
       await port.setSignals({ dataTerminalReady: dtr, requestToSend: rts });
+      if (session !== generation) throw new Error("Web Serial open was stopped");
       reader = port.readable?.getReader();
       if (!reader) throw new Error("Web Serial port has no readable stream");
       reading = pump(reader);
     },
     async write(bytes) {
-      const writer = port.writable?.getWriter();
-      if (!writer) throw new Error("Web Serial port has no writable stream");
+      const active = port.writable?.getWriter();
+      if (!active) throw new Error("Web Serial port has no writable stream");
+      writer = active;
       try {
-        await writer.write(bytes);
+        await active.write(bytes);
       } finally {
-        writer.releaseLock();
+        if (writer === active) {
+          writer = undefined;
+          active.releaseLock();
+        }
       }
     },
     async close() {
-      if (!opened) return;
+      generation++;
+      if (!opened || closing) return;
       closing = true;
       try {
+        const activeWriter = writer;
+        writer = undefined;
+        activeWriter?.releaseLock();
         await reader?.cancel().catch(() => undefined);
         await reading;
         await port.close();

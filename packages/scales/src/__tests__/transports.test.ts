@@ -34,6 +34,41 @@ describe("scale byte transports", () => {
     expect(port.listenerCount("data")).toBe(0);
   });
 
+
+  it("retires a late Node open without publishing into a newer connection", async () => {
+    let finishOpening: () => void = () => { throw new Error("Open did not start"); };
+    const first = Object.assign(new EventEmitter(), {
+      isOpen: false,
+      open(done: () => void) { finishOpening = () => { first.isOpen = true; done(); }; },
+      set: vi.fn((_value: unknown, done: () => void) => done()),
+      write: vi.fn((_value: unknown, done: () => void) => done()),
+      close: vi.fn((done: () => void) => { first.isOpen = false; done(); }),
+    });
+    const second = Object.assign(new EventEmitter(), {
+      isOpen: false,
+      open(done: () => void) { second.isOpen = true; done(); },
+      set: vi.fn((_value: unknown, done: () => void) => done()),
+      write: vi.fn((_value: unknown, done: () => void) => done()),
+      close: vi.fn((done: () => void) => { second.isOpen = false; done(); }),
+    });
+    const createPort = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const transport = createNodeSerialTransport({ createPort });
+    const received = vi.fn();
+    transport.onData(received);
+    const abandoned = transport.open(uranoPopLight.serial);
+    const rejection = expect(abandoned).rejects.toThrow("stopped");
+    await Promise.resolve();
+    await transport.close();
+    await transport.open(uranoPopLight.serial);
+    finishOpening();
+    first.emit("data", frame(captures.plate));
+    await rejection;
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(second.close).not.toHaveBeenCalled();
+    expect(received).not.toHaveBeenCalled();
+    await transport.close();
+  });
+
   it("preserves unsigned bytes over the Android bridge", async () => {
     const open = vi.fn(async () => {});
     const write = vi.fn(async () => {});

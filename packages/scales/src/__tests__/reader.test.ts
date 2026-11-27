@@ -70,6 +70,32 @@ describe("scale reader", () => {
     await reader.stop();
   });
 
+
+  it("stops and closes when an in-flight write never replies", async () => {
+    vi.useFakeTimers();
+    const { transport } = fakeTransport();
+    transport.write.mockImplementation(() => new Promise(() => {}));
+    const reader = createScale({ transport, registry, profile: uranoPopLight.id });
+    reader.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(transport.write).toHaveBeenCalledOnce();
+    await reader.stop();
+    expect(transport.close).toHaveBeenCalledOnce();
+  });
+
+  it("bounds probing across a stalled open and a stalled write", async () => {
+    vi.useFakeTimers();
+    const { transport } = fakeTransport();
+    transport.open.mockImplementationOnce(() => new Promise(() => {}));
+    transport.write.mockImplementation(() => new Promise(() => {}));
+    const second = { ...uranoPopLight, id: "second" };
+    const probing = createScaleRegistry([uranoPopLight, second]).detect(transport);
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(probing).resolves.toBeUndefined();
+    expect(transport.open).toHaveBeenCalledTimes(2);
+    expect(transport.close).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps a streaming profile that emits its first sample while opening", async () => {
     const streaming = { ...uranoPopLight, id: "stream", request: { kind: "stream" } as const };
     const noMatch = { ...uranoPopLight, id: "unmatched", createParser: () => ({ push: () => [] }) };

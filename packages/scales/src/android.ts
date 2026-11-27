@@ -1,8 +1,9 @@
-import type { ByteTransport, SerialConfig, Unsubscribe, UsbIds } from "./types";
+import type { ByteTransport, SerialConfig, Unsubscribe, UsbIds } from "./types.js";
 
 export interface AndroidSerialBridge {
   open(config: SerialConfig): Promise<void>;
   write(bytes: readonly number[]): Promise<void>;
+  /** Cancels pending permission/open requests and invalidates late callbacks. */
   close(): Promise<void>;
   subscribeData(listener: (bytes: readonly number[]) => void): Unsubscribe;
   subscribeDisconnect(listener: () => void): Unsubscribe;
