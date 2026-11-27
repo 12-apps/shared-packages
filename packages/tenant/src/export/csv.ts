@@ -31,5 +31,5 @@ export function csvLine(cells: readonly string[]): string {
 
 /** The header line, with the BOM a spreadsheet needs to read UTF-8. */
 export function csvHeader(headers: readonly string[]): string {
-  return `﻿${csvLine(headers)}`;
+  return `\ufeff${csvLine(headers)}`;
 }

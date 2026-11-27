@@ -117,7 +117,7 @@ export type TenantArchiveOpened =
 export interface TenantArchivePort {
   /** The object key of one export's archive (the host's key grammar). */
   key(tenantId: string, exportId: string): string;
-  /** Store the built archive under `key`, streamed from `body` (`size` bytes): it is never in memory whole. */
+  /** Keep the built archive under `key`, streamed from `body` (`size` bytes): it is never in memory whole. */
   putStream(key: string, body: Readable, size: number): Promise<void>;
   /** Hand one archive out under `filename` (a short-lived presigned link), or say it is gone. */
   presign(key: string, filename: string): Promise<TenantArchiveOpened>;

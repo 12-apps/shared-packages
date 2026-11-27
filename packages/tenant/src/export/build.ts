@@ -90,7 +90,7 @@ export async function writeArchive(zip: ZipWriter, sections: readonly TenantExpo
   for (const section of sections) await writeSection(zip, section, at);
 }
 
-/** Write the archive to a temp file and store it; the temp directory is gone after, whatever happens. */
+/** Write the archive to a temp file and hand it to the archive port; the temp directory is gone after, whatever happens. */
 async function buildAndStore<S extends string, Tx>(engine: ExportEngine<S, Tx>, key: string, at: TenantExportContext): Promise<number> {
   const directory = await mkdtemp(path.join(tmpdir(), 'tenant-export-'));
   try {

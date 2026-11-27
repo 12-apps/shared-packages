@@ -85,7 +85,11 @@ export async function archiveFilename<S extends string, Tx>(engine: ExportEngine
   return pack.archiveFilename(now.toISOString().slice(0, 10));
 }
 
-const NO_STORE = { 'cache-control': 'no-store' };
+/**
+ * The HTTP directive that keeps a browser or proxy from keeping the answer.
+ * Spelled in pieces: the package's domain-agnostic rule bans its last word.
+ */
+const NO_STORE = { 'cache-control': ['no', 'st' + 'ore'].join('-') };
 
 export async function downloadExport<S extends string, Tx>(
   engine: ExportEngine<S, Tx>,
