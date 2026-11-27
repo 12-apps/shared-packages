@@ -39,7 +39,7 @@ export interface TenantPurgeStrip {
   set: string;
   /** The rows the strip still changes (it keeps the statement idempotent and cheap). */
   when: string;
-  /** Values bound as `$2…`, each read once per run. */
+  /** Values bound as `$2…`, each read when its statement runs (once per strip statement, every run). */
   values?: readonly (() => string)[];
 }
 
@@ -127,6 +127,20 @@ export interface TenantPurgeParsedKey {
   scope: string | null;
 }
 
+/**
+ * The purge's audited act. Its own type, apart from the lifecycle's
+ * `TenantAuditEvent`, so a host's exhaustive switch over that union keeps
+ * compiling: the host writes its own `after` from these facts.
+ */
+export interface TenantPurgeAuditEvent {
+  act: 'closePurged';
+  tenantId: string;
+  /** The closing row's purge date the run purged under. */
+  purgeAt: Date;
+  /** Every table the erase emptied (`erase` and held entries), in order. */
+  erased: readonly string[];
+}
+
 export interface TenantPurgeConfig<Tx = unknown> {
   /** The key-column names a row may name the tenant by; every entry's key column is one of them. */
   keyColumns: readonly string[];
@@ -151,7 +165,14 @@ export interface TenantPurgeConfig<Tx = unknown> {
   beforeErase: readonly ((tenantId: string, at: { now: Date }) => Promise<void>)[];
   /** Zero whatever the tenant still owes its people, ON `tx`. Called once per purge, by the run that stamped `purgedAt`. */
   zeroBalances(tx: Tx, tenantId: string): Promise<void>;
-  /** REQUIRED until the host's contract release: write the same fields into its older closing table, on `tx`. */
+  /** Write the purge's ONE audit line ON `tx`. `action` is `ids.audit.closePurged`. */
+  audit(tx: Tx, action: string, event: TenantPurgeAuditEvent): Promise<void>;
+  /**
+   * REQUIRED until the host's contract release: write the same fields into its
+   * older closing table, on `tx`. Each field is the value to SET, as the engine
+   * wrote it: `imageKeysOwed` is the whole list after the write (sorted,
+   * distinct), never keys to add.
+   */
   mirrorClosing(tx: Tx, tenantId: string, fields: TenantPurgeMirrorFields): Promise<void>;
   /** The host's storage, for the owed objects. */
   storage: TenantPurgeStorage;
@@ -180,7 +201,11 @@ export interface TenantPurgePlanStep {
 export interface TenantPurge {
   /** Purge the tenant if it is closing and due, or closed with its purge stopped half way. */
   run(tenantId: string, at: { now: Date }): Promise<TenantPurgeOutcome>;
-  /** One tenant's owed objects, after its purge; never throws; answers how many are still owed. */
+  /**
+   * One tenant's owed objects, after its purge; never throws. Answers how many
+   * keys are still owed: 0 when nothing is (or the tenant is not purged), and
+   * -1 when its closing row could not be read (reported to `onError`).
+   */
   eraseOwedImages(tenantId: string, at: { now: Date; storage?: TenantPurgeStorage }): Promise<number>;
   /** Every purged tenant still owing objects, oldest purge first, `sweepBatch` of them. */
   sweepImages(now: Date): Promise<{ emptied: number }>;

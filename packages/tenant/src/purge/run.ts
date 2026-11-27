@@ -126,7 +126,7 @@ async function stamp<S extends string, Tx>(engine: PurgeEngine<S, Tx>, tenantId:
     if (stamped === 0) return false;
     await mirrorClosing(tx, tenantId, { purgedAt: now });
     await zeroBalances(tx, tenantId);
-    await engine.lifecycle.audit(tx, engine.tenant.config.ids.audit.closePurged, {
+    await engine.config.audit(tx, engine.tenant.config.ids.audit.closePurged, {
       act: 'closePurged',
       tenantId,
       purgeAt: row.purgeAt,

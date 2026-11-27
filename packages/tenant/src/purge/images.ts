@@ -68,9 +68,13 @@ export async function eraseOwedImages<S extends string, Tx>(
   at: { now: Date; storage?: TenantPurgeStorage },
 ): Promise<number> {
   try {
-    const row = await (await engine.lifecycle.db.table()).findUnique({ where: { tenantId } });
-    if (row === null || row.purgedAt === null) return 0;
-    const owed = row.imageKeysOwed ?? [];
+    // The engine's own read, never the lifecycle's table adapter: that one may leave the image columns out.
+    const [row] = await engine.config.db.query<{ purged_at: Date | null; image_keys_owed: string[] }>(
+      `SELECT "purged_at", "image_keys_owed" FROM ${engine.closings} WHERE "tenant_id" = $1`,
+      [tenantId],
+    );
+    if (row === undefined || row.purged_at === null) return 0;
+    const owed = row.image_keys_owed;
     if (owed.length === 0) return 0;
     const done = await eraseAll(engine, tenantId, owed, at.storage ?? engine.config.storage);
     const left = owed.length - done.length;

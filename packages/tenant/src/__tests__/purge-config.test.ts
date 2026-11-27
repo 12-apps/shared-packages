@@ -37,6 +37,7 @@ describe('I13: required config never defaults', () => {
     'heldElsewhere',
     'beforeErase',
     'zeroBalances',
+    'audit',
     'mirrorClosing',
     'storage',
     'parseKey',
@@ -56,8 +57,8 @@ describe('I13: required config never defaults', () => {
 
   it('refuses a model that does not resolve, the package table unresolved, and a lifecycle missing what the engine reuses', () => {
     expect(build({ ...host.config, models: { resolve: (model) => (model === 'TenantClosing' ? null : host.config.models.resolve(model)) } })).toThrow(/TenantClosing/u);
-    const noAudit = { ...host.lifecycle, audit: undefined };
-    expect(() => createTenantPurge(host.api, noAudit as unknown as typeof host.lifecycle, host.config)).toThrow(/lifecycle\.audit/u);
+    const noOnError = { ...host.lifecycle, onError: undefined };
+    expect(() => createTenantPurge(host.api, noOnError as unknown as typeof host.lifecycle, host.config)).toThrow(/lifecycle\.onError/u);
     expect(() => createTenantPurge({ ...host.api, port: { ...host.api.port, clearProfile: undefined as never } }, host.lifecycle, host.config)).toThrow(
       /port\.clearProfile/u,
     );
@@ -147,6 +148,15 @@ describe('C11: the classification helper', () => {
     expect(() => assertPurgeClassification(leaking, host.config, options)).toThrow(/visits <- patients/u);
     const fromHeld = { ...real, cascades: [...real.cascades, { child: 'lots', parent: 'staff' }] };
     expect(() => assertPurgeClassification(fromHeld, host.config, options)).toThrow(/lots <- staff/u);
+    // B3: through a table of no tenant key, to a fixpoint: erased patients -> keyless links -> keyless notes -> kept visits.
+    const through = {
+      ...real,
+      cascades: [...real.cascades, { child: 'patient_links', parent: 'patients' }, { child: 'link_notes', parent: 'patient_links' }, { child: 'visits', parent: 'link_notes' }],
+    };
+    expect(() => assertPurgeClassification(through, host.config, options)).toThrow(/visits <- link_notes \(reached from patients\)/u);
+    // A held table's children are deleted with it, so what cascades from them is reached too; its own holders are not.
+    const belowHeld = { ...real, cascades: [...real.cascades, { child: 'lots', parent: 'staff_roles' }] };
+    expect(() => assertPurgeClassification(belowHeld, host.config, options)).toThrow(/lots <- staff_roles \(reached from staff\)/u);
     const blocking = { ...real, restricts: [{ child: 'grants', parent: 'patients' }] };
     expect(() => assertPurgeClassification(blocking, host.config, options)).toThrow(/grants -> patients/u);
   });

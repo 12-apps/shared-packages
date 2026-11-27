@@ -131,7 +131,8 @@ async function sweepOwedImages<S extends string, Tx>(
   try {
     result.imagesErased = (await purge.sweepImages(now)).emptied;
   } catch (error) {
-    context.config.onError(error, { act: 'purgeImages', tenantId: '' });
+    // No tenant: the pass's own lookup failed (each tenant's failure is reported, with its id, by the pass).
+    context.config.onError(error, { act: 'purgeImagesLookup', tenantId: '' });
   }
 }
 

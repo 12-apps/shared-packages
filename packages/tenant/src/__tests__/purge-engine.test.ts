@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { TenantClosingRow, TenantClosingTable } from '../lifecycle';
+import { createTenantPurge } from '../server';
 import { AFTER, DAY_MS, PURGE_AT, purgeHost } from './purge-fixtures';
 
 /* eslint-disable test-flakiness/no-database-operations, test-flakiness/no-test-isolation, test-flakiness/no-long-text-match, test-flakiness/no-global-state-mutation --
@@ -130,6 +132,31 @@ describe('C1, C12, C13, C14, C15: the happy path', () => {
     expect((await host.pg.query(`SELECT image_keys_owed, images_erased_at FROM tenant_closings WHERE tenant_id = 'org-a'`)).rows).toEqual([row]);
     expect((await host.pg.query(`SELECT image_keys_owed, images_erased_at FROM legacy_closings WHERE org_id = 'org-a'`)).rows).toEqual([row]);
     expect(await host.engine.eraseOwedImages('org-a', { now: done })).toBe(0);
+  });
+
+  it('B2: a lifecycle table adapter that returns only the 3a row (no image columns) still gets its objects erased', async () => {
+    const host = await ready();
+    await host.seed('org-a', { images: ['img/org-a/one.webp'] });
+    await host.closing('org-a');
+    const lean = (tx?: unknown) => {
+      const full = host.lifecycle.db.table(tx) as TenantClosingTable;
+      return {
+        ...full,
+        findUnique: async (args: Parameters<TenantClosingTable['findUnique']>[0]) => {
+          const row = await full.findUnique(args);
+          if (row === null) return null;
+          const documented: Record<string, unknown> = { ...row };
+          delete documented.imageKeysOwed;
+          delete documented.imagesErasedAt;
+          return documented as unknown as TenantClosingRow;
+        },
+      };
+    };
+    const engine = createTenantPurge(host.api, { ...host.lifecycle, db: { ...host.lifecycle.db, table: lean } }, host.config);
+    expect(await engine.run('org-a', { now: AFTER })).toBe('purged');
+    expect(await engine.eraseOwedImages('org-a', { now: AFTER })).toBe(0);
+    expect(host.objects.has('img/org-a/one.webp')).toBe(false);
+    expect((await host.pg.query(`SELECT image_keys_owed FROM tenant_closings WHERE tenant_id = 'org-a'`)).rows).toEqual([{ image_keys_owed: [] }]);
   });
 
   it('C7: with no legacy key, heldElsewhere is never asked; with no key at all, nothing is recorded (two transactions)', async () => {

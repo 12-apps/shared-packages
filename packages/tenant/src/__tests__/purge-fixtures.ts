@@ -320,6 +320,9 @@ export function purgeHost() {
       );
       await on(tx).query(`UPDATE accounts SET balance = 0 WHERE org_id = $1 AND balance > 0`, [tenantId]);
     },
+    audit: async (tx, action, event) => {
+      await on(tx).query(`INSERT INTO audit_lines (org_id, action, after) VALUES ($1, $2, $3)`, [event.tenantId, action, JSON.stringify(event)]);
+    },
     mirrorClosing: async (tx, tenantId, fields) => {
       knobs.mirrorCalls.push({ tenantId, fields: { ...fields } });
       const set: string[] = [];

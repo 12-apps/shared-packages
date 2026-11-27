@@ -37,7 +37,7 @@ describe('lifecycle.purge XOR lifecycle.onPurgeDue', () => {
       purge: { ...fakeEngine(), sweepImages: async () => Promise.reject(new Error('read failed')) },
     }).lifecycle;
     expect((await broken?.sweep(after))?.imagesErased).toBe(0);
-    expect(host.errors.map((entry) => entry.act)).toEqual(['purgeImages']);
+    expect(host.errors.map((entry) => [entry.act, entry.tenantId])).toEqual([['purgeImagesLookup', '']]);
   });
 });
 
@@ -81,5 +81,47 @@ describe('C9b: the reopen reads the closing row inside its transaction', () => {
     }).lifecycle;
     expect((await raced?.reopen({ tenant: host.tenantOf('t-2')!, by: 'platform' }))?.status).toBe('OPEN');
     expect(host.tenantOf('t-2')?.status).toBe('OPEN');
+  });
+});
+
+describe('B4: the reopen pays nothing extra on its normal path', () => {
+  const close = async (host: ReturnType<typeof lifecycleHost>, id: string) =>
+    host.tenant().lifecycle?.close({
+      tenant: host.tenantOf(id)!,
+      by: 'platform',
+      reason: 'moving out',
+      actorUserId: null,
+      request: new Request('https://h.test/'),
+      now: new Date('2026-03-01T00:00:00.000Z'),
+    });
+
+  it('a close that started from active: one move, one row read, inside the transaction', async () => {
+    const host = lifecycleHost();
+    await close(host, 't-1');
+    host.log.length = 0;
+    expect((await host.tenant().lifecycle?.reopen({ tenant: host.tenantOf('t-1')!, by: 'member' }))?.status).toBe('OPEN');
+    expect(host.log.filter((entry) => entry.startsWith('setStatusIf') || entry === 'findUnique')).toEqual(['setStatusIf:WINDING_DOWN->OPEN', 'findUnique']);
+    expect(host.log.indexOf('begin')).toBeLessThan(host.log.indexOf('findUnique'));
+  });
+
+  it('a close that started from another live status: the second move is its only extra statement', async () => {
+    const host = lifecycleHost();
+    await close(host, 't-2');
+    host.log.length = 0;
+    expect((await host.tenant().lifecycle?.reopen({ tenant: host.tenantOf('t-2')!, by: 'platform' }))?.status).toBe('ON_HOLD');
+    expect(host.log.filter((entry) => entry.startsWith('setStatusIf') || entry === 'findUnique')).toEqual([
+      'setStatusIf:WINDING_DOWN->OPEN',
+      'findUnique',
+      'setStatusIf:OPEN->ON_HOLD',
+    ]);
+  });
+
+  it('a refused reopen reads the row for its refusal code, and rolls nothing forward', async () => {
+    const host = lifecycleHost();
+    await close(host, 't-1');
+    host.closingOf('t-1')!.purgedAt = new Date('2026-04-01T00:00:00.000Z');
+    host.tenantOf('t-1')!.status = 'SHUT';
+    await expect(host.tenant().lifecycle?.reopen({ tenant: host.tenantOf('t-1')!, by: 'member' })).rejects.toMatchObject({ kind: 'purged', status: 409 });
+    expect(host.tenantOf('t-1')?.status).toBe('SHUT');
   });
 });

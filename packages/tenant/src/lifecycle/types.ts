@@ -44,10 +44,6 @@ export interface TenantClosingRow {
   purgedAt: Date | null;
   afterCloseDoneAt: Date | null;
   afterCloseFailedAt: Date | null;
-  /** The object keys the purge still owes storage (the purge engine reads it; a hand-built table may leave it out). */
-  imageKeysOwed?: string[];
-  /** The image pass that emptied `imageKeysOwed`. */
-  imagesErasedAt?: Date | null;
 }
 
 /** What a close writes into a fresh row. */
@@ -117,9 +113,7 @@ export interface TenantClosingMirror<Tx> {
 export type TenantAuditEvent =
   | { act: 'closeScheduled'; tenantId: string; by: TenantCloseEntry; reason: string; purgeAt: Date; priorStatus: string }
   | { act: 'closeReopened'; tenantId: string; by: TenantCloseEntry; purgeAt: Date | null; restored: string }
-  | { act: 'afterCloseFailed'; tenantId: string; error: string }
-  /** The purge engine erased the tenant: `erased` is every table it emptied, in order. */
-  | { act: 'closePurged'; tenantId: string; purgeAt: Date; erased: readonly string[] };
+  | { act: 'afterCloseFailed'; tenantId: string; error: string };
 
 /** What every notice the lifecycle raises carries. */
 export interface TenantNoticePayload {
@@ -220,7 +214,11 @@ export interface TenantLifecycleConfig<S extends string = string, Tx = unknown> 
   audit(tx: Tx, action: string, event: TenantAuditEvent): Promise<void>;
   /** The current request's locale, for refusals (null: the default pack). */
   locale(): string | null;
-  /** A hook failed after the act committed; the act stands. */
+  /**
+   * A hook failed after the act committed; the act stands. `tenantId` is the
+   * tenant the act was for, and the empty string for an act over every tenant
+   * at once (`purgeImagesLookup`: the image pass's own read of who owes).
+   */
   onError(error: unknown, at: { act: string; tenantId: string }): void;
   /** The expand-and-contract mirror, when the host is moving an older table. */
   mirror?: TenantClosingMirror<Tx>;

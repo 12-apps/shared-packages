@@ -10,6 +10,7 @@ export {
 } from './classify';
 export type {
   TenantPurge,
+  TenantPurgeAuditEvent,
   TenantPurgeConfig,
   TenantPurgeEntry,
   TenantPurgeEraseEntry,

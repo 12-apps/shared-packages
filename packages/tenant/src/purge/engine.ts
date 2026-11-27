@@ -1,9 +1,10 @@
 /**
  * `createTenantPurge`: the purge engine over a tenant that has the lifecycle.
  * It reuses the tenant's `setStatusIf`, `byId`, `port.clearProfile`, tree and
- * `ids.audit.closePurged`, and the lifecycle's `db.table`, `audit`,
- * `invalidate`, `onError` and `sweepBatch`; the purge's own config adds the
- * tables, the raw statements, the host callbacks and storage. Every piece is
+ * `ids.audit.closePurged`, and the lifecycle's `db.table`, `invalidate`,
+ * `onError` and `sweepBatch`; the purge's own config adds the
+ * tables, the raw statements, the host callbacks (its own `audit` among
+ * them) and storage. Every piece is
  * validated before it returns (`TenantConfigError`, the key named).
  *
  * Wire it into the lifecycle with `lifecycle.purge` (in place of

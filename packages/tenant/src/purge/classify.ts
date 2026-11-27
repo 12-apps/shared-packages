@@ -7,9 +7,11 @@
  * Throws ONE error listing every finding:
  * - `<table>: holds a tenant key (<column>) and is in no list`;
  * - `<table>: is in the config but not in the catalogue`;
- * - `<child> <- <parent>`: an erased parent whose delete cascades into a kept
- *   child (a `keepAndStrip` with `heldBy` may cascade into its own holders: it
- *   erases only the rows no holder names);
+ * - `<child> <- <parent>`: a kept child that a delete of an erased table
+ *   reaches by cascade, directly or through tables of no tenant key (`(reached
+ *   from <erased>)` names where it started); the reach is closed to a fixpoint.
+ *   A `keepAndStrip` with `heldBy` may cascade into its own holders: it
+ *   erases only the rows no holder names;
  * - `<child> -> <parent>` (with `restricts`): an erased child after the erased
  *   parent its key restricts, so the parent's delete would fail.
  */
@@ -53,16 +55,52 @@ function unclassified(catalog: TenantPurgeCatalog, steps: ReadonlyMap<string, Te
   });
 }
 
-function cascading(catalog: TenantPurgeCatalog, steps: ReadonlyMap<string, TenantPurgePlanStep>, holders: Map<string, Set<string>>): string[] {
-  const kept = (table: string) => {
-    const action = steps.get(table)?.action;
-    return action === 'keep' || action === 'strip' || action === 'keepHeld';
+type Edge = { child: string; parent: string };
+
+/** Whether `table`'s rows survive the purge (kept, stripped, or held). */
+function keptIn(steps: ReadonlyMap<string, TenantPurgePlanStep>, table: string): boolean {
+  const action = steps.get(table)?.action;
+  return action === 'keep' || action === 'strip' || action === 'keepHeld';
+}
+
+/** An edge the erase's delete never follows: a held table into its own holders (it deletes only rows no holder names). */
+function exempt(holders: Map<string, Set<string>>, edge: Edge): boolean {
+  return holders.get(edge.parent)?.has(edge.child) === true;
+}
+
+/**
+ * Every table a delete of an erased table reaches by cascade, through tables
+ * holding no tenant key too (an erased A, a keyless B, a kept C: deleting A
+ * deletes C's rows), with the erased table each was reached from. A fixpoint
+ * by breadth: a kept table reached is a finding and is not walked past.
+ */
+function reachOf(catalog: TenantPurgeCatalog, steps: ReadonlyMap<string, TenantPurgePlanStep>, holders: Map<string, Set<string>>, erased: readonly string[]): Map<string, string> {
+  const below = new Map<string, Edge[]>();
+  catalog.cascades.forEach((edge) => below.set(edge.parent, [...(below.get(edge.parent) ?? []), edge]));
+  const reached = new Map<string, string>(erased.map((table) => [table, table]));
+  const queue = [...erased];
+  const visit = (from: string, edge: Edge): void => {
+    if (exempt(holders, edge) || reached.has(edge.child)) return;
+    reached.set(edge.child, reached.get(from) ?? from);
+    if (!keptIn(steps, edge.child)) queue.push(edge.child);
   };
-  return catalog.cascades.flatMap(({ child, parent }) => {
-    const action = steps.get(parent)?.action;
-    if (!kept(child) || (action !== 'erase' && action !== 'keepHeld')) return [];
-    if (action === 'keepHeld' && holders.get(parent)?.has(child) === true) return [];
-    return [`${child} <- ${parent}`];
+  while (queue.length > 0) {
+    const table = queue.shift() as string;
+    (below.get(table) ?? []).forEach((edge) => visit(table, edge));
+  }
+  return reached;
+}
+
+/** Every cascade edge into a kept table from a table the erase reaches (`child <- parent`, and its erased origin when indirect). */
+function cascading(catalog: TenantPurgeCatalog, steps: ReadonlyMap<string, TenantPurgePlanStep>, holders: Map<string, Set<string>>, erased: readonly string[]): string[] {
+  const reached = reachOf(catalog, steps, holders, erased);
+  const deleting = new Set(erased);
+  // A kept table the reach met is reported by its own incoming edge, not again for what lies below it.
+  const deletes = (table: string) => reached.has(table) && (deleting.has(table) || !keptIn(steps, table));
+  return catalog.cascades.flatMap((edge) => {
+    const origin = reached.get(edge.parent);
+    if (origin === undefined || !deletes(edge.parent) || !keptIn(steps, edge.child) || exempt(holders, edge)) return [];
+    return [origin === edge.parent ? `${edge.child} <- ${edge.parent}` : `${edge.child} <- ${edge.parent} (reached from ${origin})`];
   });
 }
 
@@ -89,7 +127,7 @@ export function assertPurgeClassification(
   const findings = [
     ...unclassified(catalog, steps, options),
     ...plan.steps.filter((step) => !present.has(step.table)).map((step) => `${step.table}: is in the config but not in the catalogue`),
-    ...cascading(catalog, steps, holdersOf(config)),
+    ...cascading(catalog, steps, holdersOf(config), plan.erased),
     ...blocking(catalog, plan.erased),
   ];
   if (findings.length > 0) {
@@ -111,6 +149,7 @@ function placeholderConfig(options: TenantPurgeClassificationOptions): Record<st
     heldElsewhere: noop,
     beforeErase: [],
     zeroBalances: noop,
+    audit: noop,
     mirrorClosing: noop,
     storage: { discard: noop, members: noop, state: noop },
     parseKey: noop,

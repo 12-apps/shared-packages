@@ -168,7 +168,7 @@ function validateImages(config: Bag): void {
   }
 }
 
-const CALLBACKS = ['revokeCredentials', 'collectImageKeys', 'heldElsewhere', 'zeroBalances', 'mirrorClosing'] as const;
+const CALLBACKS = ['revokeCredentials', 'collectImageKeys', 'heldElsewhere', 'zeroBalances', 'audit', 'mirrorClosing'] as const;
 
 /** The purge's config. Answers the package's own closing table, as `models.resolve` maps it. */
 export function validatePurge(value: unknown): { closings: string } {
@@ -189,7 +189,7 @@ export function validatePurge(value: unknown): { closings: string } {
   return { closings: resolvedAt(scope, 'TenantClosing', 'purge.models.resolve("TenantClosing")') };
 }
 
-const LIFECYCLE_HOOKS = ['audit', 'invalidate', 'onError'] as const;
+const LIFECYCLE_HOOKS = ['invalidate', 'onError'] as const;
 
 /** The lifecycle pieces the engine reuses. */
 export function validatePurgeLifecycle(value: unknown): void {
