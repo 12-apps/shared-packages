@@ -38,6 +38,7 @@ export {
   type TenantLifecycle,
   type TenantLifecycleConfig,
   type TenantLifecycleCopyPack,
+  type TenantLifecyclePurge,
   type TenantNoticePayload,
   type TenantSweepResult,
 } from './types';

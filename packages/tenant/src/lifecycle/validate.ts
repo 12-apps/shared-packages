@@ -110,7 +110,21 @@ function validateBlockers(lifecycle: Bag, hasTree: boolean): void {
   }
 }
 
-const HOOKS = ['confirmDangerousAct', 'afterClose', 'invalidate', 'notify', 'onPurgeDue', 'audit', 'locale', 'onError'] as const;
+const HOOKS = ['confirmDangerousAct', 'afterClose', 'invalidate', 'notify', 'audit', 'locale', 'onError'] as const;
+
+/** Exactly one of `onPurgeDue` and `purge` (the engine, with `run` and `sweepImages`). */
+function validatePurgeHook(lifecycle: Bag): void {
+  if (lifecycle.purge === undefined) {
+    fnAt(lifecycle, 'onPurgeDue', 'lifecycle.onPurgeDue');
+    return;
+  }
+  if (lifecycle.onPurgeDue !== undefined) {
+    throw new TenantConfigError('lifecycle.purge', 'is given with lifecycle.onPurgeDue: pass one or the other');
+  }
+  const purge = bagAt(lifecycle.purge, 'lifecycle.purge');
+  fnAt(purge, 'run', 'lifecycle.purge.run');
+  fnAt(purge, 'sweepImages', 'lifecycle.purge.sweepImages');
+}
 
 const MIRROR = ['replaced', 'event', 'deleted'] as const;
 
@@ -128,6 +142,7 @@ export function validateLifecycle(value: unknown, tags: readonly string[], hasTr
   fnAt(db, 'transaction', 'lifecycle.db.transaction');
   fnAt(db, 'table', 'lifecycle.db.table');
   validateBlockers(value, hasTree);
+  validatePurgeHook(value);
   for (const hook of HOOKS) fnAt(value, hook, `lifecycle.${hook}`);
   if (value.mirror === undefined) return;
   const mirror = bagAt(value.mirror, 'lifecycle.mirror');

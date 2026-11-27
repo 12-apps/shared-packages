@@ -9,9 +9,11 @@
  * (stamped either way; a failure is audited and the sweep retries it), the
  * cache invalidation and the notice.
  *
- * **Reopen**: the row read once, then ONE transaction: closing → the status
- * the close started from (a valid one, else active), the row deleted, the
- * mirror, the audit line. Then the invalidation and the notice.
+ * **Reopen**: ONE transaction: closing → active, the row read AFTER the
+ * move (what a reopen and a re-close landing before it left), a second move
+ * to the status the close started from when that is another live status, the
+ * row deleted, the mirror with THAT row's `requestedAt`, the audit line. Then
+ * the invalidation and the notice.
  */
 import type { TenantStatusSet } from '../config';
 import type { TenantRecord } from '../port';
@@ -20,6 +22,7 @@ import { purgeAtFor, sameTenantName } from './pure';
 import type {
   TenantCloseEntry,
   TenantClosingCreate,
+  TenantClosingRow,
   TenantClosingState,
   TenantLifecycle,
   TenantNoticePayload,
@@ -155,34 +158,73 @@ export async function closeTenant<S extends string, Tx>(
   return { status: statuses.closing, requestedAt: now.toISOString(), purgeAt: purgeAt.toISOString() };
 }
 
+/** The status a reopen restores from a closing row: the close's prior status when it is a live one, else active. */
+function restoredStatus<S extends string, Tx>(context: LifecycleContext<S, Tx>, prior: string | null | undefined): S {
+  const statuses = context.tenant.config.statuses as unknown as TenantStatusSet<S>;
+  return (
+    prior !== null && prior !== undefined && (statuses.all as readonly string[]).includes(prior) && !context.isGone(prior)
+      ? prior
+      : statuses.active
+  ) as S;
+}
+
+/**
+ * The reopen's transaction: closing → active FIRST, then the row read (after
+ * the move, so a reopen and a re-close landing before it are both seen), a
+ * second move only when the close started from another live status (a
+ * platform close of a suspended tenant), the delete, the mirror with THAT
+ * row's `requestedAt`, the audit line. The row is read for the refusal only
+ * when the move failed. A member's reopen costs what it did before.
+ */
+async function reopenInTransaction<S extends string, Tx>(
+  context: LifecycleContext<S, Tx>,
+  input: { tenant: TenantRecord<S>; by: TenantCloseEntry },
+  tx: Tx,
+): Promise<{ row: TenantClosingRow | null; target: S }> {
+  const statuses = context.tenant.config.statuses as unknown as TenantStatusSet<S>;
+  const id = input.tenant.id;
+  const table = await context.table(tx);
+  if (!(await context.tenant.setStatusIf(id, statuses.closing, statuses.active, tx))) {
+    const row = await table.findUnique({ where: { tenantId: id } });
+    throw context.refuse(row?.purgedAt ? 'purged' : 'notClosing');
+  }
+  const current = await table.findUnique({ where: { tenantId: id } });
+  const restored = restoredStatus(context, current?.priorStatus);
+  if (restored !== statuses.active) await context.tenant.setStatusIf(id, statuses.active, restored, tx);
+  await table.deleteMany({ where: { tenantId: id } });
+  await recordReopen(context, input, current, restored, tx);
+  return { row: current, target: restored };
+}
+
+/** The mirror (handed the deleted row's own `requestedAt`) and the audit line, on `tx`. */
+async function recordReopen<S extends string, Tx>(
+  context: LifecycleContext<S, Tx>,
+  input: { tenant: TenantRecord<S>; by: TenantCloseEntry },
+  current: TenantClosingRow | null,
+  restored: S,
+  tx: Tx,
+): Promise<void> {
+  const { config } = context;
+  const id = input.tenant.id;
+  if (config.mirror !== undefined) await config.mirror.deleted(tx, id, current?.requestedAt);
+  await config.audit(tx, context.tenant.config.ids.audit.closeReopened, {
+    act: 'closeReopened',
+    tenantId: id,
+    by: input.by,
+    purgeAt: current?.purgeAt ?? null,
+    restored,
+  });
+}
+
 export async function reopenTenant<S extends string, Tx>(
   context: LifecycleContext<S, Tx>,
   input: { tenant: TenantRecord<S>; by: TenantCloseEntry },
 ): Promise<TenantClosingState<S>> {
   const { config } = context;
   const { ids } = context.tenant.config;
-  const statuses = context.tenant.config.statuses as unknown as TenantStatusSet<S>;
   const id = input.tenant.id;
   const name = context.nameOf(input.tenant, CALLER_RECORD);
-  const row = await (await context.table()).findUnique({ where: { tenantId: id } });
-  const prior = row?.priorStatus ?? null;
-  const target = (
-    prior !== null && (statuses.all as readonly string[]).includes(prior) && !context.isGone(prior) ? prior : statuses.active
-  ) as S;
-  await config.db.transaction(async (tx) => {
-    if (!(await context.tenant.setStatusIf(id, statuses.closing, target, tx))) {
-      throw context.refuse(row?.purgedAt ? 'purged' : 'notClosing');
-    }
-    await (await context.table(tx)).deleteMany({ where: { tenantId: id } });
-    if (config.mirror !== undefined) await config.mirror.deleted(tx, id, row?.requestedAt);
-    await config.audit(tx, ids.audit.closeReopened, {
-      act: 'closeReopened',
-      tenantId: id,
-      by: input.by,
-      purgeAt: row?.purgeAt ?? null,
-      restored: target,
-    });
-  });
+  const { row, target } = await config.db.transaction((tx) => reopenInTransaction(context, input, tx));
   await context.quietly('invalidate', id, () => config.invalidate(id));
   await context.quietly('notify', id, () =>
     config.notify(ids.notifications.reopened, payloadOf(input.tenant, name, row?.purgeAt ?? new Date(), null, null, target)),

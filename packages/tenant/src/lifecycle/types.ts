@@ -196,16 +196,38 @@ export interface TenantLifecycleConfig<S extends string = string, Tx = unknown> 
   invalidate(tenantId: string): Promise<void>;
   /** Raise a notice; true when RECORDED (a reminder is stamped only then). */
   notify(typeId: string, payload: TenantNoticePayload): Promise<boolean>;
-  /** The purge is due: run the host's. `skipped` stamps nothing; `purged` and `already` stamp `purgedAt`. */
-  onPurgeDue(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'skipped'>;
+  /**
+   * The purge is due: run the host's. `skipped` stamps nothing; `purged` and
+   * `already` stamp `purgedAt`. Exactly one of `onPurgeDue` and `purge` is
+   * given: both, or neither, is refused at startup.
+   */
+  onPurgeDue?(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'skipped'>;
+  /**
+   * The package's purge engine (`createTenantPurge`), in place of
+   * `onPurgeDue`: the sweep runs `run` for each due tenant and stamps nothing
+   * itself (the engine stamps `purgedAt` in its own transaction), then the
+   * image pass (`sweepImages`). Referenced lazily, so the engine may be built
+   * after this config.
+   */
+  purge?: TenantLifecyclePurge;
   /** Write one audit line ON `tx`. `action` is `ids.audit[event.act]`. */
   audit(tx: Tx, action: string, event: TenantAuditEvent): Promise<void>;
   /** The current request's locale, for refusals (null: the default pack). */
   locale(): string | null;
-  /** A hook failed after the act committed; the act stands. */
+  /**
+   * A hook failed after the act committed; the act stands. `tenantId` is the
+   * tenant the act was for, and the empty string for an act over every tenant
+   * at once (`purgeImagesLookup`: the image pass's own read of who owes).
+   */
   onError(error: unknown, at: { act: string; tenantId: string }): void;
   /** The expand-and-contract mirror, when the host is moving an older table. */
   mirror?: TenantClosingMirror<Tx>;
+}
+
+/** What the lifecycle's sweep calls on the purge engine (`TenantPurge` satisfies it). */
+export interface TenantLifecyclePurge {
+  run(tenantId: string, at: { now: Date }): Promise<'purged' | 'already' | 'notClosing' | 'notDue' | 'descendantsPending'>;
+  sweepImages(now: Date): Promise<{ emptied: number }>;
 }
 
 /** A tenant's closing state, as an API answers it. */
@@ -223,6 +245,8 @@ export interface TenantSweepResult {
   purged: number;
   /** After-close hooks retried and gone through on this pass. */
   afterCloseRetried: number;
+  /** With `lifecycle.purge`: purged tenants whose owed objects are all gone now. Absent otherwise. */
+  imagesErased?: number;
 }
 
 export interface TenantLifecycle<S extends string = string> {

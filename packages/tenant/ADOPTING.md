@@ -268,7 +268,7 @@ const tenant = createApiTenant({
     afterClose: ({ tenant, node, now }) => …, // throws = failed: stamped, audited, retried by the sweep
     invalidate: (tenantId) => …,
     notify: (typeId, payload) => …,           // resolves true only once RECORDED
-    onPurgeDue: (tenantId, { now }) => …,      // 'purged' | 'already' | 'skipped'
+    onPurgeDue: (tenantId, { now }) => …,      // 'purged' | 'already' | 'skipped'; OR `purge` (the engine, below)
     audit: (tx, action, event) => …,           // on tx; action = ids.audit[event.act]
     locale: () => …, onError: (error, { act, tenantId }) => …,
     mirror,                                   // optional: an older table you are moving (below)
@@ -355,6 +355,124 @@ still null, as the package does. Rows your PREVIOUS release wrote only into
 the old table (during a rolling deploy) are not in `tenant_closings`: before
 each sweep, catch them up with one upsert (`INSERT … SELECT … ON CONFLICT
 (tenant_id) DO UPDATE`), and backfill once with a data-only migration.
+
+### The purge engine (opt-in, on top of the lifecycle)
+
+Additive: a host that keeps `onPurgeDue` boots unchanged. A host that wants the
+package to run its purge builds the engine and passes it as `lifecycle.purge`
+**in place of** `onPurgeDue` (one of the two is required; both are refused).
+
+```ts
+import { createTenantPurge, type TenantPurgeConfig } from '@12-apps/tenant/server';
+
+const purgeConfig: TenantPurgeConfig<Tx> = {
+  keyColumns: ['org_id', 'scope'],                       // every column a row may name the tenant by
+  models: { resolve: (model) => dmmfTable(model) },      // Prisma: `dbName ?? name`; null = unknown
+  tables: [                                              // EVERY table holding a tenant key, ONE action, in erase order
+    { model: 'Patient', key: { column: 'org_id' }, action: 'erase' },
+    { model: 'Setting', key: { column: 'owner_ref', equals: { owner_kind: 'ORG' } }, action: 'erase' },
+    { model: 'Staff', key: { column: 'org_id' }, action: 'keepAndStrip', law: 'a roster names its worker',
+      strip: { set: '"active" = false', when: '"active"' },
+      heldBy: { holders: [{ model: 'Roster', column: 'worker_id', matches: 'user_id' }],
+                children: [{ model: 'StaffRole', column: 'staff_id', references: 'id' }] } },
+    { model: 'ReportLine', key: { through: { model: 'Report', column: 'report_id', references: 'id', key: { column: 'org_id' } } },
+      action: 'keepAndStrip', law: 'the refund', strip: { set: '"photo_key" = NULL', when: '"photo_key" IS NOT NULL' } },
+    { model: 'Visit', key: { column: 'org_id' }, action: 'keep', law: 'medical record' },
+    { table: 'monthly_rollup', action: 'keep', law: 'platform rule' }, // a raw table: only ever kept
+  ],
+  db: { transaction, execute: (sql, params, tx) => …, query: (sql, params, tx) => … }, // one statement each; autocommit with no tx
+  revokeCredentials: (tx, tenantId) => …,  // idempotent: a resumed run calls it again
+  collectImageKeys: (tenantId) => …,       // every object key the tenant's rows name (archived ones too)
+  heldElsewhere: (tenantId, keys) => …,    // of these legacy keys, the ones ANOTHER tenant holds: ONE call per run
+  beforeErase: [(tenantId, { now }) => …], // in order, outside any transaction; a throw stops the run
+  zeroBalances: (tx, tenantId) => …,       // once per purge, by the run that stamped purged_at
+  audit: (tx, action, event) => …,         // the purge's ONE line, on tx; event: TenantPurgeAuditEvent (its own type)
+  mirrorClosing: (tx, tenantId, { purgedAt?, imageKeysOwed?, imagesErasedAt? }) => …, // your older table, until the contract release:
+                                           // SET each field as given (imageKeysOwed is the whole list after the write, not keys to add)
+  storage: { discard, members, state },    // `state` answers 'present' | 'absent' | 'unknown'
+  parseKey: (key) => parseObjectKey(key, prefix), // @12-apps/storage's grammar, bound to your prefix
+  unscopedKeys: 'accept',                  // as your storage mount chose it
+  imageChunk: 25,
+};
+const purge = createTenantPurge(tenant, lifecycleConfig, purgeConfig);
+// lifecycleConfig.purge = { run: (id, at) => purge.run(id, at), sweepImages: (now) => purge.sweepImages(now) }
+```
+
+- **Every piece is required** and validated at `createTenantPurge`
+  (`TenantConfigError`, `purge.zeroBalances`, `purge.tables[3].model`…). A
+  model that `models.resolve` does not know, a key column `keyColumns` does
+  not list, a raw `table` on anything but `keep`, a table named twice, and an
+  unresolvable `TenantClosing` (the package's own table, resolved the same
+  way) are refused. The engine names no table or column of yours.
+- **One run** (`purge.run(tenantId, { now })`, answering `purged`, `already`,
+  `notClosing`, `notDue` or `descendantsPending`):
+  0. with a tree, the descendants (ONE read) and, when all are closed, their
+     closing rows (ONE read): a unit not purged answers `descendantsPending`
+     before anything is written, so the parent stays closing, and
+     restorable, until every unit below it is purged;
+  1. one transaction: the status CAS closing → closed FIRST, the closing row
+     read AFTER it (a reopen and a re-close landing before it are seen: a
+     purge is never early; a row not due rolls the flip back), then
+     `port.clearProfile` (only on the flip) and `revokeCredentials`. A CAS
+     that moved nothing on a closed tenant is a run that stopped half way, and
+     resumes;
+  2. one transaction: the collected keys in the tenant's scope (legacy ones
+     another tenant holds dropped) ADDED to `image_keys_owed`, mirrored;
+  3. `beforeErase`, then the erase: per `erase` entry one `DELETE`, per
+     `keepAndStrip` with `heldBy` one `DELETE` per child, the strip and one
+     `DELETE` (`children + 2`), then every `keepAndStrip` without `heldBy`
+     (one `UPDATE` each), autocommit, in order;
+  4. one transaction: `purged_at` stamped where still null FIRST; a stamp that
+     moved no row answers `already` and writes nothing else (two overlapping
+     runs never zero twice); then `mirrorClosing`, `zeroBalances` and the
+     purge config's own `audit` with `TenantPurgeAuditEvent`
+     `{ act: 'closePurged', tenantId, purgeAt, erased }` (`erased`: the
+     `erase` and held tables, in order). It is NOT a member of the
+     lifecycle's `TenantAuditEvent`, so your exhaustive switch over that union
+     keeps compiling;
+  5. `invalidate`, quietly.
+- **Strip SQL** is over the table's own columns: `$1` is the tenant id and
+  `$2…` are `strip.values()` (each read when its statement runs, so once per
+  strip statement per run; each MUST be referenced). A key's `equals` are bound after them, never spliced.
+- **The image pass** (`purge.eraseOwedImages(id, { now, storage? })`, and
+  `purge.sweepImages(now)`, which the lifecycle's sweep runs after its
+  purges): only once `purged_at` committed; per chunk, `discard`, then
+  `state` of every member; a key is dropped only when every member is
+  `absent`. `unknown` keeps it owed and a throw stops the pass: the next
+  sweep is the retry. One `UPDATE … EXCEPT` with the mirror; `images_erased_at`
+  only on the emptying pass. Never throws: it answers the keys still owed,
+  0 when none (or the tenant is not purged), and -1 when its closing row
+  could not be read (reported to `onError`). The row is read by the engine's
+  own `db.query`, so your lifecycle table adapter need not return the image
+  columns.
+- **With `lifecycle.purge` the sweep stamps nothing itself** and its result
+  carries `imagesErased`; a failure of the pass's own lookup reaches
+  `onError` as `{ act: 'purgeImagesLookup', tenantId: '' }` (no tenant).
+  `reopen` now moves closing → active FIRST and reads the closing row INSIDE
+  its transaction, after the move, handing `mirror.deleted` THAT row's
+  `requestedAt`; a close that started from another live status (a platform
+  close of a suspended tenant) takes a second move to it. A member's reopen
+  costs what it did (move, read, delete, audit); the row is read for the
+  refusal code only when the move failed.
+- **Statement budget** (steps as numbered above): 0 = 1 read (+1 when every
+  descendant is closed); 1 = 6 on a flip (CAS, row, `clearProfile`, your
+  revocations), CAS + status + row + revocations on a resume, at most 3
+  (+tree) on `already`/`notDue`/`notClosing`; 2 = your collect + your
+  `heldElsewhere` (only with a legacy key) + 2, or your collect alone with no
+  key; 3 = your hooks + the plan's statements; 4 = 3 + your `zeroBalances`; the
+  image pass = 3 per tenant, plus one lookup per sweep.
+- **Classification, in your tests**: `assertPurgeClassification(catalog,
+  purgeConfig, { keyColumns, notATenantKey })` throws one error naming every
+  finding: a table with a key column in no list, a configured table the
+  catalogue lacks, a kept table a delete of an erased one reaches by cascade,
+  directly or through tables of no tenant key, closed to a fixpoint
+  (`child <- parent`, `(reached from <erased>)` when indirect; a held table
+  may cascade into its own holders, never past them), and, with
+  `restricts`, an erased child after the parent it restricts. Read the
+  catalogue yourself (a schema scan, or `information_schema` and
+  `pg_constraint` of the real database).
+- **No migration**: the engine writes `purged_at`, `image_keys_owed` and
+  `images_erased_at`, which 1.0's `tenant_closings` already has.
 
 ### Custom domains (opt-in)
 

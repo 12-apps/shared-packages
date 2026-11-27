@@ -21,6 +21,7 @@ import { validateCoreConfig, validatePort, validateSlugs, validateTreePort } fro
 import { createTenantLifecycle, type TenantLifecycle, type TenantLifecycleConfig } from '../lifecycle';
 
 export * from '../lifecycle';
+export * from '../purge';
 import {
   createApiTenantDomains,
   validateDomains,
