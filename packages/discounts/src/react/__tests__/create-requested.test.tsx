@@ -46,6 +46,15 @@ function surface(transport: DiscountsTransport) {
 
 const TITLE = PT_BR_DISCOUNTS_WEB_COPY.form.createTitle;
 
+/**
+ * The dialog's surface is `UsableModal`'s lazily imported chunk, behind a
+ * `Suspense` with no fallback: until the worker's first import of it resolves
+ * there is no `role="dialog"` at all. On a loaded runner that import took past
+ * `findBy`'s 1 s default and reddened `main` once (FUT-5685), the same bound
+ * the other surface-opening suites here already wait with.
+ */
+const SURFACE_LOADED = { timeout: 10_000 };
+
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   const parts: { resolve?: () => void } = {};
   const promise = new Promise<void>((resolve) => {
@@ -95,14 +104,14 @@ describe("the host's create request", () => {
   it("opens the Novo desconto dialog once and reports it once", async () => {
     const handled = vi.fn();
     mount(surface(transportOf()).Screen, handled);
-    expect(await screen.findByRole("dialog", { name: TITLE })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: TITLE }, SURFACE_LOADED)).toBeTruthy();
     await waitFor(() => expect(handled).toHaveBeenCalledTimes(1));
   });
 
   it("does not reopen nor report again while the request stays true", async () => {
     const handled = vi.fn();
     mount(surface(transportOf()).Screen, handled);
-    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }), { key: "Escape" });
+    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }, SURFACE_LOADED), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
     // Effects flush inside the click's act: a reopening would show by now.
     fireEvent.click(screen.getByRole("button", { name: "rerender" }));
@@ -113,11 +122,11 @@ describe("the host's create request", () => {
   it("opens again for a new request once the host dropped the first", async () => {
     const handled = vi.fn();
     mount(surface(transportOf()).Screen, handled);
-    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }), { key: "Escape" });
+    fireEvent.keyDown(await screen.findByRole("dialog", { name: TITLE }, SURFACE_LOADED), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "drop" }));
     fireEvent.click(screen.getByRole("button", { name: "ask" }));
-    expect(await screen.findByRole("dialog", { name: TITLE })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: TITLE }, SURFACE_LOADED)).toBeTruthy();
     await waitFor(() => expect(handled).toHaveBeenCalledTimes(2));
   });
 
@@ -129,7 +138,7 @@ describe("the host's create request", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: TITLE })).toBeNull());
     expect(handled).not.toHaveBeenCalled();
     gate.resolve();
-    expect(await screen.findByRole("dialog", { name: TITLE })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: TITLE }, SURFACE_LOADED)).toBeTruthy();
     await waitFor(() => expect(handled).toHaveBeenCalledTimes(1));
   });
 
