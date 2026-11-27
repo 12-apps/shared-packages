@@ -102,6 +102,8 @@ describe("iFood PLACED by id → fetched → ingested (FUT-5800)", () => {
     expect(read?.url).toBe(ORDER_URL);
     expect(read?.headers.Authorization).toBe("Bearer tok-1");
     expect(inboxRow(h, "evt-plc-1")?.status).toBe("PROCESSED");
+    // A success lifts only a FAILED stamp: an unverified connection stays as it was.
+    expect(integrationStatus(h)).toBe("UNVERIFIED");
     const order = h.created[0]!.order;
     expect(order).toMatchObject({
       provider: "IFOOD",
@@ -214,8 +216,9 @@ describe("iFood PLACED by id → fetched → ingested (FUT-5800)", () => {
 
     expect(await h.engine.retryable()).toEqual([]);
     expect(inboxRow(h, "evt-plc-1")).toMatchObject({ status: "FAILED" });
-    // Bounded: never more reads than the inbox's attempt bound allows.
-    expect(gets(http).length).toBeLessThanOrEqual(5);
+    // The job's own read, then the sweep's re-reads until the bound: each pass
+    // spends two of the row's five attempts (the re-queue and the failed read).
+    expect(gets(http)).toHaveLength(3);
   });
 
   it("[F9] a 401 forgets the token and reads once more with a new one", async () => {
@@ -281,5 +284,48 @@ describe("iFood PLACED by id → fetched → ingested (FUT-5800)", () => {
 
     expect(await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT)).toMatchObject({ kind: "skipped" });
     expect(h.created).toEqual([]);
+  });
+
+  it("[F14] a refusal of credentials replaced during the call leaves the new ones unjudged", async () => {
+    const holder: Harness[] = [];
+    const http = scriptedHttp(async (request) => {
+      if (request.url.endsWith("/oauth/token")) return { status: 200, body: JSON.stringify({ accessToken: "tok", expiresIn: 3600 }) };
+      // The store re-enters its credentials while iFood is refusing the old ones.
+      await holder[0]!.engine.saveIntegration({
+        clientId: TENANT,
+        provider: "IFOOD",
+        credentials: { clientId: "new-id", clientSecret: "new-secret", webhookSecret: null },
+      });
+      return { status: 401, body: "unauthorized" };
+    });
+    const h = await connected(http);
+    holder.push(h);
+    await deliverIfood(h, ifoodPlacedById());
+
+    expect(await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT)).toMatchObject({ kind: "failed" });
+
+    expect(integrationStatus(h)).toBe("UNVERIFIED");
+    expect(inboxRow(h, "evt-plc-1")?.status).toBe("FAILED");
+  });
+
+  it("[F15] the next fetch that succeeds lifts the FAILED stamp", async () => {
+    const http = ifoodApi({
+      order: (request) =>
+        request.headers.Authorization === "Bearer tok-1" || request.headers.Authorization === "Bearer tok-2"
+          ? { status: 401, body: "unauthorized" }
+          : { status: 200, body: JSON.stringify(ifoodDocumentedOrder()) },
+    });
+    const h = await connected(http);
+    await deliverIfood(h, ifoodPlacedById());
+    await h.engine.runFetchOrder(fetchJobs(h)[0]!, ATTEMPT);
+    expect(integrationStatus(h)).toBe("FAILED");
+    const publishedBefore = h.published.length;
+
+    await deliverIfood(h, { ...ifoodPlacedById(), id: "evt-plc-2" });
+    expect(await h.engine.runFetchOrder(fetchJobs(h)[1]!, ATTEMPT)).toMatchObject({ kind: "ingested" });
+
+    expect(integrationStatus(h)).toBe("VERIFIED");
+    expect(h.memory.tables.marketplaceIntegration.rows[0]?.lastVerifiedAt).toEqual(h.clock.at);
+    expect(h.published.length).toBeGreaterThan(publishedBefore);
   });
 });

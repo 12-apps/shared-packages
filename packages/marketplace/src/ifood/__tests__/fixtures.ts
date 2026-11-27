@@ -37,7 +37,7 @@ export function ifoodPlacedWithMoney() {
   };
 }
 
-/** The documented iFood test merchant and order of the FUT-5800 fixtures (invented ids, no real data). */
+/** The merchant and order of the FUT-5800 fixtures: invented ids, no real data. */
 export const IFOOD_MERCHANT = "6b487a27-c4fc-4f26-b05e-3967c2331882";
 export const IFOOD_ORDER_ID = "a1b2c3d4-0000-4000-8000-000000005800";
 

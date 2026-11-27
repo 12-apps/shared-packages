@@ -357,44 +357,33 @@ export async function readOutboundConnection(
   clientId: string,
   provider: MarketplaceProvider,
 ): Promise<OutboundConnection | null> {
+  return (await readSealedOutboundConnection(ctx, clientId, provider))?.connection ?? null;
+}
+
+/**
+ * {@link readOutboundConnection}, with the sealed blob it was opened from: a
+ * caller that stamps the connection afterwards (`./fetch-order.ts`) guards
+ * the stamp on it, so a call made with credentials since replaced never
+ * judges the new ones. The blob never reaches an adapter.
+ */
+export async function readSealedOutboundConnection(
+  ctx: EngineContext,
+  clientId: string,
+  provider: MarketplaceProvider,
+): Promise<{ connection: OutboundConnection; sealed: string } | null> {
   const db = await ctx.ports.db();
   const row = (await db.marketplaceIntegration.findUnique({
     where: { clientId_provider: { clientId, provider } },
     select: { environment: true, credentials: true, authMode: true },
   })) as { environment: string; credentials: string; authMode?: string } | null;
   if (!row || row.credentials === "") return null;
+  const sealed = row.credentials;
   const environment = environmentOf(row.environment);
-  if (row.authMode !== "LINKED") return { environment, credentials: openCredentials(ctx, row.credentials) };
+  if (row.authMode !== "LINKED") return { connection: { environment, credentials: openCredentials(ctx, sealed) }, sealed };
   // Linked: the software's app speaks for the store, with the store's refresh token.
   const app = await appCredentialsOf(ctx, provider, environment);
   if (!app) throw new Error(`No app credentials are configured for ${provider}.`);
-  const refreshToken = openLinkRefreshToken(ctx, row.credentials);
-  const link = { clientId, provider, environment, refreshToken, app, sealed: row.credentials };
-  return { environment, credentials: app, grant: linkGrant(ctx, link) };
-}
-
-/**
- * The marketplace refused this connection's credentials on a call no person
- * made (the order fetch, FUT-5800): the connection reads FAILED, which is what
- * the connections screen shows, and the staff surfaces are told. Re-entering
- * the credentials resets it to UNVERIFIED. Best-effort: never throws.
- */
-export async function markCredentialsRefused(
-  ctx: EngineContext,
-  clientId: string,
-  provider: MarketplaceProvider,
-): Promise<void> {
-  try {
-    const db = await ctx.ports.db();
-    const { count } = await db.marketplaceIntegration.updateMany({
-      where: { clientId, provider, archivedAt: null },
-      data: { status: "FAILED" },
-    });
-    if (count > 0) ctx.ports.publishChanged(clientId);
-  } catch (error) {
-    ctx.ports.logger.error(
-      `marketplace: ${provider} connection of ${clientId} not marked FAILED: ` +
-        (error instanceof Error ? error.message : String(error)),
-    );
-  }
+  const refreshToken = openLinkRefreshToken(ctx, sealed);
+  const link = { clientId, provider, environment, refreshToken, app, sealed };
+  return { connection: { environment, credentials: app, grant: linkGrant(ctx, link) }, sealed };
 }

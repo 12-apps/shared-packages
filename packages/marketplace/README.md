@@ -225,14 +225,15 @@ body fields and reason codes come from the portal's search snippets
 They live only in `src/ifood/outbound.ts` and `src/ifood/copy.ts`, whose
 headers say so, so the homologation run corrects two files.
 
-The order read (FUT-5800) is the exception, run against the sandbox on
-2026-11-27: iFood's events carry only the order id (`{ id, code, fullCode,
-orderId, merchantId, createdAt }`), so a PLACED with no items is fetched with
-`GET /order/v1.0/orders/{id}` by the `marketplace.fetch-order` job and ingested
-like a PLACED carrying its body (`src/ifood/fetch-order.ts`). A 404 right after
-the PLACED is retried (ESTIMATED: not yet served). Webhook only: the software
-is one centralized iFood app, so the adapter does not poll iFood's events
-(FUT-5798). Tests never reach
+The order read (FUT-5800) is partly verified. Only the EVENT shape was seen in
+the sandbox (2026-11-27): iFood's events carry only the order id (`{ id, code,
+fullCode, orderId, merchantId, createdAt }`), so a PLACED with no items is
+fetched with `GET /order/v1.0/orders/{id}` by the `marketplace.fetch-order` job
+and ingested like a PLACED carrying its body (`src/ifood/fetch-order.ts`). The
+order body's field names are still the documented ones, not yet checked against
+a real sandbox order. A 404 right after the PLACED is retried (ESTIMATED: not
+yet served). Webhook only: the software is one centralized iFood app, so the
+adapter does not poll iFood's events (FUT-5798). Tests never reach
 iFood: the HTTP client is the host's port.
 
 ## Linking a store through the software's own app (FUT-5613)
