@@ -35,7 +35,7 @@ interface Tx {
 type Row = TenantDataExportRow;
 
 /** Thrown by the fake table on a second PREPARING row of one tenant. */
-export class UniqueViolation extends Error {}
+class UniqueViolation extends Error {}
 
 function compare(value: unknown, bound: unknown): number {
   const left = value instanceof Date ? value.getTime() : (value as number);
@@ -58,7 +58,7 @@ function fieldMatches(value: unknown, expected: unknown): boolean {
 }
 
 /** Prisma's `where`, for the keys the engine writes. */
-export function matches(row: Row, where: TenantDataExportWhere | Record<string, unknown>): boolean {
+function matches(row: Row, where: TenantDataExportWhere | Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, expected]) => {
     if (expected === undefined) return true;
     if (key === 'OR') return (expected as Record<string, unknown>[]).some((branch) => matches(row, branch));
@@ -67,7 +67,7 @@ export function matches(row: Row, where: TenantDataExportWhere | Record<string, 
 }
 
 /** Prisma's `data`: values set, `attempts` incremented. */
-export function applied(row: Row, data: TenantDataExportUpdate): Row {
+function applied(row: Row, data: TenantDataExportUpdate): Row {
   const { attempts, ...set } = data;
   return { ...row, ...set, attempts: attempts === undefined ? row.attempts : row.attempts + 1 };
 }
@@ -92,14 +92,14 @@ export function exportRow(overrides: Partial<Row> = {}): Row {
 }
 
 /** Read a stream whole: the fake archive port keeps the bytes it was given. */
-export async function bytesOf(body: Readable): Promise<Buffer> {
+async function bytesOf(body: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of body as AsyncIterable<Buffer>) chunks.push(Buffer.from(chunk));
   return Buffer.concat(chunks);
 }
 
 /** Two small sections: a whole file and a CSV of two pages. */
-export function clinicSections(): TenantExportSection[] {
+function clinicSections(): TenantExportSection[] {
   return [
     { kind: 'file', name: 'catalogue.csv', data: async () => 'code,name\r\nX1,Consult\r\n' },
     {

@@ -96,13 +96,13 @@ function validateLimits(value: unknown): void {
 /** The export's sentences: every key, for every tag of the base copy. */
 function validateCopy(value: unknown, tags: readonly string[]): void {
   const locales = bagAt(bagAt(value, 'export.copy').locales, 'export.copy.locales');
-  for (const tag of tags) {
-    const pack = bagAt(locales[tag], `export.copy.locales.${tag}`);
-    for (const copyKey of TENANT_EXPORT_COPY_KEYS) {
-      const key = `export.copy.locales.${tag}.${copyKey}`;
-      present(pack[copyKey], key);
-      if (typeof pack[copyKey] !== 'function') throw new TenantConfigError(key, 'must be a function that writes the whole name');
-    }
+  const packs = new Map(tags.map((tag) => [tag, bagAt(locales[tag], `export.copy.locales.${tag}`)]));
+  const sentences = tags.flatMap((tag) => TENANT_EXPORT_COPY_KEYS.map((copyKey) => [tag, copyKey] as const));
+  for (const [tag, copyKey] of sentences) {
+    const key = `export.copy.locales.${tag}.${copyKey}`;
+    const sentence = packs.get(tag)?.[copyKey];
+    present(sentence, key);
+    if (typeof sentence !== 'function') throw new TenantConfigError(key, 'must be a function that writes the whole name');
   }
 }
 

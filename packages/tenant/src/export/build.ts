@@ -86,7 +86,7 @@ async function writeSection(zip: ZipWriter, section: TenantExportSection, at: Te
 }
 
 /** Write every section into `zip`, in order. */
-export async function writeArchive(zip: ZipWriter, sections: readonly TenantExportSection[], at: TenantExportContext): Promise<void> {
+async function writeArchive(zip: ZipWriter, sections: readonly TenantExportSection[], at: TenantExportContext): Promise<void> {
   for (const section of sections) await writeSection(zip, section, at);
 }
 

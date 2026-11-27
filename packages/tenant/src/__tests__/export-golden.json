@@ -1,5 +1,5 @@
 {
-  "$comment": "Bytes written by the extracted host writer (zip.ts sha256 db200481…d82769, csvLine/csvHeader/defused of sections.ts at future-pay 95bdd84d) for these sections: the golden the engine must reproduce.",
+  "$comment": "Bytes written by the extracted host writer (zip.ts sha256 db200481…d82769, csvLine/csvHeader/defused of its sections.ts, origin host commit 95bdd84d) for these sections: the golden the engine must reproduce.",
   "input": {
     "catalog": {
       "name": "catálogo.csv",
