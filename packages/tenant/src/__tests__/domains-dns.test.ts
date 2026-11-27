@@ -34,6 +34,14 @@ describe('hostnames', () => {
     expect(draftHostname('https://Acme.com/x')).toBe('acme.com');
     expect(draftHostname('acme')).toBeNull();
   });
+
+  it('cuts the path at the first slash, a run of slashes included', () => {
+    expect(hostnameOrNull('acme.com/a/b/c')).toBe('acme.com');
+    expect(hostnameOrNull('acme.com.//x')).toBe('acme.com');
+    const slashes = `/${'/'.repeat(100_000)}x`;
+    expect(hostnameOrNull(slashes)).toBeNull();
+    expect(draftHostname(`acme.com${slashes}`)).toBe('acme.com');
+  });
 });
 
 describe('zones and pairs', () => {

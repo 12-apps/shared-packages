@@ -10,12 +10,15 @@ const HOSTNAME_RE = /^(?=.{4,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]
 
 /** What a person pastes (case, a scheme, a path, a trailing dot) reduced to the bare name. */
 function stripped(raw: string): string {
-  return raw
+  const noScheme = raw
     .trim()
     .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '')
-    .replace(/\.$/, '');
+    .replace(/^https?:\/\//, '');
+  // Everything from the first slash on is a path. A cut, not a `/\/.*$/`
+  // replace, which backtracks polynomially on a run of slashes (CodeQL).
+  const slash = noScheme.indexOf('/');
+  const host = slash === -1 ? noScheme : noScheme.slice(0, slash);
+  return host.replace(/\.$/, '');
 }
 
 /** The input reduced to the stored hostname, or null when it is not one. */
