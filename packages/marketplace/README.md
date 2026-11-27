@@ -45,7 +45,7 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | **SKU map** | External SKU → host catalog id, every SKU ever seen a row; mapping checks the id is the tenant's. A link may name ONE variation of that id (`variationId`): the host's optional `order.catalogHasVariation` checks it belongs, and ingest hands it on the line as `variationRef` beside `subjectRef`. Without a variation the SKU maps to the item alone, as before. |
 | **Integration settings** | Enabled, environment, merchant id, auto-accept, acknowledgement window; credentials sealed as one blob by the host's secrets port, never returned. A connection is archived (reversible, audited), never deleted. |
 | **Outbound engine** | The `marketplace.outbound` job: confirm after accept (with the preparation time where the marketplace takes one), cancellation request with the stored reason code and SKUs. 2xx done; a 4xx other than 408/425/429 refused and final; anything else retried until the last attempt, which ends FAILED whatever went wrong. Stamps `confirmed_at`, `confirm_failed_at`, `cancellation_status` (PENDING, REQUESTED, CONFIRMED, FAILED). Idempotent by the row. Queued BEFORE the host's half runs, and the `marketplace.outbound-sweep` job re-queues every call still owed, so nothing is lost. The same sweep fails a request still waiting (never delivered, or delivered and unanswered) as TIMEOUT once past its answer window, and its retries stop (the adapter's `cancellationAnswerWindowMs`, or the engine's `cancellationWindowMs`), so no request waits forever. |
-| **Order fetch** | For a marketplace whose events name an order without carrying it (Open Delivery's `CREATED`), the adapter marks the event `orderToFetch`: the webhook records it PENDING and queues `marketplace.fetch-order`, which calls the adapter's `fetchOrder` and ingests through the same ingest path. No request calls out; the reconciliation sweep re-queues a row still owed, and a host that holds the job holds every fetch. |
+| **Order fetch** | For a marketplace whose events name an order without carrying it (Open Delivery's `CREATED`, iFood's `PLACED`, FUT-5800), the adapter marks the event `orderToFetch`: the webhook records it PENDING and queues `marketplace.fetch-order`, which calls the adapter's `fetchOrder` and ingests through the same ingest path. No request calls out; the reconciliation sweep re-queues a row still owed, and a host that holds the job holds every fetch. A fetch our credentials are refused on (an `own` 4xx) is not retried by the queue and stamps the connection FAILED. Contract: [ADOPTING.md §11](./ADOPTING.md#11-ifood-the-order-fetched-after-placed-fut-5800). |
 | **Inbound outcomes** | A marketplace CANCELLED confirms a pending request; CANCELLATION_REQUEST_FAILED marks it FAILED; CONFIRMED is terminal. |
 | **Catalogue publishing** | A store turns a product ON or OFF per connected marketplace, with an optional price for that marketplace. One row per (store, marketplace, product): PUBLISHING → PUBLISHED, WITHDRAWING → WITHDRAWN, FAILED with a failure code (and the marketplace's own words for a refusal). The `marketplace.catalogue` job makes the call; the sweep re-queues what is owed. Push or pull is the adapter's. See [Catalogue publishing](#catalogue-publishing). |
 | **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, `capabilities`, and the optional `fetchOrder`, `catalogue` and `catalogueReader`. |
@@ -223,7 +223,16 @@ body fields and reason codes come from the portal's search snippets
 (2026-11-11). (Its Catalog module's pages were read whole on 2026-11-13: see
 [Catalogue publishing](#catalogue-publishing).)
 They live only in `src/ifood/outbound.ts` and `src/ifood/copy.ts`, whose
-headers say so, so the homologation run corrects two files. Tests never reach
+headers say so, so the homologation run corrects two files.
+
+The order read (FUT-5800) is the exception, run against the sandbox on
+2026-11-27: iFood's events carry only the order id (`{ id, code, fullCode,
+orderId, merchantId, createdAt }`), so a PLACED with no items is fetched with
+`GET /order/v1.0/orders/{id}` by the `marketplace.fetch-order` job and ingested
+like a PLACED carrying its body (`src/ifood/fetch-order.ts`). A 404 right after
+the PLACED is retried (ESTIMATED: not yet served). Webhook only: the software
+is one centralized iFood app, so the adapter does not poll iFood's events
+(FUT-5798). Tests never reach
 iFood: the HTTP client is the host's port.
 
 ## Linking a store through the software's own app (FUT-5613)
