@@ -37,6 +37,60 @@ function readingsHandler(push: (event: ScaleEvent) => void, settleSamples: numbe
   return { accept, resetSamples: () => { consecutive = 0; } };
 }
 
+async function connect(options: {
+  transport: ByteTransport;
+  profile: ScaleProfile;
+  signal: AbortSignal;
+  onOpen(): void;
+  silenceMs: number;
+  samples: ReturnType<typeof readingsHandler>;
+  push(event: ScaleEvent): void;
+}) {
+  const { transport, profile, signal, onOpen, silenceMs, samples, push } = options;
+  const controller = new AbortController();
+  const disconnect = () => controller.abort();
+  signal.addEventListener("abort", disconnect, { once: true });
+  const parser = profile.createParser();
+  let lastReadingAt = Date.now();
+  let wasSilent = false;
+  const unsubscribeData = transport.onData((bytes) => {
+    for (const reading of parser.push(bytes)) {
+      if (controller.signal.aborted) return;
+      const previousReadingAt = lastReadingAt;
+      lastReadingAt = Date.now();
+      wasSilent = false;
+      if (Date.now() - previousReadingAt >= silenceMs) samples.resetSamples();
+      samples.accept(reading);
+    }
+  });
+  const unsubscribeClose = transport.onClose(disconnect);
+  try {
+    await runIo(() => transport.open(profile.serial), controller.signal, 15_000);
+    if (signal.aborted || controller.signal.aborted) return;
+    onOpen();
+    lastReadingAt = Date.now();
+    const { request } = profile;
+    const interval = request.kind === "poll" ? request.intervalMs : 100;
+    while (!controller.signal.aborted) {
+      const startedAt = Date.now();
+      const durationMs = startedAt - lastReadingAt;
+      if (durationMs >= silenceMs && !wasSilent) {
+        wasSilent = true;
+        samples.resetSamples();
+        push({ kind: "silent", durationMs });
+      }
+      if (request.kind === "poll") await runIo(() => transport.write(request.bytes), controller.signal, 1500);
+      await delay(Math.max(0, interval - (Date.now() - startedAt)), controller.signal);
+    }
+  } finally {
+    samples.resetSamples();
+    unsubscribeData();
+    unsubscribeClose();
+    signal.removeEventListener("abort", disconnect);
+    await closeTransport(transport);
+  }
+}
+
 export function createScale(options: ReaderOptions): ScaleReader {
   const { transport, registry, profile } = options;
   const settleSamples = options.settleSamples ?? 2;
@@ -54,51 +108,6 @@ export function createScale(options: ReaderOptions): ScaleReader {
   const samples = readingsHandler(push, settleSamples);
   let current: { control: AbortController; run: Promise<void> } | undefined;
 
-  async function connection(activeProfile: ScaleProfile, signal: AbortSignal, onOpen: () => void) {
-    const controller = new AbortController();
-    const disconnect = () => controller.abort();
-    signal.addEventListener("abort", disconnect, { once: true });
-    const parser = activeProfile.createParser();
-    let lastReadingAt = Date.now();
-    let wasSilent = false;
-    const unsubscribeData = transport.onData((bytes) => {
-      for (const reading of parser.push(bytes)) {
-        if (controller.signal.aborted) return;
-        const previousReadingAt = lastReadingAt;
-        lastReadingAt = Date.now();
-        wasSilent = false;
-        if (Date.now() - previousReadingAt >= silenceMs) samples.resetSamples();
-        samples.accept(reading);
-      }
-    });
-    const unsubscribeClose = transport.onClose(disconnect);
-    try {
-      await runIo(() => transport.open(activeProfile.serial), controller.signal, 15_000);
-      if (signal.aborted || controller.signal.aborted) return;
-      onOpen();
-      lastReadingAt = Date.now();
-      const { request } = activeProfile;
-      const interval = request.kind === "poll" ? request.intervalMs : 100;
-      while (!controller.signal.aborted) {
-        const startedAt = Date.now();
-        const durationMs = startedAt - lastReadingAt;
-        if (durationMs >= silenceMs && !wasSilent) {
-          wasSilent = true;
-          samples.resetSamples();
-          push({ kind: "silent", durationMs });
-        }
-        if (request.kind === "poll") await runIo(() => transport.write(request.bytes), controller.signal, 1500);
-        await delay(Math.max(0, interval - (Date.now() - startedAt)), controller.signal);
-      }
-    } finally {
-      samples.resetSamples();
-      unsubscribeData();
-      unsubscribeClose();
-      signal.removeEventListener("abort", disconnect);
-      await closeTransport(transport);
-    }
-  }
-
   async function run(signal: AbortSignal): Promise<void> {
     let reportedDisconnect = false;
     const onOpen = () => {
@@ -108,7 +117,7 @@ export function createScale(options: ReaderOptions): ScaleReader {
     while (!signal.aborted) {
       try {
         selected ??= await registry.detect(transport, signal);
-        if (selected && !signal.aborted) await connection(selected, signal, onOpen);
+        if (selected && !signal.aborted) await connect({ transport, profile: selected, signal, onOpen, silenceMs, samples, push });
       } catch {
         // A missing or unplugged device is retried through the transport.
       }

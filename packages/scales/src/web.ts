@@ -14,6 +14,23 @@ function usbIds(port: WebSerialPort): UsbIds | undefined {
   if (usbVendorId !== undefined && usbProductId !== undefined) return { vendorId: usbVendorId, productId: usbProductId };
 }
 
+async function pump(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  deliver: (bytes: Uint8Array) => void,
+): Promise<void> {
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      deliver(result.value);
+    }
+  } catch {
+    // Removal rejects a pending read and must follow the same close path.
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function createWebSerialTransport(port: WebSerialPort): ByteTransport {
   const data = new Set<(bytes: Uint8Array) => void>();
   const closed = new Set<() => void>();
@@ -24,21 +41,6 @@ export function createWebSerialTransport(port: WebSerialPort): ByteTransport {
   let generation = 0;
   let opened = false;
   let closing = false;
-  async function pump(active: ReadableStreamDefaultReader<Uint8Array>) {
-    try {
-      while (true) {
-        const result = await active.read();
-        if (result.done) break;
-        for (const listener of data) listener(result.value);
-      }
-    } catch {
-      // Removal rejects a pending read and must follow the same close path.
-    } finally {
-      active.releaseLock();
-      reader = undefined;
-      if (!closing) for (const listener of closed) listener();
-    }
-  }
   return {
     usb: usbIds(port),
     async open({ dtr, rts, ...settings }) {
@@ -59,7 +61,11 @@ export function createWebSerialTransport(port: WebSerialPort): ByteTransport {
       if (session !== generation) throw new Error("Web Serial open was stopped");
       reader = port.readable?.getReader();
       if (!reader) throw new Error("Web Serial port has no readable stream");
-      reading = pump(reader);
+      const active = reader;
+      reading = pump(active, (bytes) => data.forEach((listener) => listener(bytes))).finally(() => {
+        reader = undefined;
+        if (!closing) closed.forEach((listener) => listener());
+      });
     },
     async write(bytes) {
       const active = port.writable?.getWriter();

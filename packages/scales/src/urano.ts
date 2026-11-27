@@ -18,6 +18,22 @@ function decodeRecord(frame: string): ScaleReading | undefined {
   };
 }
 
+/** Find a complete frame or keep only bytes that can start the next one. */
+function consume(buffer: string): { rest: string; wait?: true; reading?: ScaleReading } {
+  const start = buffer.indexOf(START);
+  if (start < 0) return { rest: buffer.slice(1 - START.length), wait: true };
+  const pending = buffer.slice(start);
+  const end = pending.indexOf(END, START.length);
+  const nextStart = pending.indexOf(START, START.length);
+  if (nextStart >= 0 && (end < 0 || nextStart < end)) return { rest: pending.slice(nextStart) };
+  if (end < 0) {
+    return { rest: pending.length > MAX_FRAME_LENGTH ? pending.slice(1 - START.length) : pending, wait: true };
+  }
+  const consumed = end + END.length;
+  const reading = consumed <= MAX_FRAME_LENGTH ? decodeRecord(pending.slice(0, consumed)) : undefined;
+  return { rest: pending.slice(consumed), reading };
+}
+
 export function createUranoParser(): ScaleParser {
   let pending = "";
   return {
@@ -25,28 +41,10 @@ export function createUranoParser(): ScaleParser {
       for (const byte of bytes) pending += String.fromCharCode(byte);
       const readings: ScaleReading[] = [];
       while (pending.length >= START.length) {
-        const start = pending.indexOf(START);
-        if (start < 0) {
-          pending = pending.slice(1 - START.length);
-          break;
-        }
-        pending = pending.slice(start);
-        const end = pending.indexOf(END, START.length);
-        const nextStart = pending.indexOf(START, START.length);
-        if (nextStart >= 0 && (end < 0 || nextStart < end)) {
-          pending = pending.slice(nextStart);
-          continue;
-        }
-        if (end < 0) {
-          if (pending.length > MAX_FRAME_LENGTH) pending = pending.slice(1 - START.length);
-          break;
-        }
-        const consumed = end + END.length;
-        if (consumed <= MAX_FRAME_LENGTH) {
-          const reading = decodeRecord(pending.slice(0, consumed));
-          if (reading) readings.push(reading);
-        }
-        pending = pending.slice(consumed);
+        const { rest, wait, reading } = consume(pending);
+        pending = rest;
+        if (reading) readings.push(reading);
+        if (wait) break;
       }
       return readings;
     },
