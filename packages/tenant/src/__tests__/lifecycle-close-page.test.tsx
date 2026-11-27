@@ -21,6 +21,7 @@ import {
   view,
   wordsNotFromPack,
   type HostState,
+  focusOn,
 } from './lifecycle-react-fixtures';
 
 afterEach(cleanup);
@@ -47,7 +48,7 @@ function expectOnlyPackWords(values: readonly string[] = []): void {
 }
 
 describe('the close page, open tenant (K-P5…K-P8)', () => {
-  it('shows the three cards in order, framed as eligible, every word from the pack', () => {
+  it('shows the three cards in order, framed as eligible, every word from the pack', async () => {
     page(hostState());
     const cards = ['close-pending', 'close-data', 'close-act'].map((id) => screen.getByTestId(id));
     expect(cards[0]?.compareDocumentPosition(cards[1] as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -55,7 +56,7 @@ describe('the close page, open tenant (K-P5…K-P8)', () => {
     expect(screen.getByTestId('host-frame').dataset.eligible).toBe('true');
     expect(screen.getByText('«h.pendingNone»')).toBeTruthy();
     expect(screen.getByTestId('close-ward-open').hasAttribute('disabled')).toBe(false);
-    expect(screen.queryByTestId('close-missing')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('close-missing')).toBeNull());
     expectOnlyPackWords();
   });
 
@@ -76,7 +77,7 @@ describe('the close page, open tenant (K-P5…K-P8)', () => {
     fireEvent.click(screen.getByTestId('close-data-export'));
     const preparing = await screen.findByTestId('close-data-preparing');
     expect(preparing.getAttribute('role')).toBe('status');
-    expect(document.activeElement).toBe(preparing);
+    await waitFor(() => expect(document.activeElement).toBe(preparing));
     expect(screen.getByTestId('close-data-export').hasAttribute('disabled')).toBe(true);
     expect(host.exportRun).toHaveBeenCalledTimes(1);
   });
@@ -106,17 +107,17 @@ describe('the close page, open tenant (K-P5…K-P8)', () => {
 });
 
 describe('the close dialog (K-D)', () => {
-  function openDialog(host = hostState()) {
+  async function openDialog(host = hostState()) {
     const utils = page(host);
     const opener = screen.getByTestId('close-ward-open');
-    opener.focus();
+    await focusOn(opener);
     fireEvent.click(opener);
     return { ...utils, opener };
   }
   const confirmButton = () => screen.getByRole('button', { name: '«h.closeAction»' });
 
   it('opens with the pack words, the undo note first, and focus on the way back (K-D1…K-D3)', async () => {
-    openDialog();
+    await openDialog();
     const dialog = await screen.findByTestId('close-ward-dialog');
     expect(dialog.textContent).toContain('«h.dialogTitle»');
     expect(dialog.textContent).toContain(`«h.dialogBody(${NAME})»`);
@@ -127,7 +128,7 @@ describe('the close dialog (K-D)', () => {
 
   it('lights the confirm only with a reason, the name as the server compares it and the PIN (K-D5, K-D7)', async () => {
     const off = () => confirmButton().hasAttribute('disabled') || confirmButton().getAttribute('aria-disabled') === 'true';
-    openDialog(hostState());
+    await openDialog(hostState());
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'ab' } });
     fireEvent.change(field('close-ward-name'), { target: { value: '  hospital   SANTA clara ' } });
@@ -138,7 +139,7 @@ describe('the close dialog (K-D)', () => {
     expect(off()).toBe(true);
     expect(screen.getByText(`«h.nameMismatch» «h.nameHint(${NAME})»`)).toBeTruthy();
     cleanup();
-    openDialog(hostState({ pin: pin({ ready: false }) }));
+    await openDialog(hostState({ pin: pin({ ready: false }) }));
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'moving' } });
     fireEvent.change(field('close-ward-name'), { target: { value: NAME } });
@@ -147,7 +148,7 @@ describe('the close dialog (K-D)', () => {
 
   it('confirms the PIN first, sends the trimmed reason and the typed name, and closes (K-D7)', async () => {
     const host = hostState();
-    openDialog(host);
+    await openDialog(host);
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: '  moving  ' } });
     fireEvent.change(field('close-ward-name'), { target: { value: NAME } });
@@ -159,7 +160,7 @@ describe('the close dialog (K-D)', () => {
 
   it("keeps the dialog and says the server's refusal when the close is refused (K-D7)", async () => {
     const host = hostState({ closeRun: vi.fn(async () => Promise.reject(new Error('still busy'))) });
-    openDialog(host);
+    await openDialog(host);
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'moving' } });
     fireEvent.change(field('close-ward-name'), { target: { value: NAME } });
@@ -169,7 +170,7 @@ describe('the close dialog (K-D)', () => {
 
   it('sends nothing when the PIN is refused', async () => {
     const host = hostState({ pin: pin({ confirm: vi.fn(async () => false) }) });
-    openDialog(host);
+    await openDialog(host);
     await screen.findByTestId('close-ward-dialog');
     fireEvent.change(field('close-ward-reason'), { target: { value: 'moving' } });
     fireEvent.change(field('close-ward-name'), { target: { value: NAME } });
@@ -194,27 +195,27 @@ describe('the close dialog (K-D)', () => {
 
   it('cannot be closed while the close is with the server (K-D7)', async () => {
     const host = hostState({ closeRun: vi.fn(() => new Promise<unknown>(() => undefined)) });
-    openDialog(host);
+    await openDialog(host);
     const dialog = await screen.findByTestId('close-ward-dialog');
     fill();
     fireEvent.click(confirmButton());
     await waitFor(() => expect(host.closeRun).toHaveBeenCalledTimes(1));
     tryEveryWayOut(dialog);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Each way out answers synchronously (the dialog is unmounted in the same act), so a dialog still here stayed.
     expect(screen.getByTestId('close-ward-dialog')).toBeTruthy();
   });
 
   it('cannot be closed while the PIN is with the server (K-D7)', async () => {
-    openDialog(hostState({ pin: pin({ busy: true }) }));
+    await openDialog(hostState({ pin: pin({ busy: true }) }));
     const dialog = await screen.findByTestId('close-ward-dialog');
     expect(screen.getByRole('button', { name: '«h.closeLabel»' })).toBeTruthy();
     tryEveryWayOut(dialog);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Each way out answers synchronously (the dialog is unmounted in the same act), so a dialog still here stayed.
     expect(screen.getByTestId('close-ward-dialog')).toBeTruthy();
   });
 
   it('closes on Escape and returns focus to its opener (K-D8)', async () => {
-    const { opener } = openDialog();
+    const { opener } = await openDialog();
     const dialog = await screen.findByTestId('close-ward-dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByTestId('close-ward-dialog')).toBeNull());
@@ -231,12 +232,12 @@ describe('the close page, other states (K-P9…K-P12)', () => {
     expectOnlyPackWords(['D[2026-11-26]', 'D[2026-12-26]']);
   });
 
-  it('focuses the closing heading when the page saw the tenant open first (K-P10)', () => {
+  it('focuses the closing heading when the page saw the tenant open first (K-P10)', async () => {
     const host = hostState();
     const { rerender, screens } = page(host);
     host.view = query(CLOSING);
     rerender(<screens.ClosePage slug="north" copy={copy} />);
-    expect(document.activeElement).toBe(screen.getByTestId('close-closing-heading'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('close-closing-heading')));
   });
 
   it('reopens and says live again, or still suspended, by the answered status (K-P12)', async () => {
@@ -254,7 +255,7 @@ describe('the close page, other states (K-P9…K-P12)', () => {
   it('after a reopen to the open tenant, focus goes to the first card, never to <body>', async () => {
     const host = hostState({ view: query(CLOSING) });
     const opened = page(host);
-    act(() => screen.getByTestId('close-reopen').focus());
+    await focusOn(screen.getByTestId('close-reopen'));
     host.view = query(view());
     opened.rerender(<opened.screens.ClosePage slug="north" copy={copy} />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('close-pending')));
@@ -266,7 +267,7 @@ describe('the close page, other states (K-P9…K-P12)', () => {
     expect((await screen.findByTestId('close-reopen-error')).textContent).toContain('nope');
   });
 
-  it('neither open nor closing: the not-closable notice; after a reopen to a hold, its title says so with focus (K-P9)', () => {
+  it('neither open nor closing: the not-closable notice; after a reopen to a hold, its title says so with focus (K-P9)', async () => {
     page(hostState({ view: query(view({ status: 'ON_HOLD' })) }));
     expect(screen.getByTestId('close-not-closable').textContent).toContain('«h.notClosableTitle»');
     expect(screen.getByTestId('close-not-closable').textContent).toContain('«h.notClosableBody»');
@@ -277,14 +278,14 @@ describe('the close page, other states (K-P9…K-P12)', () => {
     next.rerender(<next.screens.ClosePage slug="north" copy={copy} />);
     const notice = screen.getByTestId('close-not-closable');
     expect(notice.textContent).toContain('«h.reopenedSuspended»');
-    expect(document.activeElement?.contains(notice)).toBe(true);
+    await waitFor(() => expect(document.activeElement?.contains(notice)).toBe(true));
   });
 
-  it('closed: the one notice, nothing else (K-P11)', () => {
+  it('closed: the one notice, nothing else (K-P11)', async () => {
     page(hostState({ view: query(view({ status: 'SHUT' })) }));
     expect(screen.getByTestId('close-closed').textContent).toContain('«h.closedTitle»');
-    expect(screen.queryByTestId('close-data')).toBeNull();
-    expect(screen.queryByTestId('close-reopen')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('close-data')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('close-reopen')).toBeNull());
     expectOnlyPackWords();
   });
 });
@@ -333,37 +334,43 @@ describe('the closing banner (K-B)', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it('asks only for a holder, and draws nothing for an open tenant (K-B1)', () => {
+  it('asks only for a holder, and draws nothing for an open tenant (K-B1)', async () => {
     const host = hostState({ holds: false });
     banner(host);
     expect(host.stateEnabled).toEqual([false]);
-    expect(screen.queryByTestId('closing-banner')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('closing-banner')).toBeNull());
   });
 
-  it('hides on the close page itself (K-B2)', () => {
+  it('hides on the close page itself (K-B2)', async () => {
     banner(hostState({ state: closingState, pathname: '/north/settings/wind-down/' }));
-    expect(screen.queryByTestId('closing-banner')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('closing-banner')).toBeNull());
   });
 });
 
 describe('the refusals (K-R)', () => {
+  afterEach(() => {
+    // The watch patches the page's fetch once per page: give each case a fresh one.
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(window, '__tenantReadOnlyWatch');
+  });
+
   it('reads the host codes on a 403 only', () => {
-    const screens = createClosingScreens(closingConfig(hostState()));
-    expect(screens.closingRefusalOf(answered(403, 'x', { code: 'WARD_SHUT' }))).toBe('closed');
-    expect(screens.closingRefusalOf(answered(403, 'x', { code: 'WARD_WINDING_DOWN' }))).toBe('closing');
-    expect(screens.closingRefusalOf(answered(403, 'x', { code: 'WARD_READ_ONLY' }))).toBe('readOnly');
-    expect(screens.closingRefusalOf(answered(409, 'x', { code: 'WARD_SHUT' }))).toBeNull();
-    expect(screens.closingRefusalOf(answered(403, 'x', { code: 'OTHER' }))).toBeNull();
-    expect(screens.closingRefusalOf(new Error('offline'))).toBeNull();
+    const readers = createClosingScreens(closingConfig(hostState()));
+    expect(readers.closingRefusalOf(answered(403, 'x', { code: 'WARD_SHUT' }))).toBe('closed');
+    expect(readers.closingRefusalOf(answered(403, 'x', { code: 'WARD_WINDING_DOWN' }))).toBe('closing');
+    expect(readers.closingRefusalOf(answered(403, 'x', { code: 'WARD_READ_ONLY' }))).toBe('readOnly');
+    expect(readers.closingRefusalOf(answered(409, 'x', { code: 'WARD_SHUT' }))).toBeNull();
+    expect(readers.closingRefusalOf(answered(403, 'x', { code: 'OTHER' }))).toBeNull();
+    expect(readers.closingRefusalOf(new Error('offline'))).toBeNull();
   });
 
   it('raises one read-only toast with the way to the close page under the host paths (K-R2)', () => {
     const toast = vi.fn();
     const navigate = vi.fn();
-    const screens = createClosingScreens(closingConfig(hostState(), toast, navigate));
+    const readers = createClosingScreens(closingConfig(hostState(), toast, navigate));
     window.history.pushState({}, '', '/console/north/wards');
-    screens.interceptReadOnly(answered(403, 'read only now', { code: 'WARD_READ_ONLY' }), { seeClosing: '«h.seeClosing»' });
-    screens.interceptReadOnly(answered(403, 'other', { code: 'WARD_SHUT' }), { seeClosing: '«h.seeClosing»' });
+    readers.interceptReadOnly(answered(403, 'read only now', { code: 'WARD_READ_ONLY' }), { seeClosing: '«h.seeClosing»' });
+    readers.interceptReadOnly(answered(403, 'other', { code: 'WARD_SHUT' }), { seeClosing: '«h.seeClosing»' });
     expect(toast).toHaveBeenCalledTimes(1);
     const [message, options] = toast.mock.calls[0] as [string, { actions: { label: string; onClick: () => void }[] }];
     expect(message).toBe('read only now');
@@ -378,21 +385,21 @@ describe('the refusals (K-R)', () => {
     expect(options.actions[0]?.label).toBe('«h.seeClosing»');
     options.actions[0]?.onClick();
     expect(navigate).toHaveBeenCalledWith('/console/north/settings/wind-down');
-    expect(screens.closePagePath('north')).toBe('/console/north/settings/wind-down');
+    expect(readers.closePagePath('north')).toBe('/console/north/settings/wind-down');
   });
 
   it("watches the app's own writes once, reading a clone (K-R2)", async () => {
     const toast = vi.fn();
-    const screens = createClosingScreens(closingConfig(hostState(), toast));
+    const readers = createClosingScreens(closingConfig(hostState(), toast));
     const body = JSON.stringify({ code: 'WARD_READ_ONLY', error: 'read only now' });
     const fetchMock = vi.fn(async () => {
       const response = new Response(body, { status: 403 });
       Object.defineProperty(response, 'url', { value: 'http://x/api/console/north/beds' });
       return response;
     });
-    window.fetch = fetchMock as unknown as typeof window.fetch;
-    screens.watchReadOnlyWrites(() => ({ seeClosing: '«h.seeClosing»' }));
-    screens.watchReadOnlyWrites(() => ({ seeClosing: '«h.seeClosing»' }));
+    vi.stubGlobal('fetch', fetchMock);
+    readers.watchReadOnlyWrites(() => ({ seeClosing: '«h.seeClosing»' }));
+    readers.watchReadOnlyWrites(() => ({ seeClosing: '«h.seeClosing»' }));
     const response = await act(async () => window.fetch('/api/console/north/beds', { method: 'POST' }));
     expect(await response.json()).toEqual({ code: 'WARD_READ_ONLY', error: 'read only now' });
     await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
@@ -402,18 +409,18 @@ describe('the refusals (K-R)', () => {
 
   it('sends a member to the one other tenant, the picker, or signs out (K-R3)', () => {
     const navigate = vi.fn();
-    const screens = createClosingScreens(closingConfig(hostState(), vi.fn(), navigate));
-    expect(screens.switchTarget(['south'])).toBe('/console/south');
-    expect(screens.switchTarget(['south', 'east'])).toBe('/console/');
-    expect(screens.switchTarget([])).toBeNull();
+    const readers = createClosingScreens(closingConfig(hostState(), vi.fn(), navigate));
+    expect(readers.switchTarget(['south'])).toBe('/console/south');
+    expect(readers.switchTarget(['south', 'east'])).toBe('/console/');
+    expect(readers.switchTarget([])).toBeNull();
     const onSignOut = vi.fn();
-    render(<screens.TenantGoneScreen refusal="closed" otherSlugs={[]} onSignOut={onSignOut} copy={copy} />);
+    render(<readers.TenantGoneScreen refusal="closed" otherSlugs={[]} onSignOut={onSignOut} copy={copy} />);
     expect(screen.getByTestId('ward-gone-screen').textContent).toContain('«h.refusedClosedTitle»');
     fireEvent.click(screen.getByRole('button', { name: '«h.signOut»' }));
     expect(onSignOut).toHaveBeenCalledTimes(1);
     expectOnlyPackWords();
     cleanup();
-    render(<screens.TenantGoneScreen refusal="closing" otherSlugs={['south']} onSignOut={onSignOut} copy={copy} />);
+    render(<readers.TenantGoneScreen refusal="closing" otherSlugs={['south']} onSignOut={onSignOut} copy={copy} />);
     expect(screen.getByTestId('ward-gone-screen').textContent).toContain('«h.refusedClosingBody»');
     fireEvent.click(screen.getByRole('button', { name: '«h.switchTenant»' }));
     expect(navigate).toHaveBeenCalledWith('/console/south');

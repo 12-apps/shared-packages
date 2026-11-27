@@ -6,10 +6,10 @@
  * package's (the T lines are the host's copy).
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createPlatformArchive, type TenantClosingBlocker, type TenantQuery } from '../lifecycle/react';
-import { HOSPITAL_PACK as copy, NAME, pin, platformConfig, query, wordsNotFromPack } from './lifecycle-react-fixtures';
+import { HOSPITAL_PACK as copy, NAME, deferred, focusOn, pin, platformConfig, query, wordsNotFromPack } from './lifecycle-react-fixtures';
 
 afterEach(cleanup);
 
@@ -53,22 +53,22 @@ const reasonField = () => {
 };
 
 describe('the archive confirmation', () => {
-  it('E5, T: nothing pending — every word from the pack, no count beside the actions', () => {
+  it('E5, T: nothing pending — every word from the pack, no count beside the actions', async () => {
     panel();
     expect(screen.getByTestId('archive-panel').getAttribute('aria-label')).toBe(`«h.platformArchiveTitle(${NAME})»`);
     expect(screen.getByTestId('archive-pending-none').textContent).toBe('«h.platformPendingNone»');
-    expect(screen.queryByTestId('archive-missing')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-missing')).toBeNull());
     expect(screen.getByTestId('archive-undo').textContent).toBe(`«h.platformUndo(${PURGE})»`);
     expect(screen.getByTestId('archive-fact-email').querySelector('b')?.textContent).toBe(SHORT);
     expect(screen.getByTestId('archive-fact-purge').querySelector('b')?.textContent).toBe(PURGE);
     expect(wordsNotFromPack(document.body.textContent ?? '', [NAME, PURGE, SHORT])).toBe('');
   });
 
-  it('E4, R5: a blocker — read-only rows with the hint, the confirm held, the count beside it', () => {
+  it('E4, R5: a blocker — read-only rows with the hint, the confirm held, the count beside it', async () => {
     panel({ blockers: query<readonly TenantClosingBlocker[]>(ONE_BLOCKER) });
     const row = screen.getByTestId('archive-blocker-admissions');
     expect(row.textContent).toBe('«h.blocker(admissions|2)»');
-    expect(row.querySelector('a, button')).toBeNull();
+    await waitFor(() => expect(row.querySelector('a, button')).toBeNull());
     expect(screen.getByTestId('archive-pending-hint').textContent).toBe('«h.platformPendingHint»');
     fireEvent.change(reasonField(), { target: { value: 'asked by phone' } });
     expect(isOff(confirm())).toBe(true);
@@ -135,8 +135,8 @@ describe('the archive confirmation', () => {
   });
 
   it('E16: while the act is with the server, nothing closes it', async () => {
-    let finish: () => void = () => undefined;
-    const opened = panel({ onConfirm: () => new Promise<void>((resolve) => (finish = resolve)) });
+    const gate = deferred();
+    const opened = panel({ onConfirm: () => gate.promise });
     fireEvent.change(reasonField(), { target: { value: 'asked by phone' } });
     fireEvent.click(confirm());
     await waitFor(() => expect(opened.onConfirm).toHaveBeenCalledTimes(1));
@@ -145,7 +145,7 @@ describe('the archive confirmation', () => {
     expect(confirm().getAttribute('aria-busy')).toBe('true');
     fireEvent.click(screen.getByTestId('host-veil'));
     expect(opened.onClose).not.toHaveBeenCalled();
-    finish();
+    gate.resolve();
     await waitFor(() => expect(opened.onClose).toHaveBeenCalledTimes(1));
   });
 
@@ -190,7 +190,7 @@ describe('the archive confirmation', () => {
     expect(screen.getByTestId('archive-back').dataset.variant).toBe('outline');
   });
 
-  it('opens empty again after it closed', () => {
+  it('opens empty again after it closed', async () => {
     const archive = createPlatformArchive(platformConfig());
     const props = {
       name: NAME,
@@ -205,7 +205,7 @@ describe('the archive confirmation', () => {
     const { rerender } = render(<archive.ArchivePanel open {...props} />);
     fireEvent.change(reasonField(), { target: { value: 'asked by phone' } });
     rerender(<archive.ArchivePanel open={false} {...props} />);
-    expect(screen.queryByTestId('archive-panel')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-panel')).toBeNull());
     rerender(<archive.ArchivePanel open {...props} />);
     expect(reasonField().value).toBe('');
   });
@@ -258,7 +258,7 @@ describe('the archive card', () => {
     expect(screen.getByTestId('archive-open')).toBeTruthy();
   });
 
-  it('E8, C9: archived — who, when (bold) and why, the deletion day (bold), and the restore', () => {
+  it('E8, C9: archived — who, when (bold) and why, the deletion day (bold), and the restore', async () => {
     const shown = card({
       status: 'WINDING_DOWN',
       archived: { day: '26/11/2026', actor: 'Admin User', byPlatform: true, reason: 'asked by phone' },
@@ -272,7 +272,7 @@ describe('the archive card', () => {
     expect(restore.textContent).toBe('«h.platformRestore»');
     fireEvent.click(restore);
     expect(shown.onRestore).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('archive-open')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-open')).toBeNull());
   });
 
   it('Q3: archived by the owner — no actor, not on their behalf', () => {
@@ -280,12 +280,12 @@ describe('the archive card', () => {
     expect(screen.getByTestId('archive-archived').textContent).toContain('"actor":null,"byPlatform":false');
   });
 
-  it('E10: not approved yet, or purged — no card', () => {
+  it('E10: not approved yet, or purged — no card', async () => {
     card({ status: 'AWAITING_REVIEW' });
-    expect(screen.queryByTestId('archive-card')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-card')).toBeNull());
     cleanup();
     card({ status: 'SHUT' });
-    expect(screen.queryByTestId('archive-card')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-card')).toBeNull());
   });
 
   describe('B1: focus when the card turns over under the person', () => {
@@ -309,98 +309,91 @@ describe('the archive card', () => {
     }
     const archiveScreens = createPlatformArchive(platformConfig());
 
-    it('takes no focus on its first render', () => {
+    const focused = (node: Element) => waitFor(() => expect(document.activeElement).toBe(node));
+
+    it('takes no focus on its first render', async () => {
       render(cardAt('OPEN'));
-      expect(document.activeElement).toBe(document.body);
+      await focused(document.body);
     });
 
     it('archive → archived: focus goes to who archived it, not to <body>', async () => {
       const { rerender } = render(cardAt('OPEN'));
-      act(() => screen.getByTestId('archive-open').focus());
+      await focusOn(screen.getByTestId('archive-open'));
       rerender(cardAt('WINDING_DOWN'));
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-archived')));
-    });
-
-    it('archived → archive: an overlay still open keeps focus, and when it closes after the change focus comes here', () => {
-      vi.useFakeTimers();
-      try {
-        const withOverlay = (status: string) => (
-          <>
-            {cardAt(status)}
-            <input data-testid="overlay-field" />
-          </>
-        );
-        const { rerender } = render(withOverlay('WINDING_DOWN'));
-        act(() => screen.getByTestId('overlay-field').focus());
-        rerender(withOverlay('OPEN'));
-        act(() => vi.advanceTimersByTime(100));
-        // The overlay is still open: its field keeps focus.
-        expect(document.activeElement).toBe(screen.getByTestId('overlay-field'));
-        // Then it closes and drops focus to <body>; the watch sends it to the new entry.
-        rerender(cardAt('OPEN'));
-        expect(document.activeElement).toBe(document.body);
-        act(() => vi.advanceTimersByTime(50));
-        expect(document.activeElement).toBe(screen.getByTestId('archive-open'));
-        // The focused button's ripple settles on its own timers.
-        act(() => vi.runOnlyPendingTimers());
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    it('a re-read the person did not cause never takes focus from the field they are typing in', () => {
-      vi.useFakeTimers();
-      try {
-        const withField = (status: string) => (
-          <>
-            {cardAt(status)}
-            <input data-testid="typing" />
-          </>
-        );
-        const { rerender } = render(withField('OPEN'));
-        act(() => screen.getByTestId('typing').focus());
-        rerender(withField('WINDING_DOWN'));
-        act(() => vi.advanceTimersByTime(1_200));
-        expect(document.activeElement).toBe(screen.getByTestId('typing'));
-      } finally {
-        vi.useRealTimers();
-      }
+      await focused(screen.getByTestId('archive-archived'));
     });
 
     it('restored → open without the archive permission: focus goes to the card itself', async () => {
       const { rerender } = render(cardAt('WINDING_DOWN'));
-      act(() => screen.getByTestId('archive-restore').focus());
+      await focusOn(screen.getByTestId('archive-restore'));
       rerender(cardAt('ON_HOLD', { canArchive: false }));
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('archive-card')));
+      await focused(screen.getByTestId('archive-card'));
     });
 
-    it('never takes a focus the person moved elsewhere after the change', () => {
-      vi.useFakeTimers();
-      try {
-        const withButton = (status: string) => (
-          <>
-            {cardAt(status)}
-            <button type="button" data-testid="elsewhere" />
-          </>
-        );
-        const { rerender } = render(withButton('OPEN'));
-        rerender(withButton('WINDING_DOWN'));
-        act(() => screen.getByTestId('elsewhere').focus());
-        act(() => vi.advanceTimersByTime(1_200));
-        expect(document.activeElement).toBe(screen.getByTestId('elsewhere'));
-      } finally {
+    describe('over the watch that follows the change', () => {
+      // Only the watch's own clock (an interval) is faked: Testing Library and the button's ripple keep real timeouts.
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      });
+      afterEach(async () => {
+        // Run the watch out, inside act, before the real clock is back.
+        await act(async () => {
+          vi.runAllTimers();
+        });
         vi.useRealTimers();
+      });
+
+      const withField = (status: string) => (
+        <>
+          {cardAt(status)}
+          <input data-testid="field" />
+        </>
+      );
+      async function advance(ms: number): Promise<void> {
+        await act(async () => {
+          vi.advanceTimersByTime(ms);
+        });
       }
+
+      it('archived → archive: an overlay still open keeps focus, and when it closes after the change focus comes here', async () => {
+        const { rerender } = render(withField('WINDING_DOWN'));
+        await focusOn(screen.getByTestId('field'));
+        rerender(withField('OPEN'));
+        await advance(100);
+        // The overlay is still open: its field keeps focus.
+        await focused(screen.getByTestId('field'));
+        // Then it closes and drops focus to <body>; the watch sends it to the new entry.
+        rerender(cardAt('OPEN'));
+        await focused(document.body);
+        await advance(50);
+        await focused(screen.getByTestId('archive-open'));
+      });
+
+      it('a re-read the person did not cause never takes focus from the field they are typing in', async () => {
+        const { rerender } = render(withField('OPEN'));
+        await focusOn(screen.getByTestId('field'));
+        rerender(withField('WINDING_DOWN'));
+        await advance(1_200);
+        await focused(screen.getByTestId('field'));
+      });
+
+      it('never takes a focus the person moved elsewhere after the change', async () => {
+        const { rerender } = render(cardAt('OPEN'));
+        rerender(withField('WINDING_DOWN'));
+        await focusOn(screen.getByTestId('field'));
+        await advance(1_200);
+        await focused(screen.getByTestId('field'));
+      });
     });
   });
 
-  it('E11: without the permissions, the facts stay and the buttons go', () => {
+  it('E11: without the permissions, the facts stay and the buttons go', async () => {
     card({ canArchive: false });
     expect(screen.getByTestId('archive-pending-none')).toBeTruthy();
-    expect(screen.queryByTestId('archive-open')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-open')).toBeNull());
     cleanup();
     card({ status: 'WINDING_DOWN', canRestore: false, archived: { day: 'd', actor: 'a', byPlatform: true, reason: 'r' } });
     expect(screen.getByTestId('archive-purge')).toBeTruthy();
-    expect(screen.queryByTestId('archive-restore')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('archive-restore')).toBeNull());
   });
 });

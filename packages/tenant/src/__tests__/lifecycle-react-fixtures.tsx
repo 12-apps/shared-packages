@@ -6,6 +6,7 @@
  * Its codes, paths and test-id word are its own too.
  */
 import { forwardRef, useState, type ReactNode } from 'react';
+import { act } from '@testing-library/react';
 import { vi } from 'vitest';
 
 import { TENANT_COPY_SHAPE } from '../config';
@@ -46,10 +47,9 @@ export const HOSPITAL_PACK = Object.fromEntries(
 
 /** Strip every marker and every value the test passed: what is left was not the pack's. */
 export function wordsNotFromPack(text: string, values: readonly string[]): string {
-  let left = text;
   // Markers nest (an emphasis wraps its own marker), so strip from the inside out.
-  for (let round = 0; round < 4; round += 1) left = left.replace(/«h\.[^«»]*»/gu, '');
-  for (const value of values) left = left.split(value).join('');
+  const stripped = [1, 2, 3, 4].reduce((rest) => rest.replace(/«h\.[^«»]*»/gu, ''), text);
+  const left = values.reduce((rest, value) => rest.split(value).join(''), stripped);
   return left.replace(/[\s.,:;|()·-]/gu, '');
 }
 
@@ -217,11 +217,28 @@ export function answered(status: number, message: string, body: unknown = {}): E
 }
 
 /** A copy of a config with the key at a dotted path left out (the copies on the way are shallow). */
-export function withoutKey(config: object, path: string): unknown {
-  const [head, ...rest] = path.split('.');
+export function withoutKey(config: object, dotted: string): unknown {
+  const [head, ...rest] = dotted.split('.');
   const bag = { ...(config as Record<string, unknown>) };
   if (head === undefined) return bag;
   if (rest.length === 0) delete bag[head];
   else bag[head] = withoutKey(bag[head] as object, rest.join('.'));
   return bag;
+}
+
+/** Focus a control the way a keyboard lands on it, inside act. */
+export async function focusOn(node: HTMLElement): Promise<void> {
+  await act(async () => {
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- not a check: the control has to hold focus for real before the state change, the case under test; the assertions read it inside waitFor.
+    node.focus();
+  });
+}
+
+/** A promise the test settles when it chooses: a write still with the server. */
+export function deferred(): { promise: Promise<void>; resolve: () => void } {
+  const handle = { resolve: (): void => undefined };
+  const promise = new Promise<void>((settle) => {
+    handle.resolve = settle;
+  });
+  return { promise, resolve: () => handle.resolve() };
 }
