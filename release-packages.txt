@@ -92,3 +92,5 @@ packages/card-terminal
 # an optional type-only peer and hono an optional peer of its ./hono half), so
 # its position is free. It sits last because it is the newest.
 packages/tenant
+# The scale reader and its transport interfaces have no runtime dependencies.
+packages/scales

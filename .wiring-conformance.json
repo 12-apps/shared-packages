@@ -871,6 +871,10 @@
     "kind": "exempt",
     "why": "contributes no permission ids: who may plan a route is the host's authorize, answered per request against the host's own catalog"
   },
+  "@12-apps/scales": {
+    "kind": "exempt",
+    "why": "library for scale byte transports, model profiles and stable readings. Hosts supply hardware access, configuration and user-facing actions. It contributes no route, schema, job, or other host wiring."
+  },
   "@12-apps/shared-helpers": {
     "kind": "exempt",
     "why": "domain-free utilities (cache, requests, aws, dates) — a deliberately host-wired-free grab bag; the day something here grows a route or a model it graduates into its own package instead"

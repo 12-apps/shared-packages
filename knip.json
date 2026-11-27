@@ -344,6 +344,14 @@
         "playwright-bdd"
       ]
     },
+    "packages/scales": {
+      "entry": [
+        "src/index.ts",
+        "src/android.ts",
+        "src/node.ts",
+        "src/web.ts"
+      ]
+    },
     "packages/shared-helpers": {
       "entry": [
         "src/index.{ts,tsx}",
