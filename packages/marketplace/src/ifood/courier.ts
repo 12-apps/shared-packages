@@ -56,7 +56,7 @@ const VEHICLE_OF: Readonly<Record<string, MarketplaceCourierVehicle>> = {
 /** The longest courier name kept: a longer one is truncated, never refused. */
 export const IFOOD_COURIER_NAME_MAX = 120;
 /** The longest photo URL kept: a longer one is dropped (a truncated URL is a broken one). */
-export const IFOOD_COURIER_PHOTO_URL_MAX = 2048;
+const IFOOD_COURIER_PHOTO_URL_MAX = 2048;
 
 /** An https URL of bounded length, or null: a photo the host renders is never another scheme. */
 function httpsUrl(value: string | null): string | null {

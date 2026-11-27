@@ -115,7 +115,7 @@ interface TrackedAcceptance {
  * courier is assigned; `unsupported` with no call for an order the engine does
  * not hold, a marketplace with no tracking, or a bag the store carries itself.
  */
-export async function readCourierTracking(
+async function readCourierTracking(
   ctx: EngineContext,
   input: { clientId: string; orderId: string },
 ): Promise<CourierTrackingResult> {
